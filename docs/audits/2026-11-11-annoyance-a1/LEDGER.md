@@ -57,11 +57,11 @@ The annoyance is around that path, and it has four causes:
 | A4-P2-6 | **Ctrl+S does nothing inside Design Studio or Image Studio** (in a browser it opens "Save page as") | Every Studio session | ADR-242, 272 | fixed (ADR-706): reproduced; Ctrl+S is always consumed and one line says what to do first. Nothing is saved from a Studio |
 | A4-P2-7 | **"More cut settings" greys out with no reason during a job or jog**, and an open draft is closed and dropped | Every job | No | fixed (ADR-706): reproduced; no safety reason found, so the dialog opens during a job and an open draft stays open |
 | A5-P2-1 | **An autosave failure is said once, in an 8 s toast, with no lasting sign** | Rare, but it is the time that matters | No | open |
-| A5-P2-2 | **Jog warnings raise a new long toast on every click** on a machine that has not homed | Every click | Warn-only yes (ADR-232); per-click no | open |
+| A5-P2-2 | **Jog warnings raise a new long toast on every click** on a machine that has not homed | Every click | Warn-only yes (ADR-232); per-click no | fixed (ADR-708): reproduced (ten jogs gave ten 249-character toasts; five queued steps gave five different texts). One rewritten slot, shorter on-screen text without the target coordinates, full text still logged; the jog is still sent unchanged |
 | A5-P2-3 | **Closing with "Don't Save" still brings "Restore it?" at the next launch** | Every unsaved close | ADR-688 decision 3 | PR #1731 (ADR-688 Amd 3) |
 | A5-P2-4 | **The same advisories return on every job** for a correct setup: one per traced image, the `$30` note on every unconnected save, the browser keep-awake text | Every job | ADR-687, 224, 117 Amd 1 | open |
-| A5-P2-5 | **Step-by-step instructions are shown as toasts that vanish** in 4 or 8 s | Each use of those tools | No | open |
-| A5-P2-6 | **Bursts lose messages**: an import or open can raise seven to nine toasts and only three show | Every busy import or open | ADR-687 fixed Save G-code only | open |
+| A5-P2-5 | **Step-by-step instructions are shown as toasts that vanish** in 4 or 8 s | Each use of those tools | No | fixed (ADR-708): reproduced (a 231-character success toast left at 4 s). Lifetime is 2 s plus 60 ms a character, capped at 30 s; the countdown stops under the pointer or keyboard focus. The surfacing and camera-target steps now stay in the Surfacing panel and the wizard's photo step |
+| A5-P2-6 | **Bursts lose messages**: an import or open can raise seven to nine toasts and only three show | Every busy import or open | ADR-687 fixed Save G-code only | fixed (ADR-708): reproduced (seven toasts for one SVG, one per note at File > Open). One keyed toast per SVG file and per project load: the result, up to three notes in the open, the rest folded. A Notices list in the status bar keeps the session's warnings and errors. DXF, HPGL, image and remote imports are unchanged |
 | A5-P2-7 | **Nothing lets a user quieten anything**: no notification setting, no "don't ask again" | Always | No | open |
 
 P3 findings are tabled per area in [REPORT.md](REPORT.md).
@@ -104,7 +104,7 @@ Each group is one fix session. Wording changes keep G-code byte-identical.
 | Group | Findings | Shape of the fix |
 |---|---|---|
 | F1 In-app confirm, alert and prompt | A1-P2-1, A1-P2-3, A1-P2-4, A1-P3-1 to P3-9, A4-P3-5 | A promise-based confirm/alert/prompt built on `kit/Dialog`, replacing `job-aware-dialogs.ts`. It does not freeze the page, so it need not be refused during a job; it gives named buttons, an inline name field and "don't ask again" |
-| F2 Toast store | A5-P2-2, A5-P2-5, A5-P2-6, A5-P3-4, A5-P3-5 | Keyed slots for repeat warnings, lifetime by length, pause on hover, one summary per action, a notice history |
+| F2 Toast store | A5-P2-2, A5-P2-5, A5-P2-6, A5-P3-4, A5-P3-5 | **Done (ADR-708, ADR-611 Amd 3).** Keyed slots for repeat warnings, lifetime by length, pause on hover and focus, one toast per action, a notice history. A5-P3-4: a settings read with nothing to do is a log line, not a toast (reproduced). A5-P3-5: the confirmation toasts are left as they are; a setting for them belongs to F3. Nothing was refuted |
 | F3 Notification settings | A5-P2-7, A5-P2-4, A5-P3-1 to P3-3 | Settings > Notifications; remembered dismissals; "seen" folding for repeat advisories |
 | F4 Keyboard and canvas | A4-P2-2, A4-P2-5, A4-P2-6, A4-P2-3, A4-P2-7 | **Done (ADR-706).** Text-like inputs only block shortcuts; Preview hint and gates; Ctrl+S consumed in modals with a hint; per-item Unlock; Cut Settings opens during a job |
 | F5 Autosave | A4-P2-1, A5-P2-1 | Autosave during a job through the worker; a status chip while the last write failed |

@@ -3,9 +3,10 @@
 // right-aligned web-app Update button when a new version is ready (ADR-227; the
 // desktop update button sits in the toolbar, ADR-561 Amendment 7). In the web
 // app the action rail also links the pricing and policy pages (ADR-524
-// Amendment 3). Job estimate is Phase C. Also hosts the canvas motion status slot (see
-// `status-bar-slots.ts`) so machine-status text lands here instead of on the
-// canvas.
+// Amendment 3), and once a warning or error has been shown it holds the
+// Notices control that lists them again (ADR-708). Job estimate is Phase C.
+// Also hosts the canvas motion status slot (see `status-bar-slots.ts`) so
+// machine-status text lands here instead of on the canvas.
 
 import { transformedBBox, type Project } from '../../core/scene';
 import { useStore } from '../state';
@@ -18,6 +19,7 @@ import {
 } from '../display-length';
 import { selectedOpenFillContourCount } from './fill-diagnostics';
 import { DesktopPreviewUpdateButton } from './DesktopPreviewUpdateButton';
+import { NoticeHistoryButton } from './NoticeHistoryButton';
 import { PwaUpdateButton } from './PwaUpdateButton';
 import { SiteLinks } from './SiteLinks';
 import { EditionStatusButton } from '../licensing/EditionStatusButton';
@@ -79,6 +81,7 @@ export function StatusBar({ children }: { readonly children?: React.ReactNode })
         <span id={CANVAS_MOTION_SLOT_ID} style={slotStyle} />
       </div>
       <div className="lf-status-bar__actions" style={actionsStyle}>
+        <NoticeHistoryButton />
         {children}
         <SiteLinks />
         <EditionStatusButton />

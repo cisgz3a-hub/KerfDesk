@@ -269,14 +269,20 @@ function reportRestoredProject(
   loadResult: ProjectMachineCapabilityLoadResult,
   record: AutosaveDurableSnapshot,
 ): void {
-  const pushToast = useToastStore.getState().pushToast;
-  if (loadResult.kind === 'capability-warning') {
-    pushToast(loadedMachineCapabilityWarningMessage(loadResult.activeKind), 'warning');
-  }
-  pushProjectLoadNotices(record.loadNotices ?? {}, pushToast, {
-    migration: true,
-    project: record.project,
-  });
+  // One toast for what Restore changed (annoyance audit A5-P2-6, ADR-708).
+  pushProjectLoadNotices(
+    record.loadNotices ?? {},
+    useToastStore.getState().pushToast,
+    { migration: true, project: record.project },
+    loadResult.kind === 'capability-warning'
+      ? [
+          {
+            message: loadedMachineCapabilityWarningMessage(loadResult.activeKind),
+            variant: 'warning',
+          },
+        ]
+      : [],
+  );
 }
 
 export function recoveryAgeLabel(savedAt: number): string {

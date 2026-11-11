@@ -38,7 +38,9 @@ describe('openProjectCommand', () => {
     expect(useStore.getState().project.notes).toBe('wrapper-owned document');
     expect(useStore.getState().savedName).toBe('wrapper.lf2');
     expect(useStore.getState().projectOpenRequestEpoch).toBe(1);
-    expect(pushToast).toHaveBeenCalledWith('Opened wrapper.lf2', 'success');
+    expect(pushToast).toHaveBeenCalledWith('Opened wrapper.lf2', 'success', {
+      key: 'project-notices',
+    });
   });
 
   it('opens a LightBurn project on the machine already open, with no machine banner', async () => {

@@ -65,6 +65,8 @@ export function PhotoStep(props: {
   readonly status: PhotoStatus;
   readonly take: () => Promise<void>;
   readonly cancel: () => void;
+  /** What to do before the photo, when the target waits on the canvas. */
+  readonly beforePhoto?: string;
 }): JSX.Element {
   const sourceState = useCameraStore((s) => s.sourceState);
   const setStep = useCameraCalibrationStore((s) => s.setStep);
@@ -76,6 +78,12 @@ export function PhotoStep(props: {
 
   return (
     <div style={columnStyle}>
+      {props.beforePhoto === undefined ? null : (
+        <p role="status" style={noteStyle}>
+          <strong>Next: </strong>
+          {props.beforePhoto}
+        </p>
+      )}
       <p style={noteStyle}>
         {checking ? CHECK_GUIDANCE : 'Leave the engraved sheet exactly where it is. '}
         {headCamera ? HEAD_GUIDANCE : FIXED_GUIDANCE}

@@ -3,6 +3,7 @@ import type { ControllerSettingsSnapshot, GrblSettingRow } from '../../core/cont
 import type { DeviceProfile } from '../../core/devices';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { pushLog } from '../state/laser-store-helpers';
 import { useToastStore } from '../state/toast-store';
 import { describePatch, describeReviewItems } from './DetectedSettingsBanner';
 import { deviceProfileSignature } from './device-setup/device-setup-nudge';
@@ -24,6 +25,12 @@ const announcedReviews = new Map<string, string>();
 // rewrites the card and restarts its timer instead.
 export const DETECTED_SETTINGS_TOAST_KEY = 'machine-settings-detected';
 
+// A read that offers no update and no review item asks nothing of the
+// operator, so it is a console log line and not a toast (annoyance audit
+// A5-P3-4, ADR-611 Amendment 3).
+export const DETECTED_SETTINGS_NOTHING_TO_DO =
+  'Machine settings detected: controller settings were read successfully in Machine Setup.';
+
 export function DetectedSettingsToast(): null {
   const detected = useLaserStore((s) => s.detectedSettings);
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
@@ -42,7 +49,12 @@ export function DetectedSettingsToast(): null {
     if (!shouldAnnounceDetectedSettings(deviceProfileSignature(current, machineKind), args)) {
       return;
     }
-    pushToast(describeDetectedSettingsToast(args), 'info', { key: DETECTED_SETTINGS_TOAST_KEY });
+    const message = describeDetectedSettingsToast(args);
+    if (message === DETECTED_SETTINGS_NOTHING_TO_DO) {
+      useLaserStore.setState((state) => ({ log: pushLog(state, `[lf2] ${message}`) }));
+      return;
+    }
+    pushToast(message, 'info', { key: DETECTED_SETTINGS_TOAST_KEY });
   }, [
     controllerSettings,
     current,
@@ -109,5 +121,5 @@ export function describeDetectedSettingsToast(args: DetectedSettingsArgs): strin
   if (review.ignored.length > 0) {
     return 'Machine settings detected: unknown GRBL settings were read; review Machine Setup.';
   }
-  return 'Machine settings detected: controller settings were read successfully in Machine Setup.';
+  return DETECTED_SETTINGS_NOTHING_TO_DO;
 }

@@ -8,6 +8,12 @@
 // the bed raised an "outside configured machine bounds" warning on every jog
 // of a homed GRBL router; a homed path is compared only through a verified
 // native-to-bed frame (audit jog-home-origin-3).
+//
+// A jog's warnings share one toast slot that is rewritten in place, and its
+// on-screen text leaves out what changes with every click (the target's
+// coordinates) and what the operator cannot act on; the console log keeps each
+// full sentence (annoyance audit A5-P2-2, ADR-708). Ten clicks past the bed
+// edge are one toast, not ten.
 
 import { firstZoneCrossedBySegment } from '../../core/preflight';
 import {
@@ -32,6 +38,11 @@ type GetFn = () => LaserState;
 type JogParams = Parameters<LaserState['jog']>[0];
 type Point = { readonly x: number; readonly y: number };
 type JogXyPath = { readonly start: Point; readonly target: Point };
+/** One finding: the full sentence for the log, the short one for the screen. */
+type JogWarning = { readonly log: string; readonly toast: string };
+
+/** The one toast slot every jog warning is written to. */
+export const JOG_POLICY_TOAST_KEY = 'jog-motion-policy';
 
 /** `start` overrides the reported position for a step queued behind running
  *  steps, which starts where they end (ADR-674); null there means unknown. */
@@ -43,14 +54,16 @@ export function warnJogMotionPolicy(
 ): void {
   const path = resolveJogXyPath(get, params, start);
   if (path === null) {
-    warnUnresolvedJogXyPath(set, get, params);
+    publishJogWarnings(set, get, [unresolvedJogXyPathWarning(params)]);
     return;
   }
   const device = useStore.getState().project.device;
   const bedPath = bedJogPath(get(), device, path);
   if (bedPath === null) return;
-  warnJogTargetOutsideConfiguredBounds(set, get, device, bedPath.target);
-  warnJogNoGoZoneCrossing(set, get, device, bedPath);
+  publishJogWarnings(set, get, [
+    jogTargetOutsideConfiguredBoundsWarning(device, bedPath.target),
+    jogNoGoZoneCrossingWarning(device, bedPath),
+  ]);
 }
 
 // The path in bed coordinates, or null when no bed comparison is meaningful.
@@ -126,12 +139,10 @@ function resolveJogXyPath(
   return { start, target };
 }
 
-function warnJogTargetOutsideConfiguredBounds(
-  set: SetFn,
-  get: GetFn,
+function jogTargetOutsideConfiguredBoundsWarning(
   device: DeviceProfile,
   target: Point,
-): void {
+): JogWarning | null {
   const bounds = configuredMotionBounds(device);
   if (
     target.x >= bounds.minX &&
@@ -139,47 +150,61 @@ function warnJogTargetOutsideConfiguredBounds(
     target.y >= bounds.minY &&
     target.y <= bounds.maxY
   ) {
-    return;
+    return null;
   }
-  const message =
-    `Jog target X${target.x.toFixed(3)} Y${target.y.toFixed(3)} is outside the ` +
-    `configured machine bounds X${bounds.minX.toFixed(3)}..${bounds.maxX.toFixed(3)}, ` +
+  const outside =
+    `is outside the configured machine bounds X${bounds.minX.toFixed(3)}..${bounds.maxX.toFixed(3)}, ` +
     `Y${bounds.minY.toFixed(3)}..${bounds.maxY.toFixed(3)}. Controller limits still apply.`;
-  publishMotionPolicyWarning(set, get, message);
+  return {
+    log: `Jog target X${target.x.toFixed(3)} Y${target.y.toFixed(3)} ${outside}`,
+    // No target coordinates: they change with every click, and the position
+    // readout already shows them.
+    toast: `Jog target ${outside}`,
+  };
 }
 
-function warnUnresolvedJogXyPath(set: SetFn, get: GetFn, params: JogParams): void {
-  if (params.dx === undefined && params.dy === undefined) return;
-  publishMotionPolicyWarning(
-    set,
-    get,
-    'The current machine XY position is unresolved, so KerfDesk cannot compare this jog path with configured bounds or no-go zones. The requested controller jog will be sent unchanged; monitor the move and use Cancel Jog or the physical E-stop if needed.',
-  );
+function unresolvedJogXyPathWarning(params: JogParams): JogWarning | null {
+  if (params.dx === undefined && params.dy === undefined) return null;
+  return {
+    log: 'The current machine XY position is unresolved, so KerfDesk cannot compare this jog path with configured bounds or no-go zones. The requested controller jog will be sent unchanged; monitor the move and use Cancel Jog or the physical E-stop if needed.',
+    toast:
+      'The machine XY position is unresolved, so this jog is not checked against the configured bounds or no-go zones. It is sent unchanged.',
+  };
 }
 
 // DEV-04 / ADR-232: configured no-go zones are operator guidance. Frame is the
 // sole ordinary policy guard, so a direct jog crossing produces the same
 // prominent warning as other configured-envelope findings and never rewrites
 // or refuses the requested controller command.
-function warnJogNoGoZoneCrossing(
-  set: SetFn,
-  get: GetFn,
-  device: DeviceProfile,
-  path: JogXyPath,
-): void {
-  if (path.start.x === path.target.x && path.start.y === path.target.y) return;
+function jogNoGoZoneCrossingWarning(device: DeviceProfile, path: JogXyPath): JogWarning | null {
+  if (path.start.x === path.target.x && path.start.y === path.target.y) return null;
   const zones = device.noGoZones;
-  if (zones === undefined || zones.length === 0) return;
+  if (zones === undefined || zones.length === 0) return null;
   const zone = firstZoneCrossedBySegment(path.start, path.target, zones);
-  if (zone === null) return;
-  publishMotionPolicyWarning(
-    set,
-    get,
-    `This jog path crosses the configured no-go zone "${zone.name}". The requested controller jog will be sent unchanged; monitor the move and use Cancel Jog or the physical E-stop if needed.`,
-  );
+  if (zone === null) return null;
+  const crosses = `This jog path crosses the configured no-go zone "${zone.name}".`;
+  return {
+    log: `${crosses} The requested controller jog will be sent unchanged; monitor the move and use Cancel Jog or the physical E-stop if needed.`,
+    toast: `${crosses} It is sent unchanged; use Cancel Jog to stop it.`,
+  };
 }
 
-/** Warn-only motion guidance: a toast plus the console log (ADR-232). */
+// Warn-only (ADR-232): the jog is never refused or changed here. Each finding
+// is logged in full; the screen gets one slot holding this jog's findings, so
+// a second finding cannot overwrite the first and a repeat rewrites in place.
+function publishJogWarnings(set: SetFn, get: GetFn, found: ReadonlyArray<JogWarning | null>): void {
+  const warnings = found.filter((warning): warning is JogWarning => warning !== null);
+  if (warnings.length === 0) return;
+  useToastStore
+    .getState()
+    .pushToast(warnings.map((warning) => warning.toast).join(' '), 'warning', {
+      key: JOG_POLICY_TOAST_KEY,
+    });
+  for (const warning of warnings) set({ log: pushLog(get(), `[lf2] ${warning.log}`) });
+}
+
+/** Warn-only motion guidance: a toast plus the console log (ADR-232). A Frame's
+ *  route warnings use it; a jog's go through one rewritten slot instead. */
 export function publishMotionPolicyWarning(set: SetFn, get: GetFn, message: string): void {
   useToastStore.getState().pushToast(message, 'warning');
   set({ log: pushLog(get(), `[lf2] ${message}`) });

@@ -7,6 +7,9 @@ import { projectAutosaveService } from '../state/autosave-durable';
 import { AUTOSAVE_FILE_CLEANUP_WARNING } from './autosave-file-cleanup';
 import { handleOpenProject } from './file-actions';
 
+// "Opened" goes to the project's one notice slot (ADR-708).
+const OPENED_SLOT = { key: 'project-notices' };
+
 type Deferred<T> = {
   readonly promise: Promise<T>;
   readonly resolve: (value: T) => void;
@@ -116,10 +119,9 @@ describe('project Open request ownership', () => {
     expect(setProject).toHaveBeenCalledWith(expect.objectContaining({ notes: 'newer document' }));
     expect(markLoaded).toHaveBeenCalledOnce();
     expect(markLoaded).toHaveBeenCalledWith('newer.lf2');
-    expect(pushToast).toHaveBeenCalledWith('Opened newer.lf2', 'success');
-    expect(pushToast).not.toHaveBeenCalledWith(
-      expect.stringContaining('older.lf2'),
-      expect.anything(),
+    expect(pushToast).toHaveBeenCalledWith('Opened newer.lf2', 'success', OPENED_SLOT);
+    expect(pushToast.mock.calls.map(([message]) => String(message)).join(' ')).not.toContain(
+      'older.lf2',
     );
   });
 
@@ -207,7 +209,7 @@ describe('project Open request ownership', () => {
     });
 
     expect(markLoaded).toHaveBeenCalledWith('current.lf2');
-    expect(pushToast).toHaveBeenCalledWith('Opened current.lf2', 'success');
+    expect(pushToast).toHaveBeenCalledWith('Opened current.lf2', 'success', OPENED_SLOT);
   });
 
   it('silences a deferred autosave cleanup warning after a later New document', async () => {
@@ -237,7 +239,7 @@ describe('project Open request ownership', () => {
       await cleanup.promise;
       await Promise.resolve();
 
-      expect(pushToast).toHaveBeenCalledWith('Opened current.lf2', 'success');
+      expect(pushToast).toHaveBeenCalledWith('Opened current.lf2', 'success', OPENED_SLOT);
       expect(pushToast).not.toHaveBeenCalledWith(AUTOSAVE_FILE_CLEANUP_WARNING, 'warning');
     } finally {
       clearCurrent.mockRestore();

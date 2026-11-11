@@ -3,7 +3,7 @@ import { saveSurfacingProgram } from './save-surfacing-program';
 
 type Options = Omit<
   Parameters<typeof saveSurfacingProgram>[0],
-  'signal' | 'onChoosing' | 'onFinalizing' | 'isCurrent'
+  'signal' | 'onChoosing' | 'onFinalizing' | 'onSaved' | 'isCurrent'
 >;
 type Phase = 'preparing' | 'choosing' | 'finalizing' | null;
 type SaveOwner = { readonly controller: AbortController; finalizing: boolean };
@@ -15,11 +15,15 @@ export function useSurfacingSave(
   readonly save: () => void;
   readonly cancel: () => void;
   readonly phase: Phase;
+  /** A file was written for this project since the panel opened. */
+  readonly saved: boolean;
 } {
   const activeSave = useRef<SaveOwner | null>(null);
   const [phase, setPhase] = useState<Phase>(null);
+  const [saved, setSaved] = useState(false);
   useEffect(() => {
     setPhase(null);
+    setSaved(false);
     return () => {
       activeSave.current?.controller.abort();
       activeSave.current = null;
@@ -42,6 +46,7 @@ export function useSurfacingSave(
         owner.finalizing = true;
         if (isCurrent()) setPhase('finalizing');
       },
+      onSaved: () => setSaved(true),
     })
       .catch((error: unknown) => {
         if (!isCurrent()) return;
@@ -64,5 +69,5 @@ export function useSurfacingSave(
     const owner = activeSave.current;
     if (owner !== null && !owner.finalizing) owner.controller.abort();
   };
-  return { save, cancel, phase };
+  return { save, cancel, phase, saved };
 }
