@@ -121,7 +121,7 @@ function humanizeToken(token: string): string {
 export function toolPlanLabels(
   plan: ReadonlyArray<CncToolPlanEntry> | undefined,
 ): ReadonlyArray<string> {
-  return (plan ?? []).map((entry, index) => `${index + 1}. ${entry.name ?? 'Active bit'}`);
+  return (plan ?? []).map((entry, index) => `${index + 1}. ${entry.name ?? 'Default bit'}`);
 }
 
 export { uniqueValues as uniqueReviewWarnings } from '../../../core/util/unique';

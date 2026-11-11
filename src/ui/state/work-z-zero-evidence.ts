@@ -1,15 +1,14 @@
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
-import { activeCncTool, type Project } from '../../core/scene';
 
 export type WorkZZeroEvidenceSource = 'manual-zero' | 'probe' | 'controller-readback';
 
 export const PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE =
   'Remove the touch plate and probe lead from the stock and cutter, then click ' +
-  '"Confirm plate removed" in the probe panel. Do not press Zero Z with the bit parked in ' +
+  '"Dismiss reminder" on the touch-plate notice. Do not press Zero Z with the bit parked in ' +
   'the air — that discards the probed work zero.';
 
 /**
- * Session-scoped proof that the active bit was referenced to the stock-top Z0.
+ * Session-scoped proof that the bit in the spindle was referenced to the stock-top Z0.
  *
  * The reference epoch changes whenever machine position/reference truth becomes
  * unknown. Keeping the epoch inside the evidence makes stale records fail closed
@@ -18,7 +17,7 @@ export const PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE =
 export type WorkZZeroEvidence = {
   readonly source: WorkZZeroEvidenceSource;
   readonly referenceEpoch: number;
-  /** Cutter selected as physically loaded when the Z reference began. */
+  /** The bit declared to be in the spindle when the Z reference began (spindle-bit.ts). */
   readonly toolId?: string;
   /** Probe plates are a collision hazard until the operator removes them. */
   readonly probePlateRemoved?: boolean;
@@ -58,11 +57,6 @@ export function captureControllerWorkZEvidence(input: {
     offsetZMm: input.offsetZMm,
     observedAtMs: input.observedAtMs,
   };
-}
-
-export function selectedCncToolId(project: Pick<Project, 'machine'>): string | undefined {
-  const machine = project.machine;
-  return machine?.kind === 'cnc' ? activeCncTool(machine).id : undefined;
 }
 
 export function isWorkZZeroEvidenceCurrent(

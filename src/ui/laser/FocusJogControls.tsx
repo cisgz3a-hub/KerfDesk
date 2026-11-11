@@ -1,6 +1,7 @@
 import { profileSupportsCapability, type DeviceProfile } from '../../core/devices';
 import type { MachineKind } from '../../core/scene';
 import { shortcutLabel } from '../common/shortcut-label';
+import { SpindleBitControl } from './SpindleBitControl';
 import { FOCUS_JOG_KEY_LABELS } from './use-jog-shortcuts';
 import { isPositiveFiniteNumber } from '../../core/util/finite';
 
@@ -80,6 +81,8 @@ export function FocusJogControls(props: {
           <span style={hintStyle}>Confirm Z travel in Machine Setup before using Z jog.</span>
         )}
       </div>
+      {/* Which bit Zero Z records Work Z for (ADR-416 Amendment 4). */}
+      {isCncMachine && <SpindleBitControl />}
     </div>
   );
 }

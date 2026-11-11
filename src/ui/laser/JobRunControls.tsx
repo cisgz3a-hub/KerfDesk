@@ -5,6 +5,7 @@
 // (no realtime feed hold) and may lack jog cancel — the copy says so.
 
 import { useLaserStore } from '../state/laser-store';
+import { SPINDLE_BIT_LABEL } from '../state/spindle-bit';
 import {
   cncJobLaserModeEnabled,
   cncPauseControllerKind,
@@ -20,7 +21,7 @@ import { pauseControlMessage } from './job-control-copy';
 // back to the generic prompt for a single-tool / imported / resume-tail job.
 function toolChangeMessage(bitLabel: string | null): string {
   const bit = bitLabel === null ? 'the next bit' : bitLabel;
-  return `Job paused for a tool change. Load ${bit}, select it as the Active bit, and re-zero Z on the stock top (jog, then Zero Z), then Continue to resume.`;
+  return `Job paused for a tool change. Load ${bit} and re-zero Z on the stock top (jog, then Zero Z, or probe), then Continue to resume. ${SPINDLE_BIT_LABEL}, beside Zero Z, shows the bit that Z zero is recorded for.`;
 }
 
 export function RunningControls(props: {

@@ -1,8 +1,8 @@
 import { selectControllerDriver } from '../../core/controllers';
-import { activeCncTool } from '../../core/scene';
 import { useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
+import { spindleBitOf } from '../state/spindle-bit';
 import {
   isWorkZEvidenceCurrentForStart,
   type WorkZZeroEvidence,
@@ -19,9 +19,10 @@ export function WorkZRecoveryControl(): JSX.Element | null {
   const workZReferenceEpoch = useLaserStore((state) => state.workZReferenceEpoch);
   const controllerSessionEpoch = useLaserStore((state) => state.controllerSessionEpoch);
   const recover = useLaserStore((state) => state.recoverWorkZFromController);
-  if (machine?.kind !== 'cnc') return null;
-
-  const tool = activeCncTool(machine);
+  const declared = useLaserStore((state) => state.spindleBit ?? null);
+  // The read-back is recorded for the bit in the spindle (ADR-416 Amendment 4).
+  const tool = spindleBitOf({ spindleBit: declared }, { machine });
+  if (machine?.kind !== 'cnc' || tool === null) return null;
   const commands = selectControllerDriver(
     activeControllerKind,
     activeControllerCommandSet ?? undefined,
@@ -29,7 +30,7 @@ export function WorkZRecoveryControl(): JSX.Element | null {
   const supported = commands.modalStateQuery !== null && commands.offsetsQuery !== null;
   const currentEvidence = currentWorkZEvidenceForTool(
     evidence,
-    tool.id,
+    tool.toolId,
     workZReferenceEpoch,
     controllerSessionEpoch,
   );
@@ -77,7 +78,7 @@ export function WorkZRecoveryControl(): JSX.Element | null {
           className="lf-button"
           disabled={controllerOperation !== null}
           title={controllerReuseTitle(controllerOperation !== null)}
-          onClick={() => void confirmAndRecover(tool.id, tool.name, recover)}
+          onClick={() => void confirmAndRecover(tool.toolId, tool.name, recover)}
         >
           Use existing controller Z zero
         </button>

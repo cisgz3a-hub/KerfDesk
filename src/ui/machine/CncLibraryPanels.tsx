@@ -147,7 +147,7 @@ function CncToolManagerRow(props: {
           title={
             props.draftControlled
               ? 'Remove this custom bit from the saved library and stage its Tool Plan assignments to use their defaults. The project changes on final Save.'
-              : 'Remove this custom bit. Primary and secondary assignments fall back to the active bit.'
+              : 'Remove this custom bit. Primary and secondary assignments fall back to the Default bit.'
           }
           style={deleteButtonStyle}
         >

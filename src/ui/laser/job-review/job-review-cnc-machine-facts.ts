@@ -20,7 +20,7 @@ export function cncMachineReviewFacts(
       'Stock',
       `${formatMm(stock.widthMm)} × ${formatMm(stock.heightMm)} × ${formatMm(stock.thicknessMm)} mm`,
     ),
-    fact('Active bit', activeCncTool(machine).name),
+    fact('Default bit', activeCncTool(machine).name),
     poweredZAssumptionFact(project),
     fact('Safe Z', `${formatMm(params.safeZMm)} mm above stock top`),
     fact('Spindle', `max ${params.spindleMaxRpm} RPM · spin-up ${params.spindleSpinupSec} s`),

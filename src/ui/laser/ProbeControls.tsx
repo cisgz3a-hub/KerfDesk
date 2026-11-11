@@ -5,12 +5,13 @@
 
 import { type ProbeCorner, type ZProbeParams } from '../../core/controllers/grbl';
 import { type CornerProbeParams, type ProbeRequest } from '../../core/controllers/grbl/probe';
-import { activeCncTool } from '../../core/scene';
+import { activeCncTool, type CncTool } from '../../core/scene';
 import { useStore } from '../state';
 import { runningJobMachineKind } from '../state/job-motion-machine';
 import { useLaserStore } from '../state/laser-store';
 import { describeProbeResult } from '../state/probe-actions';
 import { probeCircuitBlockReason } from '../state/probe-test-touch';
+import { SPINDLE_BIT_LABEL, spindleBitTool } from '../state/spindle-bit';
 import { useToastStore } from '../state/toast-store';
 import {
   CornerProbeGeometryFields,
@@ -68,9 +69,14 @@ export function ProbeControls(): JSX.Element | null {
   const setBitDiameterMm = useProbeFormStore((s) => s.setBitDiameterMm);
   const setCornerGeometry = useProbeFormStore((s) => s.setCornerGeometry);
   const runningKind = useLaserStore((s) => runningJobMachineKind(s));
+  // The probe measures the bit in the spindle (ADR-416 Amendment 4). A bit
+  // this project's list does not hold has no known diameter or shape, so only
+  // the Z cycle, which needs neither, is offered for it.
+  const spindleTool = useLaserStore((s) => spindleBitTool(s, project));
   if (machine?.kind !== 'cnc') {
-    // A running CNC job keeps its probe (ADR-416 Amendment 3), but the loaded
-    // bit is chosen in a CNC project, which the toolbar can still switch to.
+    // A running CNC job keeps its probe (ADR-416 Amendment 3), but the plate
+    // and bit geometry come from a CNC project, which the toolbar can still
+    // switch to. Zero Z needs no project (ADR-416 Amendment 4).
     return runningKind === 'cnc' ? <p style={hintStyle}>{PROBE_NEEDS_CNC_PROJECT}</p> : null;
   }
   if (!probingSupported) {
@@ -85,10 +91,10 @@ export function ProbeControls(): JSX.Element | null {
     );
   }
 
-  const effectiveTool = activeCncTool(machine);
+  const effectiveTool = spindleTool ?? activeCncTool(machine);
   // A typed diameter applies only while the bit it was typed against is still
-  // active; swapping bits re-follows the machine rather than probing with the
-  // previous cutter's diameter.
+  // in the spindle; swapping bits re-follows the bit rather than probing with
+  // the previous cutter's diameter.
   const effectiveBitDiameter = effectiveProbeBitDiameterMm(
     form,
     effectiveTool.id,
@@ -98,8 +104,7 @@ export function ProbeControls(): JSX.Element | null {
   // offers the Z cycle only; the store refuses the corner cycle there too. The
   // draft keeps its mode for after the job (ADR-375 Amendment 3).
   const mode: ProbeMode = toolChangeHold ? 'z' : form.mode;
-  const toolSupported = mode !== 'corner' || effectiveTool.kind === 'end-mill';
-  const readiness = probeControlReadiness({ ...live, toolSupported });
+  const readiness = probeControlReadiness(live, cornerToolIssue(mode, spindleTool));
 
   const run = (): void => {
     const request = buildProbeRequest({
@@ -167,16 +172,22 @@ function useProbeLiveState(): ProbeLiveState {
   return { isConnected, isIdle, isBusy, circuitBlock };
 }
 
-function probeControlReadiness(input: ProbeLiveState & { readonly toolSupported: boolean }): {
-  readonly ready: boolean;
-  readonly title: string;
-} {
-  if (!input.toolSupported) {
-    return {
-      ready: false,
-      title: 'XYZ corner probing requires a cylindrical end mill with a straight flank.',
-    };
+/** Why the XYZ corner cycle cannot run with the bit in the spindle, or null. */
+function cornerToolIssue(mode: ProbeMode, spindleTool: CncTool | null): string | null {
+  if (mode !== 'corner') return null;
+  if (spindleTool === null) {
+    return `XYZ corner probing needs the bit's diameter, and the bit chosen under ${SPINDLE_BIT_LABEL} is not in this project's bit list. Choose the loaded bit there, or use Z only.`;
   }
+  return spindleTool.kind === 'end-mill'
+    ? null
+    : 'XYZ corner probing requires a cylindrical end mill with a straight flank.';
+}
+
+function probeControlReadiness(
+  input: ProbeLiveState,
+  toolIssue: string | null,
+): { readonly ready: boolean; readonly title: string } {
+  if (toolIssue !== null) return { ready: false, title: toolIssue };
   if (!input.isConnected || !input.isIdle || input.isBusy) {
     return { ready: false, title: 'Connect and wait for Idle before probing.' };
   }
@@ -191,7 +202,7 @@ const TOOL_CHANGE_PROBE_HINT =
   'Tool change: probe Z only. The X/Y origin stays where the job started.';
 
 export const PROBE_NEEDS_CNC_PROJECT =
-  'The running job is a CNC job. Switch the toolbar to CNC to select the loaded bit as the Active bit, then probe it or Zero Z.';
+  'The running job is a CNC job. Switch the toolbar to CNC to use the touch-plate probe, or touch the bit to the stock top and use Zero Z.';
 
 function probeHint(mode: ProbeMode, toolChangeHold: boolean): string {
   const hint =
