@@ -37,6 +37,7 @@ import {
   type UntrackedLaserRecovery,
 } from './laser-recovery-untracked';
 import { resolveFailedAttempt } from './laser-recovery-attempt-failure';
+import { armRecoveryVariableStreamAdvancement } from './variable-stream-advancement';
 
 /** Final, explicit activation for the sealed laser recovery dialog. Review and
  * cancellation never call this function and therefore cannot claim a capsule. */
@@ -303,6 +304,13 @@ async function streamLaserRecoveryAttempt(
   attempt: StagedLaserRecovery,
   repository: RecoveryRepository,
 ): Promise<boolean> {
+  // Observe before the first possible stream transition, as Start does: the
+  // finished recovery consumes the record its interrupted run did not.
+  const advancement = armRecoveryVariableStreamAdvancement(
+    attempt.source.project,
+    attempt.recoveryRunId,
+    attempt.capsule.artifact.outputScope,
+  );
   try {
     await attempt.laser.startJob(attempt.resumeGcode, {
       runId: attempt.recoveryRunId,
@@ -320,6 +328,7 @@ async function streamLaserRecoveryAttempt(
       jobTimingPlan: attempt.jobTimingPlan,
     });
   } catch (error) {
+    advancement.cancel();
     await resolveFailedAttempt({
       repository,
       sourceCapsule: attempt.capsule,
@@ -330,6 +339,7 @@ async function streamLaserRecoveryAttempt(
     });
     return false;
   }
+  advancement.accept();
 
   const activated = await acceptLaserRecoveryRun(
     repository,

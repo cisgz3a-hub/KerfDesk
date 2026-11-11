@@ -1,8 +1,9 @@
 // Clean-room geometry subset of HP's PCL 5 / HP-GL/2 reference, chapters 17, 19–22:
 // https://www.hp.com/ctg/Manual/bpl13211.pdf
-// Plotter units are 0.025 mm. No device page defaults, clipping or ignored drawing commands.
+// Plotter units are 0.025 mm. No device page defaults or clipping; commands that draw nothing
+// (speed, force, pen width, colour) are skipped with a note (ADR-357 Amendment 5).
 import { hpglCommands } from './hpgl-tokenizer';
-import { createHpglState, executeHpgl } from './hpgl-interpreter';
+import { assertSinglePage, createHpglState, executeHpgl } from './hpgl-interpreter';
 import { flushStroke } from './hpgl-paths';
 import { hpglResult } from './hpgl-result';
 import { noteHpglImportSize } from './hpgl-size-advisory';
@@ -28,6 +29,7 @@ export function parseHpgl(args: {
         state.command,
       );
     flushStroke(state);
+    assertSinglePage(state);
     noteHpglImportSize(state, sourceSize);
     return hpglResult(state, args);
   } catch (error) {
