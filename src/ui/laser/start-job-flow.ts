@@ -54,6 +54,11 @@ import {
 } from './framed-run-start-review';
 import { frameExpiredStartMessage, frameExpiryReason } from './frame-expiry-note';
 import {
+  announceCarriedReview,
+  noteRunAgainReview,
+  runAgainReviewSeed,
+} from './run-again-review-carry';
+import {
   claimCurrentFramedRunStart,
   releaseFramedRunStartClaim,
   type FramedRunStartClaim,
@@ -124,7 +129,9 @@ export async function runFramedPermitStart(
   }
   // ADR-237: the single Job Review runs here at Start. Transient camera
   // permits were reviewed before their Frame and carry evidence from birth.
-  const reviewed = await framedReviewForStart(permit, options);
+  // Run again of an unchanged, already-reviewed laser job carries that review
+  // instead of showing it again (Amendment 3).
+  const reviewed = await framedReviewForStart(permit, options, completedReceipt);
   if (reviewed === null) return false;
   assertMachineExecutionOwner(options.executionOwner);
   permit = reviewed.permit;
@@ -157,10 +164,14 @@ export async function runFramedPermitStart(
     releaseFramedRunStartClaim(claim);
   }
 }
-async function framedReviewForStart(permit: FramedRunPermit, options: FramedStartOptions) {
+async function framedReviewForStart(
+  permit: FramedRunPermit,
+  options: FramedStartOptions,
+  completedReceipt: LastCompletedReceipt | null,
+) {
   if (permit.candidate.review !== undefined && permit.candidate.authorizationContext !== undefined)
     return { permit, review: permit.candidate.review };
-  return reviewFramedRunForStart(permit, options);
+  return reviewFramedRunForStart(permit, options, completedReceipt);
 }
 
 function refuseStartWhileMarkOwnsController(): boolean {
@@ -192,8 +203,16 @@ async function streamFramedRun(
   const currentLaser = await currentLaserForAuthorizedStart(authorizationArgs);
   if (currentLaser === null) return false;
   assertMachineExecutionOwner(options.executionOwner);
+  const runAgainReview = runAgainReviewSeed({
+    permit,
+    review,
+    controllerSessionEpoch: currentLaser.controllerSessionEpoch,
+    options,
+  });
   return streamPreparedStart({
     ...options,
+    ...carriedReviewStartOptions(review, options),
+    ...(runAgainReview === null ? {} : { runAgainReview }),
     outputScope: permit.candidate.outputScope,
     project: permit.candidate.project,
     laser: currentLaser,
@@ -209,10 +228,29 @@ async function streamFramedRun(
   });
 }
 
+// A carried review is honest only if it says so (ADR-237 Amendment 3): the
+// archive names the run whose confirmation it is, and the operator is told,
+// once the controller has the job, that no dialog was shown.
+function carriedReviewStartOptions(
+  review: FramedRunReviewEvidence,
+  options: FramedStartOptions,
+): Pick<PreparedStartArgs, 'reviewCarriedOver' | 'onStartCommitted'> {
+  if (review.carriedOver === undefined) return {};
+  return {
+    reviewCarriedOver: review.carriedOver,
+    onStartCommitted: (runId, streamerEpoch) => {
+      announceCarriedReview(review.reviewModel.warnings);
+      options.onStartCommitted?.(runId, streamerEpoch);
+    },
+  };
+}
+
 /** Exact-job replay after a fully settled completion (ADR-372 Amendment 1).
- * It follows Start exactly: it needs a completed Frame of this job, streams
- * that permit's bytes from line one with a new run identity, and never runs a
- * Frame itself. The receipt records which completed run it replays. */
+ * It follows Start: it needs a completed Frame of this job, streams that
+ * permit's bytes from line one with a new run identity, and never runs a Frame
+ * itself. The receipt records which completed run it replays. An unchanged
+ * laser job whose review is the one already confirmed for that run starts
+ * without showing Job Review again (ADR-237 Amendment 3). */
 export async function runCompletedJobAgainFlow(
   receipt: LastCompletedReceipt,
   repository: RecoveryRepository = recoveryRepository,
@@ -284,6 +322,9 @@ async function streamPreparedStart(args: PreparedStartArgs): Promise<boolean> {
     );
     return false;
   }
+  // Remembered before the wire: the run can finish, and Run again be pressed,
+  // while the accepted Start is still writing its archive.
+  if (args.runAgainReview !== undefined) noteRunAgainReview(runId, args.runAgainReview);
   return transmitPreparedStart({
     args,
     runId,

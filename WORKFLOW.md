@@ -2636,14 +2636,36 @@ inches hides the position until `$G` or the next Frame (ADR-375 Amendment 11).
     readable (ADR-221). Runs without a recorded start show no timer.
 
 #### Repeat — Run again
-1. **Run again** follows Start exactly (ADR-372 Amendment 1, amended by ADR-565). An unchanged
+1. **Run again** follows Start (ADR-372 Amendment 1, amended by ADR-565). An unchanged
    footprint and placement may reuse the clean completed Frame. The button needs another Frame
    when that spatial evidence expires; it never runs a Frame itself and makes no offer. Each
-   replay prepares and reviews the current exact program, claims its own execution permit and
-   starts from line 1 with a new run ID. The run records which completed run it repeats.
+   replay prepares the current exact program, claims its own execution permit and starts from
+   line 1 with a new run ID. The run records which completed run it repeats.
 2. A Current Position job at a different head position requires another Frame. After that Frame,
    Run again uses its newly framed placement, not the first run's frozen origin. The current
    execution inputs must still match the completed job, including after review edits.
+3. **Job Review is not shown again for an unchanged laser job that was already reviewed**
+   (ADR-237 Amendment 3). Run again prepares the program and builds its review as always. It
+   starts without the dialog only when all of these hold:
+   - the machine is a laser. A CNC job always shows Job Review, because its setup confirmation
+     belongs to each run;
+   - the prepared program is the one the completed run sent, byte for byte;
+   - the review needs no answer: laser mode is verified, there is no machine-type question and
+     nothing blocks Start;
+   - its warnings are exactly the ones accepted for the run being repeated;
+   - that run was reviewed in this KerfDesk session, on this controller session. After a
+     reload, or once the controller session has changed (a reconnect, for example), the
+     dialog shows.
+
+   In every other case Job Review opens as it does for Start. When the dialog is skipped, a
+   notice says **Running the same reviewed job again.** once the controller has the job; with
+   warnings it counts them and lists them when opened. The run's record states that its review
+   was carried over and names the run whose review the operator confirmed. All checks after the
+   review still run: the permit claim, the controller and origin checks and the final handoff.
+4. Ordinary **Start** always shows Job Review. So does a job started from the phone remote, and
+   a run that was approved there is not carried into Run again. Editing anything that changes
+   the program hides Run again; Start then reviews the changed job.
+5. A held Enter never presses Run again: only a fresh key press or a click does.
 
 #### Error — exact artifact cannot be produced
 1. The persistent blocker surface and error toast show the compile/transport reason. No Frame or job
@@ -3888,8 +3910,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 2. **Run same job again from start** appears only while canvas, machine profile,
    output scope, placement, and execution signature still match. Like Start, it
    is greyed out until a clean Frame of this exact job issues a permit (ADR-372
-   Amendment 1). Clicking streams that permit through Job Review, from line 1 with
-   a new run ID and zero recovery progress.
+   Amendment 1). Clicking streams that permit from line 1 with a new run ID and
+   zero recovery progress. Job Review opens first, except for an unchanged laser
+   job already reviewed in this session (ADR-237 Amendment 3; see "Repeat — Run
+   again").
 3. Any relevant edit hides the offer. The receipt remains diagnostic history
    until another accepted run replaces it; **Forget Controller** clears it.
    Ordinary **Start current job** remains available.
