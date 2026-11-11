@@ -25,17 +25,30 @@ export type DxfTagCollector<T> = {
   readonly finish: () => T;
 };
 
+// AutoCAD DXF Reference, HEADER variable $INSUNITS: every defined code
+// (audit O2-P3-1 added the ones that fell back to millimetres).
 const INSUNITS_TO_MM: Readonly<Record<number, number>> = {
   0: 1,
   1: 25.4,
   2: 304.8,
+  3: 1_609_344, // miles
   4: 1,
   5: 10,
   6: 1000,
+  7: 1_000_000, // kilometres
+  8: 0.0000254, // microinches
   9: 0.0254,
   10: 914.4,
+  11: 1e-7, // angstroms
+  12: 1e-6, // nanometres
   13: 0.001,
   14: 100,
+  15: 10_000, // decametres
+  16: 100_000, // hectometres
+  17: 1e12, // gigametres
+  18: 1.495978707e14, // astronomical units (IAU 2012)
+  19: 9.4607304725808e18, // light years (Julian year)
+  20: 3.085677581491367e19, // parsecs
 };
 
 const LAYER_FROZEN_FLAG = 1; // LAYER table group 70
