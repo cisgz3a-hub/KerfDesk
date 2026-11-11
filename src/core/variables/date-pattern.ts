@@ -1,7 +1,9 @@
-// Custom date and time formats for variable text (LightBurn's Date/Time
-// formatting codes, the familiar strftime set). Fields use the computer's
-// local time, like the fixed formats. An unknown code is kept as typed, so a
-// typo shows on the preview instead of vanishing.
+// Custom date and time formats for variable text: the POSIX strftime %-codes
+// (%Y-%m-%d, %H:%M, %B ...). These are NOT LightBurn's codes: LightBurn's
+// Date/Time formatting uses letter patterns (yyyy-MM-dd, hh:mm), so a pattern
+// copied from LightBurn burns as typed (oracle audit O1, O5-P3-1). Fields use
+// the computer's local time, like the fixed formats. An unknown code is kept
+// as typed, so a typo shows on the preview instead of vanishing.
 
 const MONTHS = [
   'January',

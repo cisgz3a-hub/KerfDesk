@@ -4,7 +4,7 @@ import { calibrationFieldStyle } from './calibration-dialog-styles';
 export function CalibrationNumberField(props: {
   readonly label: string;
   readonly value: string;
-  readonly min: number;
+  readonly min: number | undefined;
   readonly max: number | undefined;
   // 'any' opts out of native step validation for free-form mm fields whose
   // real validation lives in core code (a numeric step misaligned with min

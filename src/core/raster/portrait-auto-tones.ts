@@ -45,8 +45,12 @@ export function portraitAutoTones(histogram: ArrayLike<number>): PortraitTones |
   // unless the stretch is capped, hi becomes 255. Neither stage clamps a tone
   // between them (luma-adjust.ts).
   const offset = 128 - 128 / stretch - lo;
-  const brightness = round(offset / 2.55, 10);
-  const contrast = round((stretch - 1) * 100, 10);
+  // The controls hold a tenth: round brightness down and contrast up, so the
+  // 0.5% level still lands at or below 0 and clamps solid. Rounding to nearest
+  // left it up to a quarter level above 0, which the midtone gamma then lifted
+  // by as much as 50 levels: a dark backdrop burned grey (O6-P3-2).
+  const brightness = Math.floor(Math.round((offset / 2.55) * 1e6) / 1e5) / 10;
+  const contrast = Math.min(100, Math.ceil(Math.round((stretch - 1) * 1e8) / 1e5) / 10);
   const median = levelAtShare(histogram, total, 0.5);
   const stretched = (median + brightness * 2.55 - 128) * (1 + contrast / 100) + 128;
   return { brightness, contrast, gamma: midtoneHoldGamma(median, stretched) };
