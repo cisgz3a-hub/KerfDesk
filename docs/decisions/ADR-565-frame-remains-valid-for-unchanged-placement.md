@@ -16,4 +16,6 @@ The reusable spatial evidence is distinct from the execution permit. Each Start 
 
 This amends the exact-artifact and one-run wording of ADR-228, ADR-230, ADR-232 and ADR-237 for ordinary live-canvas Frame authorization. Transient camera markers and derived second-pass jobs retain their own immutable source and execution ownership. Frame evidence is session-local; an application or controller restart cannot restore physical-coordinate evidence from a saved project.
 
+**Amended by [ADR-237 Amendment 3](ADR-237-amendment-3-run-again-carries-an-unchanged-review.md).** "Each Start prepares and reviews" has one exception: Run again of an unchanged laser job carries a review already confirmed in the same app and controller session instead of showing it again. The program is still prepared afresh, and the spatial evidence and execution-permit rules above are unchanged.
+
 **Verification required.** Cover power/speed edits before Start and in Job Review, emitted latest S/F commands, unchanged-placement repeated runs, move/resize/registration/origin invalidation, speed-dependent scan-envelope changes, concurrent Start and preparation races, interrupted/reset sessions, and transient/recovery workflows. Test and simulator evidence does not establish measured laser power or hardware qualification.

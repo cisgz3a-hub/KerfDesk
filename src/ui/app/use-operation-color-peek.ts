@@ -5,7 +5,7 @@
 // typing in a text field.
 
 import { useEffect } from 'react';
-import { isEditableShortcutTarget } from '../common/keyboard-targets';
+import { isTextEntryTarget } from '../common/keyboard-targets';
 import { useUiStore } from '../state/ui-store';
 
 export const OPERATION_COLOR_PEEK_DELAY_MS = 150;
@@ -34,7 +34,7 @@ export function useOperationColorPeek(): void {
       if (e.repeat || timer !== null || e.ctrlKey || e.metaKey || e.shiftKey) return;
       // Option types characters on a Mac, and a held Alt in a field is typing,
       // not a request to recolour the canvas.
-      if (isEditableShortcutTarget(e.target)) return;
+      if (isTextEntryTarget(e.target)) return;
       // Alt can join a drag after pointer-down, without another pointer event.
       if (pointers.active()) {
         cancelPeek();

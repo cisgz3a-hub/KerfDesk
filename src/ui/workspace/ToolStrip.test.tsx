@@ -365,3 +365,34 @@ function loadNodeProject(
   });
   useUiStore.getState().setToolMode({ kind: 'node' });
 }
+
+describe('ToolStrip in Preview (annoyance audit A4-P2-5)', () => {
+  afterEach(() => {
+    if (useStore.getState().previewMode) useStore.getState().togglePreview();
+  });
+
+  it('disables the canvas tools with a reason, and enables them again on leaving', async () => {
+    const h = await render(<ToolStrip />);
+    const tools = (): HTMLButtonElement[] =>
+      Array.from(h.querySelectorAll<HTMLButtonElement>('button[data-help-id^="tool:"]'));
+    expect(tools().length).toBeGreaterThan(8);
+    expect(tools().every((button) => !button.disabled)).toBe(true);
+
+    await act(async () => useStore.getState().togglePreview());
+    expect(tools().every((button) => button.disabled)).toBe(true);
+    for (const button of tools()) {
+      expect(button.title).toMatch(
+        /^Not available in Preview\. Press P or click Preview to edit\./,
+      );
+    }
+    expect(h.querySelector('aside')?.getAttribute('data-preview')).toBe('true');
+    // Create artwork and the design library open their own windows.
+    expect(
+      h.querySelector<HTMLButtonElement>('button[aria-label="Create artwork"]')?.disabled,
+    ).toBe(false);
+
+    await act(async () => useStore.getState().togglePreview());
+    expect(tools().every((button) => !button.disabled)).toBe(true);
+    expect(h.querySelector('aside')?.hasAttribute('data-preview')).toBe(false);
+  });
+});

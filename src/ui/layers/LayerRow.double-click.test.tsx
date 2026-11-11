@@ -77,26 +77,35 @@ describe('compact operation row and selected operation settings', () => {
         }),
     ],
     ['active autofocus', () => useLaserStore.setState({ autofocusBusy: true })],
-  ] as const)('blocks advanced settings during %s', async (_label, makeBusy) => {
+  ] as const)('opens advanced settings during %s (A4-P2-7)', async (_label, makeBusy) => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     makeBusy();
     const mounted = await mountPanel();
     try {
-      expect(advancedButton(mounted.host).disabled).toBe(true);
-      expect(mounted.host.querySelector('[role="dialog"]')).toBeNull();
+      expect(advancedButton(mounted.host).disabled).toBe(false);
+      await click(advancedButton(mounted.host));
+      expect(mounted.host.querySelector('[role="dialog"]')).not.toBeNull();
     } finally {
       await mounted.unmount();
     }
   });
 
-  it('closes advanced settings when machine activity starts', async () => {
+  it('keeps advanced settings and its draft open when machine activity starts (A4-P2-7)', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     const mounted = await mountPanel();
     try {
       await click(advancedButton(mounted.host));
       expect(mounted.host.querySelector('[role="dialog"]')).not.toBeNull();
+      const speed = mounted.host.querySelector<HTMLInputElement>('[role="dialog"] input');
+      if (speed === null) throw new Error('cut settings field missing');
+      const typed = speed.type === 'checkbox' ? null : '123';
+      if (typed !== null) speed.value = typed;
       await act(async () => useLaserStore.setState({ autofocusBusy: true }));
-      expect(mounted.host.querySelector('[role="dialog"]')).toBeNull();
+      await act(async () => useLaserStore.setState({ streamer: activeStreamer() }));
+      expect(mounted.host.querySelector('[role="dialog"]')).not.toBeNull();
+      const kept = mounted.host.querySelector<HTMLInputElement>('[role="dialog"] input');
+      expect(kept).toBe(speed);
+      if (typed !== null) expect(kept?.value).toBe(typed);
     } finally {
       await mounted.unmount();
     }
