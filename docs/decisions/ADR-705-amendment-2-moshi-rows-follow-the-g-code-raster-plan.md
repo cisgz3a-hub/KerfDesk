@@ -1,7 +1,8 @@
 ## ADR-705 Amendment 2 - Moshi raster rows follow the G-code raster plan (2026-11-11)
 
 **Status:** Accepted. Amends ADR-705 decision 3 (Image groups). Fixes code quality audit C2
-D1-P1-1 and D1-P1-2, and D1-P3-1 (a failed Connect leaves the USB device claimed; ADR-702).
+D1-P1-1 and D1-P1-2, D1-P3-1 (a failed Connect leaves the USB device claimed; ADR-702), and
+rolling audit v14 Z4-P2-1 (rotary rows on the mil grid; extends ADR-315 Amendments 1-3).
 **Simulator-tested only; not qualified on hardware.** | **Date:** 2026-11-11
 
 ### Context
@@ -43,6 +44,16 @@ row walker, and the audit found it wrong in two ways:
    fails, the Moshi store closes the link. When WebUSB's `selectConfiguration` fails after
    `open`, the platform link closes the device, as a failed claim already did. Another program
    can then take the board.
+5. **Rotary rows are checked on the mil grid (Z4-P2-1).** A Moshiboard places every coordinate
+   on a whole mil of machine Y. On a Y-port chuck one mil turns the part 0.0254 / k mm: 0.16 mm
+   with 40 mm per turn on Ø80 glass. A 0.1 mm Fill or Image interval therefore lands rows on
+   shared mils, and those rows burn twice. The audit counted 74 of 200 rows. The Moshi job now
+   runs Job Review's rotary row check (ADR-315 Amendments 1-3) on that grid
+   (`detectRotaryRowGridWarnings` with 1/0.0254 positions per mm). Its warning, with the
+   intervals that land evenly, is added to the job's advisories, which show from the Frame on.
+   The check is a disclosure: the bytes do not change. It models the rows as G-code writes them
+   (three decimals, then the step). The Moshi encoder rounds straight to mils, so a row within
+   0.0005 mm of a half mil can be counted on the other side.
 
 ### Evidence
 
@@ -53,3 +64,7 @@ row walker, and the audit found it wrong in two ways:
 - The ADR-705 raster golden (overscan 0) decodes to the same moves as before.
 - `moshi-usb-store.test.ts`: a status read that throws on Connect closes the link once.
   `web-usb-link.test.ts`: a failed `selectConfiguration` closes the device and claims nothing.
+- `moshi-usb-job-rotary-rows.test.ts`: a 0.1 mm Fill on the 40 mm/turn chuck, Ø80, run through
+  the real `prepareMoshiUsbJob`. Its decoded rows share mils, and the job carries the row warning
+  naming the 0.1596 mm step. On a flat bed every row has its own mil and nothing warns.
+  `rotary-row-step-warnings.test.ts` still passes unchanged.
