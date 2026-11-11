@@ -103,8 +103,14 @@ function bytesOf(data: DataView | undefined): Uint8Array {
 async function openDevice(device: WebUsbDevice): Promise<void> {
   try {
     await device.open();
+  } catch (err) {
+    throw usbOpenError(err, 'open');
+  }
+  try {
     if (device.configuration === null) await device.selectConfiguration(CONFIGURATION);
   } catch (err) {
+    // The device is open: release it, as a failed claim does (C2 D1-P3-1).
+    await device.close().catch(() => undefined);
     throw usbOpenError(err, 'open');
   }
   try {

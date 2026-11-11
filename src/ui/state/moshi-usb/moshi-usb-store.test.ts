@@ -82,6 +82,23 @@ describe('Moshi USB store', () => {
     expect(store.getState().status).toBe(205);
   });
 
+  it('releases the device when the first status read fails (C2 D1-P3-1)', async () => {
+    let closes = 0;
+    const link = {
+      ...connection(new MoshiSimulator()),
+      readStatus: async (): Promise<Uint8Array> => {
+        throw new Error('transfer stalled');
+      },
+      close: async () => {
+        closes += 1;
+      },
+    };
+    await useMoshiUsbStore.getState().connect(async () => link, { wait: async () => undefined });
+    expect(useMoshiUsbStore.getState().phase).toBe('disconnected');
+    expect(useMoshiUsbStore.getState().message).toBe('transfer stalled');
+    expect(closes).toBe(1);
+  });
+
   it('refuses Start until a Frame of the same footprint completes', async () => {
     const { board, store } = await connected();
     await store.getState().start(compiled());
