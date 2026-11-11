@@ -8,6 +8,7 @@
 // sent nothing: it factually cannot take the job.
 
 import { create } from 'zustand';
+import { sleep } from '../../common/sleep';
 import {
   encodeMoshiFrameProgram,
   sameMoshiFootprint,
@@ -88,16 +89,11 @@ const DISCONNECTED = {
 type Set = (partial: Partial<MoshiUsbState>) => void;
 type Get = () => MoshiUsbState;
 
-const realWait = (ms: number): Promise<void> =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-
 export const useMoshiUsbStore = create<MoshiUsbState>()((set, get) => ({
   ...DISCONNECTED,
   message: '',
   tone: 'info',
-  connect: (open, options) => connect(set, get, open, options?.wait ?? realWait),
+  connect: (open, options) => connect(set, get, open, options?.wait ?? sleep),
   disconnect: () => disconnect(set, get),
   frame: (job) =>
     run(set, get, 'frame', [encodeMoshiFrameProgram(job.footprint, job.framingFeedMmPerMin)], job),

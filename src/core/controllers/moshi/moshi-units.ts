@@ -33,10 +33,6 @@ export function toMils(point: Vec2): MoshiPoint {
   return { x: mmToMils(point.x), y: mmToMils(point.y) };
 }
 
-export function samePoint(a: MoshiPoint, b: MoshiPoint): boolean {
-  return a.x === b.x && a.y === b.y;
-}
-
 export function isMoshiPosition(mils: number): boolean {
   return Number.isInteger(mils) && mils >= 0 && mils <= MOSHI_MAX_POSITION_MILS;
 }

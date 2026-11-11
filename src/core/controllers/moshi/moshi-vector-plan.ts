@@ -8,7 +8,8 @@
 import type { CutGroup, FillGroup } from '../../job';
 import { cutSegmentsForPass, finalPassCutSegments } from '../../job/cut-pass-segments';
 import type { Vec2 } from '../../scene';
-import { samePoint, toMils, type MoshiPoint, type MoshiStep } from './moshi-units';
+import { samePoint } from '../../geometry/point-math';
+import { toMils, type MoshiPoint, type MoshiStep } from './moshi-units';
 
 export function planCutGroupSteps(group: CutGroup): MoshiStep[] {
   const steps: MoshiStep[] = [];
