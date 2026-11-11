@@ -10,6 +10,7 @@ import { finalPassCutSegments } from './cut-pass-segments';
 import { emittedCutArcMoves, extendBoundsByEmittedArcMoves } from './cut-arc-moves';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
+import { fillSpanPoints } from './fill-sweeps';
 import {
   cncPassXyPoints,
   type CncGroup,
@@ -243,8 +244,7 @@ function extendBoundsForFill(
     const spans = sweep.spans;
     if (usesPlannedBurnBounds || (sweep.reverse && scanOffsetMm !== 0)) {
       for (const span of spans) {
-        extendBoundsForPoint(b, span.start);
-        extendBoundsForPoint(b, span.end);
+        for (const point of fillSpanPoints(span)) extendBoundsForPoint(b, point);
         any = true;
       }
     }

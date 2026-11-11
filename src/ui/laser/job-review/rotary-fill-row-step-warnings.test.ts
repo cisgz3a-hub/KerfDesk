@@ -100,3 +100,40 @@ describe('rotary Fill hatch rows against the steps (ADR-315 Amd 3)', () => {
     );
   });
 });
+
+describe('rotary Fill hatch rows on a tapered part (ADR-694 Amendment 1)', () => {
+  // Ø80 at the top, Ø70 at the bottom, over the Fill's own 30 mm: the warp
+  // bends the rows, and their pitch grows by 80/70 towards the narrow end.
+  const tapered = (): RotarySetup => ({
+    ...chuck(80),
+    taper: {
+      enabled: true,
+      topDiameterMm: 80,
+      bottomDiameterMm: 70,
+      lengthMm: 30,
+      topSide: 'left',
+      artworkFromTopMm: 0,
+    },
+  });
+
+  it('still checks the rows once the warp has bent them', () => {
+    const [warning] = detectRotaryRowStepWarnings(project(tapered()), fillJob(0.1), {
+      stepsPerMmY: 80,
+    });
+    expect(warning).toMatch(/^Fill layer Name fill on this rotary: one Y step/);
+  });
+
+  it('checks the narrow end too: an Interval even at the rim can band at the base', () => {
+    const [atRim] = detectRotaryRowStepWarnings(project(chuck(80)), fillJob(0.1), {
+      stepsPerMmY: 80,
+    });
+    const even = [...(atRim ?? '').matchAll(/(\d+\.\d{4}) mm \(\d/g)].map((m) => Number(m[1]));
+    const banding = even.filter(
+      (interval) =>
+        detectRotaryRowStepWarnings(project(tapered()), fillJob(interval), { stepsPerMmY: 80 })
+          .length > 0,
+    );
+    expect(even.length).toBeGreaterThan(0);
+    expect(banding.length).toBeGreaterThan(0);
+  });
+});

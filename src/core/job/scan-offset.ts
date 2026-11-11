@@ -126,6 +126,23 @@ export function shiftAlongTravel(
   };
 }
 
+/** A fill run's points shifted as one along its travel (first point to last):
+ * a straight run's two ends, or a curve a rotary taper warp made of one
+ * (ADR-694 Amendment 1). Null for a run of fewer than two points. */
+export function shiftFillRunAlongTravel(
+  points: ReadonlyArray<Vec2>,
+  offsetMm: number,
+): ReadonlyArray<Vec2> | null {
+  const from = points[0];
+  const to = points[points.length - 1];
+  if (from === undefined || to === undefined || points.length < 2) return null;
+  if (offsetMm === 0) return points;
+  const shifted = shiftAlongTravel(from, to, offsetMm);
+  const dx = shifted.from.x - from.x;
+  const dy = shifted.from.y - from.y;
+  return points.map((point) => ({ x: point.x + dx, y: point.y + dy }));
+}
+
 type SweepSpan = { readonly start: Vec2; readonly end: Vec2 };
 
 export function shiftedScanSweepEndpoints(

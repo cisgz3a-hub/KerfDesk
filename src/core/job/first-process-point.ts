@@ -16,7 +16,7 @@ import { planFillSweeps } from './fill-sweep-plan';
 import { groupFillScanlines } from './fill-sweeps';
 import type { CncPass, CutSegment, FillGroup, FillSegment, Job, RasterGroup } from './job';
 import { rasterRowsInProviderOrder } from './raster-rows';
-import { offsetForEmittedFeed, shiftAlongTravel } from './scan-offset';
+import { offsetForEmittedFeed, shiftFillRunAlongTravel } from './scan-offset';
 import type { BuildToolpathOptions } from './toolpath-types';
 
 /** The first cut-step XY, without allocating every travel/cut step in the job.
@@ -92,12 +92,12 @@ function firstFillProcessPoint(group: FillGroup, options: BuildToolpathOptions):
 }
 
 function shiftedFillSegment(segment: FillSegment, offset: number): FillSegment | null {
-  const start = segment.polyline[0];
-  const end = segment.polyline[1];
-  if (start === undefined || end === undefined || segment.polyline.length !== 2) return null;
-  if (!segment.reverse || offset === 0) return segment;
-  const shifted = shiftAlongTravel(start, end, offset);
-  return { ...segment, polyline: [shifted.from, shifted.to] };
+  const shifted = shiftFillRunAlongTravel(segment.polyline, segment.reverse ? offset : 0);
+  return shifted === null
+    ? null
+    : shifted === segment.polyline
+      ? segment
+      : { ...segment, polyline: shifted };
 }
 
 function firstPlannedFillPoint(group: FillGroup, segments: FillSegment[]): Vec2 | null {

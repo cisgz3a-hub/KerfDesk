@@ -4046,6 +4046,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
      burns D mm round the part at every height, and one turn stays one turn. Rows round the part
      stay level; a stroke along the side leans slightly away from the job's anchor row (2.3° at
      30 mm from it on an Ø80→Ø70 cup), so anchor a Current Position job at its centre.
+   - A Fill's hatch lines bend with the warp. Each bent line burns through its points as one
+     sweep, at every hatch angle and on Y, A or Z (ADR-694 Amendment 1). If a Fill's planned burn is
+     ever shorter than what was compiled, output stops and names the layer instead of burning
+     short. Job Review's row-step check reads a tapered 0° Fill's rows at both ends of the artwork.
    - The preview gives one turn round the top and round the bottom, and checks the artwork against
      one turn where the part is narrowest under it. Job Review's Rotary fact names the taper, for
      example "Chuck, taper Ø80 → Ø70 mm over 100 mm". A taper whose ends differ in radius by more
