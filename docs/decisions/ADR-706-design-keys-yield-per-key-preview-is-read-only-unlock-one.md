@@ -48,8 +48,9 @@ it was changed (fix group F4).
      lets a key through to the machine. Design Studio's own keymap (`design-shortcuts.ts`) is also
      unchanged.
 2. **Enter in a `DraftNumberInput` commits and releases focus**, so the shortcuts work without a
-   canvas click. Focus stays where it is in three cases: the field holds an error; the field is
-   inside a dialog (the dialog owns the keyboard and would move a released focus to its first
+   canvas click. A table row that commits on blur (`commitOnBlur`, such as a scan-offset row whose
+   Enter sorts the rows) keeps its field as before. Otherwise focus stays where it is in three
+   cases: the field holds an error; the field is inside a dialog (the dialog owns the keyboard and would move a released focus to its first
    control); or Enter came from the numeric keypad. With a machine connected the bare keypad digits
    jog the head whenever no form control has focus (ADR-493), so a person typing the next number on
    the keypad must stay in the field.

@@ -55,8 +55,10 @@ async function typeAndPress(
     input.value = text;
     Simulate.change(input);
   });
+  // Simulate copies every property onto the event; its type omits `code`.
+  const enter = { key: 'Enter', code };
   await act(async () => {
-    Simulate.keyDown(input, { key: 'Enter', code });
+    Simulate.keyDown(input, enter);
   });
 }
 
@@ -84,6 +86,16 @@ describe('DraftNumberInput Enter (A4-P2-2)', () => {
       <div role="dialog" aria-label="Settings">
         <Field commit={commit} />
       </div>,
+    );
+    await typeAndPress(input, '25', 'Enter');
+    expect(commit).toHaveBeenLastCalledWith(25);
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('keeps focus in a commit-on-blur table row, whose Enter sorts the rows', async () => {
+    const commit = vi.fn();
+    const input = await mount(
+      <DraftNumberInput aria-label="Speed" value={10} commitOnBlur onValueChange={commit} />,
     );
     await typeAndPress(input, '25', 'Enter');
     expect(commit).toHaveBeenLastCalledWith(25);

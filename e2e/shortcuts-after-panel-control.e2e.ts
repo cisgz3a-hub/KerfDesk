@@ -135,7 +135,7 @@ async function openWithTwoRectangles(page: Page): Promise<void> {
 }
 
 async function scene(page: Page): Promise<{
-  readonly ids: ReadonlyArray<string>;
+  readonly ids: readonly string[];
   readonly oneX: number | null;
   readonly preview: boolean;
 }> {

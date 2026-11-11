@@ -62,7 +62,9 @@ export function DraftNumberInput({
         if (event.key === 'Enter' && !event.defaultPrevented) {
           if (commitOnBlur) event.preventDefault();
           field.onBlur();
-          releaseFocusAfterEnter(event, field.errorMessage);
+          // A table row that commits on blur keeps its field: its Enter sorts
+          // the rows and the operator goes on editing the same one.
+          if (!commitOnBlur) releaseFocusAfterEnter(event, field.errorMessage);
         }
       }}
     />
@@ -71,7 +73,8 @@ export function DraftNumberInput({
 
 // Enter means "done": the value is committed, so the field lets go of the
 // keyboard and Delete, Ctrl+Z and the arrow keys reach the artwork again
-// (annoyance audit A4-P2-2). Three cases keep focus:
+// (annoyance audit A4-P2-2). Besides a commit-on-blur table row, three cases
+// keep focus:
 //   * a field with an error, so it can be corrected;
 //   * a field inside a dialog, which owns the keyboard and would hand a
 //     released focus to its first control;

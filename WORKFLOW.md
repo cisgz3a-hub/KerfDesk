@@ -2026,7 +2026,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
   Paste and Escape act on the artwork straight after a tick box, slider or drop-down was used, with
   no click on the canvas first.
 - Enter in a number field that commits on Enter also releases focus. It stays in the field when the
-  value is invalid, inside a dialog, and on the numeric keypad's Enter (the keypad digits jog a
+  value is invalid, inside a dialog, in a table row that sorts on Enter, and on the numeric keypad's Enter (the keypad digits jog a
   connected machine when no field has focus).
 - The machine keys are stricter: the jog keys and `Cmd/Ctrl+Return` do nothing while any form
   control has focus.
