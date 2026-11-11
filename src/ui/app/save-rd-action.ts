@@ -23,7 +23,7 @@ import {
   isOutputPreparationAbort,
   outputPreparationFailure,
 } from '../laser/output-preparation-errors';
-import { jobAwareAlert } from '../state/job-aware-dialogs';
+import { pushExportRefusal } from './export-refusal';
 import type { SaveGcodeCtx } from './file-actions';
 import { advanceExportVariables } from './advance-export-variables';
 import { pickPreparedSaveTarget } from './pick-prepared-save-target';
@@ -56,7 +56,7 @@ export async function handleSaveRd(
       ? await emitRdChecked(ctx.project, options)
       : await prepareBackgroundRd(ctx, options, snapshot);
   if (result === null) return;
-  if (!result.ok) return showRdFailure(result.messages);
+  if (!result.ok) return showRdFailure(ctx, result.messages);
   const target = await pickRdTarget(ctx);
   if (target !== null) await writeRdResult(ctx, target, result);
 }
@@ -96,14 +96,14 @@ async function prepareBackgroundRd(
     ...(snapshot === undefined ? {} : { snapshot }),
   });
   if (pending === null) {
-    showBackgroundUnavailable();
+    showRdFailure(ctx, [BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE]);
     return null;
   }
   try {
     return await pending;
   } catch (error) {
     if (isOutputPreparationAbort(error)) throw error;
-    showRdFailure([outputPreparationFailure(error).message]);
+    showRdFailure(ctx, [outputPreparationFailure(error).message]);
     return null;
   }
 }
@@ -128,13 +128,9 @@ async function writeRdResult(
   }
 }
 
-function showBackgroundUnavailable(): void {
-  showRdFailure([BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE]);
-}
-
-function showRdFailure(messages: ReadonlyArray<string>): void {
-  const lines = messages.map((message) => `• ${message}`).join('\n');
-  jobAwareAlert(`Cannot save .rd file:\n\n${lines}`);
+// One error toast, reasons folded, instead of a native alert (ADR-656 Amendment 4).
+function showRdFailure(ctx: SaveGcodeCtx, messages: ReadonlyArray<string>): void {
+  pushExportRefusal(ctx.pushToast, 'Cannot save .rd file', messages);
 }
 
 function suggestedRdName(savedName: string | null): string {

@@ -172,7 +172,7 @@ function BitmapDialog(): JSX.Element | null {
 function StoreOpenedDialogs(): JSX.Element {
   return (
     <>
-      <GcodeSaveDialogHost />
+      <GcodeSaveDialog />
       <ProjectSaveDialog />
       <SaveReadyDialog />
       <BarcodeDialogHost />
@@ -189,12 +189,6 @@ function StoreOpenedDialogs(): JSX.Element {
       <ConnectionHelpHost />
     </>
   );
-}
-
-function GcodeSaveDialogHost(): JSX.Element | null {
-  const open = useUiStore((state) => state.gcodeSaveDialogOpen);
-  const close = useUiStore((state) => state.closeGcodeSaveDialog);
-  return open ? <GcodeSaveDialog onClose={close} /> : null;
 }
 
 function SettingsDialogHost(props: {

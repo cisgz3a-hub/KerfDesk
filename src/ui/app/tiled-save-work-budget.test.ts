@@ -28,13 +28,16 @@ describe('tiledSaveWorkBudgetMessage', () => {
         savedName: 'job',
         pushToast,
       });
-      expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('No files were written'));
-      expect([handled, pickedNames.length, written.length, pushToast.mock.calls.length]).toEqual([
-        true,
-        0,
-        0,
-        0,
-      ]);
+      // One error toast, no native alert (ADR-656 Amendment 4).
+      expect(alertSpy).not.toHaveBeenCalled();
+      expect(pushToast).toHaveBeenCalledExactlyOnceWith(
+        expect.stringMatching(
+          /^Cannot export tiles: This job would require .*No files were written\.$/,
+        ),
+        'error',
+        expect.objectContaining({ key: 'export-refused' }),
+      );
+      expect([handled, pickedNames.length, written.length]).toEqual([true, 0, 0]);
     } finally {
       vi.restoreAllMocks();
     }
@@ -45,9 +48,9 @@ describe('tiledSaveWorkBudgetMessage', () => {
     if (result.kind !== 'work-budget-exceeded') throw new Error('expected budget outcome');
 
     expect(tiledSaveWorkBudgetMessage(result.grid)).toBe(
-      'Cannot export tiles:\n\nThis job would require 116,281 planned grid cells using an effective ' +
+      'This job would require 116,281 planned grid cells using an effective ' +
         'overlap of 59 mm (X step 1 mm, Y step 1 mm), which exceeds the 500-cell work limit. ' +
-        'Increase tile width or height, or reduce overlap, then try again.\n\nNo files were written.',
+        'Increase tile width or height, or reduce overlap, then try again. No files were written.',
     );
   });
 

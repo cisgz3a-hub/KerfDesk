@@ -63,7 +63,19 @@ export async function pickPreparedSaveTarget(
   });
 }
 
-function hasPickerActivation(): boolean {
+/** How long a save prepares before its "Preparing…" dialog appears. A save
+ * that is ready sooner goes straight to the file dialog and never shows one
+ * (ADR-656 Amendment 4). */
+export const PREPARING_DIALOG_DELAY_MS = 400;
+
+/** Whether a file picker may open now, without a fresh click.
+ *
+ * Chromium opens a picker only within 5 s of the last click or key press
+ * (transient activation); after that it throws SecurityError. The desktop app
+ * calls the same `showSaveFilePicker`, so its limit is the same 5 s (measured
+ * in Chrome 157 and the Electron renderer, ADR-656 Amendment 4). Opening a
+ * picker does not use the activation up. */
+export function hasPickerActivation(): boolean {
   // Without the User Activation API, the picker itself decides.
   const activation = (navigator as Partial<Pick<Navigator, 'userActivation'>>).userActivation;
   return activation?.isActive !== false;

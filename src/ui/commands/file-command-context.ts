@@ -3,6 +3,7 @@ import { handleImportGcodeArtwork } from '../app/import-gcode-artwork';
 import { handleExportPalette } from '../app/export-palette';
 import { confirmDiscardAsync } from '../app/confirm-discard';
 import { handleImportDxf, handleImportSvg, handleSaveProject } from '../app/file-actions';
+import { startGcodeSave } from '../app/gcode-save-flow';
 import {
   inspectCurrentGcodeAction,
   openGcodeInspectorAction,
@@ -23,7 +24,6 @@ import { selectedObjectIds } from './selection-command-state';
 import { desktopWindowCommandContext } from './desktop-window-command-context';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
-import { useUiStore } from '../state/ui-store';
 import type { useToastStore } from '../state/toast-store';
 
 type FileCommandContext = Pick<
@@ -114,7 +114,8 @@ export function fileCommandContext(
         pushToast,
       });
     },
-    saveGcode: () => useUiStore.getState().openGcodeSaveDialog(),
+    // Straight to the file dialog when the export is ready in time (ADR-656 Amendment 4).
+    saveGcode: () => startGcodeSave({ platform, pushToast }),
     // Options first (ADR-451); the dialog's Choose File... opens the picker.
     exportSvg: () => useExportSvgDialogStore.getState().show(),
     exportDxf: () => {

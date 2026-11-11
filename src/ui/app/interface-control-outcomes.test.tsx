@@ -22,6 +22,7 @@ import { DesktopCloseNotice } from './DesktopCloseNotice';
 import { desktopCloseController } from './desktop-close-runtime';
 import { ExternalGcodePreviewBanner } from './ExternalGcodePreviewBanner';
 import { GcodeSaveDialog } from './GcodeSaveDialog';
+import { useGcodeSaveFlowStore } from './gcode-save-flow';
 import { PlatformProvider } from './platform-context';
 
 let host: HTMLDivElement;
@@ -98,8 +99,11 @@ describe('individual shell control outcomes', () => {
   it('G-code Cancel closes without choosing or writing a destination', async () => {
     useStore.setState({ project: projectWithLine() });
     const pick = vi.fn(async () => null);
+    // The slow-save dialog (gcode-save-flow.test.tsx covers how it gets here).
+    const cancel = vi.fn(() => useGcodeSaveFlowStore.setState({ flow: null }));
+    useGcodeSaveFlowStore.setState({ flow: { kind: 'preparing', progress: null, cancel } });
     function Export(): JSX.Element {
-      const [open, setOpen] = useState(true);
+      const open = useGcodeSaveFlowStore((state) => state.flow !== null);
       return (
         <PlatformProvider
           adapter={{
@@ -109,12 +113,14 @@ describe('individual shell control outcomes', () => {
             serial: { isSupported: () => false, requestPort: async () => null },
           }}
         >
-          {open ? <GcodeSaveDialog onClose={() => setOpen(false)} /> : <span>Export closed</span>}
+          <GcodeSaveDialog />
+          {open ? null : <span>Export closed</span>}
         </PlatformProvider>
       );
     }
     await mount(<Export />);
     await click('Cancel');
+    expect(cancel).toHaveBeenCalledOnce();
     expect(pick).not.toHaveBeenCalled();
     expect(host.textContent).toBe('Export closed');
   });
