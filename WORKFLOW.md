@@ -474,6 +474,12 @@ destination and cannot overwrite the template source.
 1. Edit menu `Lock Selection` locks selected artwork and clears selection.
 2. Normal click, marquee, Select All, and transform tools skip locked objects.
 3. Edit menu `Unlock All` unlocks every locked object in the project.
+4. One object can be unlocked on its own (ADR-706). A locked row in the Artwork tree has
+   **Unlock**: an artwork row unlocks that artwork and selects it, and a group row unlocks the
+   locked artwork inside it. A right-click on locked artwork on the canvas opens the context menu
+   with **Unlock** first, which unlocks that object and selects it. Each is one undo step and
+   leaves every other lock in place. The name button of a locked row stays disabled and reads
+   `{name} is locked. Unlock it to select or edit it.`
 
 ---
 
@@ -946,7 +952,8 @@ the linked artwork.
   Numeric typing retains the 300 ms debounce. Mixed values show a neutral, disabled slider until
   an exact value is entered. **More cut settings**
   opens the full draft editor grouped by purpose; **Apply settings** commits the draft and
-  **Cancel** leaves the operation unchanged.
+  **Cancel** leaves the operation unchanged. It opens whatever the machine is doing, and an open
+  draft stays open when a job, jog, Frame or autofocus begins (ADR-706).
 - **Saved defaults** in More cut settings offers **Make Default for #rrggbb**, which remembers
   the operation's applied settings for the colour it names: the colour of the artwork the operation
   was created for, or the operation's own colour when it has no artwork. Further operations in this
@@ -1388,6 +1395,21 @@ that owns those fields, without changing the existing Frame/Start policy.
 1. Click toggle again (or `P`).
 2. Viewport returns to design view.
 3. Scrubber disappears.
+
+#### Editing while Preview is on (ADR-706)
+- Preview shows the job and not the selection, so the canvas only pans (`Space + drag`, the wheel
+  button or the right button) and zooms. Nothing on it can be selected, moved or drawn.
+- The first plain click on the canvas in each visit to Preview shows one line: `Preview shows the
+  job and cannot be edited. Press P or click Preview to go back to the design.` Later clicks in
+  that visit are quiet, a pan never shows it, and the line leaves with Preview.
+- The canvas tools in the left tool strip are disabled, each with the reason `Not available in
+  Preview. Press P or click Preview to edit.` Create artwork and the design library stay available.
+- A key that would change artwork changes nothing and shows the same line: Delete, Backspace, Cut,
+  Paste, Paste in Place, Duplicate, Group, Ungroup, Delete Duplicates, the nudge, flip and rotate
+  keys, the align, Move Together and draw-order keys, and the keys that arm a drawing tool. The key
+  is still consumed, so it never reaches the browser.
+- Undo, Redo, Copy, Select All, Escape, the view keys and `P` work as usual. Menu and toolbar
+  commands and the settings panels are unchanged; Preview rebuilds after each edit (Live updates).
 
 #### Live updates
 - Changes to any Layer's power/speed/passes/visible/output or object transform schedule a preview rebuild outside render. Stale scheduled or asynchronous builds are cancelled; the previous route stays painted until its replacement is ready.
@@ -1997,11 +2019,31 @@ are shown. Nothing here is a gate: Frame, Start and Save are unchanged.
 
 Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 
+#### Which control has the keyboard (ADR-706)
+- A text field keeps every key, so typing, Backspace and its own Undo work as in any field.
+- A control that holds no text keeps only the keys that work it. A slider keeps the arrow keys,
+  Home, End, PgUp and PgDn. A drop-down keeps those, Enter, Space and typed letters, which jump to
+  an option. A radio button keeps the arrows and Space, a tick box Space, and a colour or file
+  button Enter and Space.
+- Every other design shortcut still works while such a control has focus. Delete, Undo, Redo, Copy,
+  Paste and Escape act on the artwork straight after a tick box, slider or drop-down was used, with
+  no click on the canvas first.
+- Enter in a number field that commits on Enter also releases focus. It stays in the field when the
+  value is invalid, inside a dialog, in a table row that sorts on Enter, and on the numeric keypad's Enter (the keypad digits jog a
+  connected machine when no field has focus).
+- The machine keys are stricter: the jog keys and `Cmd/Ctrl+Return` do nothing while any form
+  control has focus.
+- In Preview the editing keys change nothing (F-A8).
+
 #### File
 - `Cmd/Ctrl+N` — New project
 - `Cmd/Ctrl+O` — Open project
 - `Cmd/Ctrl+S` — Save project
 - `Cmd/Ctrl+Shift+S` — Save Project As
+- While a dialog, Design Studio, Image Studio or on-canvas text has the keyboard, both Save keys
+  save nothing and one line says what to do first (apply the drawing or image and close the Studio,
+  finish the text, or close the window). The key never reaches the browser's own "Save page as"
+  (ADR-706)
 - `Cmd/Ctrl+I` — Import SVG, DXF, PDF/compatible AI, HPGL/PLT, PNG/JPG/BMP/GIF/TIFF/PSD or STL through the unified picker
 - `Cmd/Ctrl+Shift+E` — Save G-code (Export)
 
@@ -2027,7 +2069,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - Shift+Arrow — Nudge 10 mm
 - `Cmd/Ctrl+Arrow` — Nudge 0.1 mm (ADR-499; all three distances are set in Settings → Canvas)
 - Holding an arrow key slides the selection as one undo step. An arrow key on a focused tab strip,
-  slider, radio group, list or menu works that control and does not nudge (or align, with Alt);
+  slider, radio group, drop-down, list or menu works that control and does not nudge (or align, with Alt);
   from a plain button it still nudges (ADR-493, ADR-499 Amendment 1).
 - `Alt+Left` / `Alt+Right` / `Alt+Up` / `Alt+Down` — Align left / right / top / bottom (ADR-499)
 - `Alt+PgUp` / `Alt+PgDn` — Align centres on X / Y (ADR-499)

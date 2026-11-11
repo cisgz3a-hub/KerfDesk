@@ -4,7 +4,7 @@
 // selection commands, and Esc (cancel → close with the session kept, F-L1).
 
 import { invertMask, selectAllMask } from '../../core/image-select';
-import { isEditableShortcutTarget, isKeyboardActivationTarget } from '../common/keyboard-targets';
+import { isKeyboardActivationTarget, isTextEntryTarget } from '../common/keyboard-targets';
 import { useAdjustDialogStore } from './adjust-dialog-store';
 import type { EditorTool } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
@@ -31,11 +31,13 @@ export function handleEditorKeyDown(e: React.KeyboardEvent): void {
 }
 
 function nativeControlOwnsKey(e: React.KeyboardEvent): boolean {
-  // A button retains Enter/Space and plain tool letters, but Ctrl+Z still undoes
-  // the edit it just performed. Text fields retain their native editing keys.
+  // A button, slider, tick box or drop-down retains Enter/Space, its arrows and
+  // plain tool letters, but Ctrl+Z still undoes the edit it just performed (a
+  // dragged slider included, annoyance audit A4-P2-2). Text fields retain their
+  // native editing keys.
   return (
     e.defaultPrevented ||
-    isEditableShortcutTarget(e.target) ||
+    isTextEntryTarget(e.target) ||
     (!(e.ctrlKey || e.metaKey) && isKeyboardActivationTarget(e.target))
   );
 }

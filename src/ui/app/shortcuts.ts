@@ -30,7 +30,7 @@ import { handleUnifiedArtworkImport } from './import-dispatch';
 import { useStore } from '../state';
 import { useUiStore, type ToolMode } from '../state/ui-store';
 import { finishPen } from '../workspace/pen-tool';
-import { isEditableShortcutTarget, isEnterActivationTarget } from '../common/keyboard-targets';
+import { focusedControlOwnsKey, isEnterActivationTarget } from '../common/keyboard-targets';
 import { projectWithCurrentJobSetup } from '../state/project-job-setup';
 import type { NudgeSteps } from '../state/nudge-preferences';
 import { tryNudge } from './nudge-step';
@@ -107,8 +107,10 @@ function hasMeta(e: KeyboardEvent): boolean {
   return e.ctrlKey || e.metaKey;
 }
 
+// A text field owns every key; a tick box, slider or drop-down only the keys
+// that work it (keyboard-targets.ts, annoyance audit A4-P2-2).
 function isEditableTarget(e: KeyboardEvent): boolean {
-  return isEditableShortcutTarget(e.target);
+  return focusedControlOwnsKey(e);
 }
 
 // Ctrl+E moved to the Ellipse tool (LightBurn parity, ADR-051 B7); export
@@ -339,7 +341,9 @@ export function handleEditShortcut(e: KeyboardEvent, ctx: EditCtx): boolean {
   // handlers eat Backspace (deletes the selected scene object) and
   // Cmd+A (selects every scene object), making text dialogs and
   // number inputs unusable. Mirrors the same check on
-  // handleTransformShortcut / handleViewShortcut.
+  // handleTransformShortcut / handleViewShortcut. A control that holds no
+  // text (tick box, slider, colour button, drop-down) keeps only its own keys,
+  // so these shortcuts still work straight after one was used.
   if (isEditableTarget(e)) return false;
   for (const binding of EDIT_BINDINGS) {
     if (binding.match(e)) {

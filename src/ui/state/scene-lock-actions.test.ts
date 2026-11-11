@@ -69,3 +69,51 @@ describe('scene lock actions', () => {
     expect(useStore.getState().project.scene.objects[0]?.transform).toEqual(before);
   });
 });
+
+describe('unlocking one object (annoyance audit A4-P2-3)', () => {
+  beforeEach(() => resetStore());
+
+  it('unlocks only the named objects as one undoable dirty edit', () => {
+    useStore.getState().importSvgObject({ ...svgObj('A', ['#ff0000']), locked: true });
+    useStore.getState().importSvgObject({ ...svgObj('B', ['#00ff00']), locked: true });
+    useStore.getState().importSvgObject({ ...svgObj('C', ['#0000ff']), locked: true });
+    useStore.setState({ undoStack: [], dirty: false });
+
+    useStore.getState().unlockObjects(['B']);
+
+    const state = useStore.getState();
+    expect(state.project.scene.objects.map((object) => object.locked)).toEqual([
+      true,
+      undefined,
+      true,
+    ]);
+    expect(state.undoStack).toHaveLength(1);
+    expect(state.dirty).toBe(true);
+
+    // The freed object can be selected again; its locked neighbours cannot.
+    useStore.getState().selectObjects(['A', 'B', 'C']);
+    expect(useStore.getState().selectedObjectId).toBe('B');
+    expect([...useStore.getState().additionalSelectedIds]).toEqual([]);
+
+    useStore.getState().undo();
+    expect(useStore.getState().project.scene.objects.map((object) => object.locked)).toEqual([
+      true,
+      true,
+      true,
+    ]);
+  });
+
+  it('changes nothing, and adds no undo step, for unlocked or unknown objects', () => {
+    useStore.getState().importSvgObject(svgObj('A', ['#ff0000']));
+    useStore.setState({ undoStack: [], dirty: false });
+    const before = useStore.getState().project;
+
+    useStore.getState().unlockObjects(['A']);
+    useStore.getState().unlockObjects(['missing']);
+    useStore.getState().unlockObjects([]);
+
+    expect(useStore.getState().project).toBe(before);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+    expect(useStore.getState().dirty).toBe(false);
+  });
+});
