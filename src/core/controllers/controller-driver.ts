@@ -168,7 +168,7 @@ export type ControllerDriver = {
    *  datagram link (ADR-697); absent for every serial driver. */
   readonly datagramNetwork?: DatagramNetworkCapabilities;
   /** Present when the app can reach this controller over its own USB link
-   *  (ADR-702, ADR-705); absent for every serial driver. */
+   *  (ADR-703); absent for every serial driver. */
   readonly usbLink?: UsbLinkCapabilities;
   readonly realtime: ControllerRealtime;
   readonly commands: ControllerCommands;

@@ -20,9 +20,9 @@ import type { ControllerDriver } from '../controller-driver';
  *  L425-441), and the board runs the program it holds to its end. */
 export const MOSHI_USB_CAPABILITIES: UsbLinkCapabilities = {
   // Programs streamed one at a time over EPP (controller.py L597-695).
-  start: 'stream-programs',
+  start: 'stream-packets',
   // A laser-off vector program around the job's bounds (moshi-frame.ts).
-  frame: 'travel-only-program',
+  frame: 'travel-only',
   pause: false,
   resume: false,
   // The estop address write (builder.py `stop` L734-742).
@@ -30,7 +30,7 @@ export const MOSHI_USB_CAPABILITIES: UsbLinkCapabilities = {
   // A move to the board's 0,0 at 40 mm/s (driver.py `home` L481-493).
   home: true,
   // Byte 1 of the CH341 status read: 205 OK, 207 busy, 237 error (L35-38).
-  status: 'ch341-status',
+  status: 'status-byte',
   jog: false,
   console: false,
   settings: false,

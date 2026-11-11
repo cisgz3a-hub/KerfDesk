@@ -51,7 +51,7 @@ read for this decision and reimplemented in TypeScript (no source copied; the MI
 
 1. **A separate link and store, as for Ruida.** `ControllerKind` gains `'moshi'`. The driver is
    `transport: 'file-only'` for the line-based store, so its Connect, jog, console and Start stay
-   off, and it lists a new optional `usbLink` capability object (`MOSHI_USB_CAPABILITIES`). The
+   off, and it lists the optional `usbLink` capabilities ADR-703 adds (`MOSHI_USB_CAPABILITIES`). The
    Moshi USB store (`ui/state/moshi-usb/`) drives `core/controllers/moshi/moshi-link-session.ts`
    over the shared CH341 EPP driver (ADR-702). The panel mounts only when the platform has a USB
    link and the driver lists `usbLink` (no `kind` check, ADR-094), and loads lazily: the encoder,

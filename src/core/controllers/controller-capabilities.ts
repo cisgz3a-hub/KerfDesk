@@ -60,19 +60,18 @@ export type DatagramNetworkCapabilities = {
   readonly overrides: false;
 };
 
-/** A live USB link outside the line-based controller store (ADR-702: the
- *  shared USB link; ADR-705: Moshiboard over a CH341). Each control it offers
- *  is listed; the UI mounts only those, and every other machine control stays
- *  off. `start` and `frame` name how the job and the laser-off Frame go out. */
+/** A live link over USB outside the line-based controller store (ADR-703:
+ *  a Lihuiyu board behind its CH341 bridge). Each control it offers is listed;
+ *  the UI mounts only those, and every other machine control stays off. */
 export type UsbLinkCapabilities = {
-  readonly start: 'stream-programs';
-  readonly frame: 'travel-only-program';
+  readonly start: 'stream-packets';
+  readonly frame: 'travel-only';
   readonly pause: boolean;
   readonly resume: boolean;
   readonly abort: boolean;
   readonly home: boolean;
-  readonly status: 'ch341-status' | 'none';
-  readonly jog: false;
+  readonly jog: 'relative' | false;
+  readonly status: 'status-byte';
   readonly console: false;
   readonly settings: false;
   readonly origin: false;
