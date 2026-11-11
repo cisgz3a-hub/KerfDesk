@@ -12,7 +12,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { useDialogA11y } from '../common/use-dialog-a11y';
-import { isEditableShortcutTarget } from '../common/keyboard-targets';
+import { focusedControlOwnsKey } from '../common/keyboard-targets';
 import { useRegisterModal } from '../common/use-register-modal';
 import { useStore } from '../state';
 import { DesignCanvas } from './DesignCanvas';
@@ -126,7 +126,7 @@ function handlePhotoWorkspaceKey(
     !event.ctrlKey &&
     !event.metaKey &&
     !event.altKey &&
-    !isEditableShortcutTarget(event.target)
+    !focusedControlOwnsKey(event)
   ) {
     event.preventDefault();
     onBack();

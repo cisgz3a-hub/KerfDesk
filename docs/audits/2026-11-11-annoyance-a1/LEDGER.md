@@ -50,12 +50,12 @@ The annoyance is around that path, and it has four causes:
 | A3-P2-3 | **A lid opened at Idle leaves a controller reset as the only way out on screen**; the reset can clear the origin | Every material load on such machines | ADR-375 item 10 | open |
 | A3-P2-4 | **Console: Enter does nothing while blocked, and each line blocks the next for up to a second** with a message about jogging | Every quick pair of console lines | No | open |
 | A4-P2-1 | **Autosave is off for the whole length of a job**, so work drawn meanwhile has no recovery copy. Contradicts WORKFLOW F-C3 | Every job | No | open |
-| A4-P2-2 | **After touching a checkbox, slider or dropdown, Delete, Ctrl+Z, copy/paste and arrows do nothing** until the canvas is clicked | Every session | For text fields only | open |
-| A4-P2-3 | **Locked artwork can only be freed with "Unlock All"** | Every session for users who lock | No | open |
+| A4-P2-2 | **After touching a checkbox, slider or dropdown, Delete, Ctrl+Z, copy/paste and arrows do nothing** until the canvas is clicked | Every session | For text fields only | fixed (ADR-706): reproduced; a control that holds no text keeps only its own keys, and Enter in a `DraftNumberInput` releases focus. The jog and Start keys keep the broad rule |
+| A4-P2-3 | **Locked artwork can only be freed with "Unlock All"** | Every session for users who lock | No | fixed (ADR-706): reproduced; Unlock on the locked tree row and on a canvas right-click, one undo step |
 | A4-P2-4 | **Save G-code always shows a modal and needs a second click**, even when the file is ready at once; a failure costs two dismissals | Every export | ADR-656 in part | open |
-| A4-P2-5 | **In Preview the canvas silently becomes pan-only**, yet Delete and arrows still change the hidden selection | Every session with Preview on | No | open |
-| A4-P2-6 | **Ctrl+S does nothing inside Design Studio or Image Studio** (in a browser it opens "Save page as") | Every Studio session | ADR-242, 272 | open |
-| A4-P2-7 | **"More cut settings" greys out with no reason during a job or jog**, and an open draft is closed and dropped | Every job | No | open |
+| A4-P2-5 | **In Preview the canvas silently becomes pan-only**, yet Delete and arrows still change the hidden selection | Every session with Preview on | No | fixed (ADR-706): reproduced; hint on the first ignored click, tool strip disabled with a reason, editing keys change nothing. Menu and toolbar edit commands still act in Preview |
+| A4-P2-6 | **Ctrl+S does nothing inside Design Studio or Image Studio** (in a browser it opens "Save page as") | Every Studio session | ADR-242, 272 | fixed (ADR-706): reproduced; Ctrl+S is always consumed and one line says what to do first. Nothing is saved from a Studio |
+| A4-P2-7 | **"More cut settings" greys out with no reason during a job or jog**, and an open draft is closed and dropped | Every job | No | fixed (ADR-706): reproduced; no safety reason found, so the dialog opens during a job and an open draft stays open |
 | A5-P2-1 | **An autosave failure is said once, in an 8 s toast, with no lasting sign** | Rare, but it is the time that matters | No | open |
 | A5-P2-2 | **Jog warnings raise a new long toast on every click** on a machine that has not homed | Every click | Warn-only yes (ADR-232); per-click no | open |
 | A5-P2-3 | **Closing with "Don't Save" still brings "Restore it?" at the next launch** | Every unsaved close | ADR-688 decision 3 | open; needs the maintainer's word |
@@ -102,7 +102,7 @@ Each group is one fix session. Wording changes keep G-code byte-identical.
 | F1 In-app confirm, alert and prompt | A1-P2-1, A1-P2-3, A1-P2-4, A1-P3-1 to P3-9, A4-P3-5 | A promise-based confirm/alert/prompt built on `kit/Dialog`, replacing `job-aware-dialogs.ts`. It does not freeze the page, so it need not be refused during a job; it gives named buttons, an inline name field and "don't ask again" |
 | F2 Toast store | A5-P2-2, A5-P2-5, A5-P2-6, A5-P3-4, A5-P3-5 | Keyed slots for repeat warnings, lifetime by length, pause on hover, one summary per action, a notice history |
 | F3 Notification settings | A5-P2-7, A5-P2-4, A5-P3-1 to P3-3 | Settings > Notifications; remembered dismissals; "seen" folding for repeat advisories |
-| F4 Keyboard and canvas | A4-P2-2, A4-P2-5, A4-P2-6, A4-P2-3 | Text-like inputs only block shortcuts; Preview hint and gates; Ctrl+S through modals; per-item Unlock |
+| F4 Keyboard and canvas | A4-P2-2, A4-P2-5, A4-P2-6, A4-P2-3, A4-P2-7 | **Done (ADR-706).** Text-like inputs only block shortcuts; Preview hint and gates; Ctrl+S consumed in modals with a hint; per-item Unlock; Cut Settings opens during a job |
 | F5 Autosave | A4-P2-1, A5-P2-1 | Autosave during a job through the worker; a status chip while the last write failed |
 | F6 Save dialogs | A4-P2-4, A1-P3-9, A4-P3-2 | Open the picker at once when preparation is quick; failure text inside the dialog |
 | F7 Jog and Console | A3-P2-2, A3-P2-4, A3-P3-1, A3-P3-4, A3-P3-5 | Fix the step-jog wiring with a `LaserWindow` test; status report after each console `ok`; reasons on disabled controls; plain wording |

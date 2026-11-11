@@ -62,8 +62,28 @@ export function DraftNumberInput({
         if (event.key === 'Enter' && !event.defaultPrevented) {
           if (commitOnBlur) event.preventDefault();
           field.onBlur();
+          releaseFocusAfterEnter(event, field.errorMessage);
         }
       }}
     />
   );
+}
+
+// Enter means "done": the value is committed, so the field lets go of the
+// keyboard and Delete, Ctrl+Z and the arrow keys reach the artwork again
+// (annoyance audit A4-P2-2). Three cases keep focus:
+//   * a field with an error, so it can be corrected;
+//   * a field inside a dialog, which owns the keyboard and would hand a
+//     released focus to its first control;
+//   * Enter on the numeric keypad. With a machine connected the keypad digits
+//     jog the head whenever no field has focus (ADR-493), so someone typing
+//     the next number on the keypad must stay in the field.
+function releaseFocusAfterEnter(
+  event: React.KeyboardEvent<HTMLInputElement>,
+  errorMessage: string | null,
+): void {
+  if (errorMessage !== null || event.code === 'NumpadEnter') return;
+  const input = event.currentTarget;
+  if (input.closest('[role="dialog"], [role="alertdialog"], [aria-modal="true"]') !== null) return;
+  input.blur();
 }
