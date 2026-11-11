@@ -5,8 +5,9 @@
 // exact its outlines are. Job Review names each such code. A warning, never a
 // refusal (PROJECT.md non-negotiable 21).
 //
-// Matrix codes (QR Code, Data Matrix) lose rows whatever the scan angle. A 1D
-// code loses bars only when every line runs along its bars: any other angle,
+// Matrix codes (QR Code, Data Matrix) lose rows whatever the scan angle once
+// the interval passes the module. A 1D code is at risk only when every line
+// runs along its bars, and then already past half a module: any other angle,
 // or a cross-hatch pass, crosses every bar and keeps its widths exact. Follow
 // Shape fills trace each outline first, so they are not checked.
 
@@ -41,11 +42,15 @@ export function detectBarcodeLineIntervalWarnings(project: Project): ReadonlyArr
   const extra = warnings.length - MAX_NAMED_BARCODES;
   return [
     ...warnings.slice(0, MAX_NAMED_BARCODES),
-    `${extra} more barcode${extra === 1 ? ' has' : 's have'} modules narrower than the Fill line interval.`,
+    `${extra} more barcode${extra === 1 ? ' has' : 's have'} modules too narrow for the Fill line interval.`,
   ];
 }
 
-type Finding = { readonly moduleMm: number; readonly intervalMm: number };
+type Finding = {
+  readonly moduleMm: number;
+  readonly intervalMm: number;
+  readonly bars: boolean;
+};
 
 function coarsestSkippingInterval(
   object: BarcodeObject,
@@ -54,17 +59,22 @@ function coarsestSkippingInterval(
 ): Finding | null {
   const moduleMm = placedModuleMm(object);
   if (moduleMm === null) return null;
+  const matrix = isMatrixSymbology(object.spec.symbology);
   let worst: Finding | null = null;
   for (const operation of operations) {
     if (!sceneObjectUsesOperation(object, operation)) continue;
     const effective = effectiveOperationForObject(operation, object);
     if (effective.mode !== 'fill' || effective.fillStyle === 'offset') continue;
-    if (!(effective.hatchSpacingMm > moduleMm + INTERVAL_SLACK_MM)) continue;
-    if (!isMatrixSymbology(object.spec.symbology) && !scansAlongBars(object, effective, signs)) {
-      continue;
-    }
+    // A 1D code scanned along its bars takes each bar's width from whole
+    // lines, so above half a module the widths drift past what a reader
+    // tolerates (the refuter's edge-to-similar-edge decode failed at 0.2 mm
+    // lines on 0.33 mm modules). A matrix code is read at module centres and
+    // fails once whole rows get no line.
+    const limit = matrix ? moduleMm : moduleMm / 2;
+    if (!(effective.hatchSpacingMm > limit + INTERVAL_SLACK_MM)) continue;
+    if (!matrix && !scansAlongBars(object, effective, signs)) continue;
     if (worst === null || effective.hatchSpacingMm > worst.intervalMm) {
-      worst = { moduleMm, intervalMm: effective.hatchSpacingMm };
+      worst = { moduleMm, intervalMm: effective.hatchSpacingMm, bars: !matrix };
     }
   }
   return worst;
@@ -105,9 +115,11 @@ function message(id: string, finding: Finding): string {
   const interval = finding.intervalMm.toFixed(2);
   // Rounded down, so the advice never exceeds half the module.
   const advised = (Math.floor((finding.moduleMm / 2) * 100) / 100).toFixed(2);
+  const effect = finding.bars
+    ? 'its lines run along the bars, so bar widths come out uneven and the code may not scan'
+    : 'whole rows of modules get no line and the code will not scan';
   return (
-    `Barcode ${id} has ${module} mm modules but a ${interval} mm Fill line interval, so whole ` +
-    `rows of modules get no line and the code will not scan. Set the interval to ${advised} mm ` +
-    'or less, or make the code larger.'
+    `Barcode ${id} has ${module} mm modules but a ${interval} mm Fill line interval, and ` +
+    `${effect}. Set the interval to ${advised} mm or less, or make the code larger.`
   );
 }

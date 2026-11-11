@@ -21,9 +21,11 @@ the interval. The minimum-feature check (ADR-433) skips Fill operations.
    output Fill operation whose effective line interval, including a per-object override, is wider
    than the code's module as placed (the dialog's module size times the object's scale). The
    message gives both sizes and advises an interval of half the module or less.
-2. Matrix codes (QR Code, Data Matrix) are checked at any scan angle. A 1D code is checked only when
-   every line runs along its bars (within 1 degree, in machine coordinates, with no cross-hatch).
-   Any other angle crosses every bar, so bar widths stay exact.
+2. Matrix codes (QR Code, Data Matrix) are checked at any scan angle, against the module. A 1D
+   code is checked only when every line runs along its bars (within 1 degree, in machine
+   coordinates, with no cross-hatch), and then against half the module: each bar's width is made
+   of whole lines, and the audit's refuter found an edge-to-similar-edge decode failing at 0.2 mm
+   lines on 0.33 mm modules. Any other angle crosses every bar, so bar widths stay exact.
 3. Follow Shape (offset) fills trace each outline first and are not checked. Line operations are
    not checked.
 4. It is a warning and never a refusal (PROJECT.md non-negotiable 21). At most four codes are named,

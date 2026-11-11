@@ -98,7 +98,7 @@ describe('barcodes whose modules are narrower than the Fill line interval', () =
   it('names a QR Code whose modules are narrower than its line interval', () => {
     const project = projectWith([code('tag', 'qr', { moduleMm: 0.25 })], { hatchSpacingMm: 0.3 });
     const expected =
-      'Barcode tag has 0.25 mm modules but a 0.30 mm Fill line interval, so whole rows of ' +
+      'Barcode tag has 0.25 mm modules but a 0.30 mm Fill line interval, and whole rows of ' +
       'modules get no line and the code will not scan. Set the interval to 0.12 mm or less, ' +
       'or make the code larger.';
     expect(detectBarcodeLineIntervalWarnings(project)).toEqual([expected]);
@@ -134,6 +134,18 @@ describe('barcodes whose modules are narrower than the Fill line interval', () =
     expect(detectBarcodeLineIntervalWarnings(across)).toEqual([]);
     const along = projectWith([code('bars', 'code128')], { ...coarse, hatchAngleDeg: 90 });
     expect(detectBarcodeLineIntervalWarnings(along)).toHaveLength(1);
+    // Along the bars, an interval above half the 0.33 mm module already skews widths.
+    const halfModule = projectWith([code('bars', 'code128')], {
+      hatchSpacingMm: 0.2,
+      hatchAngleDeg: 90,
+    });
+    expect(detectBarcodeLineIntervalWarnings(halfModule)).toEqual([
+      'Barcode bars has 0.33 mm modules but a 0.20 mm Fill line interval, and its lines run ' +
+        'along the bars, so bar widths come out uneven and the code may not scan. Set the ' +
+        'interval to 0.16 mm or less, or make the code larger.',
+    ]);
+    const halfModuleAcross = projectWith([code('bars', 'code128')], { hatchSpacingMm: 0.2 });
+    expect(detectBarcodeLineIntervalWarnings(halfModuleAcross)).toEqual([]);
     const crossHatched = projectWith([code('bars', 'code128')], {
       ...coarse,
       hatchAngleDeg: 90,
@@ -170,6 +182,6 @@ describe('barcodes whose modules are narrower than the Fill line interval', () =
     );
     const warnings = detectBarcodeLineIntervalWarnings(many);
     expect(warnings).toHaveLength(5);
-    expect(warnings[4]).toBe('2 more barcodes have modules narrower than the Fill line interval.');
+    expect(warnings[4]).toBe('2 more barcodes have modules too narrow for the Fill line interval.');
   });
 });
