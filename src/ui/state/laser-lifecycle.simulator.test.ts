@@ -259,7 +259,13 @@ describe('laser lifecycle against the GRBL simulator', () => {
     });
     await useLaserStore.getState().stopJob();
     unsubscribe();
-    expect(seenWithError[0]).toEqual({ reason: 'operator', streamerEpoch: epoch });
+    // With the kind the job started as, read before the stop clears it
+    // (ADR-341 Amendment 14).
+    expect(seenWithError[0]).toEqual({
+      reason: 'operator',
+      streamerEpoch: epoch,
+      jobMachineKind: 'laser',
+    });
     await pump(50);
     expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
   });

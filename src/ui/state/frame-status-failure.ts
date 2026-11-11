@@ -54,10 +54,13 @@ export function jogMpgInterruptionPatch(
   const {
     cancelStatusQueryAfterSequence: staleFence,
     cancelAttemptId: interruptedCancel,
+    // A pendant takeover voids a Frame held through this jog (ADR-565 Amd 1).
+    heldFrame: droppedFrame,
     ...interrupted
   } = operation;
   void staleFence;
   void interruptedCancel;
+  void droppedFrame;
   const message = JOG_MPG_INTERRUPTION_MESSAGE;
   return {
     motionOperation: {

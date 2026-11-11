@@ -13,6 +13,7 @@ import {
   idleControllerStatusForFrameTest,
   installReviewPendingFramedRunPermitForCurrentState,
 } from './framed-run-testing';
+import { JOG_KEEPS_FRAME_STATUS } from './JobActionControls';
 import { LaserWindow } from './LaserWindow';
 import type * as StartJobFlow from './start-job-flow';
 import { useStartBlockerStore } from './start-blocker-store';
@@ -173,6 +174,50 @@ describe('Workspace job dock', () => {
     expect(host.textContent).toContain('Frame expired');
     expect(button('Frame job').dataset['primary']).toBe('true');
     expect(button('Start').dataset['primary']).toBe('false');
+  });
+
+  // ADR-565 Amendment 1: an XY jog under a fixed placement carries the Frame.
+  it('keeps Start off during a jog that carries the Frame, without calling it expired', async () => {
+    installArtwork();
+    connectIdle();
+    const permit = await installReviewPendingFramedRunPermitForCurrentState();
+    render(<WorkspaceJobActions />);
+    expect(host.textContent).toContain('Ready to start — framed placement unchanged');
+
+    act(() =>
+      useLaserStore.setState({
+        framedRun: null,
+        completedFrame: null,
+        frameVerification: null,
+        statusReport: { ...idleControllerStatusForFrameTest(), state: 'Jog' },
+        motionOperation: {
+          operationId: 2,
+          kind: 'jog',
+          sawControllerBusy: true,
+          idleStatusReports: 0,
+          dispatchComplete: true,
+          pendingLines: [],
+          heldFrame: { frame: permit, armed: true },
+        },
+      }),
+    );
+    expect(button('Start').disabled).toBe(true);
+    expect(button('Start').title).toContain('Start unlocks when the head stops');
+    expect(host.textContent).toContain(JOG_KEEPS_FRAME_STATUS);
+    expect(host.textContent).not.toContain('Frame expired');
+    expect(host.textContent).not.toContain('Not framed');
+
+    act(() =>
+      useLaserStore.setState({
+        framedRun: permit,
+        completedFrame: permit,
+        frameVerification: permit.candidate.frameVerification,
+        statusReport: idleControllerStatusForFrameTest(),
+        motionOperation: null,
+      }),
+    );
+    expect(button('Start').disabled).toBe(false);
+    expect(host.textContent).toContain('Ready to start — framed placement unchanged');
   });
 
   it('mounts one estimator and action pair while preserving setup, placement, recovery, and console', () => {
