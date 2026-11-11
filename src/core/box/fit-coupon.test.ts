@@ -74,7 +74,7 @@ describe('generateFitCoupon', () => {
   });
 
   // O4-P2-1: the generator leaves kerf to the cutting layer (default kerf
-  // offset 0), so on such a layer every rung ≥ 0 is loose by the kerf. The
+  // offset 0), so on such a layer every rung ≥ 0 is loose by about twice the kerf. The
   // ladder must reach the press fits (negative clearance) the Box Generator
   // accepts, with the same |c| < min(f, T)/2 bound.
   it('starts the ladder below zero to reach press fits, bounded like the generator', () => {

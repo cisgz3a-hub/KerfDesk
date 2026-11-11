@@ -4,8 +4,10 @@
 // that presses right on the bench IS the clearance to type into the Box
 // Generator. The ladder may start below zero (ADR-119 Amendment 1): kerf is
 // compensated by the cutting layer, not here, so on a layer without a kerf
-// offset every rung is loose by the kerf and the press fit is negative. Rung order is read from the narrow-margin end (half a finger
-// at the start, two fingers at the end) — deliberately no cut index marks:
+// offset every rung is loose by about twice the kerf (each cut edge loses
+// half a beam width) and the press fit is negative. Rung order is read
+// from the narrow-margin end (half a finger at the start, two fingers at
+// the end) — deliberately no cut index marks:
 // any small protrusion or notch has reflex junctions the CNC relief pass
 // would sliver. CNC mode runs both strips through the shared relief pass,
 // exactly like panels.
@@ -69,7 +71,7 @@ function validate(spec: FitCouponSpec): BoxSpecIssue[] {
   }
   // A negative rung is a press fit, the same |c| bound the Box Generator
   // accepts (box-spec collectClearanceIssues). A layer that cuts without kerf
-  // compensation makes every rung loose by the kerf, so the ladder must be
+  // compensation makes every rung loose by about twice the kerf, so the ladder must be
   // able to start below zero to find the fit that layer needs.
   if (-spec.startClearanceMm >= limitMm) {
     issues.push({

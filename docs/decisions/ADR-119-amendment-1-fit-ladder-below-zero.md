@@ -6,15 +6,18 @@
 
 ADR-106 and ADR-116 leave laser kerf to the cutting layer: the generator draws nominal panels and the
 compile-time kerf offset widens outlines and narrows holes. A new layer's kerf offset is 0
-(`LAYER_DEFAULTS.kerfOffsetMm`). On such a layer the beam removes about half the kerf from every
-cut edge, so each tab comes out one kerf narrower and each notch one kerf wider than drawn: the
-physical play of a joint drawn with clearance `c` is about `c + kerf`.
+(`LAYER_DEFAULTS.kerfOffsetMm`). On such a layer the beam removes about half the kerf (beam
+width `k`) from every cut edge, so each tab comes out `k` narrower and each notch `k` wider than
+drawn: the physical play of a joint drawn with clearance `c` is about `c + 2k`. Job Review already
+warns about box panels on a 0 mm kerf Line operation and advises entering a measured kerf "or
+cut the fit coupon on the intended material first" (`job-intent-warnings.ts`).
 
 The Box Generator already accepts a negative clearance for closed, open-top and open-front boxes
 (`|c| < min(cell, T)/2`, "a negative c grows tabs into a press fit"). The Box Fit Test did not:
 it refused a ladder start below 0 and its default ladder runs 0.05 to 0.30 mm. On a laser layer
-without a kerf offset every rung was therefore loose by at least the kerf, and no rung could
-press right, although ADR-119 promises that the rung that feels right is the number to type.
+without a kerf offset every rung was therefore loose by at least `2k`, and no rung could press
+right, although ADR-119 promises that the rung that feels right is the number to type. The
+coupon route the Job Review warning offers was a dead end on exactly the layers it warns about.
 
 For comparison, boxes.py bakes its own kerf correction into every part: its `burn` setting is
 half the kerf, defaults to 0.1 mm, and "bigger values make a tighter fit" (boxes.py user manual).

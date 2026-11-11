@@ -9232,7 +9232,7 @@ Simulator-tested only; no real Ruida has run this path.
 #### Edge — laser layer without a kerf offset
 
 1. Kerf is compensated by the cutting layer, not the coupon. On a layer
-   whose kerf offset is 0 every rung is loose by about the kerf. The
+   whose kerf offset is 0 every rung is loose by about twice the kerf. The
    ladder start may be negative (a press fit) down to the same bound as
    the Box Generator, and the laser dialog says so.
 
