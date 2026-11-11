@@ -39,6 +39,14 @@ speed-code constants. The attribution, scope and full MIT notice are in
 `docs/licensing/meerk40t-lihuiyu.txt` and are included in the generated release
 notices. No MeerK40t interface, artwork or Python code is bundled.
 
+The experimental Moshiboard support (ADR-705) reimplements in TypeScript the
+Moshi protocol from MeerK40t (MIT) at commit
+`d511944e08788e88077727f682957759884ff5ca`: the command numbers, the
+command-byte bit permutation and its swizzle table, the program byte layout,
+the status codes and the send order. No MeerK40t source file is bundled. The
+attribution and full permission notice are in `docs/licensing/meerk40t-moshi.txt`
+and are included in the generated release notices.
+
 The Blue Noise dither (ADR-649) transcribes the integer error-filter weights
 from Appendix I of Victor Ostromoukhov, "A Simple and Efficient
 Error-Diffusion Algorithm" (SIGGRAPH 2001). The paper states the author's

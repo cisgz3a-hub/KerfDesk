@@ -355,6 +355,10 @@ async function stopWithOwnedReset(
             reason,
             streamerEpoch: state.streamerEpoch,
             ...g92OriginAtStop(state),
+            // Read here too: the stop outcome clears the job's own kind.
+            ...(state.activeJobMachineKind === null
+              ? {}
+              : { jobMachineKind: state.activeJobMachineKind }),
           },
         }),
     ...(state.streamer === null
@@ -482,5 +486,7 @@ function rotaryStartTurnAtStop(state: LaserState): RotaryStartTurn | null {
   if (axis === null || wco === null) return null;
   const value =
     axis === 'A' ? wco.a : wco.z * (state.controllerSettings?.reportInches === true ? 25.4 : 1);
-  return value === undefined || !Number.isFinite(value) ? null : { axis, machine: value };
+  return value === undefined || !Number.isFinite(value)
+    ? null
+    : { axis, machine: value, machineZeroEpoch: state.machineZeroEpoch ?? 0 };
 }

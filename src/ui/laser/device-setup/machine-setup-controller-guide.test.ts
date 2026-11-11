@@ -27,6 +27,7 @@ describe('machineSetupControllerGuide', () => {
       'smoothieware',
       'ruida',
       'lihuiyu',
+      'moshi',
     ]);
     for (const guide of guides) {
       const driver = selectControllerDriver(guide.kind);

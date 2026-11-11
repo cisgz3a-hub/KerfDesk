@@ -73,7 +73,7 @@ G54
 G94
 M4 S0
 ; image layer stamp color #0000ff power 80%
-; 122 x 14 px, 12.200 x 14.000 mm
+; 120 x 12 px, 12.000 x 12.000 mm
 ; feed 3000 mm/min, overscan 5.000 mm, dot width correction 0.000 mm
 M5
 M4 S0
@@ -821,7 +821,7 @@ G54
 G94
 M4 S0
 ; image layer stamp color #0000ff power 80%
-; 122 x 14 px, 12.200 x 14.000 mm
+; 120 x 12 px, 12.000 x 12.000 mm
 ; feed 3000 mm/min, overscan 5.000 mm, dot width correction 0.000 mm
 M5
 M4 S0

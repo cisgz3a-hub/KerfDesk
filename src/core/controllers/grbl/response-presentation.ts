@@ -115,7 +115,9 @@ const FLUIDNC_ERRORS = new Map<number, ErrorPresentation>(
 // limit feed-holds before it alarms, and probe and G-code failures stop
 // between moves, so those keep position. Every other code is conservative
 // (true), as the grblHAL table is: re-homing after a stop KerfDesk cannot
-// explain is the safe default (ADR-644).
+// explain is the safe default (ADR-644). Unlock keeps the reported position
+// only for a code marked false, so false needs a firmware source
+// (alarm-position-kept.ts, ADR-367 Amendment 3).
 const FLUIDNC_ALARM_ENTRIES = [
   [1, 'Hard Limit', true],
   [2, 'Soft Limit', false],

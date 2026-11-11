@@ -9,6 +9,7 @@ import { grblDriver } from './grbl/driver';
 import { grblHalDriver } from './grblhal/driver';
 import { lihuiyuDriver } from './lihuiyu/driver';
 import { marlinDriver } from './marlin/driver';
+import { moshiDriver } from './moshi/driver';
 import { ruidaDriver } from './ruida/driver';
 import { smoothiewareDriver } from './smoothieware/driver';
 import { withFalconCommandContract } from './falcon-command-contract';
@@ -26,6 +27,7 @@ const DRIVERS: Readonly<Record<ControllerKind, ControllerDriver>> = {
   smoothieware: smoothiewareDriver,
   ruida: ruidaDriver,
   lihuiyu: lihuiyuDriver,
+  moshi: moshiDriver,
 };
 
 export function selectControllerDriver(

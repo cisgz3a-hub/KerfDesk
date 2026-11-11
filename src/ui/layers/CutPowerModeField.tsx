@@ -22,6 +22,14 @@ export function CutPowerModeField(props: {
       </p>
     );
   }
+  if (props.controllerKind === 'moshi') {
+    return (
+      <p className="lf-subheading">
+        A Moshiboard has no power control: the beam fires at the power set on the machine whenever
+        this layer's power is above 0.
+      </p>
+    );
+  }
   if (props.controllerKind === 'ruida') {
     return (
       <p className="lf-subheading">

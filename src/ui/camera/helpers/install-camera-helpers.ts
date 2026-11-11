@@ -31,9 +31,9 @@ import { watchCanvasTargetBurns } from '../calibrate/canvas-target-burn';
 import { AFTER_SETTLE_MS } from '../job-watch/job-watch-runner';
 import { localCameraBridgeAvailable } from '../panel/camera-platform-capability';
 import { lastSourceKind, startRememberedCamera, type CameraStartDeps } from './auto-start';
-import { captureSourceFrame } from '../frame-source';
 import { useCameraHelpersStore } from './camera-helpers-store';
-import { checkCameraMoved } from './moved-check';
+import { checkCameraMovedInWorker, rgbaView } from './moved-check';
+import { checkStartedCameraMoved } from './moved-check-capture';
 import { scheduleAfterJobRefresh } from './schedule-after-job-refresh';
 import { refreshCameraPicture, reportRefresh, takePendingRefresh } from './refresh-picture';
 
@@ -117,7 +117,10 @@ function checkForMoves(): () => void {
     const { sourceState } = state;
     if (sourceState.kind !== 'live') return;
     if (state.overlayStill !== null && state.overlayStill !== previous.overlayStill) {
-      checkCameraMoved(sourceState.source, state.overlayStill);
+      // Compared in the camera picture worker (ADR-663 Amendment 6).
+      void checkCameraMovedInWorker(sourceState.source, rgbaView(state.overlayStill)).catch(
+        () => undefined,
+      );
     }
     if (
       previous.sourceState.kind === 'live' &&
@@ -131,9 +134,8 @@ function checkForMoves(): () => void {
       timer = null;
       const now = useCameraStore.getState().sourceState;
       if (now.kind !== 'live' || now.source !== source) return;
-      void captureSourceFrame(source)
-        .then((frame) => (frame === null ? undefined : checkCameraMoved(source, frame)))
-        .catch(() => undefined);
+      // Read in the camera picture worker (ADR-663 Amendment 6).
+      void checkStartedCameraMoved(source).catch(() => undefined);
     }, MOVED_CHECK_SETTLE_MS);
   });
   return () => {

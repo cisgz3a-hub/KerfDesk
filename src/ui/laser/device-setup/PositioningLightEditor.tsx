@@ -28,6 +28,14 @@ export function PositioningLightEditor({
   readonly device: DeviceProfile;
   readonly onChange: LightChange;
 }): JSX.Element {
+  if (device.controllerKind === 'moshi') {
+    return (
+      <p>
+        A Moshiboard has no light or pointer command KerfDesk can send. Use the switch on the
+        machine.
+      </p>
+    );
+  }
   if (device.controllerKind === 'ruida' || device.controllerKind === 'lihuiyu') {
     return (
       <p>
@@ -304,6 +312,8 @@ function commandHelp(kind: ControllerKind | undefined): string {
       return 'Ruida uses file output; operate the light from the machine panel.';
     case 'lihuiyu':
       return 'Lihuiyu boards have no light output; switch the light at the machine.';
+    case 'moshi':
+      return 'A Moshiboard has no light command; use the machine switch.';
   }
 }
 

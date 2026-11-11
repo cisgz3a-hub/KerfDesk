@@ -65,6 +65,7 @@ function rotaryAxesForKind(kind: ControllerKind): ReadonlyArray<RotaryAxis> {
     case 'smoothieware':
     case 'ruida':
     case 'lihuiyu':
+    case 'moshi':
       return ['Y'];
   }
 }

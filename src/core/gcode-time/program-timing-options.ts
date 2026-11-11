@@ -51,7 +51,7 @@ export function deviceMotionLimits(
   };
 }
 
-/** Uses the same serial default as connection setup; Ruida and Lihuiyu run binary jobs
+/** Uses the same serial default as connection setup; Ruida, Lihuiyu and Moshi run binary jobs
  * with no serial link, so they get no baud rate. */
 export function deviceProgramTimingOptions(
   device: DeviceProfile,
@@ -76,7 +76,7 @@ export function deviceProgramTimingOptions(
       ? { controllerArcToleranceMm: GRBL_DEFAULT_ARC_TOLERANCE_MM }
       : {}),
     ...(laserPowerControl === undefined ? {} : { laserPowerControl }),
-    // Ruida and Lihuiyu have no serial link, so no baud rate (ADR-697, ADR-703).
+    // Ruida, Lihuiyu and Moshi have no serial link, so no baud rate (ADR-697, ADR-703, ADR-705).
     ...(driver.capabilities.transport === 'serial' ? { baudRate } : {}),
     ...(plannerBlocks === undefined ? {} : { plannerBlocks }),
     ...laserModeTiming(device, machineKind, controllerKind),

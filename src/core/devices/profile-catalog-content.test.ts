@@ -17,6 +17,7 @@ const RECORDED: Readonly<Record<string, string>> = {
   'generic-grbl-400x400': '2026-09-19 99584b14b49a75ff',
   'generic-grblhal': '2026-09-19 73f84d5af72bd78c',
   'generic-marlin-laser': '2026-09-19 33d9199ef3c16b7d',
+  'generic-moshiboard-usb': '2026-11-11 df5528ce3839aed0',
   'generic-ruida-rd-export': '2026-09-19 6aaf6ae9e05882e6',
   'generic-smoothieware': '2026-09-19 9237f81b2f61a647',
   'k40-lihuiyu-m2-nano': '2026-11-11 e068084438639369',

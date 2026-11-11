@@ -30,6 +30,7 @@ import { LaserModuleRow } from './LaserModuleRow';
 import { DeviceSetupControls } from './device-setup';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { MachineNetworkConnect } from './MachineNetworkConnect';
+import { MoshiUsbPanel } from './MoshiUsbPanel';
 import { RuidaNetworkPanel } from './RuidaNetworkPanel';
 import { LihuiyuUsbPanel } from './LihuiyuUsbPanel';
 import { RECONNECT_DURING_JOB_TITLE, reconnectWithSavedProfile } from './reconnect-job-guard';
@@ -151,6 +152,7 @@ function MachineDetailsContent(): JSX.Element {
       <MachineNetworkConnect />
       <RuidaNetworkPanel />
       <LihuiyuUsbPanel />
+      <MoshiUsbPanel />
     </>
   );
 }

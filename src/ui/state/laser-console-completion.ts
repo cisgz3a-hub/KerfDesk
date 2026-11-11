@@ -17,6 +17,7 @@ import { readOnlyControllerOperation } from './laser-controller-operation';
 import { retainControllerReportUnits } from './controller-report-units';
 import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
+import { unlockPositionVerdict, type UnlockPositionVerdict } from './position-kept-alarm';
 import { isProbeFailureAlarm } from './probe-failure-alarm';
 
 type SetFn = (
@@ -80,20 +81,26 @@ export function isSettingsReadOperation(operation: LaserState['controllerOperati
  *  except after a failed probe: `unlockedAlarm`, the alarm this Unlock cleared,
  *  read before its reply, is ALARM:4 or 5, which stopped only the probe move,
  *  so the machine position and the XY origin still stand and the next reports
- *  carry them (probe-failure-alarm.ts). Work Z is void either way. The alarm
- *  code stays until a report that is not Alarm clears it: FluidNC acknowledges
- *  `$X` in its Critical state without unlocking, and its next report still
- *  reads Alarm (controller audit 2026-09-25 HF-2), which latches a reset
- *  (controller-reset-required.ts; UX audit U5-P2-1). */
+ *  carry them (probe-failure-alarm.ts). The same holds for an alarm the
+ *  firmware raises only after a controlled stop, a soft limit above all: the
+ *  position and whatever work offset the controller still reports stay shown
+ *  (position-kept-alarm.ts, ADR-367 Amendment 3). An unknown or missing code,
+ *  or any doubt about that alarm, hides them as before. Work Z, Home and Frame
+ *  evidence are void either way. The alarm code stays until a report that is
+ *  not Alarm clears it: FluidNC acknowledges `$X` in its Critical state
+ *  without unlocking, and its next report still reads Alarm (controller audit
+ *  2026-09-25 HF-2), which latches a reset (controller-reset-required.ts; UX
+ *  audit U5-P2-1). */
 export function controllerUnlockedPatch(
   state: LaserState,
   unlockedAlarm: number | null,
 ): Partial<LaserState> {
   const probeFailed = isProbeFailureAlarm(unlockedAlarm);
+  const verdict = unlockPositionVerdict(state, unlockedAlarm);
   return {
     homingState: 'unknown',
     homingProof: null,
-    ...(probeFailed ? {} : positionLostAtUnlockPatch(state)),
+    ...(probeFailed || verdict.kept ? {} : positionLostAtUnlockPatch(state)),
     statusReport: null,
     unlockAwaitsReport: true,
     statusObservation: null,
@@ -103,13 +110,21 @@ export function controllerUnlockedPatch(
     framedRun: null,
     frameTrace: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
-    log: pushLog(
-      state,
-      probeFailed
-        ? '[lf2] Controller unlocked after a failed probe. Kept position and XY origin evidence; cleared Z, Home, and Frame evidence.'
-        : '[lf2] Controller unlocked. Cleared stale position, origin, Z, Home, and Frame evidence.',
-    ),
+    // Read once: a later lock needs its own ALARM:N line to keep anything.
+    alarmRaised: null,
+    log: pushLog(state, unlockLogLine(probeFailed, verdict)),
   };
+}
+
+// Says which case applied, so a hidden position can be traced to its reason.
+function unlockLogLine(probeFailed: boolean, verdict: UnlockPositionVerdict): string {
+  if (probeFailed) {
+    return '[lf2] Controller unlocked after a failed probe. Kept position and XY origin evidence; cleared Z, Home, and Frame evidence.';
+  }
+  if (verdict.kept) {
+    return `[lf2] Controller unlocked after ALARM:${verdict.code}, which keeps the machine position. Kept position and XY origin evidence; cleared Z, Home, and Frame evidence.`;
+  }
+  return `[lf2] Controller unlocked. Position not kept: ${verdict.reason}. Cleared stale position, origin, Z, Home, and Frame evidence.`;
 }
 
 function positionLostAtUnlockPatch(state: LaserState): Partial<LaserState> {

@@ -158,6 +158,7 @@ function JogButtons({
     <span role="group" aria-label="Jog (laser off)">
       <select
         aria-label="Jog step"
+        title="Distance each jog button moves the head"
         value={stepMm}
         onChange={(event) => setStepMm(Number(event.target.value))}
       >
@@ -170,6 +171,7 @@ function JogButtons({
       <button
         type="button"
         aria-label="Jog left"
+        title="Move the head left by the jog step (laser off)"
         disabled={disabled}
         onClick={() => void board.jog(-stepMm, 0)}
       >
@@ -178,6 +180,7 @@ function JogButtons({
       <button
         type="button"
         aria-label="Jog right"
+        title="Move the head right by the jog step (laser off)"
         disabled={disabled}
         onClick={() => void board.jog(stepMm, 0)}
       >
@@ -186,6 +189,7 @@ function JogButtons({
       <button
         type="button"
         aria-label="Jog toward the back"
+        title="Move the head toward the back by the jog step (laser off)"
         disabled={disabled}
         onClick={() => void board.jog(0, -stepMm)}
       >
@@ -194,6 +198,7 @@ function JogButtons({
       <button
         type="button"
         aria-label="Jog toward the front"
+        title="Move the head toward the front by the jog step (laser off)"
         disabled={disabled}
         onClick={() => void board.jog(0, stepMm)}
       >

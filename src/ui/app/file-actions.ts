@@ -239,6 +239,16 @@ async function savedWithoutGcode(
   placement: Extract<ReturnType<typeof resolveExportJobPlacement>, { readonly ok: true }>,
 ): Promise<boolean> {
   const driver = selectControllerDriver(ctx.project.device.controllerKind);
+  // A USB-link controller with no file format (ADR-705: Moshiboard) has
+  // nothing to save: its programs exist only on the link. A USB-link driver
+  // that names a fileFormat (ADR-703: Lihuiyu .egv) saves that file instead.
+  if (driver.usbLink !== undefined && driver.fileFormat === undefined) {
+    ctx.pushToast(
+      `${driver.label} has no job file to save. Run the job from Machine details over its USB link.`,
+      'warning',
+    );
+    return true;
+  }
   if (driver.capabilities.transport !== 'file-only') return false;
   if (driver.fileFormat === 'egv') {
     const { handleSaveEgv } = await import('./save-egv-action');

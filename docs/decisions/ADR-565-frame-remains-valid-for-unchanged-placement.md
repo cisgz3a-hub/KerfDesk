@@ -2,6 +2,8 @@
 
 **Status:** Accepted by the maintainer's explicit instruction on 2026-10-02. Software, release and physical-machine qualification remain separate evidence.
 
+**Amended by [Amendment 1](ADR-565-amendment-1-a-clean-jog-keeps-a-fixed-placement-frame.md):** a clean app-owned X/Y jog keeps the Frame of a job placed by Absolute Coords, User Origin or Verified Origin.
+
 **Context.** The maintainer requested that one completed Frame remain valid while changing power and speed, and that only coordinate changes require another Frame. Binding the physical trace to a full execution signature invalidated it after a process-setting edit and after each Start. Ignoring that signature alone would instead send the old prepared power and speed.
 
 **Decision.** A clean completed Frame records reusable spatial evidence for the job's framed footprint and resolved placement in the current controller session. Ordinary power and speed edits preserve that evidence. Starting or completing an app-owned job does not by itself discard it. Geometry, size, placement, output geometry, registration, work origin or coordinate-session drift invalidates the evidence. An interrupted Frame issues none. Reset, reconnect, alarm, interrupted execution and machine mutations retain their existing coordinate-evidence invalidation.
@@ -13,5 +15,7 @@ Known process-only device settings also preserve the footprint: S-value scales, 
 The reusable spatial evidence is distinct from the execution permit. Each Start claims one exact reviewed program once. Concurrent Start requests, asynchronous preparation and review edits cannot replace its bytes after approval. Existing controller-session, origin, live transport, final wire handoff, archive and recovery ownership remain bound to that execution. Job Review continues to be the single warning surface. No account, licence, controller-setting or calculated-bounds policy gate is added.
 
 This amends the exact-artifact and one-run wording of ADR-228, ADR-230, ADR-232 and ADR-237 for ordinary live-canvas Frame authorization. Transient camera markers and derived second-pass jobs retain their own immutable source and execution ownership. Frame evidence is session-local; an application or controller restart cannot restore physical-coordinate evidence from a saved project.
+
+**Amended by [ADR-237 Amendment 3](ADR-237-amendment-3-run-again-carries-an-unchanged-review.md).** "Each Start prepares and reviews" has one exception: Run again of an unchanged laser job carries a review already confirmed in the same app and controller session instead of showing it again. The program is still prepared afresh, and the spatial evidence and execution-permit rules above are unchanged.
 
 **Verification required.** Cover power/speed edits before Start and in Job Review, emitted latest S/F commands, unchanged-placement repeated runs, move/resize/registration/origin invalidation, speed-dependent scan-envelope changes, concurrent Start and preparation races, interrupted/reset sessions, and transient/recovery workflows. Test and simulator evidence does not establish measured laser power or hardware qualification.

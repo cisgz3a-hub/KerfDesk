@@ -10,6 +10,7 @@
 // alternate direction. MeerK40t's native raster mode (V…G step codes) is not
 // written by this build.
 
+import { samePoint } from '../../geometry/point-math';
 import type { CutGroup, FillGroup, RasterGroup } from '../../job';
 import { cutSegmentsForPass, finalPassCutSegments } from '../../job/cut-pass-segments';
 import { rasterRowsInProviderOrder } from '../../job/raster-rows';
@@ -151,8 +152,4 @@ export function unionLhyBounds(parts: ReadonlyArray<{ readonly bounds: LhyBounds
       }),
     first.bounds,
   );
-}
-
-function samePoint(a: LhyPoint, b: LhyPoint): boolean {
-  return a.x === b.x && a.y === b.y;
 }

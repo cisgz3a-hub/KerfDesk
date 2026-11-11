@@ -24,7 +24,8 @@ export type ControllerKind =
   | 'marlin'
   | 'smoothieware'
   | 'ruida'
-  | 'lihuiyu';
+  | 'lihuiyu'
+  | 'moshi';
 
 /** Single source of truth for validators (catalog, .lfmachine shape, .lf2
  *  normalize). Grows in lockstep with the ControllerKind union. */
@@ -36,6 +37,7 @@ export const KNOWN_CONTROLLER_KINDS: ReadonlyArray<ControllerKind> = [
   'smoothieware',
   'ruida',
   'lihuiyu',
+  'moshi',
 ];
 
 /** Lihuiyu boards (ADR-703, MeerK40t's board list); 'M3-pwm' is an M3 whose

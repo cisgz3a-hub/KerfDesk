@@ -22,6 +22,7 @@ import {
   SCULPFUN_S30_MANUAL_AIR_PROFILE,
   ORTUR_LASER_MASTER_3_PROFILES,
 } from './brand-laser-profiles';
+import { GENERIC_MOSHI_PROFILE } from './moshi-profile';
 
 export const PROFILE_CATALOG_VERSION = '2026-09-19';
 
@@ -227,6 +228,9 @@ export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEn
   ]),
   entry(K40_M3_NANO_PWM_PROFILE, [
     'Lihuiyu M3 Nano with PWM firmware: as the M2 profile, with layer power sent as per mille of Full-power S.',
+  ]),
+  entry(GENERIC_MOSHI_PROFILE, [
+    'Moshiboard: USB link only (Frame, Start, Abort, Home); EXPERIMENTAL, simulator-tested only.',
   ]),
 ];
 

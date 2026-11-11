@@ -59,7 +59,7 @@ import {
   takeNextAcknowledgedFramePrefixLine,
 } from './laser-motion-operation';
 import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
-import { forgetAlarmBeforeBanner, takeAlarmBeforeBanner } from './laser-reset-alarm';
+import { alarmAfterBannerPatch, forgetAlarmBeforeBanner } from './laser-reset-alarm';
 import { handleAlarmLine } from './laser-alarm-line';
 import { handleLostReplyProbeLine } from './laser-lost-ack-reconcile';
 import { handleMotionReplyProbeLine } from './laser-motion-reply-probe';
@@ -412,8 +412,9 @@ function handleWelcomeLine(
     ...retainedControllerSettingsPatch(retainedSettings, nextSessionEpoch),
     // An ALARM:N the reset itself raised (Abort mid-motion) is still the
     // controller's alarm after the banner; any other code belonged to the
-    // previous boot (audit streaming-4).
-    alarmCode: takeAlarmBeforeBanner(refs),
+    // previous boot (audit streaming-4), except a position-kept alarm whose
+    // reset KerfDesk sent (position-kept-alarm.ts).
+    ...alarmAfterBannerPatch(refs, state, ownedReset),
     // The reboot is the soft reset a critical event asked for.
     ...resetBoundaryPatch(state),
     wcoCache: null,

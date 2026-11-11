@@ -54,7 +54,9 @@ function opened(): Project {
   expect(result.migratedFrom).toBe(21);
   // Its strokes round the part now burn 6.28x the energy 1.0.29 gave them, and
   // the file says so (ADR-127 Amd 2, rolling audit v13 Y5-P2-2).
-  expect(result.oldProjectBurn?.rotaryFeed).toEqual([{ yScale: 40 / (Math.PI * 80) }]);
+  expect(result.oldProjectBurn?.rotaryFeed).toEqual([
+    { yScale: 40 / (Math.PI * 80), ratio: expect.closeTo(Math.PI * 2, 2) },
+  ]);
   return result.project;
 }
 

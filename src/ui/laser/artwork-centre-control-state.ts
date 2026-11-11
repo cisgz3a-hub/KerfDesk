@@ -41,7 +41,7 @@ export function artworkCentreBlockMessage(options: {
   readonly disabled: boolean;
 }): string | null {
   if (options.fileOnly)
-    return 'Ruida is file export only. Position the head and switch its light at the machine.';
+    return 'This controller runs from files or its own USB link. Position the head and switch its light at the machine.';
   if (options.needsSetup)
     return 'Configure the separate LED/crosshair commands and offset in Machine Setup.';
   if (options.count === 0) return 'Select artwork on the canvas to centre its positioning light.';

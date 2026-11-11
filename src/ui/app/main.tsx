@@ -136,6 +136,7 @@ createRoot(rootElement).render(
   </StrictMode>,
 );
 
-// Static timber and branding paint together before JS. Hold from the first
-// startup frame in both editions, excluding time the document is hidden.
+// Static timber and branding paint together before JS. The first launch of a
+// version holds from the first startup frame in both editions, excluding time
+// the document is hidden; every other launch reveals a painted workspace.
 dismissStartupSplash({ desktop: adapter.id === 'electron' });
