@@ -4050,7 +4050,7 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    turn in degrees ("the part has turned +111° since"), and on rollers says the part may have
    slipped.
 
-#### Success — image rows fit the rotary's steps (ADR-315 Amendments 1 and 2)
+#### Success — image and Fill rows fit the rotary's steps (ADR-315 Amendments 1 to 3)
 1. The controller places each image row on a whole Y step, and on a rotary one step turns the part
    `1 / (Y scale × $101)` mm. Job Review checks the rows as the program writes them (row centres,
    3 decimals) and the controller steps them. When they band or double, it warns, for example "one
@@ -4059,9 +4059,11 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    evenly once typed as printed (here 0.1571 mm, 6.37 lines/mm, 2 steps).
 2. When rows double, the warning counts them ("136 of its 382 rows land on the row before and burn
    twice"). When no interval the layer accepts lands every row, it says so and names the closest.
-3. A rotary on A or Z is checked against `$103` or `$102` the same way. When the controller
+3. A 0° Fill's hatch rows are checked the same way and advised on the Fill's Interval; an offered
+   interval lands evenly wherever the artwork sits against the step grid. Layers go by their names.
+4. A rotary on A or Z is checked against `$103` or `$102` the same way. When the controller
    reported no steps for the rotary's axis, one warning says the rows could not be checked.
-4. The warning changes nothing on its own; the operator sets the line interval.
+5. The warning changes nothing on its own; the operator sets the line interval or Interval.
 
 #### Success — the Rotary switch
 1. Once the profile has a rotary setup, a laser project's Job actions dock shows a **Rotary**
