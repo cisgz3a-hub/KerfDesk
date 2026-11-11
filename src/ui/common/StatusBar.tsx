@@ -21,6 +21,7 @@ import { DesktopPreviewUpdateButton } from './DesktopPreviewUpdateButton';
 import { PwaUpdateButton } from './PwaUpdateButton';
 import { SiteLinks } from './SiteLinks';
 import { EditionStatusButton } from '../licensing/EditionStatusButton';
+import { BackgroundSaveStatus } from './BackgroundSaveStatus';
 import { CANVAS_MOTION_SLOT_ID } from './status-bar-slots';
 import './status-bar.css';
 import { useScrollOverflowCue } from './use-scroll-overflow-cue';
@@ -79,6 +80,7 @@ export function StatusBar({ children }: { readonly children?: React.ReactNode })
         <span id={CANVAS_MOTION_SLOT_ID} style={slotStyle} />
       </div>
       <div className="lf-status-bar__actions" style={actionsStyle}>
+        <BackgroundSaveStatus />
         {children}
         <SiteLinks />
         <EditionStatusButton />
