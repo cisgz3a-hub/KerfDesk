@@ -12,6 +12,7 @@ import {
   type ProjectSavePreparation,
 } from './project-save-preparation-client';
 import { portableProjectAssets, projectNeedsPortableAssets } from './portable-project-assets';
+import { hasPickerActivation, PREPARING_DIALOG_DELAY_MS } from './pick-prepared-save-target';
 
 export type ProjectSaveTargetResult =
   | { readonly kind: 'selected'; readonly target: SaveTarget }
@@ -27,9 +28,13 @@ type LargeProjectSaveResult =
   | Extract<ProjectSavePreparation, { readonly kind: 'invalid' | 'failed' }>
   | { readonly kind: 'cancelled' | 'stale-document' | 'stale-request' };
 
-// A fresh Choose file click follows validation, so a slow worker never spends
-// Chromium's transient picker activation. Already selected writes are still
-// independent, even when a newer request or document owns the visible dialog.
+// The picker needs a click or key press from the last 5 s (Chromium's transient
+// activation, in the browser and the desktop app alike). A project validated
+// within that time opens the picker at once; one that takes longer asks for a
+// fresh Choose file click. The dialog itself appears only once preparation has
+// run for PREPARING_DIALOG_DELAY_MS (ADR-656 Amendment 4). Already selected
+// writes are still independent, even when a newer request or document owns
+// the visible dialog.
 export async function prepareLargeProjectSave(
   ctx: SaveProjectCtx,
   owner: ProjectSaveOwner,
@@ -40,6 +45,14 @@ export async function prepareLargeProjectSave(
   const controller = new AbortController();
   let resolveTarget: ((target: ProjectSaveTargetResult) => void) | null = null;
   let request: ProjectSaveDialogRequest;
+  let shown = false;
+  const display = (): void => {
+    if (shown) useProjectSaveDialogStore.getState().show(request);
+  };
+  const reveal = (): void => {
+    shown = true;
+    display();
+  };
   const cancelledOutcome = (): LargeProjectSaveResult => ({
     kind: staleProjectSaveOutcome(owner) ?? 'cancelled',
   });
@@ -57,7 +70,7 @@ export async function prepareLargeProjectSave(
       return;
     }
     request = { ...request, phase: 'choosing' };
-    useProjectSaveDialogStore.getState().show(request);
+    display();
     // pick() invokes the platform picker synchronously, before any await.
     void pick().then((target) => {
       close();
@@ -71,12 +84,13 @@ export async function prepareLargeProjectSave(
     cancel,
     choose,
   };
-  if (!reuseTarget) useProjectSaveDialogStore.getState().show(request);
+  const revealTimer = reuseTarget ? undefined : setTimeout(reveal, PREPARING_DIALOG_DELAY_MS);
   const unsubscribe = useStore.subscribe(() => {
     if (!reuseTarget && staleProjectSaveOutcome(owner) !== null) cancel();
   });
   try {
     const prepared = await prepareCapturedProject(ctx.project, purpose, controller.signal);
+    clearTimeout(revealTimer);
     if (!reuseTarget && (controller.signal.aborted || staleProjectSaveOutcome(owner) !== null))
       return cancelledOutcome();
     if (prepared.kind !== 'ok') return prepared;
@@ -85,7 +99,9 @@ export async function prepareLargeProjectSave(
       resolveTarget = resolve;
     });
     request = { ...request, phase: 'ready' };
-    useProjectSaveDialogStore.getState().show(request);
+    // Still inside the click: open the picker now. Otherwise ask for a fresh one.
+    if (hasPickerActivation()) choose();
+    else reveal();
     const selected = await target;
     if (controller.signal.aborted) return cancelledOutcome();
     return { kind: 'prepared', json: prepared.json, target: selected };
@@ -93,6 +109,7 @@ export async function prepareLargeProjectSave(
     if (controller.signal.aborted) return cancelledOutcome();
     throw error;
   } finally {
+    clearTimeout(revealTimer);
     unsubscribe();
     close();
   }

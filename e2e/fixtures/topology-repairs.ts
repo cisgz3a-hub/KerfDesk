@@ -6,6 +6,7 @@ import {
   type OraclePoint,
 } from '../../src/core/controllers/grbl/laser-burn-oracle.test-helper';
 import { composedSvgSnapshot, importComposedSvg } from './composed-svg-browser';
+import { finishGcodeSave } from './gcode-save';
 import { expect, type KerfDeskFixture, type Page } from './kerfdesk-test';
 import { runMenuCommand } from './recovery-flow';
 import { selectWorkspacePanel } from './workspace-ui';
@@ -252,15 +253,15 @@ export async function topologyWorkerRequests(page: Page) {
 export async function saveTopologyGcode(page: Page, fixture: KerfDeskFixture): Promise<string> {
   const before = (await fixture.events()).filter((event) => event.kind === 'file-saved').length;
   await runMenuCommand(page, 'File', 'Save G-code...');
-  const dialog = page.getByRole('dialog', { name: 'Save G-code', exact: true });
-  await expect(dialog).toContainText('The complete export is ready.', { timeout: 90_000 });
-  await dialog.getByRole('button', { name: 'Save as…', exact: true }).click();
-  await expect
-    .poll(
-      async () => (await fixture.events()).filter((event) => event.kind === 'file-saved').length,
-      { timeout: 30_000 },
-    )
-    .toBe(before + 1);
+  // Straight to the file dialog when ready in time (ADR-656 Amendment 4).
+  await finishGcodeSave(
+    page,
+    async () =>
+      (await fixture.events()).filter((event) => event.kind === 'file-saved').length > before,
+  );
+  expect((await fixture.events()).filter((event) => event.kind === 'file-saved')).toHaveLength(
+    before + 1,
+  );
   const name = (await fixture.events()).filter((event) => event.kind === 'file-saved').at(-1)?.[
     'name'
   ];

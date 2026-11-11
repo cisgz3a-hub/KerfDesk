@@ -1133,11 +1133,11 @@ that owns those fields, without changing the existing Frame/Start policy.
 
 #### Edge — Layer has zero objects left (all deleted)
 - Layer row is *removed* from the panel.
-- If the row was the only output-enabled row, Save G-code button is disabled.
+- If the row was the only output-enabled row, Save G-code reports `No output layers.` (F-A9 edge).
 
 #### Edge — every layer has output: false
-- Save G-code button is disabled.
-- Tooltip on the disabled button: `Enable Output on at least one layer.`
+- Save G-code stays available and reports one error toast:
+  `Cannot save G-code: No output layers. Enable Output on at least one layer.` (F-A9 edge).
 
 #### Edge — two SVGs share a color
 - Each imported artwork keeps its own operation by default. Matching source colors do not couple
@@ -1449,8 +1449,23 @@ that owns those fields, without changing the existing Frame/Start policy.
 #### Success — web and packaged desktop
 1. User clicks `File → Save G-code` (`Cmd/Ctrl+Shift+E`).
 2. Pre-flight and background preparation run (F-A10) before choosing a file. A failure creates no file.
-3. When the complete export is ready, click **Save as…**. The standard Chromium Save As dialog
-   opens with `<project-name>.gcode` when the project has a saved name, otherwise `untitled.gcode`.
+3. A laser export that is ready while the click or key press is still active goes straight to
+   the standard Chromium Save As dialog: no KerfDesk dialog and no second click (ADR-656
+   Amendment 4). It opens with `<project-name>.gcode` when the project has a saved name,
+   otherwise `untitled.gcode`. Chromium keeps a click or key press active for 5 s, in the browser
+   and in the desktop app, which opens the same picker.
+   - Preparation that runs longer than 0.4 s shows **Save G-code** with `Preparing your G-code
+     file…`, the progress the preparation reports (for example `Planning toolpaths: 3 of 12`) and
+     **Cancel**, which stops it. If the export is ready within the 5 s, the Save As dialog still
+     opens by itself.
+   - An export ready later than that shows `The complete export is ready…` and waits for a click
+     on **Save as…**: the picker cannot open without a fresh click.
+   - A CNC export shows **Save G-code** whenever it is ready, because **Save as…** or **Save setup
+     sheet + program…** is a choice (F-CNC14).
+   - A tiled CNC save (F-CNC19) asks for its folder at the click, and a `.rd` save asks for its
+     file once it is compiled. Neither shows **Save G-code** first; one still compiling after
+     0.4 s says `Preparing the export…` in a toast until it is done.
+   - One save at a time: a second request while one is under way is ignored.
 4. Choose any permitted folder, such as **Downloads** or **Desktop**, and enter a new filename
    or choose an existing file to replace. An existing file is not required. The native dialog handles
    overwrite confirmation; cancelling it writes nothing.
@@ -1464,13 +1479,20 @@ that owns those fields, without changing the existing Frame/Start policy.
    ADR-688).
 
 #### Error — pre-flight failure
-- See F-A10.
+- See F-A10 for what refuses a save. The reasons are shown once (ADR-656 Amendment 4), never in
+  a native alert:
+  - With no dialog open, one error toast: `Cannot save G-code: <first reason>`, with any further
+    reasons folded under **Show all**.
+  - With **Save G-code** already open (a slow preparation), the reasons are listed inside it with
+    `No file was created or changed.` and a single **Close**.
+  - Tiled and `.rd` saves use the same toast: `Cannot export tiles: …`, `Cannot save .rd file: …`.
 
 #### Error — file system error (disk full, permissions, etc.)
 - Toast: `Could not save G-code: <one-line reason>`. Project is unaffected.
 
 #### Edge — save when no output-enabled layers exist
-- Save G-code button is disabled (see F-A7 edge).
+- One error toast: `Cannot save G-code: No output layers. Enable Output on at least one layer.`
+  No **Save G-code** dialog and no file dialog opens.
 
 ---
 
@@ -1688,9 +1710,15 @@ the completed physical Frame is the spatial source of truth.
 
 #### Success — first save
 1. `File → Save` (`Cmd/Ctrl+S`).
-2. For a large project, **Save project** shows `Preparing <name>…` while validation runs.
-   When it is ready, click **Choose file…** to open the OS Save dialog. Smaller projects open
-   the OS dialog directly after validation. Cancel leaves the project unsaved and changes no file.
+2. The OS Save dialog opens once the project is validated. Smaller projects validate at once. A
+   large project (250 objects, about 5,000 path points, a 375 KB image or embedded fonts)
+   validates in the background, and its OS dialog still opens by itself when that finishes while
+   the click is active, which Chromium allows for 5 s (ADR-656 Amendment 4).
+   - Validation that runs longer than 0.4 s shows **Save project** with `Preparing <name>…` and
+     **Cancel**.
+   - Validation that outlasts the 5 s ends at `Your project is ready.`; click **Choose file…** to
+     open the OS dialog.
+   - Cancel leaves the project unsaved and changes no file.
 3. Default name: `untitled.lf2`, default location: Documents.
 4. On confirm, the captured, validated project JSON is written to disk.
 5. Window title updates: `KerfDesk — <project-name>`.
@@ -1719,9 +1747,9 @@ the completed physical Frame is the spatial source of truth.
 
 #### Success — Save As
 1. `File → Save As` (`Cmd/Ctrl+Shift+S`).
-2. Always shows dialog. Default name: current project name.
-   A large project first shows **Save project**, then **Choose file…** opens the native picker
-   after validation is complete, using that click's file access permission.
+2. Always shows the OS dialog. Default name: current project name.
+   A large project opens it as the first save does (step 2 above): by itself when validated within
+   5 s, otherwise after a click on **Choose file…**.
 
 #### Error — save failure
 - Error toast: `Could not save project: <reason>`. Unpersisted changes remain unsaved and the user can retry.
@@ -1976,6 +2004,9 @@ are shown. Nothing here is a gate: Frame, Start and Save are unchanged.
 1. Modal: `Save changes to <project-name>?` with `Save`, `Don't Save`, `Cancel`.
 2. `Save` → save flow F-A11, then new only if the saved version is still the current document.
    `Don't Save` → discard, then new. `Cancel` → no action.
+3. `File → Open` over unsaved work asks the same question. `Save` then shows at most the OS Save
+   dialog (none when the project already has a file) and the OS Open dialog; a large project no
+   longer adds **Save project** between them when it validates within 5 s (ADR-656 Amendment 4).
 
 ---
 

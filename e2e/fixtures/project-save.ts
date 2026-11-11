@@ -1,34 +1,36 @@
 import { expect, type KerfDeskFixture, type Page } from './kerfdesk-test';
 import { toolbarCommand } from './workspace-ui';
 
-/** Save through the rendered preparation and picker flow, preserving artifact checks at callers. */
-export async function saveProjectAs(
-  page: Page,
-  fixture: KerfDeskFixture,
-  options: { readonly expectPreparation?: boolean } = {},
-): Promise<void> {
+/**
+ * Save As through to the file picker, preserving artifact checks at callers.
+ *
+ * A project that is ready while the click is still active opens the picker at
+ * once: with no dialog when it is quick, or from the Save project dialog by
+ * itself when it took longer. Only a project ready after the activation lapsed
+ * waits for a click on Choose file… (ADR-656 Amendment 4).
+ */
+export async function saveProjectAs(page: Page, fixture: KerfDeskFixture): Promise<void> {
   const pickerCount = async () =>
     (await fixture.events()).filter((event) => event.kind === 'picker-save').length;
   const before = await pickerCount();
   await (await toolbarCommand(page, 'Save As...')).click();
   const dialog = page.getByRole('dialog', { name: 'Save project', exact: true });
-  if (options.expectPreparation === true) await expect(dialog).toBeVisible();
-  else {
-    await expect
-      .poll(async () => (await dialog.isVisible()) || (await pickerCount()) > before)
-      .toBe(true);
-  }
-  if (await dialog.isVisible()) {
-    // Preparation must finish before a real second click opens any file picker.
-    expect(await pickerCount()).toBe(before);
-    const choose = dialog.getByRole('button', { name: 'Choose file…', exact: true });
-    await expect(choose).toBeEnabled({ timeout: 60_000 });
-    await expect(dialog).toContainText('Your project is ready.');
-    expect(await pickerCount()).toBe(before);
-    await choose.click();
-    await expect(dialog).toBeHidden();
-  }
-  await expect.poll(pickerCount).toBe(before + 1);
+  const choose = dialog.getByRole('button', { name: 'Choose file…', exact: true });
+  await expect
+    .poll(
+      async () => {
+        if ((await pickerCount()) > before) return true;
+        if ((await choose.isVisible()) && (await choose.isEnabled())) {
+          // The dialog may close under the click when the picker opens by itself.
+          await choose.click({ timeout: 2_000 }).catch(() => undefined);
+        }
+        return (await pickerCount()) > before;
+      },
+      { timeout: 90_000 },
+    )
+    .toBe(true);
+  await expect(dialog).toBeHidden();
+  expect(await pickerCount()).toBe(before + 1);
 }
 
 /** One object of a saved project, read by field rather than by its JSON text. */

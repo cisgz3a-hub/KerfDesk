@@ -14,6 +14,7 @@ import {
   prepareProjectSaveMessage,
 } from './project-save-preparation';
 import { prepareProjectSaveOffThread } from './project-save-preparation-client';
+import { lapseUserActivation } from '../../platform/web/chromium-save-picker.test-support';
 
 vi.mock('./project-save-preparation-client', () => ({ prepareProjectSaveOffThread: vi.fn() }));
 // Resolve the fixture only when constructed: importing it inside this hoisted
@@ -95,6 +96,8 @@ describe('ordinary portable project sheet Save', () => {
     const source = project();
     useStore.setState({ project: source, dirty: true });
     const { ctx, pick, write } = context(source);
+    // The slow save: the click's activation lapsed while the pages were embedded.
+    const restoreActivation = lapseUserActivation();
     const pending = handleSaveProject(ctx);
     await vi.waitFor(() =>
       expect(useProjectSaveDialogStore.getState().request?.phase).toBe('ready'),
@@ -102,6 +105,7 @@ describe('ordinary portable project sheet Save', () => {
     expect(pick).not.toHaveBeenCalled();
     useProjectSaveDialogStore.getState().request!.choose();
     expect(await pending).toBe('saved');
+    restoreActivation();
     const opened = deserializeProject(write.mock.calls[0]![0] as string);
     expect(opened.kind).toBe('ok');
     if (opened.kind !== 'ok') throw new Error('saved book did not reopen');

@@ -231,11 +231,6 @@ export type UiState = ArtworkRunOrderUiState &
     readonly materialTestDialogOpen: boolean;
     readonly openMaterialTestDialog: () => void;
     readonly closeMaterialTestDialog: () => void;
-    // Transactional G-code export prepares bytes before a separate,
-    // user-activated destination-selection click.
-    readonly gcodeSaveDialogOpen: boolean;
-    readonly openGcodeSaveDialog: () => void;
-    readonly closeGcodeSaveDialog: () => void;
     // Phase G drawing tool-mode (ADR-051).
     readonly toolMode: ToolMode;
     readonly setToolMode: (next: ToolMode) => void;
@@ -302,9 +297,6 @@ function uiDialogSlice(
   | 'materialTestDialogOpen'
   | 'openMaterialTestDialog'
   | 'closeMaterialTestDialog'
-  | 'gcodeSaveDialogOpen'
-  | 'openGcodeSaveDialog'
-  | 'closeGcodeSaveDialog'
 > {
   return {
     textDialog: null,
@@ -322,9 +314,6 @@ function uiDialogSlice(
     materialTestDialogOpen: false,
     openMaterialTestDialog: () => set({ materialTestDialogOpen: true }),
     closeMaterialTestDialog: () => set({ materialTestDialogOpen: false }),
-    gcodeSaveDialogOpen: false,
-    openGcodeSaveDialog: () => set({ gcodeSaveDialogOpen: true }),
-    closeGcodeSaveDialog: () => set({ gcodeSaveDialogOpen: false }),
   };
 }
 
