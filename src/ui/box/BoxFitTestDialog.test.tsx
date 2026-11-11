@@ -82,4 +82,37 @@ describe('fit coupon relief validation', () => {
   it('generates a laser coupon without a hidden relief diameter', () => {
     expect(generateFitCoupon({ ...SPEC, relief: { kind: 'none' } }).kind).toBe('generated');
   });
+
+  // O4-P2-1: a laser layer without a kerf offset makes every rung ≥ 0 loose,
+  // so the form must accept a negative ladder start and say why.
+  it('accepts a negative ladder start on a laser and explains the kerf case', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const onGenerate = vi.fn();
+    await act(async () =>
+      root.render(
+        <BoxFitTestDialog machine={{ kind: 'laser' }} onCancel={vi.fn()} onGenerate={onGenerate} />,
+      ),
+    );
+    try {
+      expect(host.textContent).toContain('kerf');
+      const start = host.querySelector<HTMLInputElement>('input[aria-label="Ladder start"]');
+      if (!start) throw new Error('ladder start missing');
+      await act(async () => {
+        start.value = '-0.15';
+        Simulate.change(start);
+      });
+      expect(start.validity.valid).toBe(true);
+      expect(host.querySelector('[role="alert"]')).toBeNull();
+      await act(async () =>
+        host.querySelector<HTMLButtonElement>('button[type="submit"]')?.click(),
+      );
+      expect(onGenerate).toHaveBeenCalledOnce();
+      expect(onGenerate.mock.calls[0]?.[1]).toMatchObject({ startClearanceMm: -0.15 });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
 });
