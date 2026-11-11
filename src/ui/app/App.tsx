@@ -13,6 +13,7 @@ import { CanvasGcodeView, CanvasViewSwitch } from '../gcode-inspector';
 import { useCanvasViewStore } from '../state/canvas-view-store';
 import { UpdatePrompt } from '../licensing/UpdatePrompt';
 import { LiveMotionBar, useAbortShortcut, useStartShortcut } from '../laser';
+import { LinkMachineWorkBar } from '../laser/LinkMachineWorkBar';
 import { useAbortAutoRestore } from '../laser/abort-auto-restore';
 import { MachineSetupDialogHost } from '../laser/device-setup';
 import { BoardCapturePanel } from '../laser/board-capture';
@@ -127,6 +128,7 @@ function AppWorkspace(): JSX.Element {
           swallows the mousedown that starts a drag. */}
       <Toasts />
       <LiveMotionBar />
+      <LinkMachineWorkBar />
       <PwaUpdateWatcherGate />
       <ArtworkCreationHost />
       <AddTextDialog />

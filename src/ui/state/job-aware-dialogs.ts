@@ -11,15 +11,15 @@
 // question the operator never saw. When no job is active the native dialogs
 // behave exactly as before.
 
-import { isActiveJob } from './laser-store-helpers';
-import { useLaserStore } from './laser-store';
+import { anyMachineJobActive } from './link-machine-work';
 import { useToastStore } from './toast-store';
 
 export const JOB_ACTIVE_CONFIRM_BLOCKED =
   'A job is running — stop it before discarding or replacing work.';
 
+// A streamed laser job, or a Moshi or Ruida link job (ADR-705 Amendment 3).
 function jobActive(): boolean {
-  return isActiveJob(useLaserStore.getState().streamer);
+  return anyMachineJobActive();
 }
 
 export function jobAwareAlert(message: string): void {
