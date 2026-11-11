@@ -165,7 +165,11 @@ export function createLicensingStore(options: {
         // caller offers a reset; the server keeps this device's seat for reuse.
         throw new LicenceStoreUnreadableError();
       }
-      if (decrypted.shouldReEncrypt) await write(value);
+      // Re-encrypting under the operating system's current key is housekeeping:
+      // the record just decrypted is valid, so a failed rewrite (a locked file, a
+      // full disk, a refusing key provider) must not hide the saved rights. The
+      // next read tries again (ADR-623 Amendment 2: paid licences keep working).
+      if (decrypted.shouldReEncrypt) await write(value).catch(() => undefined);
       return value;
     },
     reset: () => setAside(options.userDataPath),
