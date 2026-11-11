@@ -19,6 +19,7 @@ import type {
 import { saveDirectoryUnsupportedError } from '../types';
 import { webCamera } from './web-camera';
 import { webSerial } from './web-serial';
+import { webUsbLink } from './web-usb-link';
 import { createHttpCameraBridge } from './camera-bridge';
 import { createLaunchQueueFileOpens } from './launch-queue-file-opens';
 import { downloadSaveTarget, downloadsAvailable } from './download-save-target';
@@ -327,4 +328,11 @@ export const webAdapter: PlatformAdapter = {
   recentFiles: webRecentFiles,
   externalFileOpens: createLaunchQueueFileOpens(),
   openedProjectSaveTarget,
+  // WebUSB lasers (ADR-702): Chromium browsers and the desktop window only.
+  ...usbLinkEntry(),
 };
+
+function usbLinkEntry(): Pick<PlatformAdapter, 'usbLink'> {
+  const usbLink = webUsbLink();
+  return usbLink === undefined ? {} : { usbLink };
+}

@@ -47,6 +47,7 @@ const moduleBoundaries = {
     { type: 'platform-types', pattern: 'src/platform/types.ts', mode: 'file' },
     { type: 'platform-types', pattern: 'src/platform/build-capabilities.ts', mode: 'file' },
     { type: 'platform-types', pattern: 'src/platform/ruida-network-types.ts', mode: 'file' },
+    { type: 'platform-types', pattern: 'src/platform/usb-link-types.ts', mode: 'file' },
     { type: 'platform-web', pattern: 'src/platform/web', mode: 'folder' },
     { type: 'platform-electron', pattern: 'src/platform/electron', mode: 'folder' },
     { type: 'core', pattern: 'src/core', mode: 'folder' },
