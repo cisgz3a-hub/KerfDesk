@@ -44,6 +44,8 @@ export type FillPool = {
   /** Pools with one key are separate clusters of one operation: they never overlap. */
   readonly key: string;
   readonly color: string;
+  /** Whether the operation outputs (a pool never mixes the two). */
+  readonly output: boolean;
   readonly widthPx: number;
   /** World-millimetre closed contours; their even-odd parity is what burns. */
   readonly contours: ReadonlyArray<Polyline>;
@@ -333,6 +335,7 @@ function poolParts(
   const whole: FillPool = {
     key,
     color: pool.color,
+    output: pool.output,
     widthPx: artworkStrokeWidthPx(geometry.segmentCount, pool.output),
     contours: geometry.contours,
     segmentCount: geometry.segmentCount,

@@ -35,19 +35,23 @@ export function paintDesignProjectArtwork(
     offsetX: -view.panXmm * view.pxPerMm,
     offsetY: -view.panYmm * view.pxPerMm,
   };
-  const paintVector = createDesignVectorPainter(scene, view, draftObjectIds, onReady);
-  for (const object of scene.objects) {
+  // ADR-683 Amendment 4: vectors pool their Fill operations; a photo between
+  // two members splits the pool there, so the stacking order is kept.
+  const vectors = createDesignVectorPainter(ctx, scene, view, draftObjectIds, onReady, true);
+  for (const [index, object] of scene.objects.entries()) {
     if (object.kind !== 'raster-image') {
-      paintVector(ctx, object);
+      vectors.paintAt(index);
       continue;
     }
     if (!sceneObjectHasVisibleLayerFromMap(object, layers)) continue;
+    vectors.flush();
     drawRasterImage(ctx, object, rasterView, {
       adjustments: burnedImageAdjustments(object, layers),
       ...(onReady === undefined ? {} : { onBitmapReady: onReady }),
     });
     if (object.id === selectedPhotoId) paintPhotoOutline(ctx, object, view);
   }
+  vectors.flush();
 }
 
 function paintPhotoOutline(

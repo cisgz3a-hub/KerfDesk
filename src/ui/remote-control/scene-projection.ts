@@ -8,9 +8,15 @@ import {
   type SceneObject,
   type Vec2,
 } from '../../core/scene';
+import { fillPoolRuns, type FillPoolRuns } from '../../core/scene/fill-operations';
 import { transformedBBox } from '../../core/scene/hit-test';
 import type { AppState } from '../state/store';
-import { resolveObjectDisplay, type VectorSceneObject } from '../workspace/object-display';
+import type { ResolvedVector } from '../workspace/fill-pools';
+import {
+  resolveObjectDisplay,
+  type ObjectDisplay,
+  type VectorSceneObject,
+} from '../workspace/object-display';
 import { RemoteFault } from './fault';
 import { previewView, strictPreviewCache } from './preview-geometry';
 import {
@@ -23,6 +29,7 @@ import {
 import { publicIdentifier, remoteBounds } from './projections';
 import type { RemoteControlOptions } from './types';
 import { fitsRemoteResponse } from './response-budget';
+import { projectFillPools, type ProjectedPools } from './scene-projection-pools';
 
 export const SCENE_OBJECT_LIMIT = 200;
 // eslint-disable-next-line no-restricted-syntax -- scene DATA: stands in for an unparseable layer colour key (ADR-047).
@@ -48,14 +55,15 @@ type SceneObjectProjection = {
   bounds: { xMm: number; yMm: number; widthMm: number; heightMm: number };
   paths: ScenePath[];
 };
+type ResolvedPath = {
+  color: string;
+  fill: boolean;
+  output: boolean;
+  polylines: readonly { closed: boolean; points: readonly Vec2[] }[];
+};
 type Resolved = {
   readonly object: VectorSceneObject;
-  readonly paths: readonly {
-    color: string;
-    fill: boolean;
-    output: boolean;
-    polylines: readonly { closed: boolean; points: Vec2[] }[];
-  }[];
+  readonly paths: readonly ResolvedPath[];
 };
 
 /** ADR-582: bounded vector geometry behind the existing artwork-sharing opt-in. */
@@ -121,7 +129,7 @@ export function buildScene(project: Project): Record<string, unknown> {
   const { layers, vectors, images, extent } = collectVisible(project, units);
   const bed = bedSize(project);
   const area = extent ?? { minX: 0, minY: 0, maxX: bed.widthMm, maxY: bed.heightMm };
-  const resolved = resolveDisplays(vectors, layers, area);
+  const resolved = resolveDisplays(vectors, layers, area, fillPoolRuns(scene));
   const base = Math.max(0.01, Math.max(area.maxX - area.minX, area.maxY - area.minY) / 8000);
   for (const factor of [1, 2, 4, 8, 16, 32]) {
     const objects = resolved.map((item) => projectObject(item, units, scene.layers, base * factor));
@@ -151,24 +159,60 @@ function resolveDisplays(
   vectors: readonly VectorSceneObject[],
   layers: ReadonlyMap<string, Layer>,
   area: AABB,
+  runOf: FillPoolRuns,
 ): Resolved[] {
   const view = previewView(area, 4096);
   const cache = strictPreviewCache();
-  return vectors.map((object) => {
+  const entries: ResolvedVector[] = vectors.map((object) => {
     const display = resolveObjectDisplay(object, layers, view, cache, 'design');
     if (display.isSimplified) previewTooLarge();
-    return {
-      object,
-      paths: display.paths.map((path) => ({
+    return { object, display };
+  });
+  // ADR-683 Amendment 4: a Fill operation reaches the phone as the one even-odd
+  // region it burns, each object carrying its share (scene-projection-pools.ts).
+  const pools = projectFillPools(entries, runOf);
+  return entries.map(({ object, display }, index) => ({
+    object,
+    paths: [
+      ...pools.sharesAt(index).map((share) => ({
+        color: share.color.toLowerCase(),
+        fill: true,
+        output: share.output,
+        polylines: share.contours,
+      })),
+      ...objectPaths(object, display, pools, index),
+    ],
+  }));
+}
+
+// The object's own paths in world millimetres. A path whose closed fills a pool
+// carries keeps only what the pool does not paint: its stroke, its open
+// contours, or its outline when the pool gave the object nothing to fill.
+function objectPaths(
+  object: VectorSceneObject,
+  display: ObjectDisplay,
+  pools: ProjectedPools,
+  index: number,
+): ResolvedPath[] {
+  const pooled = pools.pooledPathsAt(index);
+  const outlined = pools.outlinedAt(index);
+  return display.paths.flatMap((path, pathIndex) => {
+    const inPool = pooled?.has(pathIndex) === true;
+    const polylines = path.display.polylines.filter(
+      (polyline) => !inPool || outlined || path.paint.kind !== 'fill' || !polyline.closed,
+    );
+    if (inPool && polylines.length === 0) return [];
+    return [
+      {
         color: path.paint.color.toLowerCase(),
-        fill: path.paint.kind === 'fill' || path.fillOperations.length > 0,
+        fill: !inPool && (path.paint.kind === 'fill' || path.fillOperations.length > 0),
         output: path.paint.output,
-        polylines: path.display.polylines.map((polyline) => ({
+        polylines: polylines.map((polyline) => ({
           closed: polyline.closed,
           points: polyline.points.map((point) => applyTransform(point, object.transform)),
         })),
-      })),
-    };
+      },
+    ];
   });
 }
 
