@@ -18,7 +18,18 @@ runs:
 
     - name: Install the service's test browser
       shell: bash
-      run: pnpm --dir services/remote-control exec playwright install --with-deps chromium
+      # --with-deps fetches optional fonts from the Ubuntu archive. When the
+      # runner cannot reach it (2026-11-11 DNS failures), install the browser
+      # alone from Playwright's CDN; the runner image already has its libraries.
+      run: |
+        set +e
+        pnpm --dir services/remote-control exec playwright install --with-deps chromium
+        status=$?
+        set -e
+        if [ "$status" -ne 0 ]; then
+          echo "::warning::playwright install --with-deps chromium failed; installing chromium without system packages"
+          pnpm --dir services/remote-control exec playwright install chromium
+        fi
 
     - name: Select the installed test browser
       shell: bash
