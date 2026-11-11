@@ -27,11 +27,15 @@ import { idleControllerStatusForFrameTest } from './framed-run-testing';
 import { useStartBlockerStore } from './start-blocker-store';
 import { runFrameNow } from './use-frame-action';
 
-const dialogs = vi.hoisted(() => ({ confirm: vi.fn((_message: string) => false) }));
+const dialogs = vi.hoisted(() => ({
+  confirm: vi.fn(
+    async (_options: { readonly message: string; readonly confirmLabel: string }) => false,
+  ),
+}));
 
-vi.mock('../state/job-aware-dialogs', async (importOriginal) => {
+vi.mock('../state/app-dialogs', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
-  return { ...actual, jobAwareConfirm: dialogs.confirm };
+  return { ...actual, appConfirm: dialogs.confirm };
 });
 
 const original = useLaserStore.getState();
@@ -144,7 +148,10 @@ describe('CNC Frame on a controller that cannot run KerfDesk CNC jobs (CN-2)', (
     await expect(runFrameNow()).resolves.toBe(false);
 
     expect(dialogs.confirm).toHaveBeenCalledTimes(1);
-    expect(dialogs.confirm.mock.calls[0]?.[0]).toContain(CNC_FRAME_WORK_Z_REQUIRED_MESSAGE);
+    expect(dialogs.confirm.mock.calls[0]?.[0].message).toContain(CNC_FRAME_WORK_Z_REQUIRED_MESSAGE);
+    // The button names the action; the text no longer explains OK and Cancel.
+    expect(dialogs.confirm.mock.calls[0]?.[0].confirmLabel).toBe('Zero Z here');
+    expect(dialogs.confirm.mock.calls[0]?.[0].message).not.toMatch(/\bOK\b/);
     expect(actions.zeroZHere).not.toHaveBeenCalled();
   });
 });

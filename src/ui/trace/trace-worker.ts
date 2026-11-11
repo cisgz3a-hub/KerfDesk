@@ -29,6 +29,11 @@ import { resolveFrozenTraceSourceOptions } from '../../core/trace/trace-source-d
 import type { TraceReport, TraceSteps } from '../../core/trace/trace-steps';
 import type { TracePhase, TraceProgress } from '../../core/trace/trace-progress';
 import { collectTraceReports } from './trace-report-collector';
+import {
+  packTracePaths,
+  packedTracePathsTransfer,
+  type PackedTracePaths,
+} from './trace-result-transfer';
 
 export type TraceWorkerRequest = {
   readonly id: number;
@@ -64,7 +69,11 @@ export type TraceWorkerResponse =
   | {
       readonly id: number;
       readonly kind: 'ok';
-      readonly paths: ColoredPath[];
+      // The traced paths, packed (trace-result-transfer.ts) so the UI thread
+      // receives them without deserialising every vertex in one task. Plain
+      // `paths` carries the rare result the packer declines.
+      readonly packedPaths?: PackedTracePaths;
+      readonly paths?: ColoredPath[];
       readonly bounds: Bounds;
       readonly width: number;
       readonly height: number;
@@ -98,17 +107,18 @@ self.onmessage = (e: MessageEvent<TraceWorkerRequest>): void => {
         phaseReporter(id),
       );
       const bounds = boundsFromColoredPaths(paths);
+      const packedPaths = packTracePaths(paths);
       const response: TraceWorkerResponse = {
         id,
         kind: 'ok',
-        paths,
+        ...(packedPaths === null ? { paths } : { packedPaths }),
         bounds,
         width: image.width,
         height: image.height,
         ...(freezeSourceDecisions === true ? { sourceOptions: traced } : {}),
         ...reports.entry(),
       };
-      self.postMessage(response);
+      self.postMessage(response, packedPaths === null ? [] : packedTracePathsTransfer(packedPaths));
     } catch (err) {
       const response: TraceWorkerResponse = {
         id,

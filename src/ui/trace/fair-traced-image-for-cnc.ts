@@ -1,6 +1,7 @@
 import type { TracedImage, Transform } from '../../core/scene';
 import { boundsFromColoredPaths, type TraceOptions } from '../../core/trace';
-import { fairTracedPathsForCnc } from './cnc-trace-fairing';
+import { runTraceSteps, type TraceSteps } from '../../core/trace/trace-steps';
+import { fairTracedPathsForCncSteps } from './cnc-trace-fairing';
 
 /** Photo ribbon widths encode tone and must retain the reviewed geometry. */
 export function shouldFairTracedImageForCnc(
@@ -13,6 +14,15 @@ export function shouldFairTracedImageForCnc(
 /** Keep scene bounds synchronized with conditioned geometry. The complete
  * trace grid and local coordinates remain the source-placement reference. */
 export function fairTracedImageForCnc(traced: TracedImage, placement: Transform): TracedImage {
-  const paths = fairTracedPathsForCnc(traced.paths, placement);
+  return runTraceSteps(fairTracedImageForCncSteps(traced, placement));
+}
+
+/** fairTracedImageForCnc as resumable steps, so a commit can fair a dense
+ *  trace in slices instead of one long UI task. */
+export function* fairTracedImageForCncSteps(
+  traced: TracedImage,
+  placement: Transform,
+): TraceSteps<TracedImage> {
+  const paths = yield* fairTracedPathsForCncSteps(traced.paths, placement);
   return { ...traced, paths, bounds: boundsFromColoredPaths(paths) };
 }

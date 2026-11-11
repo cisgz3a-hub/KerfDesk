@@ -52,6 +52,7 @@ No control anywhere in `src/ui` remembers a dismissal ("don't ask again", "don't
 - Result on desktop: the user clicks Save, nothing appears, no preset is saved, and no message says why.
 - In a browser it works, but an empty name gives a second popup and the user starts again.
 - **Runtime check owed** (read only). **Frequency:** every attempt on desktop.
+- **Runtime check done 2026-11-11 (fix group F1):** on Electron 44.9.1 `prompt()` throws `Error: prompt() is not supported.`; it does not return null. The handler dies and the global error toast appears. Fixed by ADR-707; see [F1-fix-native-popups.md](F1-fix-native-popups.md).
 - **Lighter form:** an inline name field beside the preset list, as CNC presets already have (`src/ui/layers/CncSaveCuttingPresetRows.tsx:46-49`).
 
 ### A1-P2-2 — A modal opens by itself after every finished laser job

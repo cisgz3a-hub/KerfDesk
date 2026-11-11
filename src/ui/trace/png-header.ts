@@ -12,6 +12,9 @@ export type PngHeader = {
   /** Frame size as encoded, before Orientation is applied. */
   readonly stored: ImageDimensions;
   readonly orientation: ExifOrientation;
+  /** The PNG carries an embedded colour profile (iCCP or cICP), or may: a
+   *  header that could not be read through to the image data counts. */
+  readonly colourProfile: boolean;
 };
 
 /**
@@ -27,13 +30,34 @@ export async function readPngHeader(
 ): Promise<PngHeader | null> {
   const stored = parsePngDimensions(prefix);
   if (stored === null) return null;
-  const orientation =
-    pngExifOrientation(prefix) ??
-    (prefix.byteLength < file.size
-      ? pngExifOrientation(await readImagePrefix(file, file.size, signal))
-      : null) ??
-    1;
-  return { stored, orientation };
+  let orientation = pngExifOrientation(prefix);
+  let colourProfile = pngHasColourProfile(prefix);
+  if ((orientation === null || colourProfile === null) && prefix.byteLength < file.size) {
+    const whole = await readImagePrefix(file, file.size, signal);
+    orientation ??= pngExifOrientation(whole);
+    colourProfile ??= pngHasColourProfile(whole);
+  }
+  return { stored, orientation: orientation ?? 1, colourProfile: colourProfile ?? true };
+}
+
+const COLOUR_PROFILE_CHUNKS = new Set(['iCCP', 'cICP']);
+
+/**
+ * Whether a colour profile chunk precedes the image data, or null when the
+ * bytes end before the image data starts. Chromium converts an embedded
+ * profile differently for an <img> drawn on a canvas than for a bitmap decode
+ * on some platforms (ADR-357 Amendment 4), so such a PNG keeps the <img>.
+ */
+export function pngHasColourProfile(bytes: Uint8Array): boolean | null {
+  if (bytes.byteLength < 8 || !hasPngSignature(bytes)) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  for (let offset = 8; offset + 8 <= bytes.byteLength; ) {
+    const type = String.fromCharCode(...bytes.subarray(offset + 4, offset + 8));
+    if (COLOUR_PROFILE_CHUNKS.has(type)) return true;
+    if (type === 'IDAT' || type === 'IEND') return false;
+    offset += 12 + view.getUint32(offset);
+  }
+  return null;
 }
 
 export function parsePngDimensions(header: Uint8Array): ImageDimensions | null {
