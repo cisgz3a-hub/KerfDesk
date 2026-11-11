@@ -206,6 +206,8 @@ Scope: everything outside Start and Frame. Timings below are derived from consta
 | A3-P3-5 | Internal wording reaches toasts: "Manual motion could not obtain a fresh same-session controller status…", "Home finished without fresh session-bound Idle settlement evidence.", "Controller recovery was superseded by another session or operation.", "Wait for GRBL to report Idle" on Marlin, "isolated recovery capsule" | `state/manual-motion-fresh-idle.ts:42-43`, `laser-home-action.ts:115,274,375`, `laser-store-helpers.ts:40-41`, `CheckpointResumeBanner.tsx:226-236` | Plain words plus one next step |
 | A3-P3-6 | Jog is refused while Fire or the laser dot is on. Deliberate, ADR-664, so a slow jog cannot draw a line. Keep; listed for completeness | `state/laser-store-helpers.ts:42-43` | None proposed |
 
+**Fix status (F7, ADR-674 Amendment 1):** A3-P3-1, A3-P3-4 and A3-P3-5 are fixed. A3-P3-1 took the first lighter form: the commands stay refused and the sentence now says KerfDesk does not send them. A3-P3-4 also covers Auto-focus. A3-P3-5 reworded the messages listed; the same kind of wording remains in "Laser Start could not obtain a fresh same-session controller status report…" (`state/laser-live-start-readiness.ts`), the start-mark timeout (`state/laser-job-start-mark-transaction.ts`) and the laser recovery review dialog, which were not in this finding.
+
 A recovery attempt that failed blocks Review for five minutes (`state/recovery/recovery-model.ts:55`). The stacked confirms in recovery are A1-P2-3, the Console write confirm is A1-P3-5, and the release-motors confirm is A1-P3-2.
 
 ### A3 checked and sound

@@ -32,13 +32,14 @@ import {
 } from './work-z-zero-evidence';
 
 export const LOG_MAX = 200;
-const AUTOFOCUS_BUSY_MESSAGE =
+export const AUTOFOCUS_BUSY_MESSAGE =
   'Auto-focus is running. Wait for it to finish before sending other motion commands.';
 export const ACTIVE_JOB_COMMAND_MESSAGE =
   'A job is active. Request ABORT before sending setup, jog, home, unlock, origin, settings, or autofocus commands.';
 export { CONNECT_MACHINE_FIRST, UNKNOWN_IDLE_STATUS_MESSAGE } from './status-unknown-message';
+// Names no firmware: it also shows on Marlin and Smoothieware (A3-P3-5).
 export const MOTION_OPERATION_ACTIVE_MESSAGE =
-  'A jog or frame operation is active. Wait for GRBL to report Idle, or cancel the operation, before sending another motion command.';
+  'A jog or Frame is still running. Wait for it to finish, or stop it with ABORT MOTION, then try again.';
 export const FIRE_ACTIVE_COMMAND_MESSAGE =
   'Release the momentary Fire control, or switch the laser dot off, before sending another machine command.';
 export const MPG_ACTIVE_MOTION_MESSAGE =

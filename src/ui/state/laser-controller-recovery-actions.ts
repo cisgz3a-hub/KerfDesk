@@ -307,7 +307,9 @@ function beginOwnedRecovery(
     observedAlarm: () => owns() && observedAlarm(),
     assertOwned: () => {
       if (!owns())
-        throw new Error('Controller recovery was superseded by another session or operation.');
+        throw new Error(
+          'Recovery stopped because the connection or another machine action took over. Check the machine, then try again.',
+        );
     },
   };
 }

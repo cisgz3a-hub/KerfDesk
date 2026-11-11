@@ -40,7 +40,7 @@ export type ConsoleCommandResult =
 const EMPTY_REASON = 'Enter one GRBL or G-code command.';
 const MULTILINE_REASON = 'Console commands and saved macros must contain exactly one line.';
 const BLOCKED_PERSISTENT_REASON =
-  'This persistent controller command is blocked in the Console. Back up settings and use Machine Settings in a later lane.';
+  'KerfDesk does not send this command. It erases or rewrites settings stored on the controller (a factory restore, a startup line or the build info), so the Console refuses it. To run it you need another sender.';
 
 // GRBL-family firmware executes these bytes the moment they arrive, anywhere
 // in the stream and even inside a comment (gnea/grbl serial.c ISR; grblHAL's

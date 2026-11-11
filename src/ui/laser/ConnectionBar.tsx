@@ -36,6 +36,7 @@ import { NO_ANSWER_TOOLBAR } from '../state/port-open-no-answer';
 import './ConnectionBar.css';
 import type { ControllerAttention } from '../state/controller-attention';
 import { StatusDot } from './ConnectionStatusDot';
+import { titleWhenDisabled } from './control-block-reason';
 
 export type ConnectionBarProps = {
   readonly connection: ConnectionState;
@@ -44,6 +45,8 @@ export type ConnectionBarProps = {
   readonly onDisconnect: () => void;
   readonly onForget: () => void;
   readonly disabled: boolean;
+  /** Why Disconnect is off (a jog, Frame or controller operation), or null. */
+  readonly disabledReason?: string | null;
   readonly qualification?: ControllerQualification;
   readonly qualificationReadBlockReason?: string | null;
   readonly reconnectRecommended?: boolean;
@@ -219,7 +222,11 @@ function PrimaryAction(props: Props): JSX.Element {
           className="lf-btn"
           onClick={props.onDisconnect}
           disabled={props.disabled}
-          title={`Close the current ${props.machineNoun} serial connection but keep device permission.`}
+          title={titleWhenDisabled(
+            props.disabled,
+            props.disabledReason ?? null,
+            `Close the current ${props.machineNoun} serial connection but keep device permission.`,
+          )}
         >
           Disconnect
         </button>
