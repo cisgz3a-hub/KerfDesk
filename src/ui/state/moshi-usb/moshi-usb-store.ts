@@ -31,6 +31,7 @@ import {
   moshiDisconnectedMessage,
 } from './moshi-usb-messages';
 import type { MoshiUsbConnection, MoshiUsbJob, MoshiUsbOpener } from './moshi-usb-types';
+import { reportLinkMachineWork, type LinkMachineWork } from '../link-machine-work';
 
 export type MoshiUsbPhase =
   | 'disconnected'
@@ -116,12 +117,15 @@ async function connect(
 ): Promise<void> {
   if (get().phase !== 'disconnected') return;
   set({ phase: 'connecting', message: 'Opening the Moshiboard over USB…', tone: 'info' });
-  let link: MoshiUsbConnection;
+  let link: MoshiUsbConnection | null = null;
   let code: number | null;
   try {
     link = await open();
     code = moshiStatusCode(await link.readStatus());
   } catch (error) {
+    // A device opened before the failure is released, so another program can
+    // take it (code quality audit C2 D1-P3-1).
+    await link?.close().catch(() => undefined);
     const message = error instanceof Error ? error.message : String(error);
     set({ ...DISCONNECTED, message, tone: 'error' });
     return;
@@ -190,7 +194,9 @@ async function run(
   current.cancelled = false;
   set({
     phase: RUN_PHASE[kind],
-    advisories: kind === 'job' && job !== null ? job.advisories : [],
+    // The job's warnings show from its Frame on, not only once it is sent
+    // (code quality audit C2 D1-P2-1); Home carries none.
+    advisories: job === null ? [] : job.advisories,
     message: RUN_START[kind],
     tone: 'info',
     sending: { sent: 0, total: 0 },
@@ -212,6 +218,8 @@ async function run(
   if (live !== current || current.cancelled) return;
   if (result.ok) {
     set({ phase: 'idle', sending: null, ...finishedState(kind, job), tone: 'info' });
+    // "After completed job" variable advance (code quality audit C2 D2-P2-3).
+    if (kind === 'job') job?.completed?.();
     return;
   }
   set({
@@ -271,3 +279,27 @@ export function resetMoshiUsbStoreForTests(): void {
   live = null;
   useMoshiUsbStore.setState({ ...DISCONNECTED, message: '', tone: 'info' });
 }
+
+// Active work is reported where the always-mounted guards can see it without
+// loading this store (link-machine-work.ts; ADR-705 Amendment 3).
+const ACTIVE_WORK: Partial<Record<MoshiUsbPhase, LinkMachineWork['activity']>> = {
+  framing: 'framing',
+  running: 'running',
+  homing: 'homing',
+  stopping: 'stopping',
+};
+
+useMoshiUsbStore.subscribe((state) => {
+  const activity = ACTIVE_WORK[state.phase];
+  reportLinkMachineWork(
+    'moshi-usb',
+    activity === undefined
+      ? null
+      : {
+          controller: 'Moshiboard',
+          activity,
+          advisories: state.advisories,
+          abort: () => useMoshiUsbStore.getState().abort(),
+        },
+  );
+});

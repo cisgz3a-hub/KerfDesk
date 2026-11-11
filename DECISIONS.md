@@ -10565,6 +10565,8 @@ labeling and default machining policy remain CNC-oriented.
 
 ## ADR-227 - Status-bar Update button replaces the PWA update popup
 
+**Amended by [ADR-227 Amendment 2](docs/decisions/ADR-227-amendment-2-the-web-update-waits-for-machine-work.md):** the web Update button reads "Update after job" and waits while machine work runs.
+
 **Date:** 2026-07-17
 **Status:** Accepted
 

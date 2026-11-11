@@ -10,6 +10,7 @@ import {
 import { validateCameraProfileShape } from '../camera';
 import { GRBLHAL_DEFAULT_RX_BUFFER_BYTES } from '../grbl-streaming';
 import { FALCON_A1_PRO_GRBLHAL_PROFILE, FALCON_COMPATIBLE_PROFILE } from './falcon-profiles';
+import { K40_M2_NANO_PROFILE, K40_M3_NANO_PWM_PROFILE } from './lihuiyu-profiles';
 import { validateScanOffsetProfile } from './scan-offset-profile';
 import { cncSubProfileIssues } from './cnc-sub-profile-validation';
 import { machineProfileControllerIssues } from './machine-profile-controller-validation';
@@ -221,6 +222,12 @@ export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEn
   ]),
   entry(GENERIC_RUIDA_PROFILE, [
     'Ruida: file-export only (.rd); encoder is EXPERIMENTAL and not accepted by real hardware yet.',
+  ]),
+  entry(K40_M2_NANO_PROFILE, [
+    'Lihuiyu M2 Nano (stock K40): .egv export and a USB link, both EXPERIMENTAL and simulator-tested only. Power is set on the machine knob.',
+  ]),
+  entry(K40_M3_NANO_PWM_PROFILE, [
+    'Lihuiyu M3 Nano with PWM firmware: as the M2 profile, with layer power sent as per mille of Full-power S.',
   ]),
   entry(GENERIC_MOSHI_PROFILE, [
     'Moshiboard: USB link only (Frame, Start, Abort, Home); EXPERIMENTAL, simulator-tested only.',

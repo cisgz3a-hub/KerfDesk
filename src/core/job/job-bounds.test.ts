@@ -140,10 +140,11 @@ describe('computeJobBounds', () => {
       scanningOffsets: [{ speedMmPerMin: 1000, offsetMm: 0.25 }],
     };
 
+    // ADR-052 Amendment 2: forward rows +0.125, reverse rows -0.125.
     expect(computeJobMotionBounds(rasterJob, device)).toEqual({
-      minX: 8.75,
+      minX: 8.875,
       minY: 0,
-      maxX: 13,
+      maxX: 13.125,
       maxY: 2,
     });
   });
@@ -175,16 +176,17 @@ describe('computeJobMotionBounds', () => {
       scanningOffsets: [{ speedMmPerMin: 6000, offsetMm: 0.25 }],
     };
 
+    // ADR-052 Amendment 2: forward rows +0.125, reverse rows -0.125.
     expect(computeJobBounds(rasterJob, device)).toEqual({
-      minX: -0.25,
+      minX: -0.125,
       minY: 0,
-      maxX: 2,
+      maxX: 2.125,
       maxY: 2,
     });
     expect(computeJobMotionBounds(rasterJob, device)).toEqual({
-      minX: -0.25,
+      minX: -0.125,
       minY: 0,
-      maxX: 2,
+      maxX: 2.125,
       maxY: 2,
     });
   });
@@ -259,16 +261,17 @@ describe('computeJobMotionBounds', () => {
       scanningOffsets: [{ speedMmPerMin: 6000, offsetMm: 0.5 }],
     };
 
+    // ADR-052 Amendment 2: the sweep moves half the 0.5 mm offset along its travel.
     expect(computeJobBounds(fillJob, device)).toEqual({
-      minX: 4.5,
+      minX: 4.75,
       minY: 20,
       maxX: 10,
       maxY: 20,
     });
     expect(computeJobMotionBounds(fillJob, device)).toEqual({
-      minX: 3.5,
+      minX: 3.75,
       minY: 20,
-      maxX: 10.5,
+      maxX: 10.75,
       maxY: 20,
     });
   });

@@ -7,7 +7,12 @@ import { machineCapabilityWarningMessage } from '../../machine/machine-capabilit
 import { useStore } from '../../state';
 import type { CncStartupOperationDraft } from '../../state/cnc-startup-setup';
 import { useLaserStore } from '../../state/laser-store';
-import { isActiveJob, isActiveJobStatus } from '../../state/laser-store-helpers';
+import { isActiveJobStatus } from '../../state/laser-store-helpers';
+import {
+  activeLinkMachineWork,
+  anyMachineJobActive,
+  useLinkMachineWorkStore,
+} from '../../state/link-machine-work';
 import { useToastStore } from '../../state/toast-store';
 import type { DeviceSetupState } from './device-setup-flow';
 import { machineSetupProfile } from './device-setup-flow';
@@ -44,12 +49,15 @@ export function useMachineSetupSave(input: {
   const replaceCncStartupSetup = useStore((store) => store.replaceCncStartupSetup);
   const rows = useLaserStore((store) => store.grblSettingsRows);
   const writeGrblSetting = useLaserStore((store) => store.writeGrblSetting);
-  const lockedByJob = useLaserStore((store) => isActiveJobStatus(store.streamer?.status ?? null));
+  const laserJob = useLaserStore((store) => isActiveJobStatus(store.streamer?.status ?? null));
+  // A Moshi or Ruida link job too: a profile change would unmount its Abort.
+  const linkJob = useLinkMachineWorkStore((store) => activeLinkMachineWork(store) !== null);
+  const lockedByJob = laserJob || linkJob;
   const pushToast = useToastStore((store) => store.pushToast);
   const writes = queuedFirmwareDiffs(input.state, rows);
   const onSave = (): void => {
     if (saving) return;
-    if (isActiveJob(useLaserStore.getState().streamer)) {
+    if (anyMachineJobActive()) {
       pushToast(SETUP_SAVE_LOCKED_DURING_JOB, 'warning');
       return;
     }

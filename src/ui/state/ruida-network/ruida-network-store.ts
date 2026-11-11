@@ -33,6 +33,7 @@ import {
   ruidaStopOutcome,
 } from './ruida-network-messages';
 import { watchRuidaRun, type RuidaMonitor } from './ruida-network-monitor';
+import { reportLinkMachineWork, type LinkMachineWork } from '../link-machine-work';
 
 export type RuidaNetworkPhase =
   | 'disconnected'
@@ -48,6 +49,8 @@ export type RuidaNetworkJob = {
   readonly bytes: Uint8Array;
   readonly footprint: RdFootprint;
   readonly advisories: ReadonlyArray<string>;
+  /** Runs once the controller reports the job finished (variable advance). */
+  readonly completed?: () => void;
 };
 
 export type RuidaNetworkState = {
@@ -188,14 +191,15 @@ async function run(set: Set, get: Get, kind: 'frame' | 'job', job: RuidaNetworkJ
   set({
     phase: frame ? 'framing' : 'running',
     status,
-    advisories: frame ? [] : job.advisories,
+    // The job's warnings show from its Frame on (code quality audit C2 D1-P2-1).
+    advisories: job.advisories,
     message: frame ? 'Sending the Frame (laser off)…' : 'Sending the job…',
     tone: 'info',
   });
   current.cancelSend = false;
   const sent = streamTo(set, current, bytes);
   current.sendDone = sent;
-  if (await sent) watchToEnd(set, get, current, kind, job.footprint);
+  if (await sent) watchToEnd(set, get, current, kind, job);
 }
 
 // A job the controller already runs (from its panel, or another program)
@@ -246,7 +250,7 @@ function watchToEnd(
   get: Get,
   current: Live,
   kind: 'frame' | 'job',
-  footprint: RdFootprint,
+  job: RuidaNetworkJob,
 ): void {
   // An Abort that arrived while the last datagram was acknowledged owns the
   // run now: no monitor may start after it and later report a finish.
@@ -261,7 +265,7 @@ function watchToEnd(
     status: (status, positionMm) => set({ status, positionMm }),
     paused: () => get().phase === 'paused',
     silent: () => set({ message: RUIDA_STATUS_SILENT, tone: 'warning' }),
-    finished: () => {
+    finished: (sawBusy) => {
       current.monitor = null;
       // Only a run still in progress finishes; a stopped one never counts as a Frame.
       const phase = get().phase;
@@ -270,8 +274,10 @@ function watchToEnd(
         kind === 'frame'
           ? {
               phase: 'idle',
-              framed: footprint,
-              message: 'Frame finished. Start is available for this footprint.',
+              framed: job.footprint,
+              message: sawBusy
+                ? 'Frame finished. Start is available for this footprint.'
+                : 'Frame finished: the controller took the whole frame and read idle before any status read caught it moving (a short frame). Start is available for this footprint.',
               tone: 'info',
             }
           : {
@@ -281,6 +287,8 @@ function watchToEnd(
               tone: 'info',
             },
       );
+      // "After completed job" variable advance (code quality audit C2 D2-P2-3).
+      if (kind === 'job') job.completed?.();
     },
   });
 }
@@ -335,3 +343,27 @@ export function resetRuidaNetworkStoreForTests(): void {
   live = null;
   useRuidaNetworkStore.setState({ ...DISCONNECTED, message: '', tone: 'info' });
 }
+
+// Active work is reported where the always-mounted guards can see it without
+// loading this store (link-machine-work.ts; ADR-705 Amendment 3).
+const ACTIVE_WORK: Partial<Record<RuidaNetworkPhase, LinkMachineWork['activity']>> = {
+  framing: 'framing',
+  running: 'running',
+  paused: 'paused',
+  stopping: 'stopping',
+};
+
+useRuidaNetworkStore.subscribe((state) => {
+  const activity = ACTIVE_WORK[state.phase];
+  reportLinkMachineWork(
+    'ruida-network',
+    activity === undefined
+      ? null
+      : {
+          controller: 'Ruida',
+          activity,
+          advisories: state.advisories,
+          abort: () => useRuidaNetworkStore.getState().abort(),
+        },
+  );
+});

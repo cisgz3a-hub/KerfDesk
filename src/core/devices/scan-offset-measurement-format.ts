@@ -18,10 +18,10 @@ export function scanOffsetSpeedFromMmPerMin(value: number, unit: ScanOffsetSpeed
 }
 
 /**
- * Convert an entered offset to LaserForge's full signed reverse-row correction.
- * LightBurn asks for half the measured pair separation because it moves both
- * scan directions; LaserForge keeps forward rows anchored and moves reverse
- * rows by the full separation.
+ * Convert an entered offset to the stored full signed forward-to-reverse
+ * separation. LightBurn asks for half the measured separation because it moves
+ * every row by that amount; KerfDesk stores the full separation and moves every
+ * row half of it (ADR-052 Amendment 2), so the result is the same.
  */
 export function scanOffsetMeasurementToLaserForge(
   value: number,

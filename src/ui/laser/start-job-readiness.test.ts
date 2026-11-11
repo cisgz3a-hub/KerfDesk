@@ -306,7 +306,8 @@ describe('prepareStartJob', () => {
     expect(burnBounds).not.toBeNull();
     expect(motionBounds).not.toBeNull();
     if (burnBounds === null || motionBounds === null) return;
-    expect(burnBounds.maxX).toBe(12);
+    // Reverse rows move half the -2 mm table, 1 mm along +X (ADR-052 Amendment 2).
+    expect(burnBounds.maxX).toBe(11);
     expect(motionBounds.maxX).toBeGreaterThan(burnBounds.maxX);
 
     const result = prepareStartJob(

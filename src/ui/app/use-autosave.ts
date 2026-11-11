@@ -3,6 +3,8 @@
 // useAutosave:
 //   * 30s interval that snapshots project + dirty + streaming from
 //     both stores into atomic IndexedDB, with localStorage fallback.
+//     It keeps running while a job streams when the job gate lets the
+//     project through (ADR-305 Amendment 1).
 //   * beforeunload listener that preserves the existing synchronous
 //     localStorage best effort. Large projects recover the last completed
 //     interval snapshot because unload cannot await IndexedDB.
@@ -23,8 +25,10 @@ import {
   type AutosaveDurableSnapshot,
   type AutosaveDurableWriteResult,
 } from '../state/autosave-durable';
+import { createAutosaveJobGate, type AutosaveJobGate } from '../state/autosave-job-gate';
 import { startAutosaveLoop, type AutosaveSnapshotFn } from '../state/autosave-loop';
 import { createAutosaveProjectSnapshot } from '../state/autosave-project-snapshot';
+import { useBackgroundSaveHealth } from '../state/background-save-health';
 import { noteProjectCopyOnDisk } from '../state/design-document-copies';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
@@ -49,6 +53,9 @@ export const AUTOSAVE_FAILURE_MESSAGE =
 // (performance audit S3-P2-2 found the storage wording sent users the wrong way).
 export const AUTOSAVE_TIMEOUT_MESSAGE =
   'Autosave could not prepare a recovery copy of the newest project within 60 seconds. Save the .lf2 file manually.';
+// The status bar's tooltip while a job holds an autosave back (ADR-305 Amendment 1).
+export const AUTOSAVE_WAITING_FOR_JOB_MESSAGE =
+  'Autosave is waiting for the job to end: copying this project now could disturb the job. Changes made during the job have no recovery copy yet. Save the project to keep them now.';
 export const AUTOSAVE_RECOVERY_DEGRADED_MESSAGE =
   'The newest autosave was unavailable; KerfDesk recovered the previous complete snapshot.';
 export const AUTOSAVE_RECOVERY_STORAGE_MESSAGE =
@@ -76,20 +83,25 @@ function autosaveFailureMessage(failure: AutosaveWriteFailure | undefined): stri
   return AUTOSAVE_FAILURE_MESSAGE;
 }
 
-/** Warns once per session for each cause, naming the cause the failure carries. */
+/**
+ * Warns once per session for each cause, naming the cause the failure carries.
+ * Every failure also sets the status bar's lasting sign, which stays until a
+ * write succeeds (annoyance audit A5-P2-1).
+ */
 export function createAutosaveFailureReporter(
   pushToast: PushToast,
 ): (failure?: AutosaveWriteFailure) => void {
   const warned = new Set<string>();
   return (failure) => {
     const message = autosaveFailureMessage(failure);
+    useBackgroundSaveHealth.getState().noteFailed('autosave', message);
     if (warned.has(message)) return;
     warned.add(message);
     pushToast(message, 'warning');
   };
 }
 
-function createSnapshotForAutosave(): AutosaveSnapshotFn {
+function createSnapshotForAutosave(noteJob: (active: boolean) => void): AutosaveSnapshotFn {
   const snapshotProject = createAutosaveProjectSnapshot();
   return () => {
     const s = useStore.getState();
@@ -97,6 +109,7 @@ function createSnapshotForAutosave(): AutosaveSnapshotFn {
     const streamer = ls.streamer;
     const isStreaming =
       streamer !== null && (streamer.status === 'streaming' || streamer.status === 'paused');
+    noteJob(isStreaming);
     return {
       project: snapshotProject(s),
       dirty: s.dirty && !isAutosaveDiscardPending(s.project),
@@ -125,27 +138,69 @@ export function autosaveWriter(
   };
 }
 
+type AutosaveProject = ReturnType<AutosaveSnapshotFn>['project'];
+
+/**
+ * The interval's writer with its results reported: to the job gate, which
+ * decides whether the next write may run during a job, and to the status
+ * bar's sign, which a good write clears.
+ */
+export function reportingAutosaveWriter(
+  write: (project: AutosaveProject) => Promise<AutosaveDurableWriteResult>,
+  gate: Pick<AutosaveJobGate, 'noteWrite'>,
+  jobActive: () => boolean,
+): (project: AutosaveProject) => Promise<AutosaveDurableWriteResult> {
+  return async (project) => {
+    const duringJob = jobActive();
+    let result: AutosaveDurableWriteResult;
+    try {
+      result = await write(project);
+    } catch (error) {
+      gate.noteWrite({ kind: 'failed', reason: 'storage-error', error }, duringJob);
+      throw error;
+    }
+    gate.noteWrite(result, duringJob);
+    if (result.kind === 'ok') useBackgroundSaveHealth.getState().noteSaved('autosave');
+    return result;
+  };
+}
+
 export function useAutosave(): void {
   const pushToast = useToastStore((s) => s.pushToast);
   const platform = usePlatformOptional();
   const askToPersist = platform !== null && !platformCanPickFiles(platform);
   useEffect(() => {
     const reportAutosaveFailure = createAutosaveFailureReporter(pushToast);
-    const snapshotForAutosave = createSnapshotForAutosave();
+    const health = useBackgroundSaveHealth.getState();
+    const gate = createAutosaveJobGate();
+    let jobActive = false;
+    const snapshotForAutosave = createSnapshotForAutosave((active) => {
+      jobActive = active;
+      gate.noteJob(active);
+    });
     const stopInterval = startAutosaveLoop(
       snapshotForAutosave,
       AUTOSAVE_INTERVAL_MS,
       reportAutosaveFailure,
-      autosaveWriter(askToPersist),
+      reportingAutosaveWriter(autosaveWriter(askToPersist), gate, () => jobActive),
+      {
+        // The writer works in a worker, so a job need not stop it (ADR-305
+        // Amendment 1); the gate bounds what is left on this thread.
+        writeDuringJob: gate.allows,
+        onWaitingForJob: (waiting) =>
+          health.noteWaiting('autosave', waiting ? AUTOSAVE_WAITING_FOR_JOB_MESSAGE : null),
+      },
     );
+    // A manual save, New or Open leaves nothing for the autosave to protect.
+    const stopWatchingSaves = useStore.subscribe((state, previous) => {
+      if (previous.dirty && !state.dirty) health.noteSaved('autosave');
+    });
     void projectAutosaveService.session();
     const onBeforeUnload = (event: BeforeUnloadEvent): void => {
       const snap = snapshotForAutosave();
-      // Even mid-stream: if the user closed the window, persisting
-      // their scene is more important than respecting "don't write
-      // during streaming." The streaming guard exists so the 30s
-      // interval doesn't perturb the render loop — that no longer
-      // applies once the page is unloading.
+      // Even mid-stream and whatever the job gate says: if the user closed
+      // the window, persisting their scene matters more than the canvas
+      // thread, which has nothing left to keep up with once the page unloads.
       if (snap.dirty) {
         const result = writeAutosave(snap.project);
         if (result.kind === 'ok') {
@@ -163,6 +218,8 @@ export function useAutosave(): void {
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => {
       stopInterval();
+      stopWatchingSaves();
+      health.noteSaved('autosave');
       window.removeEventListener('beforeunload', onBeforeUnload);
     };
   }, [pushToast, askToPersist]);

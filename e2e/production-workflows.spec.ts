@@ -21,6 +21,7 @@ import {
 } from './fixtures/recovery-flow';
 import { acknowledgedStartControlLinesSince } from './fixtures/recovery-start-boundary';
 import { saveProjectAs } from './fixtures/project-save';
+import { expectGcodeSaveRefused, finishGcodeSave } from './fixtures/gcode-save';
 import { composedSvgSnapshot } from './fixtures/composed-svg-browser';
 
 test.beforeEach(async ({ page }) => {
@@ -30,15 +31,18 @@ test.beforeEach(async ({ page }) => {
   await dismissNotifications(page);
 });
 
-test('saves prepared G-code with Save As without asking for a directory', async ({
+test('saves prepared G-code in one action, without a dialog or asking for a directory', async ({
   page,
   kerfdesk,
 }) => {
   const eventCount = (await kerfdesk.events()).length;
+  const dialogs = await watchForDialog(page, 'Save G-code');
+  // One action: the file dialog opens from the menu command itself (ADR-656 Amendment 4).
   await runMenuCommand(page, 'File', 'Save G-code...');
-  const dialog = page.getByRole('dialog', { name: 'Save G-code', exact: true });
-  await expect(dialog).toContainText('Downloads or Desktop');
-  await choosePreparedGcodeDestination(page);
+  await expect
+    .poll(async () => fileSavedCount((await kerfdesk.events()).slice(eventCount)))
+    .toBe(1);
+  expect(await dialogs()).toBe(0);
 
   expect(await savedText(kerfdesk, '.gcode')).toContain('G21');
   const saveEvents = (await kerfdesk.events()).slice(eventCount);
@@ -202,8 +206,7 @@ test('exports rotary raster through the configured machine-space transform', asy
     { name: 'rotary-raster.png', kind: 'png-fixture', width: 16, height: 16 },
   ]);
   await (await toolbarCommand(page, 'Import...')).click();
-  await runMenuCommand(page, 'File', 'Save G-code...');
-  await choosePreparedGcodeDestination(page);
+  await saveGcodeFromMenu(page, kerfdesk);
 
   const gcode = await savedText(kerfdesk, '.gcode');
   const yValues = [...gcode.matchAll(/Y(-?\d+(?:\.\d+)?)/g)].map((match) => Number(match[1]));
@@ -265,8 +268,7 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
   await captureButtons.nth(1).click();
   await page.getByRole('button', { name: 'Apply registration' }).click();
 
-  await runMenuCommand(page, 'File', 'Save G-code...');
-  await choosePreparedGcodeDestination(page);
+  await saveGcodeFromMenu(page, kerfdesk);
   const gcode = await savedText(kerfdesk, '.gcode');
   expect(gcode).toContain('X30.000');
   // Design Y=10 is registered to machine Y=40; front-left output then maps
@@ -278,17 +280,17 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
     page.getByTitle('Print-and-Cut registration is not valid. Capture both machine points again.'),
   ).toBeVisible();
   const savedBefore = fileSavedCount(await kerfdesk.events());
-  let blockedMessage = '';
-  page.once('dialog', (dialog) => {
-    blockedMessage = dialog.message();
-    void dialog.dismiss();
-  });
+  // Refused once, as an error toast: no native alert and no dialog left
+  // behind to cancel (annoyance audit A1-P3-9, ADR-656 Amendment 4).
+  let nativeDialogs = 0;
+  const countNative = (): void => void (nativeDialogs += 1);
+  page.on('dialog', countNative);
   await runMenuCommand(page, 'File', 'Save G-code...');
-  await expect.poll(() => blockedMessage).toContain('registration is not valid');
+  await expectGcodeSaveRefused(page, /registration is not valid/);
   expect(fileSavedCount(await kerfdesk.events())).toBe(savedBefore);
-  const failedSave = page.getByRole('dialog', { name: 'Save G-code' });
-  await expect(failedSave).toContainText('No final file was selected or modified');
-  await failedSave.getByRole('button', { name: 'Cancel', exact: true }).click();
+  expect(nativeDialogs).toBe(0);
+  page.off('dialog', countNative);
+  await dismissNotifications(page);
 
   await saveProjectAs(page, kerfdesk);
 
@@ -1355,10 +1357,28 @@ async function confirmJobReview(
   await confirmRecoveryJobReview(page, kerfdesk, startButton);
 }
 
-async function choosePreparedGcodeDestination(page: Page): Promise<void> {
-  const dialog = page.getByRole('dialog', { name: 'Save G-code' });
-  await expect(dialog).toContainText('The complete export is ready.');
-  await dialog.getByRole('button', { name: 'Save as…' }).click();
+async function saveGcodeFromMenu(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
+  const before = fileSavedCount(await kerfdesk.events());
+  await runMenuCommand(page, 'File', 'Save G-code...');
+  await finishGcodeSave(page, async () => fileSavedCount(await kerfdesk.events()) > before);
+}
+
+/** Counts how often a dialog of this name is drawn, however briefly. */
+async function watchForDialog(page: Page, name: string): Promise<() => Promise<number>> {
+  await page.evaluate((title) => {
+    const state = window as Window & { __dialogsSeen?: number };
+    state.__dialogsSeen = 0;
+    new MutationObserver(() => {
+      for (const node of document.querySelectorAll('[role="dialog"] h2')) {
+        if (node.textContent === title && !node.hasAttribute('data-seen')) {
+          node.setAttribute('data-seen', '');
+          state.__dialogsSeen = (state.__dialogsSeen ?? 0) + 1;
+        }
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+  }, name);
+  return () =>
+    page.evaluate(() => (window as Window & { __dialogsSeen?: number }).__dialogsSeen ?? 0);
 }
 
 async function dismissNotifications(page: Page): Promise<void> {

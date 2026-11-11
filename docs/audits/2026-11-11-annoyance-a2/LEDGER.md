@@ -46,7 +46,7 @@ The rest is friction, and most of it sits at the edges of the product: the phone
 | ID | Summary | How often | Deliberate? | Fix status |
 |---|---|---|---|---|
 | B4-P1-1 | **A multi-bit CNC job cannot Continue past a bit change** unless the next bit already is the project's Default bit. Continue needs Work Z tagged with the pending bit; Zero Z and the probe tag it with the project's bit; the only control that changes that bit is in Machine Setup, whose Save is refused during a job. **Reproduced** on the GRBL simulator through the rendered Machine rail (main 06d947672): after Zero Z or a Z probe at the hold the record is for the Default bit and Continue reads "Work Z belongs to a different bit" | Every bit change of a project Start | ADR-416 Amd 1, 3 in part | **fixed**, ADR-416 Amendment 4: the bit in the spindle is session state, a hold declares the bit it asked for, and the rail has a Bit in the spindle selector; the Continue check is unchanged. Simulator tests only, no hardware |
-| B1-P1-1 | **Web: one click on Update during a job reloads the page and stops the burn.** No job check, no question | Rare click; the button is present most days | ADR-227, ADR-228; ADR-561 Amd 7 names the guard as open | open; needs the maintainer's word |
+| B1-P1-1 | **Web: one click on Update during a job reloads the page and stops the burn.** No job check, no question | Rare click; the button is present most days | ADR-227, ADR-228; ADR-561 Amd 7 names the guard as open | maintainer said "Yes, make it wait" (2026-11-11); fixed by ADR-227 Amd 2 |
 
 ## P2 findings (coordinator-read)
 
@@ -99,7 +99,7 @@ Each rests on an ADR or the maintainer's own instruction. None is changed by thi
 
 | ID | Current behaviour | Rule | Option |
 |---|---|---|---|
-| B1-P1-1 | The web Update button reloads during a job | ADR-227, ADR-228, ADR-561 Amd 7 dec 7 | Show "Update after job" while machine work is active, as the desktop button does |
+| B1-P1-1 | The web Update button reloads during a job | ADR-227, ADR-228, ADR-561 Amd 7 dec 7 | **Decided 2026-11-11: make it wait.** ADR-227 Amd 2 |
 | B4-D-1 | On a CNC any Z move after Frame expires the Frame | ADR-565 Amd 1 | Keep the Frame through an app-owned Z jog; still expire on Zero Z, probe, origin change, alarm, reset |
 | B5-D-1 | No "Run again" on the phone | ADR-237 Amd 3 | A carried review with the slide kept as the one gesture |
 | B6-D-1 | A two-finger trackpad scroll zooms the canvas and cannot pan | ADR-359 Amd 2 | Pinch zooms, two-finger scroll pans, as the trace preview does |

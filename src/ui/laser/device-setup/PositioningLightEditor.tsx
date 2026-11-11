@@ -36,11 +36,11 @@ export function PositioningLightEditor({
       </p>
     );
   }
-  if (device.controllerKind === 'ruida') {
+  if (device.controllerKind === 'ruida' || device.controllerKind === 'lihuiyu') {
     return (
       <p>
-        Ruida uses file output in KerfDesk. Live positioning and light control are unavailable; use
-        the machine panel.
+        This controller runs from files or its own link in KerfDesk. Live positioning and light
+        control are unavailable; use the machine panel.
       </p>
     );
   }
@@ -310,6 +310,8 @@ function commandHelp(kind: ControllerKind | undefined): string {
       return 'Stock GRBL has no standard pointer command. Use your machine vendor’s documented accessory commands. M7/M8/M9 are coolant controls unless your machine explicitly maps that output to the separate light.';
     case 'ruida':
       return 'Ruida uses file output; operate the light from the machine panel.';
+    case 'lihuiyu':
+      return 'Lihuiyu boards have no light output; switch the light at the machine.';
     case 'moshi':
       return 'A Moshiboard has no light command; use the machine switch.';
   }

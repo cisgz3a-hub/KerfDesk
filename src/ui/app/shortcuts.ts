@@ -26,6 +26,7 @@ import type { AppState, ImportOutcome } from '../state/store';
 import type { ProjectMachineCapabilityLoadResult } from '../state/project-machine-capability';
 import type { ToastVariant } from '../state/toast-store';
 import { handleOpenProject, handleSaveProject } from './file-actions';
+import { startGcodeSave } from './gcode-save-flow';
 import { handleUnifiedArtworkImport } from './import-dispatch';
 import { useStore } from '../state';
 import { useUiStore, type ToolMode } from '../state/ui-store';
@@ -200,7 +201,7 @@ export function handleFileShortcut(e: KeyboardEvent, ctx: FileCtx): boolean {
   // tool — LightBurn parity, ADR-051 B7).
   if (e.shiftKey && e.key.toLowerCase() === 'e') {
     e.preventDefault();
-    useUiStore.getState().openGcodeSaveDialog();
+    startGcodeSave({ platform: ctx.platform, pushToast: ctx.pushToast });
     return true;
   }
   if (e.shiftKey) return false;

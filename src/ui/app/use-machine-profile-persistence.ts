@@ -2,9 +2,13 @@ import { useEffect } from 'react';
 import type { DeviceProfile } from '../../core/devices';
 import { machineKindOf, type Project } from '../../core/scene';
 import { useStore } from '../state';
+import { useBackgroundSaveHealth } from '../state/background-save-health';
 import { browserLocalStorage } from '../state/browser-local-storage';
 import { rememberLastMachine } from '../state/last-machine-persistence';
 import { useToastStore } from '../state/toast-store';
+
+export const MACHINE_SETTINGS_NOT_SAVED_MESSAGE =
+  'Your machine settings could not be saved for next session.';
 
 export function useMachineProfilePersistence(): void {
   const pushToast = useToastStore((state) => state.pushToast);
@@ -29,9 +33,17 @@ export function useMachineProfilePersistence(): void {
         return;
       const saved =
         storage !== null && rememberLastMachine(storage, persistableProfile(state.project), kind);
-      if (!saved && !warned) {
+      // The status bar keeps saying so until a later change is saved; the
+      // toast says it once (annoyance audit A5-P2-1).
+      const health = useBackgroundSaveHealth.getState();
+      if (saved) {
+        health.noteSaved('machine-settings');
+        return;
+      }
+      health.noteFailed('machine-settings', MACHINE_SETTINGS_NOT_SAVED_MESSAGE);
+      if (!warned) {
         warned = true;
-        pushToast('Your machine settings could not be saved for next session.', 'warning');
+        pushToast(MACHINE_SETTINGS_NOT_SAVED_MESSAGE, 'warning');
       }
     });
   }, [pushToast]);
