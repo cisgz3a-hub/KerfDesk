@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLayer, type RasterImage } from '../../core/scene';
+import { answerAppDialogs, clearAppDialogs } from '../state/app-dialog-test-helpers';
 import { AdjustImageDialog } from './AdjustImageDialog';
 
 (
@@ -40,6 +41,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  clearAppDialogs();
   localStorage.clear();
 });
 
@@ -264,7 +266,8 @@ describe('AdjustImageDialog', () => {
 
   it('saves, reapplies, and deletes user presets without applying to the scene', async () => {
     const onApply = vi.fn();
-    vi.spyOn(window, 'prompt').mockReturnValue('Wood logo');
+    // The name is asked in the app, never with window.prompt (ADR-707).
+    const naming = answerAppDialogs(() => 'Wood logo');
     const { host, root } = await renderDialog({ onApply });
     try {
       change(host, 'input[name="brightness"]', '33');
@@ -279,6 +282,7 @@ describe('AdjustImageDialog', () => {
       click(host, 'input[name="invertDisplay"]');
 
       clickButton(host, 'button[name="saveImagePreset"]');
+      await act(async () => undefined);
 
       expect(host.querySelector('option[value="user:Wood logo"]')).not.toBeNull();
 
@@ -322,6 +326,7 @@ describe('AdjustImageDialog', () => {
       );
       expect(onApply).not.toHaveBeenCalled();
     } finally {
+      naming.stop();
       await act(async () => root.unmount());
       host.remove();
     }

@@ -13,7 +13,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { totalWco } from '../../__fixtures__/controllers/grbl-sim-state';
 import { useStore } from '../state';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
+import { appConfirm } from '../state/app-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { positionWithheldMessage } from './frame-position-withheld';
@@ -32,6 +32,9 @@ import {
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
   jobAwareConfirm: vi.fn(() => true),
+}));
+vi.mock('../state/app-dialogs', () => ({
+  appConfirm: vi.fn(async () => true),
 }));
 
 installRecoveryStressHooks();
@@ -162,11 +165,13 @@ describe('A3-P2-1: Unlock after a soft limit keeps the position', () => {
       setHoming(false);
       await originSetAndHeadMoved();
       await softLimitThenReset(h);
-      vi.mocked(jobAwareConfirm).mockClear();
+      vi.mocked(appConfirm).mockClear();
 
       await frameUntilPermit();
 
-      expect(vi.mocked(jobAwareConfirm).mock.calls[0]?.[0]).toBe(POSITION_KEPT_UNLOCK_OFFER_PROMPT);
+      expect(vi.mocked(appConfirm).mock.calls[0]?.[0]?.message).toBe(
+        POSITION_KEPT_UNLOCK_OFFER_PROMPT,
+      );
       expect(useLaserStore.getState().positionEvidenceSuppressed).not.toBe(true);
       expect(totalWco(h.simulator.state())).toMatchObject(ORIGIN);
     },

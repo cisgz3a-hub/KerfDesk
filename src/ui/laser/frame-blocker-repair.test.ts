@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StatusReport } from '../../core/controllers/grbl';
 import { createProject } from '../../core/scene';
 import { useStore } from '../state';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
+import { appConfirm } from '../state/app-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { resetStore } from '../state/test-helpers';
@@ -17,8 +17,8 @@ import { SET_ORIGIN_OFFER_PROMPT } from './start-blocked-setup-offers';
 import { useStartBlockerStore } from './start-blocker-store';
 import { ALARM_ACTIVE_START_MESSAGE, machineNotIdleStartMessage } from './start-machine-refusals';
 
-vi.mock('../state/job-aware-dialogs', () => ({
-  jobAwareConfirm: vi.fn(() => true),
+vi.mock('../state/app-dialogs', () => ({
+  appConfirm: vi.fn(async () => true),
 }));
 
 function status(state: StatusReport['state'], wco: StatusReport['wco'] = null): StatusReport {
@@ -54,7 +54,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   resetStore();
   installProject(false);
-  vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
+  vi.mocked(appConfirm).mockReset().mockResolvedValue(true);
   useLaserStore.setState({
     ...initialLaserState(),
     connection: { kind: 'connected' },
@@ -90,20 +90,24 @@ describe('offerFrameBlockerFixes — alarm', () => {
     const repaired = offerFrameBlockerFixes();
     await vi.advanceTimersByTimeAsync(200);
     await expect(repaired).resolves.toBe(true);
-    expect(jobAwareConfirm).toHaveBeenCalledWith(HOME_OFFER_PROMPT);
+    expect(appConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: HOME_OFFER_PROMPT }),
+    );
     expect(useLaserStore.getState().home).toHaveBeenCalledTimes(1);
     expect(useLaserStore.getState().unlockAlarm).not.toHaveBeenCalled();
   });
 
   it('offers Unlock on a machine without homing switches, then hands over to Set origin', async () => {
     await expect(offerFrameBlockerFixes()).resolves.toBe(false);
-    expect(jobAwareConfirm).toHaveBeenCalledWith(UNLOCK_OFFER_PROMPT);
+    expect(appConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: UNLOCK_OFFER_PROMPT }),
+    );
     expect(useLaserStore.getState().unlockAlarm).toHaveBeenCalledTimes(1);
     expect(useToastStore.getState().toasts.at(-1)?.message).toBe(UNLOCKED_NEXT_STEP_MESSAGE);
   });
 
   it('refuses with the alarm itself when the operator declines the fix', async () => {
-    vi.mocked(jobAwareConfirm).mockReturnValue(false);
+    vi.mocked(appConfirm).mockResolvedValue(false);
     await expect(offerFrameBlockerFixes()).resolves.toBe(false);
     expect(useLaserStore.getState().unlockAlarm).not.toHaveBeenCalled();
     expect(useStartBlockerStore.getState()).toMatchObject({
@@ -116,7 +120,7 @@ describe('offerFrameBlockerFixes — alarm', () => {
     installProject(true);
     useLaserStore.setState({ alarmCode: 10, detectedControllerKind: 'grblhal' });
     await expect(offerFrameBlockerFixes()).resolves.toBe(false);
-    expect(jobAwareConfirm).not.toHaveBeenCalled();
+    expect(appConfirm).not.toHaveBeenCalled();
     expect(useStartBlockerStore.getState().messages).toContain(ALARM_ACTIVE_START_MESSAGE);
   });
 
@@ -126,13 +130,15 @@ describe('offerFrameBlockerFixes — alarm', () => {
     const repaired = offerFrameBlockerFixes();
     await vi.advanceTimersByTimeAsync(200);
     await expect(repaired).resolves.toBe(true);
-    expect(jobAwareConfirm).toHaveBeenCalledWith(HOME_OFFER_PROMPT);
+    expect(appConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: HOME_OFFER_PROMPT }),
+    );
   });
 
   it('reports an alarm standing beside another blocker without offering a fix', async () => {
     useLaserStore.setState({ autofocusBusy: true });
     await expect(offerFrameBlockerFixes()).resolves.toBe(false);
-    expect(jobAwareConfirm).not.toHaveBeenCalled();
+    expect(appConfirm).not.toHaveBeenCalled();
     expect(useStartBlockerStore.getState().messages).toContain(ALARM_ACTIVE_START_MESSAGE);
   });
 
@@ -187,7 +193,7 @@ describe('offerFrameBlockerFixes — alarm', () => {
     const repaired = offerFrameBlockerFixes();
     await vi.advanceTimersByTimeAsync(3_100);
     await expect(repaired).resolves.toBe(true);
-    expect(jobAwareConfirm).toHaveBeenCalledTimes(1);
+    expect(appConfirm).toHaveBeenCalledTimes(1);
     expect(useLaserStore.getState().setOriginHere).not.toHaveBeenCalled();
   });
 });
@@ -198,7 +204,9 @@ describe('offerFrameBlockerFixes — placement and status', () => {
     const repaired = offerFrameBlockerFixes();
     await vi.advanceTimersByTimeAsync(3_100);
     await expect(repaired).resolves.toBe(true);
-    expect(jobAwareConfirm).toHaveBeenCalledWith(SET_ORIGIN_OFFER_PROMPT);
+    expect(appConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: SET_ORIGIN_OFFER_PROMPT }),
+    );
     expect(useLaserStore.getState().setOriginHere).toHaveBeenCalledTimes(1);
   });
 
@@ -235,7 +243,7 @@ describe('offerFrameBlockerFixes — placement and status', () => {
     await vi.advanceTimersByTimeAsync(500);
     await expect(repaired).resolves.toBe(true);
     expect(queries).toBe(3);
-    expect(jobAwareConfirm).not.toHaveBeenCalled();
+    expect(appConfirm).not.toHaveBeenCalled();
   });
 
   it('leaves an Absolute placement to the offset wait in the preparation', async () => {
@@ -247,7 +255,7 @@ describe('offerFrameBlockerFixes — placement and status', () => {
     });
     await expect(offerFrameBlockerFixes()).resolves.toBe(true);
     expect(useLaserStore.getState().requestControllerStatus).not.toHaveBeenCalled();
-    expect(jobAwareConfirm).not.toHaveBeenCalled();
+    expect(appConfirm).not.toHaveBeenCalled();
   });
 
   it('asks for a first status report before judging the machine', async () => {
@@ -261,14 +269,14 @@ describe('offerFrameBlockerFixes — placement and status', () => {
     await vi.advanceTimersByTimeAsync(100);
     await expect(repaired).resolves.toBe(true);
     expect(useLaserStore.getState().requestControllerStatus).toHaveBeenCalled();
-    expect(jobAwareConfirm).not.toHaveBeenCalled();
+    expect(appConfirm).not.toHaveBeenCalled();
   });
 
   it('leaves machine blocks without an in-place fix to the ordinary refusal', async () => {
     useStore.getState().setJobPlacement({ startFrom: 'user-origin' });
     useLaserStore.setState({ statusReport: status('Hold', { x: 0, y: 0, z: 0 }) });
     await expect(offerFrameBlockerFixes()).resolves.toBe(true);
-    expect(jobAwareConfirm).not.toHaveBeenCalled();
+    expect(appConfirm).not.toHaveBeenCalled();
     expect(useStartBlockerStore.getState().messages).toEqual([]);
   });
 });

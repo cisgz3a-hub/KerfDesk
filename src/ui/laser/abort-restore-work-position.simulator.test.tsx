@@ -19,7 +19,7 @@ import { useStore } from '../state';
 import { RESTORE_ORIGIN_WORK_POSITION_ONLY_MESSAGE } from '../state/laser-origin-restore';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
+import { appConfirm } from '../state/app-dialogs';
 import { AbortStoppedCard } from './AbortStoppedCard';
 import { operatorAbortAlarm, restoreOriginAfterAbort } from './abort-alarm-recovery';
 import {
@@ -36,6 +36,10 @@ import { runFrameNow } from './use-frame-action';
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
   jobAwareConfirm: vi.fn(() => true),
+}));
+// Frame's offers are asked in the app (ADR-707); the operator accepts them.
+vi.mock('../state/app-dialogs', () => ({
+  appConfirm: vi.fn(async () => true),
 }));
 
 /** How the simulated controller's status reports are shaped. */
@@ -278,13 +282,13 @@ describe('V3-P2-2: Restore saved origin after Abort, $10=0 against $10=1', () =>
         await act(async () => root.unmount());
 
         // GRBL sends WCO again; the operator presses Frame, as success would
-        // have told them to. The offer names the saved origin, and OK restores it.
+        // have told them to. The offer names the saved origin, and Restore origin puts it back.
         reports.wcoNever = false;
         await tick(3_000);
-        vi.mocked(jobAwareConfirm).mockClear();
+        vi.mocked(appConfirm).mockClear();
         const frameFrom = h.simulator.outbound().length;
         await drive(runFrameNow(), 60_000);
-        const prompt = String(vi.mocked(jobAwareConfirm).mock.calls[0]?.[0] ?? '');
+        const prompt = vi.mocked(appConfirm).mock.calls[0]?.[0]?.message ?? '';
         expect(prompt).toContain(
           'The job you stopped ran from X 20, Y 30 mm from machine zero, and that origin was not restored.',
         );

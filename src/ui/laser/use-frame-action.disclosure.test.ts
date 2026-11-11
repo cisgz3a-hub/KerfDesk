@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { JobBounds } from '../../core/job';
 import { createLayer, createProject, EMPTY_SCENE, IDENTITY_TRANSFORM } from '../../core/scene';
 import { useStore } from '../state';
+import { answerAppDialogs } from '../state/app-dialog-test-helpers';
 import { useCameraStore } from '../state/camera-store';
 import { createFramedRunPermit, type FramedRunCandidate } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
@@ -251,9 +252,13 @@ describe('Frame WCS disclosure and completion reporting', () => {
       frame: successfulFrame(),
     });
     // The operator declines the Set origin offer, so the placement refusal stands.
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const answers = answerAppDialogs(() => false);
 
     await expect(runFrameNow()).resolves.toBe(false);
+    answers.stop();
+    expect(answers.asked.map((request) => request.options.title)).toEqual([
+      'Set the work origin here?',
+    ]);
 
     expect(reviewHarness.runJobReviewGate).not.toHaveBeenCalled();
     expect(useStartBlockerStore.getState().messages).toContain(warning);

@@ -8,7 +8,6 @@
 
 import type { JobOriginAnchor } from '../../core/job';
 import { useStore } from '../state';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import {
@@ -16,6 +15,7 @@ import {
   USER_ORIGIN_REQUIRED_MESSAGE,
   VERIFIED_ORIGIN_REQUIRED_MESSAGE,
 } from '../job-placement';
+import { askMachineOffer } from './machine-offer';
 import { repairFailed, type BlockedStartRepair } from './start-blocked-repair';
 import {
   abortRestoreHomesFirst,
@@ -39,6 +39,9 @@ const ANCHOR_WORDS: Readonly<Record<JobOriginAnchor, string>> = {
   'front-right': 'front-right corner',
 };
 
+export const SET_ORIGIN_OFFER_BUTTON = 'Set origin here';
+
+/** The offer's text; its button is SET_ORIGIN_OFFER_BUTTON (ADR-707). */
 export function setOriginOfferPrompt(
   mode: 'User Origin' | 'Verified Origin',
   anchor: JobOriginAnchor,
@@ -46,11 +49,13 @@ export function setOriginOfferPrompt(
 ): string {
   return (
     `${mode} needs a custom work origin.${note === undefined ? '' : ` ${note}`}\n\n` +
-    `OK: set the work origin where the head is now. The ${ANCHOR_WORDS[anchor]} of your design ` +
-    'goes there and the job runs from it. Then Frame the updated placement before starting.\n' +
-    'Cancel: leave the job blocked.'
+    `"${SET_ORIGIN_OFFER_BUTTON}" sets the work origin where the head is now. The ` +
+    `${ANCHOR_WORDS[anchor]} of your design goes there and the job runs from it. Then Frame ` +
+    'the updated placement before starting.'
   );
 }
+
+export const SET_ORIGIN_OFFER_TITLE = 'Set the work origin here?';
 
 export const SET_ORIGIN_OFFER_PROMPT = setOriginOfferPrompt(
   'User Origin',
@@ -84,7 +89,12 @@ export async function offerSetupFixForBlockedStart(message: string): Promise<Blo
 }
 
 async function offerSetOriginHere(prompt: string): Promise<BlockedStartRepair> {
-  if (!jobAwareConfirm(prompt)) return 'unrepaired';
+  const accepted = await askMachineOffer({
+    title: SET_ORIGIN_OFFER_TITLE,
+    message: prompt,
+    confirmLabel: SET_ORIGIN_OFFER_BUTTON,
+  });
+  if (!accepted) return 'unrepaired';
   try {
     // The store action itself waits for the post-G92 WCO status frame on
     // WCS-reporting controllers, so a plain retry already sees the origin.
