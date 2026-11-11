@@ -11,7 +11,7 @@
 
 import { test, expect, type KerfDeskFixture, type Page } from './fixtures/kerfdesk-test';
 import { dismissNotifications } from './fixtures/recovery-flow';
-import { selectWorkspacePanel, toolbarCommand } from './fixtures/workspace-ui';
+import { machineJogAction, selectWorkspacePanel, toolbarCommand } from './fixtures/workspace-ui';
 import { multiBitCncProject, starterBitName } from '../src/__fixtures__/cnc-multi-bit-project';
 
 test.use({ viewport: { width: 1440, height: 1000 } });
@@ -23,6 +23,7 @@ const JOB_TIMEOUT_MS = 120_000;
 
 interface RunFacts {
   readonly streaming: boolean;
+  readonly originSet: boolean;
   readonly status: string | null;
   readonly workZToolId: string | null;
   readonly pendingToolId: string | null;
@@ -70,6 +71,9 @@ async function openAndConnect(
   });
   await selectWorkspacePanel(page, 'Machine');
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible({ timeout: 30_000 });
+  // The job is placed from a work origin, which the operator sets where the bit stands.
+  await machineJogAction(page, 'Set origin here').click();
+  await expect.poll(async () => (await facts(page)).originSet).toBe(true);
   await dismissNotifications(page);
 }
 
@@ -98,6 +102,7 @@ function facts(page: Page): Promise<RunFacts> {
     const sentLines = simulator.outbound().join('').split('\n');
     return {
       streaming: laser.streamer !== null,
+      originSet: laser.workOriginActive === true,
       status: laser.streamer?.status ?? null,
       workZToolId: laser.workZZeroEvidence?.toolId ?? null,
       pendingToolId: laser.pendingToolId ?? null,
@@ -247,8 +252,9 @@ test('Continue stays off while Z was zeroed with another bit declared', async ({
       `Work Z belongs to a different bit\\. Load ${starterBitName(SECOND).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}, choose it under Bit in the spindle`,
     ),
   );
-  // A press on the blocked Continue leaves the job held.
-  await continueButton(page).click();
+  // A press on the blocked Continue leaves the job held. Forced: Playwright
+  // will not click a button that says aria-disabled, and a mouse still can.
+  await continueButton(page).click({ force: true });
   expect((await facts(page)).status).toBe('tool-change');
 
   // Choosing the right bit is not enough: the record keeps the bit it was taken with.

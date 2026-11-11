@@ -131,6 +131,10 @@ Start of the same file would have cut those operations with the last bit of the 
   With decision 3 switched off (`holdEntrySpindleBitPatch` returning nothing), the two- and
   three-bit jobs fail, 2 of the 4 tests: the rail still shows the Default bit at the hold, and
   Zero Z then records it, which is the finding.
+- `e2e/cnc-bit-change-continue.e2e.ts` (Playwright, the real workspace): the two-bit job, the
+  three-bit job and the wrong-bit case, with the app's own Open, Set origin here, Zero Z, Frame
+  job, Start, Job Review and Continue. The controller is the unit suites' GRBL simulator loaded
+  in the page, because the specs' serial fixtures do not move Z.
 - `use-zero-z-action.test.tsx`: at a held job the overwrite question is asked in the app and a
   yes zeroes; Cancel sends nothing; a yes after the bit moved sends nothing and says so; no
   question with the bit at the existing zero.
