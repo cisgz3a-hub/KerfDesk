@@ -58,4 +58,4 @@ Finding IDs are `D<area>-P<n>-<k>`.
 - **Changes:** anything that could move a toolpath or change what users see is listed for the maintainer, not changed, unless it is a confirmed P1 or P2.
 - **Fix pull requests:** auto-merge with the MERGE method, plus Auto-fix.
 
-**Status:** started 2026-11-11. D1 ledgered ([LEDGER.md](LEDGER.md)). It runs alongside the last area of rolling audit v14 (Z4, the round-glass journey), one agent at a time.
+**Status:** started 2026-11-11. D1 and D2 ledgered ([LEDGER.md](LEDGER.md)); D3 next. Rolling audit v14 finished the same day.
