@@ -154,11 +154,11 @@ describe('strict HPGL geometry import', () => {
     'SM*',
     'PEabc',
     'RO90',
-    'PW1',
     'BZ1,2,3,4,5,6',
     'DT@',
-    'VS40',
-    'PG',
+    'PS1000,1000',
+    'CT1',
+    'IR0,0,50,50',
   ])('rejects unsupported %s without returning partial geometry', (unsupported) => {
     const text = `SP1;PU0,0;PD40,0;${unsupported};`;
     const result = parse(text);
@@ -206,5 +206,47 @@ describe('strict HPGL geometry import', () => {
       kind: 'error',
       diagnostics: [{ severity: 'error' }],
     });
+  });
+});
+
+// Audit O2-P2-2 (Oracle audit O1): the HP-GL/2 reference defines VS, FS, PW,
+// NP, PC and the like as device or pen attributes that draw nothing, and PG as
+// "advance full page". A plotter driver's file that sets a cutting speed must
+// import the same geometry as one that does not (ADR-357 Amendment 5).
+describe('HPGL commands that draw nothing (O2-P2-2)', () => {
+  const plain = 'IN;SP1;PU0,0;PD400,0,400,200;PU;';
+  it.each([
+    'VS10;',
+    'vs10;',
+    'FS2;',
+    'PW0.35,1;',
+    'WU0;',
+    'NP8;',
+    'PC1,255,0,0;',
+    'CR0,255,0,255,0,255;',
+    'MC0;',
+    'TR0;',
+    'LA1,4,2,4;',
+  ])('imports the same geometry when the file also sets %s', (attribute) => {
+    const expected = artwork(plain);
+    const result = parse(`IN;${attribute}SP1;PU0,0;PD400,0,400,200;PU;`);
+    if (result.kind !== 'ok' || result.object === null) throw new Error(JSON.stringify(result));
+    expect(result.object.paths).toEqual(expected.paths);
+    expect(result.object.bounds).toEqual(expected.bounds);
+    expect(result.notes.join(' ')).toMatch(/draw nothing/);
+  });
+
+  it('accepts a trailing PG that ends the job', () => {
+    const result = parse(`${plain}PG;`);
+    expect(result.kind).toBe('ok');
+  });
+
+  it('refuses drawing after PG instead of stacking two pages', () => {
+    const result = parse(`${plain}PG;SP1;PU0,0;PD0,400;`);
+    expect(result).toMatchObject({
+      kind: 'error',
+      diagnostics: [{ code: 'multiple-pages', command: 'PG' }],
+    });
+    expect(result).not.toHaveProperty('object');
   });
 });
