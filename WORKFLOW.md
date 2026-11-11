@@ -61,7 +61,7 @@ arrives in chunks. The workspace does not accept pointer or keyboard input behin
 Workspace overlays, including the controller pause panel, stay beneath the startup screen
 through its hold and fade. Live machine controls regain their normal priority after dismissal.
 Reduced motion uses a static indicator. On the first launch of each app version on a device (a
-fresh install or an update; a desktop release, or any deployed change to the web app), both web
+fresh install or an update; a desktop release, or a new major.minor number of the web app), both web
 and desktop hold the screen for at least four visible seconds from its first frame after the
 workspace module starts, then fade it over 750 ms once the workspace canvas has had a paint
 opportunity. Time before that frame or while the browser document or native desktop window is

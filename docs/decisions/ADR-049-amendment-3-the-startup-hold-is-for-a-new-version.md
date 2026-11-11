@@ -18,7 +18,8 @@ on a device: a fresh install, or the first launch after an update. On every othe
 on every reload the splash starts its fade as soon as the workspace canvas, or the settled
 licence window, has had its paint opportunity.
 
-- The version is the build's `__APP_VERSION__`, the one About and the updater show. The
+- The version is the build's `__APP_VERSION__`, the one About and the updater show. The web
+  app uses only its major.minor part, because the last part is a commit count. The
   version that has had its hold is kept in localStorage under
   `kerfdesk-startup-splash-held-version-v1`.
 - The record is written when the hold completes, not when it starts. A first launch that is
@@ -40,11 +41,10 @@ licence window, has had its paint opportunity.
 A returning user reaches a working workspace as soon as it has painted, about four seconds
 sooner than before. A new install and each update still present the complete timber screen
 for the full hold, once per device. The desktop app's version is its release number, so it
-holds once per release. A web build's version carries the commit count
-(`src/platform/web/build-info.ts`), so every deployed change is a new version there: the web
-app holds once for each update the browser loads, not once per release, and deploying the
-same commit again does not hold. Holding the web app less often than that would need its own
-rule for what counts as a version. Clearing site
+holds once per release. A web build's version ends in the commit count
+(`src/platform/web/build-info.ts`), which changes with every deploy, so the web app keys the
+hold on major.minor (`splashHoldVersion`): it holds on a first visit and when the major or
+minor number changes, and a deploy alone does not hold. Clearing site
 data, a new browser profile and a private window count as a first launch. Browser specs
 start from a fresh context, which is a first launch, so their first navigation still holds
 in full and the shared Playwright fixture still waits for the splash to be removed; later

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { dismissStartupSplash, SPLASH_HELD_VERSION_KEY } from './startup-splash';
+import { dismissStartupSplash, SPLASH_HELD_VERSION_KEY, splashHoldVersion } from './startup-splash';
 
 let frames: Map<number, FrameRequestCallback>;
 let nextFrame: number;
@@ -82,7 +82,9 @@ describe('startup splash', () => {
     expect(splash()).not.toBeNull();
     vi.advanceTimersByTime(1);
     expect(splash()).toBeNull();
-    expect(localStorage.getItem(SPLASH_HELD_VERSION_KEY)).toBe(__APP_VERSION__);
+    expect(localStorage.getItem(SPLASH_HELD_VERSION_KEY)).toBe(
+      splashHoldVersion(__APP_VERSION__, false),
+    );
   });
 
   it('excludes hidden intervals from the hold and removes its visibility listener', () => {
@@ -277,7 +279,7 @@ describe('startup splash after this version has been shown (ADR-049 Amendment 3)
   const inert = (): boolean => document.getElementById('app-root')?.hasAttribute('inert') === true;
 
   it('releases a later launch as soon as the workspace has painted', () => {
-    localStorage.setItem(SPLASH_HELD_VERSION_KEY, __APP_VERSION__);
+    localStorage.setItem(SPLASH_HELD_VERSION_KEY, splashHoldVersion(__APP_VERSION__, false));
     const shortcut = vi.fn();
     window.addEventListener('keydown', shortcut);
     paintWorkspace();
@@ -301,7 +303,7 @@ describe('startup splash after this version has been shown (ADR-049 Amendment 3)
   });
 
   it('still waits for the workspace to paint on a later launch', () => {
-    localStorage.setItem(SPLASH_HELD_VERSION_KEY, __APP_VERSION__);
+    localStorage.setItem(SPLASH_HELD_VERSION_KEY, splashHoldVersion(__APP_VERSION__, false));
     const canvas = document.createElement('canvas');
     document.getElementById('app-root')?.append(canvas);
     dismissStartupSplash();
@@ -315,7 +317,7 @@ describe('startup splash after this version has been shown (ADR-049 Amendment 3)
   });
 
   it('releases a later desktop launch on paint, shown or not, and at the licence window', () => {
-    localStorage.setItem(SPLASH_HELD_VERSION_KEY, __APP_VERSION__);
+    localStorage.setItem(SPLASH_HELD_VERSION_KEY, splashHoldVersion(__APP_VERSION__, true));
     document.documentElement.dataset.desktopWindowVisible = 'false';
     const gate = document.createElement('section');
     gate.dataset.licenceState = 'checking';
@@ -332,7 +334,7 @@ describe('startup splash after this version has been shown (ADR-049 Amendment 3)
   });
 
   it('keeps the five-second missing-workspace fallback on a later launch', () => {
-    localStorage.setItem(SPLASH_HELD_VERSION_KEY, __APP_VERSION__);
+    localStorage.setItem(SPLASH_HELD_VERSION_KEY, splashHoldVersion(__APP_VERSION__, false));
     dismissStartupSplash();
     frame();
     frame(4983);
@@ -343,7 +345,7 @@ describe('startup splash after this version has been shown (ADR-049 Amendment 3)
   });
 
   it('removes the splash on paint without a fade for reduced motion', () => {
-    localStorage.setItem(SPLASH_HELD_VERSION_KEY, __APP_VERSION__);
+    localStorage.setItem(SPLASH_HELD_VERSION_KEY, splashHoldVersion(__APP_VERSION__, false));
     reducedMotion = true;
     paintWorkspace();
     dismissStartupSplash();
@@ -364,7 +366,9 @@ describe('startup splash after this version has been shown (ADR-049 Amendment 3)
     frame(1);
     frame();
     expect(fading()).toBe(true);
-    expect(localStorage.getItem(SPLASH_HELD_VERSION_KEY)).toBe(__APP_VERSION__);
+    expect(localStorage.getItem(SPLASH_HELD_VERSION_KEY)).toBe(
+      splashHoldVersion(__APP_VERSION__, false),
+    );
   });
 
   it('owes the hold again when the first launch of a version ends early', () => {
@@ -377,7 +381,9 @@ describe('startup splash after this version has been shown (ADR-049 Amendment 3)
     frame();
     frame();
     expect(fading()).toBe(true);
-    expect(localStorage.getItem(SPLASH_HELD_VERSION_KEY)).not.toBe(__APP_VERSION__);
+    expect(localStorage.getItem(SPLASH_HELD_VERSION_KEY)).not.toBe(
+      splashHoldVersion(__APP_VERSION__, false),
+    );
   });
 
   it.each(['getItem', 'setItem'] as const)('does not hold when storage %s throws', (method) => {
@@ -401,5 +407,21 @@ describe('startup splash after this version has been shown (ADR-049 Amendment 3)
     frame();
     frame();
     expect(fading()).toBe(true);
+  });
+});
+
+describe('what counts as a version for the startup hold (ADR-049 Amendment 3)', () => {
+  it('keys the desktop app on its full release number', () => {
+    expect(splashHoldVersion('1.0.31', true)).toBe('1.0.31');
+  });
+
+  it('keys the web app on major.minor, so a deploy alone does not hold', () => {
+    expect(splashHoldVersion('1.4.2310', false)).toBe('1.4');
+    expect(splashHoldVersion('1.4.2311', false)).toBe('1.4');
+    expect(splashHoldVersion('1.5.2312', false)).toBe('1.5');
+  });
+
+  it('keeps a version with no commit count whole', () => {
+    expect(splashHoldVersion('2.0', false)).toBe('2.0');
   });
 });

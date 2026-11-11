@@ -7,17 +7,28 @@ const FADE_MS = 750;
 export const SPLASH_HELD_VERSION_KEY = 'kerfdesk-startup-splash-held-version-v1';
 
 /**
+ * What counts as one version for the hold. A desktop version is its release
+ * number. A web version ends in the commit count, which changes with every
+ * deploy, so the web app keys on major.minor and holds for a real release.
+ */
+export function splashHoldVersion(version: string, desktop: boolean): string {
+  if (desktop) return version;
+  const parts = version.split('.');
+  return parts.length < 3 ? version : parts.slice(0, 2).join('.');
+}
+
+/**
  * How long this launch holds the splash (ADR-049 Amendment 3): the full hold
  * for a version this device has not shown yet, a fresh install or an update,
  * and none on every other launch. Without working storage no launch can be
  * told from the first, and a hold on every one is the cost, so none holds.
  */
-function versionHoldMs(): number {
+function versionHoldMs(desktop: boolean): number {
   try {
     const storage = browserLocalStorage();
     if (storage === null) return 0;
     const held = storage.getItem(SPLASH_HELD_VERSION_KEY);
-    if (held === __APP_VERSION__) return 0;
+    if (held === splashHoldVersion(__APP_VERSION__, desktop)) return 0;
     // A store that reads but cannot write would hold on every launch. Prove
     // the write now; the version itself is recorded once the hold is served.
     storage.setItem(SPLASH_HELD_VERSION_KEY, held ?? '');
@@ -27,9 +38,12 @@ function versionHoldMs(): number {
   }
 }
 
-function rememberVersionHold(): void {
+function rememberVersionHold(desktop: boolean): void {
   try {
-    browserLocalStorage()?.setItem(SPLASH_HELD_VERSION_KEY, __APP_VERSION__);
+    browserLocalStorage()?.setItem(
+      SPLASH_HELD_VERSION_KEY,
+      splashHoldVersion(__APP_VERSION__, desktop),
+    );
   } catch {
     // The next launch holds once more.
   }
@@ -78,7 +92,7 @@ export function dismissStartupSplash(options: { readonly desktop?: boolean } = {
   }
   root?.setAttribute('inert', '');
   window.addEventListener('keydown', blockKeyboard, true);
-  const holdMs = versionHoldMs();
+  const holdMs = versionHoldMs(options.desktop === true);
   const installedAt = performance.now();
   let visibleMs = 0;
   let visibleSince: number | null = null;
@@ -132,7 +146,7 @@ export function dismissStartupSplash(options: { readonly desktop?: boolean } = {
     if (crashed || held) {
       stopWatching();
       // A crash screen cut the hold short, so this version still owes one.
-      if (held && holdMs > 0) rememberVersionHold();
+      if (held && holdMs > 0) rememberVersionHold(options.desktop === true);
       // Give a newly painted canvas its own paint opportunity before the fade.
       requestAnimationFrame(() => fadeSplash(splash, releaseInput));
       return;
