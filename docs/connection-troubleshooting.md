@@ -132,6 +132,40 @@ If KerfDesk connects but position never updates or commands do nothing:
 
 ---
 
+## K40 (M2/M3 Nano, Moshiboard) or galvo (EZCad2) laser over USB
+
+These boards are not serial ports. KerfDesk opens them over WebUSB (ADR-702), in
+Chrome, Edge or the desktop app. **This support is experimental: it is tested
+against simulators only, not yet on a real machine.**
+
+| Board | USB id | Shows in Device Manager as |
+| --- | --- | --- |
+| Lihuiyu M2/M3 Nano, Moshiboard (CH341 chip) | `1a86:5512` | USB2.0-Print, USB-EPP/I2C… CH341A |
+| JCZ LMC galvo (EZCad2) | `9588:9899` | USBLMCV2, USBLMCV4, or BJJCZ Device |
+
+- **Windows:** the board needs the **WinUSB** driver in place of its own. Run
+  [Zadig](https://zadig.akeo.ie), choose **Options > List All Devices**, pick the
+  board, select **WinUSB** and **Replace Driver**. This is the same driver swap
+  K40 Whisperer and LightBurn's legacy galvo setup use. **To go back** to
+  LaserDRW, CorelLaser or EZCad: in Device Manager, uninstall the device, tick
+  **Delete the driver software for this device**, then unplug and replug the
+  laser.
+- **Linux:** give your user access with a udev rule, then replug the laser:
+
+  ```
+  # /etc/udev/rules.d/99-kerfdesk-lasers.rules
+  SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", ATTR{idProduct}=="5512", MODE="0666"
+  SUBSYSTEM=="usb", ATTR{idVendor}=="9588", ATTR{idProduct}=="9899", MODE="0666"
+  ```
+
+- **macOS:** no driver needed.
+- **One program at a time** can hold the board: close EZCad, LaserDRW,
+  LightBurn and MeerK40t before you connect.
+- The desktop app asks which laser to open each run; it does not remember the
+  pick across restarts.
+
+---
+
 ## Camera not working?
 
 - **USB webcams** work directly — no extra software needed.

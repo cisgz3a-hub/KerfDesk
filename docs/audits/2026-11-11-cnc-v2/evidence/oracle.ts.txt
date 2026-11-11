@@ -1,0 +1,527 @@
+// TEMPORARY audit oracle (never committed). Independent of production CAM:
+// own G-code parser, own cutter profiles, own exact swept-removal field.
+
+export type P2 = { readonly x: number; readonly y: number };
+export type Loop = ReadonlyArray<P2>;
+
+export type OracleTool = {
+  readonly id: string;
+  readonly kind: 'end-mill' | 'ball-nose' | 'v-bit' | 'engraving' | 'tapered-ball-nose';
+  readonly diameterMm: number;
+  readonly tipAngleDeg?: number;
+  readonly tipDiameterMm?: number;
+};
+
+export type Move = {
+  readonly ax: number;
+  readonly ay: number;
+  readonly az: number;
+  readonly bx: number;
+  readonly by: number;
+  readonly bz: number;
+  readonly rapid: boolean;
+  readonly feed: number;
+  readonly tool: string;
+  readonly line: number;
+  readonly spindleOn: boolean;
+  readonly fromArc: boolean;
+};
+
+export type Parsed = {
+  readonly moves: Move[];
+  readonly notes: string[];
+  readonly toolOrder: string[];
+};
+
+const START_Z = 25;
+
+export function parseProgram(text: string): Parsed {
+  const moves: Move[] = [];
+  const notes: string[] = [];
+  const toolOrder: string[] = [];
+  let x = 0;
+  let y = 0;
+  let z = START_Z;
+  let mode = 0;
+  let feed = 0;
+  let tool = '?';
+  let spindleOn = false;
+  let absolute = true;
+  const lines = text.split('\n');
+  for (let index = 0; index < lines.length; index += 1) {
+    const raw = lines[index] ?? '';
+    const toolComment = /;\s*cnc tool-id:\s*(\S+)/.exec(raw);
+    if (toolComment !== null && toolComment[1] !== undefined) {
+      tool = toolComment[1];
+      if (toolOrder.at(-1) !== tool) toolOrder.push(tool);
+    }
+    const line = raw.replace(/;.*$/, '').replace(/\(.*?\)/g, '').trim().toUpperCase();
+    if (line === '') continue;
+    const words = [...line.matchAll(/([A-Z])\s*([-+]?(?:\d+\.?\d*|\.\d+))/g)].map(
+      (m) => [m[1] ?? '', Number(m[2])] as const,
+    );
+    let nx = x;
+    let ny = y;
+    let nz = z;
+    let hasAxis = false;
+    let i = 0;
+    let j = 0;
+    let hasR = false;
+    let dwell = false;
+    for (const [letter, value] of words) {
+      if (letter === 'G') {
+        if (value === 0 || value === 1 || value === 2 || value === 3) mode = value;
+        else if (value === 90) absolute = true;
+        else if (value === 91) absolute = false;
+        else if (value === 4) dwell = true;
+        else if (value === 20) notes.push(`G20 inches at line ${index + 1}`);
+        else if (value === 18 || value === 19) notes.push(`plane G${value} at line ${index + 1}`);
+        else if (value === 53) notes.push(`G53 at line ${index + 1}`);
+        else if (value === 28 || value === 30) notes.push(`G${value} at line ${index + 1}`);
+      } else if (letter === 'M') {
+        if (value === 3 || value === 4) spindleOn = true;
+        if (value === 5) spindleOn = false;
+        if (value === 0 || value === 1 || value === 6) notes.push(`M${value} at line ${index + 1}`);
+      } else if (letter === 'F') feed = value;
+      else if (letter === 'X') {
+        nx = absolute ? value : x + value;
+        hasAxis = true;
+      } else if (letter === 'Y') {
+        ny = absolute ? value : y + value;
+        hasAxis = true;
+      } else if (letter === 'Z') {
+        nz = absolute ? value : z + value;
+        hasAxis = true;
+      } else if (letter === 'I') i = value;
+      else if (letter === 'J') j = value;
+      else if (letter === 'R') hasR = true;
+    }
+    if (dwell || !hasAxis) continue;
+    if (!absolute) notes.push(`G91 motion at line ${index + 1}`);
+    if (mode === 0 || mode === 1) {
+      moves.push({
+        ax: x,
+        ay: y,
+        az: z,
+        bx: nx,
+        by: ny,
+        bz: nz,
+        rapid: mode === 0,
+        feed,
+        tool,
+        line: index + 1,
+        spindleOn,
+        fromArc: false,
+      });
+    } else {
+      if (hasR) notes.push(`R-format arc at line ${index + 1}`);
+      const cx = x + i;
+      const cy = y + j;
+      const r0 = Math.hypot(x - cx, y - cy);
+      const r1 = Math.hypot(nx - cx, ny - cy);
+      if (Math.abs(r0 - r1) > 0.002) {
+        notes.push(`arc radius mismatch ${(r0 - r1).toFixed(4)} at line ${index + 1}`);
+      }
+      let a0 = Math.atan2(y - cy, x - cx);
+      let a1 = Math.atan2(ny - cy, nx - cx);
+      const cw = mode === 2;
+      if (cw) {
+        if (a1 >= a0 - 1e-12) a1 -= 2 * Math.PI;
+      } else if (a1 <= a0 + 1e-12) a1 += 2 * Math.PI;
+      const sweep = a1 - a0;
+      const steps = Math.max(8, Math.ceil(Math.abs(sweep) / Math.acos(Math.max(0, 1 - 0.002 / Math.max(r0, 0.002)))));
+      let px = x;
+      let py = y;
+      let pz = z;
+      for (let s = 1; s <= steps; s += 1) {
+        const t = s / steps;
+        const a = a0 + sweep * t;
+        const r = r0 + (r1 - r0) * t;
+        const qx = s === steps ? nx : cx + r * Math.cos(a);
+        const qy = s === steps ? ny : cy + r * Math.sin(a);
+        const qz = z + (nz - z) * t;
+        moves.push({
+          ax: px,
+          ay: py,
+          az: pz,
+          bx: qx,
+          by: qy,
+          bz: qz,
+          rapid: false,
+          feed,
+          tool,
+          line: index + 1,
+          spindleOn,
+          fromArc: true,
+        });
+        px = qx;
+        py = qy;
+        pz = qz;
+      }
+      a0 = a1;
+    }
+    x = nx;
+    y = ny;
+    z = nz;
+  }
+  return { moves, notes, toolOrder };
+}
+
+// ---- cutter profiles (own formulas) -------------------------------------
+
+export type Profile = {
+  readonly radius: number;
+  /** Height of the cutting surface above the tip at radial distance r <= radius. */
+  readonly h: (r: number) => number;
+  /** Largest radius whose surface is below `depth` above the tip. */
+  readonly reach: (depth: number) => number;
+  readonly flat?: boolean;
+  /** Height at which the modelled cutting surface ends. */
+  readonly cuttingHeight: number;
+};
+
+export function profileFor(tool: OracleTool): Profile {
+  const R = tool.diameterMm / 2;
+  if (tool.kind === 'end-mill') {
+    return { radius: R, h: () => 0, reach: () => R, cuttingHeight: Number.POSITIVE_INFINITY, flat: true };
+  }
+  if (tool.kind === 'ball-nose') {
+    return {
+      radius: R,
+      h: (r) => R - Math.sqrt(Math.max(0, R * R - r * r)),
+      reach: (d) => (d >= R ? R : Math.sqrt(Math.max(0, d * (2 * R - d)))),
+      cuttingHeight: Number.POSITIVE_INFINITY,
+    };
+  }
+  const half = (((tool.tipAngleDeg ?? 60) / 2) * Math.PI) / 180;
+  const t = Math.tan(half);
+  if (tool.kind === 'v-bit' || tool.kind === 'engraving') {
+    const r0 = tool.kind === 'engraving' ? (tool.tipDiameterMm ?? 0) / 2 : 0;
+    return {
+      radius: R,
+      h: (r) => Math.max(0, r - r0) / t,
+      reach: (d) => Math.min(R, r0 + Math.max(0, d) * t),
+      cuttingHeight: (R - r0) / t,
+    };
+  }
+  const rb = (tool.tipDiameterMm ?? 0) / 2;
+  const tr = rb * Math.cos(half);
+  const th = rb * (1 - Math.sin(half));
+  return {
+    radius: R,
+    h: (r) => (r <= tr ? rb - Math.sqrt(Math.max(0, rb * rb - r * r)) : th + (r - tr) / t),
+    reach: (d) =>
+      Math.min(R, d >= th ? tr + (d - th) * t : Math.sqrt(Math.max(0, rb * rb - (rb - d) * (rb - d)))),
+    cuttingHeight: th + (R - tr) / t,
+  };
+}
+
+// ---- removal field -----------------------------------------------------
+
+export type Field = {
+  readonly x0: number;
+  readonly y0: number;
+  readonly cell: number;
+  readonly nx: number;
+  readonly ny: number;
+  /** Positive removed depth below Z0 per cell centre. */
+  readonly depth: Float32Array;
+};
+
+export function emptyField(x0: number, y0: number, x1: number, y1: number, cell: number): Field {
+  const nx = Math.max(1, Math.ceil((x1 - x0) / cell));
+  const ny = Math.max(1, Math.ceil((y1 - y0) / cell));
+  return { x0, y0, cell, nx, ny, depth: new Float32Array(nx * ny) };
+}
+
+/** Exact swept removal of one straight feed move at one XY point (convex minimisation). */
+function cutDepthAt(px: number, py: number, m: Move, profile: Profile): number {
+  const dx = m.bx - m.ax;
+  const dy = m.by - m.ay;
+  const dz = m.bz - m.az;
+  const f = (t: number): number => {
+    const r = Math.hypot(px - (m.ax + dx * t), py - (m.ay + dy * t));
+    if (r > profile.radius) return Number.POSITIVE_INFINITY;
+    return m.az + dz * t + profile.h(r);
+  };
+  // Restrict t to where the point is within the cutter radius.
+  const len2 = dx * dx + dy * dy;
+  let lo = 0;
+  let hi = 1;
+  if (len2 > 0) {
+    const tc = ((px - m.ax) * dx + (py - m.ay) * dy) / len2;
+    const perp2 = (px - m.ax - dx * tc) ** 2 + (py - m.ay - dy * tc) ** 2;
+    const R2 = profile.radius * profile.radius;
+    if (perp2 > R2) return 0;
+    const half = Math.sqrt((R2 - perp2) / len2);
+    lo = Math.max(0, tc - half);
+    hi = Math.min(1, tc + half);
+    if (lo > hi) return 0;
+  } else if (Math.hypot(px - m.ax, py - m.ay) > profile.radius) return 0;
+  if (profile.flat === true) {
+    // A flat cutter removes down to the lowest Z it reaches while over the point.
+    const z = Math.min(m.az + dz * lo, m.az + dz * hi);
+    return z < 0 ? -z : 0;
+  }
+  let a = lo;
+  let b = hi;
+  for (let k = 0; k < 48; k += 1) {
+    const m1 = a + (b - a) / 3;
+    const m2 = b - (b - a) / 3;
+    if (f(m1) < f(m2)) b = m2;
+    else a = m1;
+  }
+  const best = Math.min(f(lo), f(hi), f((a + b) / 2));
+  return best < 0 ? -best : 0;
+}
+
+export function stampMoves(
+  field: Field,
+  moves: ReadonlyArray<Move>,
+  profiles: ReadonlyMap<string, Profile>,
+  filter: (m: Move) => boolean = () => true,
+): void {
+  for (const m of moves) {
+    if (m.rapid || !filter(m)) continue;
+    const zMin = Math.min(m.az, m.bz);
+    if (!(zMin < 0)) continue;
+    const profile = profiles.get(m.tool);
+    if (profile === undefined) throw new Error(`no profile for tool ${m.tool}`);
+    const reach = profile.reach(-zMin);
+    const i0 = Math.max(0, Math.floor((Math.min(m.ax, m.bx) - reach - field.x0) / field.cell));
+    const i1 = Math.min(field.nx - 1, Math.ceil((Math.max(m.ax, m.bx) + reach - field.x0) / field.cell));
+    const j0 = Math.max(0, Math.floor((Math.min(m.ay, m.by) - reach - field.y0) / field.cell));
+    const j1 = Math.min(field.ny - 1, Math.ceil((Math.max(m.ay, m.by) + reach - field.y0) / field.cell));
+    const dx = m.bx - m.ax;
+    const dy = m.by - m.ay;
+    const len = Math.hypot(dx, dy);
+    for (let j = j0; j <= j1; j += 1) {
+      const py = field.y0 + (j + 0.5) * field.cell;
+      for (let i = i0; i <= i1; i += 1) {
+        const px = field.x0 + (i + 0.5) * field.cell;
+        let dseg: number;
+        if (len > 0) {
+          const t = Math.max(0, Math.min(1, ((px - m.ax) * dx + (py - m.ay) * dy) / (len * len)));
+          dseg = Math.hypot(px - m.ax - dx * t, py - m.ay - dy * t);
+        } else dseg = Math.hypot(px - m.ax, py - m.ay);
+        if (dseg > reach) continue;
+        // Upper bound of this move's cut here: deepest Z at the nearest approach.
+        const bound = -zMin - profile.h(dseg);
+        const k = j * field.nx + i;
+        const have = field.depth[k] ?? 0;
+        if (bound <= have) continue;
+        const cut = m.az === m.bz ? bound : cutDepthAt(px, py, m, profile);
+        if (cut > have) field.depth[k] = cut;
+      }
+    }
+  }
+}
+
+// ---- region geometry ---------------------------------------------------
+
+export function insideEvenOdd(px: number, py: number, loops: ReadonlyArray<Loop>): boolean {
+  let inside = false;
+  for (const loop of loops) {
+    for (let i = 0, n = loop.length, j = n - 1; i < n; j = i, i += 1) {
+      const a = loop[i];
+      const b = loop[j];
+      if (a === undefined || b === undefined) continue;
+      if (a.y > py !== b.y > py && px < a.x + ((py - a.y) * (b.x - a.x)) / (b.y - a.y)) {
+        inside = !inside;
+      }
+    }
+  }
+  return inside;
+}
+
+export function distanceToLoops(px: number, py: number, loops: ReadonlyArray<Loop>): number {
+  let best = Number.POSITIVE_INFINITY;
+  for (const loop of loops) {
+    for (let i = 0, n = loop.length; i < n; i += 1) {
+      const a = loop[i];
+      const b = loop[(i + 1) % n];
+      if (a === undefined || b === undefined) continue;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const l2 = dx * dx + dy * dy;
+      const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / l2));
+      const d = Math.hypot(px - a.x - dx * t, py - a.y - dy * t);
+      if (d < best) best = d;
+    }
+  }
+  return best;
+}
+
+export type Compare = {
+  worstGougeMm: number;
+  gougeAt: P2 | null;
+  gougeCells: number;
+  worstShortMm: number;
+  shortAt: P2 | null;
+  shortCells: number;
+  cells: number;
+};
+
+/** Compare a field with a target surface; tolerances only bucket the cell counts. */
+export function compareField(
+  field: Field,
+  target: (x: number, y: number) => number,
+  gougeTolMm: number,
+  shortTolMm: number,
+): Compare {
+  const out: Compare = {
+    worstGougeMm: Number.NEGATIVE_INFINITY,
+    gougeAt: null,
+    gougeCells: 0,
+    worstShortMm: Number.NEGATIVE_INFINITY,
+    shortAt: null,
+    shortCells: 0,
+    cells: 0,
+  };
+  for (let j = 0; j < field.ny; j += 1) {
+    const y = field.y0 + (j + 0.5) * field.cell;
+    for (let i = 0; i < field.nx; i += 1) {
+      const x = field.x0 + (i + 0.5) * field.cell;
+      const want = target(x, y);
+      if (Number.isNaN(want)) continue;
+      const got = field.depth[j * field.nx + i] ?? 0;
+      out.cells += 1;
+      const gouge = got - want;
+      const short = want - got;
+      if (gouge > out.worstGougeMm) {
+        out.worstGougeMm = gouge;
+        out.gougeAt = { x, y };
+      }
+      if (short > out.worstShortMm) {
+        out.worstShortMm = short;
+        out.shortAt = { x, y };
+      }
+      if (gouge > gougeTolMm) out.gougeCells += 1;
+      if (short > shortTolMm) out.shortCells += 1;
+    }
+  }
+  return out;
+}
+
+// ---- motion checks -----------------------------------------------------
+
+export type MotionAudit = {
+  rapidsBelowZero: number;
+  rapidXYBelowSafe: number;
+  lowestRapidXYZ: number;
+  cutsWithSpindleOff: number;
+  worstPlungeRate: number; // mm/min of Z descent on feed moves
+  worstPlungeLine: number;
+  maxFeed: number;
+  zeroFeedCuts: number;
+  deepestZ: number;
+  deepestByTool: Record<string, number>;
+  feedLengthMm: number;
+};
+
+export function auditMotion(parsed: Parsed, safeZ: number): MotionAudit {
+  const out: MotionAudit = {
+    rapidsBelowZero: 0,
+    rapidXYBelowSafe: 0,
+    lowestRapidXYZ: Number.POSITIVE_INFINITY,
+    cutsWithSpindleOff: 0,
+    worstPlungeRate: 0,
+    worstPlungeLine: 0,
+    maxFeed: 0,
+    zeroFeedCuts: 0,
+    deepestZ: 0,
+    deepestByTool: {},
+    feedLengthMm: 0,
+  };
+  for (const m of parsed.moves) {
+    const xy = Math.hypot(m.bx - m.ax, m.by - m.ay);
+    const zMin = Math.min(m.az, m.bz);
+    if (m.rapid) {
+      if (zMin < -1e-9) out.rapidsBelowZero += 1;
+      if (xy > 1e-9) {
+        out.lowestRapidXYZ = Math.min(out.lowestRapidXYZ, zMin);
+        if (zMin < safeZ - 1e-6) out.rapidXYBelowSafe += 1;
+      }
+      continue;
+    }
+    const len = Math.hypot(xy, m.bz - m.az);
+    out.feedLengthMm += len;
+    if (zMin < 0) {
+      if (!m.spindleOn) out.cutsWithSpindleOff += 1;
+      if (!(m.feed > 0)) out.zeroFeedCuts += 1;
+      out.maxFeed = Math.max(out.maxFeed, m.feed);
+      out.deepestZ = Math.min(out.deepestZ, zMin);
+      out.deepestByTool[m.tool] = Math.min(out.deepestByTool[m.tool] ?? 0, zMin);
+      if (m.bz < m.az - 1e-9 && len > 0) {
+        const rate = (m.feed * (m.az - m.bz)) / len;
+        if (rate > out.worstPlungeRate) {
+          out.worstPlungeRate = rate;
+          out.worstPlungeLine = m.line;
+        }
+      }
+    }
+  }
+  return out;
+}
+
+// ---- sequential rapid check -------------------------------------------
+
+export type RapidAudit = {
+  rapidsEndingBelowZero: number;
+  worstStockHitMm: number;
+  worstLine: number;
+  hits: number;
+};
+
+/** Replays the program in order; a rapid that ends below Z0 must find its footprint already cut. */
+export function auditRapidDescents(
+  field: Field,
+  moves: ReadonlyArray<Move>,
+  profiles: ReadonlyMap<string, Profile>,
+  tolMm = 0.02,
+): RapidAudit {
+  const out: RapidAudit = { rapidsEndingBelowZero: 0, worstStockHitMm: 0, worstLine: 0, hits: 0 };
+  for (const m of moves) {
+    if (!m.rapid) {
+      stampMoves(field, [m], profiles);
+      continue;
+    }
+    const xy = Math.hypot(m.bx - m.ax, m.by - m.ay);
+    const lowZ = xy > 1e-9 ? Math.min(m.az, m.bz) : m.bz;
+    if (!(lowZ < -1e-9)) continue;
+    out.rapidsEndingBelowZero += 1;
+    const profile = profiles.get(m.tool);
+    if (profile === undefined) continue;
+    const reach = profile.reach(-lowZ);
+    const samples = xy > 1e-9 ? Math.max(2, Math.ceil(xy / (field.cell / 2))) : 1;
+    let worst = 0;
+    for (let s = 0; s < samples; s += 1) {
+      const t = samples === 1 ? 1 : s / (samples - 1);
+      const sx = m.ax + (m.bx - m.ax) * t;
+      const sy = m.ay + (m.by - m.ay) * t;
+      const i0 = Math.max(0, Math.floor((sx - reach - field.x0) / field.cell));
+      const i1 = Math.min(field.nx - 1, Math.ceil((sx + reach - field.x0) / field.cell));
+      const j0 = Math.max(0, Math.floor((sy - reach - field.y0) / field.cell));
+      const j1 = Math.min(field.ny - 1, Math.ceil((sy + reach - field.y0) / field.cell));
+      for (let j = j0; j <= j1; j += 1) {
+        const py = field.y0 + (j + 0.5) * field.cell;
+        for (let i = i0; i <= i1; i += 1) {
+          const px = field.x0 + (i + 0.5) * field.cell;
+          const r = Math.hypot(px - sx, py - sy);
+          if (r > reach - field.cell) continue;
+          const need = -(lowZ + profile.h(r));
+          const have = field.depth[j * field.nx + i] ?? 0;
+          if (need - have > worst) worst = need - have;
+        }
+      }
+    }
+    if (worst > tolMm) {
+      out.hits += 1;
+      if (worst > out.worstStockHitMm) {
+        out.worstStockHitMm = worst;
+        out.worstLine = m.line;
+      }
+    }
+  }
+  return out;
+}

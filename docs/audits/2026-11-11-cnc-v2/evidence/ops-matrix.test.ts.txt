@@ -1,0 +1,290 @@
+// @vitest-environment node
+// TEMPORARY audit probe (never committed).
+import { writeFileSync } from 'node:fs';
+import { describe, it } from 'vitest';
+import { DEFAULT_DEVICE_PROFILE, toMachineCoords, type DeviceProfile } from '../devices';
+import { cncGrblStrategy } from '../output';
+import {
+  createLayer,
+  DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_MACHINE_CONFIG,
+  IDENTITY_TRANSFORM,
+  type CncLayerSettings,
+  type CncTool,
+  type Polyline,
+  type Scene,
+} from '../scene';
+import { compileCncJob } from './compile-cnc-job';
+import {
+  auditMotion,
+  auditRapidDescents,
+  distanceToLoops,
+  emptyField,
+  insideEvenOdd,
+  parseProgram,
+  profileFor,
+  stampMoves,
+  type Field,
+  type Loop,
+  type OracleTool,
+  type Profile,
+} from './zz-audit-oracle';
+
+const OUT =
+  process.env['AUDIT_OUT'] ?? '.';
+
+const poly = (pts: ReadonlyArray<readonly [number, number]>): Polyline => ({
+  closed: true,
+  points: pts.map(([x, y]) => ({ x, y })),
+});
+const rect = (x0: number, y0: number, x1: number, y1: number): Polyline =>
+  poly([
+    [x0, y0],
+    [x1, y0],
+    [x1, y1],
+    [x0, y1],
+  ]);
+
+const SHAPES: Record<string, ReadonlyArray<Polyline>> = {
+  rect: [rect(20, 20, 50, 40)],
+  L: [
+    poly([
+      [20, 20],
+      [50, 20],
+      [50, 50],
+      [38, 50],
+      [38, 32],
+      [20, 32],
+    ]),
+  ],
+  donut: [rect(20, 20, 60, 50), rect(34, 30, 46, 40)],
+  tri: [
+    poly([
+      [20, 20],
+      [55, 26],
+      [20, 32],
+    ]),
+  ],
+  smallHoles: [rect(20, 20, 26, 26), rect(30, 20, 33.4, 23.4), rect(40, 20, 50, 30)],
+};
+
+const TOOLS: ReadonlyArray<CncTool> = [...DEFAULT_CNC_MACHINE_CONFIG.tools];
+
+type Kind = 'outside' | 'inside' | 'pocket' | 'on-path' | 'drill';
+type Case = {
+  readonly name: string;
+  readonly shape: keyof typeof SHAPES;
+  readonly tool: string;
+  readonly kind: Kind;
+  readonly patch: Partial<CncLayerSettings>;
+  readonly stockMm?: number;
+  readonly origin?: DeviceProfile['origin'];
+};
+
+const base = (cutType: CncLayerSettings['cutType'], depthMm: number, dpp: number): Partial<CncLayerSettings> => ({
+  cutType,
+  depthMm,
+  depthPerPassMm: dpp,
+});
+
+const CASES: ReadonlyArray<Case> = [
+  { name: 'out-rect-default-tabs', shape: 'rect', tool: 'em-3175', kind: 'outside', patch: base('profile-outside', 6.35, 2) },
+  { name: 'out-rect-stock9-depth9.5', shape: 'rect', tool: 'em-3175', kind: 'outside', patch: base('profile-outside', 9.5, 2), stockMm: 9 },
+  { name: 'out-donut-ramp5', shape: 'donut', tool: 'em-3175', kind: 'outside', patch: { ...base('profile-outside', 6.35, 2), rampEntryDeg: 5 } },
+  { name: 'out-L-allow03', shape: 'L', tool: 'em-3175', kind: 'outside', patch: { ...base('profile-outside', 6.35, 2), finishAllowanceMm: 0.3 } },
+  { name: 'out-tri-conv-notabs', shape: 'tri', tool: 'em-6350', kind: 'outside', patch: { ...base('profile-outside', 4, 2), cutDirection: 'conventional', tabsEnabled: false } },
+  { name: 'in-L-default', shape: 'L', tool: 'em-3175', kind: 'inside', patch: base('profile-inside', 6.35, 2) },
+  { name: 'in-smallHoles', shape: 'smallHoles', tool: 'em-3175', kind: 'inside', patch: base('profile-inside', 3, 1.5) },
+  { name: 'on-rect', shape: 'rect', tool: 'em-3175', kind: 'on-path', patch: base('profile-on-path', 2, 1) },
+  { name: 'pocket-L-offset', shape: 'L', tool: 'em-3175', kind: 'pocket', patch: base('pocket', 3, 1.5) },
+  { name: 'pocket-donut-offset-so80', shape: 'donut', tool: 'em-3175', kind: 'pocket', patch: { ...base('pocket', 3, 1.5), stepoverPercent: 80 } },
+  { name: 'pocket-L-rasterx', shape: 'L', tool: 'em-3175', kind: 'pocket', patch: { ...base('pocket', 3, 1.5), pocketStrategy: 'raster-x' } },
+  { name: 'pocket-donut-rastery', shape: 'donut', tool: 'em-3175', kind: 'pocket', patch: { ...base('pocket', 3, 1.5), pocketStrategy: 'raster-y' } },
+  { name: 'pocket-donut-adaptive', shape: 'donut', tool: 'em-6350', kind: 'pocket', patch: { ...base('pocket', 3, 1.5), pocketStrategy: 'adaptive' } },
+  { name: 'pocket-L-helix', shape: 'L', tool: 'em-3175', kind: 'pocket', patch: { ...base('pocket', 3, 1.5), helixEntry: { maxDiameterMm: 3, minDiameterMm: 1, angleDeg: 3 } } },
+  { name: 'pocket-L-ramp', shape: 'L', tool: 'em-3175', kind: 'pocket', patch: { ...base('pocket', 3, 1.5), rampEntryDeg: 5 } },
+  { name: 'pocket-donut-rest', shape: 'donut', tool: 'em-1588', kind: 'pocket', patch: { ...base('pocket', 3, 1.5), pocketRoughToolId: 'em-6350' } },
+  { name: 'pocket-L-ball', shape: 'L', tool: 'bn-6350', kind: 'pocket', patch: base('pocket', 2, 1) },
+  { name: 'pocket-L-vbit60', shape: 'L', tool: 'vb-60', kind: 'pocket', patch: base('pocket', 2, 1) },
+  { name: 'out-rect-ball', shape: 'rect', tool: 'bn-6350', kind: 'outside', patch: { ...base('profile-outside', 2, 1), tabsEnabled: false } },
+  { name: 'out-rect-vbit60', shape: 'rect', tool: 'vb-60', kind: 'outside', patch: { ...base('profile-outside', 2, 1), tabsEnabled: false } },
+  { name: 'drill-smallHoles', shape: 'smallHoles', tool: 'em-3175', kind: 'drill', patch: base('drill', 6, 2) },
+  { name: 'out-rect-rearleft', shape: 'rect', tool: 'em-3175', kind: 'outside', patch: base('profile-outside', 3, 1.5), origin: 'rear-left' },
+  { name: 'out-rect-frontright', shape: 'rect', tool: 'em-3175', kind: 'outside', patch: base('profile-outside', 3, 1.5), origin: 'front-right' },
+  { name: 'pocket-rect-rearright', shape: 'rect', tool: 'em-3175', kind: 'pocket', patch: base('pocket', 3, 1.5), origin: 'rear-right' },
+  { name: 'pocket-rect-rearleft', shape: 'rect', tool: 'em-3175', kind: 'pocket', patch: base('pocket', 3, 1.5), origin: 'rear-left' },
+];
+
+function histogram(field: Field, pick: (x: number, y: number) => boolean, binMm: number): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (let j = 0; j < field.ny; j += 1) {
+    const y = field.y0 + (j + 0.5) * field.cell;
+    for (let i = 0; i < field.nx; i += 1) {
+      const x = field.x0 + (i + 0.5) * field.cell;
+      if (!pick(x, y)) continue;
+      const d = field.depth[j * field.nx + i] ?? 0;
+      const key = (Math.round(d / binMm) * binMm).toFixed(2);
+      out[key] = (out[key] ?? 0) + 1;
+    }
+  }
+  return out;
+}
+
+/** Shoelace turn sense of each closed feed loop at the deepest level, weighted by which side the kept material lies. */
+function travelSense(parsed: ReturnType<typeof parseProgram>, loops: ReadonlyArray<Loop>, kind: Kind, radiusMm: number) {
+  // For each long flat feed move at depth, find whether the design material to keep is on the left or right.
+  let left = 0;
+  let right = 0;
+  for (const m of parsed.moves) {
+    if (m.rapid || m.az >= 0 || m.bz >= 0 || m.az !== m.bz) continue;
+    const dx = m.bx - m.ax;
+    const dy = m.by - m.ay;
+    const len = Math.hypot(dx, dy);
+    if (len < 2) continue;
+    const mx = (m.ax + m.bx) / 2;
+    const my = (m.ay + m.by) / 2;
+    // probe both sides at 1.2 x a 3.175 mm cutter radius
+    const off = radiusMm + 0.6;
+    const lx = mx - (dy / len) * off;
+    const ly = my + (dx / len) * off;
+    const rx = mx + (dy / len) * off;
+    const ry = my - (dx / len) * off;
+    const keptLeft = kind === 'outside' ? insideEvenOdd(lx, ly, loops) : !insideEvenOdd(lx, ly, loops);
+    const keptRight = kind === 'outside' ? insideEvenOdd(rx, ry, loops) : !insideEvenOdd(rx, ry, loops);
+    if (keptLeft && !keptRight) left += len;
+    if (keptRight && !keptLeft) right += len;
+  }
+  return { keptOnLeftMm: Math.round(left), keptOnRightMm: Math.round(right) };
+}
+
+function run(c: Case) {
+  const shape = SHAPES[c.shape] ?? [];
+  const device: DeviceProfile = { ...DEFAULT_DEVICE_PROFILE, origin: c.origin ?? DEFAULT_DEVICE_PROFILE.origin };
+  const scene: Scene = {
+    objects: [
+      {
+        kind: 'imported-svg',
+        id: 'source',
+        source: 'source.svg',
+        bounds: { minX: 0, minY: 0, maxX: 80, maxY: 80 },
+        transform: IDENTITY_TRANSFORM,
+        paths: [{ color: '#ff0000', polylines: shape }],
+      },
+    ],
+    layers: [
+      {
+        ...createLayer({ id: 'cut', color: '#ff0000' }),
+        cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, toolId: c.tool, ...c.patch },
+      },
+    ],
+  };
+  const config = {
+    ...DEFAULT_CNC_MACHINE_CONFIG,
+    tools: TOOLS,
+    toolId: c.tool,
+    stock: { ...DEFAULT_CNC_MACHINE_CONFIG.stock, thicknessMm: c.stockMm ?? DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm },
+  };
+  const job = compileCncJob(scene, device, config);
+  const program = cncGrblStrategy.emit(job, device);
+  writeFileSync(`${OUT}/d-${c.name}.nc`, program);
+  const parsed = parseProgram(program);
+  const profiles = new Map<string, Profile>();
+  for (const tool of TOOLS) profiles.set(tool.id, profileFor(tool as OracleTool));
+  const loops: Loop[] = shape.map((p) => p.points.map((q) => toMachineCoords(q, device)));
+  const xs = loops.flatMap((l) => l.map((p) => p.x));
+  const ys = loops.flatMap((l) => l.map((p) => p.y));
+  const margin = 12;
+  const field = emptyField(Math.min(...xs) - margin, Math.min(...ys) - margin, Math.max(...xs) + margin, Math.max(...ys) + margin, 0.05);
+  stampMoves(field, parsed.moves, profiles);
+  const tool = TOOLS.find((t) => t.id === c.tool);
+  if (tool === undefined) throw new Error('tool');
+  const R = tool.diameterMm / 2;
+  const H = c.patch.depthMm ?? 1;
+  const inside = (x: number, y: number) => insideEvenOdd(x, y, loops);
+  const dist = (x: number, y: number) => distanceToLoops(x, y, loops);
+
+  // kept-material violations
+  let keptCells = 0;
+  let keptWorst = 0;
+  let keptAt: { x: number; y: number; d: number } | null = null;
+  let overDepth = 0;
+  let maxDepth = 0;
+  for (let j = 0; j < field.ny; j += 1) {
+    const y = field.y0 + (j + 0.5) * field.cell;
+    for (let i = 0; i < field.nx; i += 1) {
+      const x = field.x0 + (i + 0.5) * field.cell;
+      const got = field.depth[j * field.nx + i] ?? 0;
+      if (got > maxDepth) maxDepth = got;
+      if (got > H + 0.0015) overDepth += 1;
+      if (got <= 0.002) continue;
+      const isIn = inside(x, y);
+      let kept = false;
+      if (c.kind === 'outside') kept = isIn;
+      else if (c.kind === 'inside' || c.kind === 'pocket') kept = !isIn;
+      if (kept) {
+        const d = dist(x, y);
+        if (d > 0.036) {
+          keptCells += 1;
+          if (got > keptWorst) {
+            keptWorst = got;
+            keptAt = { x, y, d };
+          }
+        }
+      }
+    }
+  }
+  // slot / floor depth distributions
+  let slotHist: Record<string, number> = {};
+  if (c.kind === 'outside') {
+    slotHist = histogram(field, (x, y) => !inside(x, y) && dist(x, y) > 0.08 && dist(x, y) < 2 * R - 0.08, 0.25);
+  } else if (c.kind === 'inside') {
+    slotHist = histogram(field, (x, y) => inside(x, y) && dist(x, y) > R && dist(x, y) < 2 * R - 0.08, 0.25);
+  } else if (c.kind === 'pocket') {
+    slotHist = histogram(field, (x, y) => inside(x, y) && dist(x, y) > R + 0.01, 0.25);
+  }
+  // wall position along straight edges: nearest cut cell to the line on the waste side
+  let nearestWasteCut = Number.POSITIVE_INFINITY;
+  let fullDepthNearWall = Number.POSITIVE_INFINITY;
+  for (let j = 0; j < field.ny; j += 1) {
+    const y = field.y0 + (j + 0.5) * field.cell;
+    for (let i = 0; i < field.nx; i += 1) {
+      const x = field.x0 + (i + 0.5) * field.cell;
+      const got = field.depth[j * field.nx + i] ?? 0;
+      const waste = c.kind === 'outside' ? !inside(x, y) : inside(x, y);
+      if (!waste) continue;
+      const d = dist(x, y);
+      if (got > 0.01 && d < nearestWasteCut) nearestWasteCut = d;
+      if (got >= H - 0.002 && d < fullDepthNearWall) fullDepthNearWall = d;
+    }
+  }
+  const motion = auditMotion(parsed, DEFAULT_CNC_MACHINE_CONFIG.params.safeZMm);
+  const levels = [...new Set(parsed.moves.filter((m) => !m.rapid && m.az === m.bz && m.az < 0).map((m) => m.az))].sort((a, b) => b - a);
+  return {
+    name: c.name,
+    lines: program.split('\n').length,
+    maxDepth,
+    overDepthCells: overDepth,
+    kept: { cells: keptCells, worst: keptWorst, at: keptAt },
+    nearestWasteCutMm: nearestWasteCut,
+    fullDepthNearestToWallMm: fullDepthNearWall,
+    slotHist,
+    levels: levels.slice(0, 24),
+    sense: travelSense(parsed, loops, c.kind, R),
+    rapids: auditRapidDescents(emptyField(field.x0, field.y0, field.x0 + field.nx * field.cell, field.y0 + field.ny * field.cell, 0.1), parsed.moves, profiles),
+    motion,
+    notes: parsed.notes.slice(0, 12),
+    toolOrder: parsed.toolOrder,
+    groups: job.groups.map((g) => (g.kind === 'cnc' ? { cutType: g.cutType, toolId: g.toolId, passes: g.passes.length } : { kind: g.kind })),
+  };
+}
+
+describe('audit 2d matrix', () => {
+  it.each(CASES)(
+    '$name',
+    (c) => {
+      const result = run(c);
+      writeFileSync(`${OUT}/d-${c.name}.json`, JSON.stringify(result, null, 1));
+    },
+    600_000,
+  );
+});

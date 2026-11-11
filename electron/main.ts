@@ -75,6 +75,8 @@ import { installWindowReadinessPolicy } from './window-readiness-policy.js';
 import { sessionPermissionsOnce } from './session-permissions-once.js';
 import { installDesktopProjectOpens } from './desktop-project-open.js';
 import { installDesktopSerialPorts } from './desktop-serial-ports.js';
+import { installDesktopUsbDevices } from './desktop-usb-devices.js';
+import { createDevicePermissionRouter } from './device-permission-router.js';
 import { externalBrowserUrl } from './external-links.js';
 import { installDesktopContextMenu } from './desktop-context-menu.js';
 import { loadWindowPlacement, rememberWindowPlacement } from './desktop-window-placement.js';
@@ -326,10 +328,14 @@ function installPermissionHandlers(ses: Session): void {
   // Only the picked port is granted, never every attached adapter (ADR-366);
   // Windows remembers the picks across restarts (ADR-552). Only the trusted
   // origin reaches the picker: requestPort is gated by the check handler above.
+  // Serial and the USB lasers share the session's one device handler (ADR-702).
+  const devicePermissions = createDevicePermissionRouter(ses);
   installDesktopSerialPorts(ses, {
     trustedOrigins: TRUSTED_RENDERER_ORIGINS,
     userDataPath: DESKTOP_DATA_PATH,
+    devicePermissions,
   });
+  installDesktopUsbDevices(ses, devicePermissions, { trustedOrigins: TRUSTED_RENDERER_ORIGINS });
 }
 
 function installNavigationPolicy(window: BrowserWindow): void {
