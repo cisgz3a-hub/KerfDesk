@@ -37,6 +37,8 @@ import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capabi
 import { preserveUnadmittedProProject } from '../state/pending-pro-project';
 import { initialLicenceStatus } from '../licensing/edition';
 import { isAutosaveDiscardPending } from './autosave-file-cleanup';
+import { rememberStartFresh } from './autosave-recovery-summary';
+import { desktopCloseController } from './desktop-close-runtime';
 import { platformCanPickFiles } from './browser-file-access';
 import { usePlatformOptional } from './platform-context';
 import { requestPersistentStorageOnce } from './persistent-storage-request';
@@ -137,7 +139,7 @@ export function useAutosave(): void {
       autosaveWriter(askToPersist),
     );
     void projectAutosaveService.session();
-    const onBeforeUnload = (): void => {
+    const onBeforeUnload = (event: BeforeUnloadEvent): void => {
       const snap = snapshotForAutosave();
       // Even mid-stream: if the user closed the window, persisting
       // their scene is more important than respecting "don't write
@@ -146,9 +148,16 @@ export function useAutosave(): void {
       // applies once the page is unloading.
       if (snap.dirty) {
         const result = writeAutosave(snap.project);
-        // Before the Studio's own last write, which records that it is held.
-        if (result.kind === 'ok') noteProjectCopyOnDisk(snap.project);
-        else reportAutosaveFailure();
+        if (result.kind === 'ok') {
+          // Before the Studio's own last write, which records that it is held.
+          noteProjectCopyOnDisk(snap.project);
+          // Don't Save at the desktop close question: this copy stays under
+          // File > Recover unsaved work, and the next launch does not ask
+          // about it (ADR-688 Amendment 3). Only this exact copy goes quiet.
+          if (desktopCloseController.unloadDiscardsUnsavedWork(event)) rememberStartFresh(result);
+        } else {
+          reportAutosaveFailure();
+        }
       }
     };
     window.addEventListener('beforeunload', onBeforeUnload);

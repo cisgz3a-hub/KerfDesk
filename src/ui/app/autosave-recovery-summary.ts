@@ -34,7 +34,8 @@ export function recoveryThumbnail(project: Project): string | null {
 }
 
 // Start fresh keeps the autosave (File > Recover unsaved work still lists it)
-// but the card does not ask about the same snapshot again.
+// but the card does not ask about the same snapshot again. Don't Save at the
+// desktop close question marks its close copy the same way (ADR-688 Amendment 3).
 const START_FRESH_KEY = 'kerfdesk-autosave-start-fresh-v1';
 const START_FRESH_LIMIT = 16;
 
