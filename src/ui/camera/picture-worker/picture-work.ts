@@ -3,13 +3,26 @@
 // it onto the bed through the camera model, and encoding a JPEG. On the UI
 // thread these held a running job's window for 60-300 ms a picture with a 4K
 // camera or a calibrated whole-bed job, so an Abort pressed meanwhile waited.
-// Runs in camera-picture-worker.ts; needs OffscreenCanvas.
+// The overlay's pictures and the camera-moved check's are worked here too
+// (ADR-440 Amendment 11, ADR-663 Amendment 6). Runs in
+// camera-picture-worker.ts; needs OffscreenCanvas.
 
 import type { CameraPose, LensModel } from '../../../core/camera/model/camera-model';
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import { warpFrameToBedImage } from '../../../core/camera/model/bed-image';
 import type { SurfaceHeightArea } from '../../../core/camera/model/height-areas';
 import type { RgbaImage } from '../../../core/camera/rgba-image';
+import {
+  compareWork,
+  decodeShrunk,
+  stillWork,
+  type BitmapReply,
+  type CompareReply,
+  type CompareRequest,
+  type DecodeRequest,
+  type StillReply,
+  type StillRequest,
+} from './picture-work-still';
 
 /** Where and how to flatten a frame onto the bed (the camera model fitted to its size). */
 export type FlattenSpec = {
@@ -31,17 +44,33 @@ export type PictureRequest =
       readonly flatten?: FlattenSpec;
       readonly maxSidePx: number;
       readonly quality: number;
-    };
+    }
+  | DecodeRequest
+  | StillRequest
+  | CompareRequest;
 
 export type PictureReply =
   | { readonly kind: 'flat-image'; readonly image: RgbaImage }
   | { readonly kind: 'jpeg'; readonly blob: Blob; readonly width: number; readonly height: number }
   /** `unseen`: the camera does not see the region; `failed`: the frame could not be read or encoded. */
   | { readonly kind: 'unseen' }
-  | { readonly kind: 'failed' };
+  | { readonly kind: 'failed' }
+  | BitmapReply
+  | StillReply
+  | CompareReply;
 
 export async function doPictureWork(request: PictureRequest): Promise<PictureReply> {
+  if (request.op === 'decode' || request.op === 'compare-views') {
+    try {
+      return request.op === 'decode'
+        ? { kind: 'bitmap', bitmap: await decodeShrunk(request) }
+        : compareWork(request);
+    } catch {
+      return { kind: 'failed' };
+    }
+  }
   try {
+    if (request.op === 'still') return (await stillWork(request, bitmapPixels)) ?? FAILED;
     if (request.op === 'flat-image') {
       const image = flatten(request.frame, request.flatten);
       return image === null ? { kind: 'unseen' } : { kind: 'flat-image', image };
@@ -58,6 +87,8 @@ export async function doPictureWork(request: PictureRequest): Promise<PictureRep
     request.frame.close();
   }
 }
+
+const FAILED: PictureReply = { kind: 'failed' };
 
 function flatten(frame: ImageBitmap, spec: FlattenSpec): RgbaImage | null {
   const pixels = bitmapPixels(frame);
