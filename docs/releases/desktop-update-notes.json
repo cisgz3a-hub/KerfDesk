@@ -3,9 +3,9 @@
   "sinceSourceSha": "74191e0c7c922c71fb201f18e66f686fc0bc4f26",
   "highlights": [
     "New experimental connections: stock K40 (M2/M3 Nano, with .egv export) and Moshiboard lasers over USB, and live Ruida control over the network. They are tested on simulators only, so air-cut on scrap first.",
-    "Import EPS and Illustrator 3–8 (.ai) files as editable paths. Design Studio adds typed length and angle while drawing, tangent and perpendicular snaps, alignment guides, a Dimension tool and Trim to boundary.",
-    "A new 3D Sliced image mode and Fill Ramp for rubber stamps. A dense trace no longer freezes the window while it finishes, and beginners get a guided first job and a Simple view.",
-    "Fewer interruptions: questions appear inside the app instead of system pop-ups, Run again skips Job Review for an unchanged job you already reviewed, autosave keeps going during a job, and quick jog taps are no longer lost.",
+    "Import EPS and Illustrator 3–8 (.ai) files as editable paths, and DXF splines given only by fit points. Design Studio adds typed length and angle, tangent and perpendicular snaps, alignment guides, a Dimension tool and Trim.",
+    "A new 3D Sliced image mode and Fill Ramp for rubber stamps, and a dense trace no longer freezes the window. A recovered job advances its serial number once, and {{time}} jobs can now be confirmed in Job Review.",
+    "Fewer interruptions: questions appear inside the app instead of system pop-ups, Run again skips Job Review for an unchanged job you already reviewed, and autosave keeps going during a job. Beginners get a guided first job.",
     "After Abort, a laser without homing gets its origin back by itself. Unlock keeps the position unless the alarm lost it, a Frame placed from a fixed origin survives a clean jog, and a jog stuck on a lost reply is released in place.",
     "Rotary: Moshi and Ruida .rd jobs match the part's surface speed, ramped Fills scan along X, and the turn-back waits at the axis's own rate. Job Review warns when a move needs more than the rotary max rate ($112/$113)."
   ]
