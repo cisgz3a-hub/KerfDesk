@@ -91,6 +91,18 @@ describe('detectRotarySurfaceSpeedWarnings (ADR-127 Amd 2)', () => {
     expect(warning).toContain('set this layer to 4909 mm/min or less');
   });
 
+  it('is silent at the Max feed for rows along a taper that the warp leans by a hair (Z3-P3-2)', () => {
+    // Rows far from the warp's pivot lean a little; at 6000 they round to 100 %.
+    const rows = [10, 30, 50, 70].map(
+      (y) =>
+        [
+          { x: 0, y },
+          { x: 150, y },
+        ] as const,
+    );
+    expect(detectRotarySurfaceSpeedWarnings(project(TAPERED_ROLLER), job(6000, rows))).toEqual([]);
+  });
+
   it('is silent for strokes along X, under the Max feed, on a chuck, or flat (Y5-P3-1)', () => {
     expect(
       detectRotarySurfaceSpeedWarnings(project(PLACEHOLDER_ROLLER), job(6000, [ALONG])),

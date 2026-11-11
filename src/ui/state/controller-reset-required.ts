@@ -53,11 +53,16 @@ import type { ControllerKind } from '../../core/devices';
 import type { LaserSafetyNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
+import type { AlarmRaisedRecord } from './position-kept-alarm';
 
 /** The controller's alarm lock, as LaserState holds it. */
 export type AlarmLockState = {
   // The last ALARM:N, until a report that is not Alarm or Sleep.
   readonly alarmCode: number | null;
+  // What that ALARM:N line was raised under; Unlock reads it to decide whether
+  // the position still stands (position-kept-alarm.ts). Optional so hand-built
+  // test states stay valid; absent reads as none, which hides the position.
+  readonly alarmRaised?: AlarmRaisedRecord | null;
   // The firmware printed "Reset to continue" after a critical event, or a
   // reply above showed one it printed before the connection: only a soft
   // reset is accepted until the reboot banner. 'homing-state': stock GRBL

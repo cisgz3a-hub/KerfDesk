@@ -85,7 +85,7 @@ const scaled = scaleLens(lens, 640, 360);
 function verdictFor(frame: RgbaImage) {
   return frameRescaleFromView({
     reference,
-    frame,
+    current: viewThumbnail(frame, reference.width),
     scaledLens: scaled,
     pose,
     bedWidthMm: 400,

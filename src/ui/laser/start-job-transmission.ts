@@ -3,6 +3,8 @@ import type { WorkStepsRunner } from '../../core/recovery/work-steps';
 import type { MachineKind, OutputScope, Project } from '../../core/scene';
 import type { StartJobOptions, useLaserStore } from '../state/laser-store';
 import type { createRunId, LastCompletedReceipt, RecoveryRepository } from '../state/recovery';
+import type { ReviewCarriedOverV2 } from '../state/recovery/execution-workflow-evidence';
+import type { RunAgainReviewSeed } from './run-again-review-carry';
 import type { CncSetupAttestation } from '../state/cnc-setup-attestation';
 import type { LaserModeStartEvidence } from '../state/laser-mode-start-evidence';
 import { armVariableStreamAdvancement } from './variable-stream-advancement';
@@ -45,6 +47,10 @@ export type PreparedStartArgs = FramedStartOptions & {
   readonly reviewModel: JobReviewModel;
   readonly laserModeStartEvidence: LaserModeStartEvidence | undefined;
   readonly cncSetupAttestation: CncSetupAttestation | undefined;
+  /** Run again carried this review instead of showing it (ADR-237 Amendment 3). */
+  readonly reviewCarriedOver?: ReviewCarriedOverV2;
+  /** What this session keeps of the review so a later Run again can carry it. */
+  readonly runAgainReview?: RunAgainReviewSeed;
   readonly completedReceipt: LastCompletedReceipt | null;
   readonly repository: RecoveryRepository;
   readonly framedRunClaim?: FramedRunStartClaim;
@@ -173,6 +179,7 @@ async function archiveAcceptedFreshRunInSlices(
     ...(args.cncSetupAttestation === undefined
       ? {}
       : { cncSetupAttestation: args.cncSetupAttestation }),
+    ...(args.reviewCarriedOver === undefined ? {} : { reviewCarriedOver: args.reviewCarriedOver }),
     ...(args.completedReceipt === null
       ? {}
       : { completedReplaySourceRunId: args.completedReceipt.runId }),

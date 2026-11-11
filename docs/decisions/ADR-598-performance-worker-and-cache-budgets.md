@@ -271,3 +271,21 @@ guard `e2e/camera-pictures-off-ui-thread.e2e.ts` holds the budget: no long
 task, and key handlers within 50 ms, with 4K pictures worked meanwhile. The
 camera overlay's bridge pictures are decoded off the thread the same way
 (ADR-440 Amendment 10).
+
+### Amendment 6 — The camera overlay's shrink and the held picture are worked in the worker too (2026-11-11)
+
+Rolling audit v14 Z1-P1-1, Z1-P2-1 and Z1-P2-2: Amendment 5's claim for the
+camera overlay did not hold. Chromium decodes a bitmap off the thread but
+shrinks it on the thread that receives it, so the overlay's shrink to 1,920 px
+held the UI thread 118–243 ms per 4K picture during a job, on any full-HD
+window. A camera started mid-job (its camera-moved check) and Alt+C read the
+whole picture in the window as well, 76–251 ms, and the moved check's
+comparison took 185–290 ms. The camera picture worker now does the shrink,
+reads the held picture with an overlay-sized copy, and makes and compares the
+moved check's thumbnail (ADR-440 Amendment 11, ADR-663 Amendment 6). The
+window decodes only at full size, which stays off its thread. The guard
+`e2e/camera-overlay-mjpeg-ui-thread.e2e.ts` now runs during a streamed job in a
+1920 × 1080 window. It checks for no long task (on CI, none over the larger
+of 100 ms and the job's own worst task without a camera plus 20 ms, capped at
+120 ms), and for no shrink
+and no camera-sized pixel read in the window.

@@ -3,7 +3,9 @@
 // the old capture, even if its camera/context is selected again later.
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
-import { cameraCaptureBindingForFrame, captureSourceFrame } from './frame-source';
+import { cameraCaptureBindingForFrame, type captureSourceFrame } from './frame-source';
+import { movedCheckThumbWidth } from './helpers/moved-check';
+import { captureStill } from './still-capture';
 
 export type OverlayCaptureOutcome = 'captured' | 'superseded' | 'failed' | 'no-camera';
 let cancelCurrent: (() => void) | null = null;
@@ -23,8 +25,16 @@ export function cancelOverlayCapture(): void {
   cancelCurrent?.();
 }
 
+/**
+ * The held picture, read in the camera picture worker with its overlay copy
+ * and moved-check thumbnail (ADR-440 Amendment 11), so Alt+C during a job
+ * does not hold the UI thread.
+ */
+export const captureHeldPicture: typeof captureSourceFrame = (source) =>
+  captureStill(source, { thumbWidth: movedCheckThumbWidth(source) });
+
 export async function captureOverlayStill(
-  capture: typeof captureSourceFrame = captureSourceFrame,
+  capture: typeof captureSourceFrame = captureHeldPicture,
   options: { readonly showOverlay?: boolean; readonly activatePlacement?: boolean } = {},
 ): Promise<OverlayCaptureOutcome> {
   cancelOverlayCapture();

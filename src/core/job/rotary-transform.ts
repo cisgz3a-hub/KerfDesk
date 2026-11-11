@@ -10,6 +10,12 @@
 // the same transform; reverse mode maps source-row traversal onto descending Y.
 
 import { withoutArcMoves } from './cut-arc-moves';
+import { maxOf, minOf } from '../util/spread-free';
+import {
+  normalizedScanAngleDeg,
+  rasterScanFrame,
+  scanRectMachineCorners,
+} from '../raster/raster-scan-frame';
 import type { CutSegment, FillSegment, Job, RasterGroup } from './job';
 import type { Vec2 } from '../scene';
 
@@ -116,8 +122,9 @@ export function jobYRange(job: Job): { readonly min: number; readonly max: numbe
   let max = Number.NEGATIVE_INFINITY;
   for (const group of job.groups) {
     if (group.kind === 'raster') {
-      min = Math.min(min, group.bounds.minY);
-      max = Math.max(max, group.bounds.maxY);
+      const raster = rasterMachineYRange(group);
+      min = Math.min(min, raster.min);
+      max = Math.max(max, raster.max);
       continue;
     }
     if (group.kind !== 'cut' && group.kind !== 'fill') continue;
@@ -136,7 +143,22 @@ export function jobYRange(job: Job): { readonly min: number; readonly max: numbe
   return Number.isFinite(min) && Number.isFinite(max) ? { min, max } : null;
 }
 
+// ADR-699 Amd 1: a turned raster's bounds are in its scan frame, not bed Y.
+function rasterMachineYRange(group: RasterGroup): { readonly min: number; readonly max: number } {
+  const ys = scanRectMachineCorners(rasterScanFrame(group.scanAngleDeg), group.bounds).map(
+    (corner) => corner.y,
+  );
+  return { min: minOf(ys), max: maxOf(ys) };
+}
+
 function mapRasterGroup(group: RasterGroup, map: RotaryYMap): RasterGroup {
+  // ADR-492 D9 and ADR-699 Amd 1: compilation scans every raster along X on a
+  // rotary. A turned one cannot be scaled round the part, so it never runs.
+  if (normalizedScanAngleDeg(group.scanAngleDeg) !== 0) {
+    throw new Error(
+      'A raster scanned at an angle cannot run on a rotary; rotary rasters scan along X.',
+    );
+  }
   return {
     ...group,
     bounds: { ...group.bounds, ...mapRotaryYRange(map, group.bounds.minY, group.bounds.maxY) },

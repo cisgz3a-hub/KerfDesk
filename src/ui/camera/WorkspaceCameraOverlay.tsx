@@ -34,6 +34,7 @@ import {
 } from './overlay/use-bed-overlay-drawing';
 import { overlayDisplayWidth, useMachineFrame } from './overlay/use-machine-frame';
 import { useElementSize, type ElementSize } from './use-element-size';
+import { stillCompanion } from './still-capture';
 import type { ActiveCameraSource } from './frame-source';
 import type { RgbaImage } from '../../core/camera/rgba-image';
 import type { CameraCaptureBinding } from '../../core/camera/camera-capture-binding';
@@ -139,7 +140,10 @@ function useOverlayFrame(
   const stillImage = still?.image ?? null;
   const stillCapture = still?.capture ?? null;
   return useMemo<OverlayFrame | null>(() => {
-    if (stillImage !== null) return { kind: 'still', image: stillImage, capture: stillCapture };
+    if (stillImage !== null) {
+      const display = stillCompanion(stillImage)?.display ?? null;
+      return { kind: 'still', image: stillImage, capture: stillCapture, display };
+    }
     if (machineSource !== null) {
       return machineFrame === null
         ? null

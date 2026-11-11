@@ -1,11 +1,24 @@
 import type { GrblState } from '../../core/controllers/grbl';
 import type { FrameVerification } from './frame-verification';
-import type { FrameMotionCandidate } from './framed-run';
+import type { FrameMotionCandidate, FramedRunPermit } from './framed-run';
 import type { MachineExecutionOwner } from './machine-execution-owner';
 import type { StepJogQueue } from './step-jog-queue';
 
 export type LaserMotionOperationKind = 'frame' | 'jog';
 export type LaserMotionOperationId = number | symbol;
+
+/** A completed Frame set aside while an app-owned XY jog runs (ADR-565
+ * Amendment 1). The live proof fields are cleared for the whole move, exactly
+ * as before; only the jog's own clean settlement may put this Frame back. */
+export type HeldJogFrame = {
+  readonly frame: FramedRunPermit;
+  /** The exact permit was still armed (`framedRun` was this same Frame). */
+  readonly armed: boolean;
+  /** The operator Cancel that stopped this jog while it was still healthy,
+   * such as a hold-to-jog release. Only that attempt's own settlement may
+   * return the Frame; any other cancelled end drops it. */
+  readonly releaseAttemptId?: symbol;
+};
 
 type LaserMotionOperationCommon = {
   /** Stable owner for every async transport/ack continuation belonging to one
@@ -63,6 +76,9 @@ type LaserMotionOperationCommon = {
   /** An operator step jog that later step presses may extend; their lines
    *  wait in pendingLines ahead of the settlement marker (ADR-674). */
   readonly stepJogQueue?: StepJogQueue;
+  /** Jog only: the Frame this move may return on its clean end. Every failed,
+   * interrupted or replaced end drops it (jog-held-frame.ts). */
+  readonly heldFrame?: HeldJogFrame;
 };
 
 export type LaserMotionOperation = LaserMotionOperationCommon &
@@ -317,12 +333,26 @@ export function takeNextMotionLine(
   };
 }
 
+/** The same operation with no Frame to return. Every path that fails,
+ * interrupts or takes over a jog uses this, so a held Frame can only come back
+ * from a move that ended cleanly (ADR-565 Amendment 1). */
+export function withoutHeldJogFrame<T extends LaserMotionOperation | null>(operation: T): T {
+  if (operation === null || operation.heldFrame === undefined) return operation;
+  const { heldFrame: dropped, ...rest } = operation;
+  void dropped;
+  return rest as T;
+}
+
 // What a dispatched line's successor keeps of its predecessor's ownership.
 function carriedOwnershipPatch(
   operation: LaserMotionOperation,
-): Pick<LaserMotionOperationCommon, 'executionOwner' | 'stepJogQueue' | 'mpgInterruptionId'> {
+): Pick<
+  LaserMotionOperationCommon,
+  'executionOwner' | 'stepJogQueue' | 'mpgInterruptionId' | 'heldFrame'
+> {
   return {
     ...executionOwnerPatch(operation),
+    ...(operation.heldFrame === undefined ? {} : { heldFrame: operation.heldFrame }),
     ...(operation.stepJogQueue === undefined ? {} : { stepJogQueue: operation.stepJogQueue }),
     ...(operation.mpgInterruptionId === undefined
       ? {}

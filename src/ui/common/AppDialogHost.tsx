@@ -58,6 +58,7 @@ function ConfirmPanel(props: {
           <label data-dialog-secondary-focus="" style={checkStyle}>
             <input
               type="checkbox"
+              title="Skip this question next time"
               checked={dontAskAgain}
               onChange={(event) => setDontAskAgain(event.target.checked)}
             />
@@ -132,6 +133,7 @@ function PromptPanel(props: {
             type="text"
             className="lf-input"
             name="appDialogText"
+            title={options.label}
             value={value}
             maxLength={options.maxLength}
             autoComplete="off"

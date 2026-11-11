@@ -17,7 +17,9 @@ import type { PreparedJobMetrics } from '../laser/prepared-job-metrics';
 import type { ControllerKind } from '../../core/devices';
 import type { CanvasJobTimingPlanResult } from './canvas-job-timing-plan';
 import type { LaserSecondPassChain } from './recovery/laser-second-pass-lineage';
+import type { ReviewCarriedOverV2 } from './recovery/execution-workflow-evidence';
 import { matchesCncFrameReturnWorkZ } from './framed-run-cnc-return-position';
+import { framesZRotary, withoutRotaryZ } from './framed-run-rotary';
 import type { LaserPowerScale } from '../laser/connected-laser-power-scale';
 
 /** The exact executable bundle carried through Frame. Ordinary permits review
@@ -46,6 +48,10 @@ export type FramedRunReviewEvidence = {
   readonly reviewModel: JobReviewModel;
   readonly laserModeStartEvidence?: LaserModeStartEvidence;
   readonly cncSetupAttestation?: CncSetupAttestation;
+  /** Present when Run again carried an earlier confirmation instead of showing
+   * the dialog (ADR-237 Amendment 3). Everything else here is still built from
+   * this run's own fresh preparation. */
+  readonly carriedOver?: ReviewCarriedOverV2;
 };
 
 /** Immutable exact prepared input carried by the Frame motion until physical completion. */
@@ -244,13 +250,17 @@ export function framedRunCompletionIssue(
   source: FramedRunControllerSource,
   expectedReturnWorkZMm?: number,
 ): string | null {
-  const completed = framedRunControllerSnapshot(source);
-  if (!sameControllerSetup(candidate.controllerBeforeFrame, completed)) {
+  // ADR-695 Amendment 2: on a Z rotary the Frame's own G92 Z0 moves work Z.
+  const zRotary = framesZRotary(candidate.project);
+  const reported = framedRunControllerSnapshot(source);
+  const completed = zRotary ? withoutRotaryZ(reported) : reported;
+  const before = zRotary
+    ? withoutRotaryZ(candidate.controllerBeforeFrame)
+    : candidate.controllerBeforeFrame;
+  if (!sameControllerSetup(before, completed)) {
     return FRAME_CONTROLLER_CHANGED_MESSAGE;
   }
-  if (
-    !sameReportedWorkPosition(candidate.controllerBeforeFrame, completed, expectedReturnWorkZMm)
-  ) {
+  if (!sameReportedWorkPosition(before, completed, expectedReturnWorkZMm)) {
     return FRAME_RETURN_POSITION_CHANGED_MESSAGE;
   }
   return null;

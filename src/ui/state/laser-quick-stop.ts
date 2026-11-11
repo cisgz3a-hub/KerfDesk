@@ -13,6 +13,7 @@
 
 import type { ControllerDriver } from '../../core/controllers';
 import type { StreamerState } from '../../core/controllers/grbl';
+import { withoutHeldJogFrame } from './laser-motion-operation';
 import type { LaserState } from './laser-store';
 
 const AIR_OFF_LINE = 'M9';
@@ -71,6 +72,6 @@ export function quickStopPatch(
     motionOperation:
       operation === null || operation.mpgInterruptionId !== undefined
         ? operation
-        : { ...operation, cancelRequested: true },
+        : { ...withoutHeldJogFrame(operation), cancelRequested: true },
   };
 }
