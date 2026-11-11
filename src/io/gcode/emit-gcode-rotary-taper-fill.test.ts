@@ -17,7 +17,9 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { buildPreviewToolpathFromPrepared } from '../../ui/workspace/draw-preview';
 import { emitGcode } from './emit-gcode';
+import { prepareOutput } from './prepare-output';
 
 // ADR-694 Amendment 1 (rolling audit v14 Z4-P1-1). A taper warp bends every
 // Fill hatch line that is not along the turn into a curve. The Fill planner
@@ -180,6 +182,31 @@ describe('a Fill on a tapered part burns all of its hatch (ADR-694 Amendment 1)'
       });
     }
   }
+});
+
+// The canvas Preview stays surface-true (ADR-127): it draws the hatch as
+// designed. What the warped program burns on the cone must be the same hatch,
+// so a planner that drops or adds runs fails here even when the Preview looks
+// right (rolling audit v14 Z4-P1-1).
+describe('the Preview and the tapered burn agree (ADR-694 Amendment 1)', () => {
+  const y = AXES[0] as AxisCase;
+  const pinned = HATCHES.filter((hatch) => ['0°', '45°', 'cross-hatch'].includes(hatch.name));
+  it.each(pinned.map((hatch) => [hatch.name, hatch] as const))(
+    '%s: the burn on the cone is the Preview’s cut length',
+    (_name, hatch) => {
+      const project = fillProject(y, hatch, TAPER);
+      const prepared = prepareOutput(project);
+      if (!prepared.ok) throw new Error('preparation failed');
+      let previewCutMm = 0;
+      for (const step of buildPreviewToolpathFromPrepared(project, prepared).steps) {
+        if (step.kind === 'cut') previewCutMm += step.length;
+      }
+      const burned = burnedSurfaceMm(emitGcode(project).gcode, y, coneRadiusAt);
+      expect(previewCutMm).toBeGreaterThan(hatch.fillCrossHatch ? 6000 : 3000);
+      expect(burned / previewCutMm).toBeGreaterThan(0.99);
+      expect(burned / previewCutMm).toBeLessThan(1.03);
+    },
+  );
 });
 
 describe('the Fill plan keeps every compiled millimetre', () => {
