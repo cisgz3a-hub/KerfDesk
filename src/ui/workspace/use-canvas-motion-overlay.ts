@@ -408,6 +408,6 @@ function statusQueryFor(
   if (laser.connection.kind === 'connected') return laser.statusQuery;
   if (project.device.controllerKind === 'marlin') return 'queued-poll';
   const kind = project.device.controllerKind;
-  if (kind === 'ruida' || kind === 'moshi') return 'none';
+  if (kind === 'ruida' || kind === 'lihuiyu' || kind === 'moshi') return 'none';
   return 'realtime-report';
 }

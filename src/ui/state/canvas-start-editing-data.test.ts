@@ -206,7 +206,7 @@ describe('idle marker editing metadata crossing the worker boundary', () => {
         ...project,
         device: {
           ...project.device,
-          scanningOffsets: [{ speedMmPerMin: 1000, offsetMm: 0.00065 }],
+          scanningOffsets: [{ speedMmPerMin: 1000, offsetMm: 0.0013 }],
         },
       },
     });

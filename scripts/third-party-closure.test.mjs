@@ -193,6 +193,14 @@ test('renders deterministic notices for every production package and artwork ass
     first.includes(ostromoukhovNotice),
     'the transcribed Ostromoukhov weight table must ship its attribution',
   );
+  const meerk40tNotice = fs
+    .readFileSync(path.join(REPO_ROOT, 'docs/licensing/meerk40t-lihuiyu.txt'), 'utf8')
+    .trim()
+    .replace(/\r\n?/g, '\n');
+  assert.ok(
+    first.includes(meerk40tNotice),
+    'the MeerK40t-derived Lihuiyu protocol code must ship its MIT notice',
+  );
   const meerk40tMoshiNotice = fs
     .readFileSync(path.join(REPO_ROOT, 'docs/licensing/meerk40t-moshi.txt'), 'utf8')
     .trim()

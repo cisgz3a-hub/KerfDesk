@@ -40,7 +40,7 @@ Every loop drives the real path (`createProject` → `emitGcode`, or `compileCnc
 | 6 | 3D CNC | relief roughing and finishing on depth maps and STLs, rest finishing, maturity against Vectric Aspire | [done](L6-cnc-3d.md) — 1 P2 and 1 P3 fixed; gap list |
 | 4 | Time estimate | estimate against an independent planner model | [done](L4-time-estimate.md) — clean |
 | 5 | CNC 2D output | profile, pocket, drill, Z safety and feeds through the oracle | [done](L5-cnc-2d.md) — clean |
-| 7 | Bidirectional scan offset | row shift against LightBurn's rule, its seven twins | [done](L7-scan-offset.md) — 1 P2, held for the maintainer |
+| 7 | Bidirectional scan offset | row shift against LightBurn's rule, its seven twins | [done](L7-scan-offset.md) — 1 P2, fixed in #1623 |
 | 8 | Other controllers | Marlin inline and fan, Smoothieware, FluidNC, grblHAL through the L1 matrix | [done](L8-other-controllers.md) — clean |
 | 9 | Material Test grid | each cell's label against its emitted burn | [done](L9-material-test.md) — clean |
 | 10 | Rotary scaling | chuck and roller Y scale and wrap limit against LightBurn | [done](L10-rotary.md) — clean |

@@ -6,7 +6,7 @@ import { effectiveFillOverscanMm } from './fill-overscan';
 import type { FillRunwayLengths } from './fill-runway';
 import { FILL_GAP_RAPID_THRESHOLD_MM, groupFillScanlines, type FillSweep } from './fill-sweeps';
 import type { FillGroup, FillSegment } from './job';
-import { shiftAlongTravel } from './scan-offset';
+import { fillRunsBothWays, scanRowShiftAlongTravelMm, shiftAlongTravel } from './scan-offset';
 
 /** Laser-off motion mode used to enter and leave a planned fill sweep. */
 export type FillRunwayMotion = 'rapid' | 'feed-matched';
@@ -82,14 +82,22 @@ function segmentsWithScanOffset(
   scanOffsetMm: number,
 ): ReadonlyArray<FillSegment> {
   if (scanOffsetMm === 0) return segments;
-  return segments.map((segment) => {
-    if (!segment.reverse) return segment;
-    const start = segment.polyline[0];
-    const end = segment.polyline[1];
-    if (start === undefined || end === undefined || segment.polyline.length !== 2) return segment;
-    const shifted = shiftAlongTravel(start, end, scanOffsetMm);
-    return { ...segment, polyline: [shifted.from, shifted.to] };
-  });
+  const shiftMm = scanRowShiftAlongTravelMm(scanOffsetMm, fillRunsBothWays(segments));
+  if (shiftMm === 0) return segments;
+  return segments.map((segment) => shiftedFillSegment(segment, shiftMm) ?? segment);
+}
+
+/**
+ * One fill row moved `shiftMm` along its own travel (ADR-052 Amendment 2), or
+ * null when it is not a two-point row.
+ */
+export function shiftedFillSegment(segment: FillSegment, shiftMm: number): FillSegment | null {
+  const start = segment.polyline[0];
+  const end = segment.polyline[1];
+  if (start === undefined || end === undefined || segment.polyline.length !== 2) return null;
+  if (shiftMm === 0) return segment;
+  const shifted = shiftAlongTravel(start, end, shiftMm);
+  return { ...segment, polyline: [shifted.from, shifted.to] };
 }
 
 /** Returns whether a fill group owns feed-matched runway motion. */

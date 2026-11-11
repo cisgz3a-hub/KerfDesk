@@ -12,11 +12,16 @@ import { cncHelicalContourCanEmit } from './cnc-helical-representation';
 import { isEmittableFillSegment } from './fill-emission-resolution';
 import { isEmittableCutSegment } from './cut-emission-resolution';
 import { expandFillHatchWithRunways } from './fill-runway';
-import { planFillSweeps } from './fill-sweep-plan';
+import { planFillSweeps, shiftedFillSegment } from './fill-sweep-plan';
 import { groupFillScanlines } from './fill-sweeps';
 import type { CncPass, CutSegment, FillGroup, FillSegment, Job, RasterGroup } from './job';
 import { rasterRowsInProviderOrder } from './raster-rows';
-import { offsetForEmittedFeed, shiftAlongTravel } from './scan-offset';
+import {
+  fillRunsBothWays,
+  offsetForEmittedFeed,
+  rasterRowShiftX,
+  scanRowShiftAlongTravelMm,
+} from './scan-offset';
 import type { BuildToolpathOptions } from './toolpath-types';
 
 /** The first cut-step XY, without allocating every travel/cut step in the job.
@@ -71,9 +76,12 @@ function firstFillProcessPoint(group: FillGroup, options: BuildToolpathOptions):
   const offset =
     group.bidirectionalScanOffsetMm ??
     offsetForEmittedFeed(options.scanningOffsets ?? [], group.speed);
+  // Only a non-zero offset needs to know whether the hatch runs both ways.
+  const shiftMm =
+    offset === 0 ? 0 : scanRowShiftAlongTravelMm(offset, fillRunsBothWays(group.segments));
   let scanline: FillSegment[] = [];
   for (const source of group.segments) {
-    const segment = shiftedFillSegment(source, offset);
+    const segment = shiftedFillSegment(source, shiftMm);
     if (segment === null) continue;
     if (group.fillRunwayPolicy === 'feed-matched-every-sweep' && !isEmittableFillSegment(segment)) {
       continue;
@@ -89,15 +97,6 @@ function firstFillProcessPoint(group: FillGroup, options: BuildToolpathOptions):
     scanline.push(segment);
   }
   return firstPlannedFillPoint(group, scanline);
-}
-
-function shiftedFillSegment(segment: FillSegment, offset: number): FillSegment | null {
-  const start = segment.polyline[0];
-  const end = segment.polyline[1];
-  if (start === undefined || end === undefined || segment.polyline.length !== 2) return null;
-  if (!segment.reverse || offset === 0) return segment;
-  const shifted = shiftAlongTravel(start, end, offset);
-  return { ...segment, polyline: [shifted.from, shifted.to] };
 }
 
 function firstPlannedFillPoint(group: FillGroup, segments: FillSegment[]): Vec2 | null {
@@ -172,7 +171,7 @@ function firstRasterSweepPoint(
     activeStartX:
       group.bounds.minX + (reverse ? plan.span.lastX + 1 : plan.span.firstX) * pixelWidthMm,
     y,
-    shiftX: reverse ? -offset : 0,
+    shiftX: rasterRowShiftX(offset, reverse, group.bidirectional ?? true),
     scanAngleDeg: group.scanAngleDeg,
   });
   for (const span of spans) return span.from;

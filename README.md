@@ -27,7 +27,7 @@ that a burn or a cut *looks* right on real material.
 | GRBL and grblHAL lasers and routers | Used informally on a Creality Falcon A1 Pro and a Neotronics 4040. Not qualified. |
 | FluidNC, Marlin, Smoothieware | Tested against simulators only |
 | Ruida (`.rd` export, desktop UDP link) | Simulator and round-trip tests only; never run on a real controller |
-| Moshiboard over USB | Experimental; simulator only |
+| Stock K40 (Lihuiyu) `.egv` export and USB link, Moshiboard over USB | Experimental; simulator only |
 | Rotary (Y, A or Z axis) | Code and tests; not qualified on hardware |
 | Desktop installers | Published for Windows; macOS and Linux builds pass CI |
 
@@ -117,10 +117,11 @@ be produced, or the reviewed program is not the one about to be sent. See
 | GRBL 1.1, Marlin, Smoothieware | USB (WebSerial) |
 | grblHAL, FluidNC | USB (WebSerial); network (raw TCP / Telnet) on the desktop |
 | Ruida | `.rd` file export; experimental UDP link on the desktop |
+| Stock K40 (Lihuiyu M2/M3 Nano) | `.egv` file export; experimental USB link (WebUSB) |
 | Moshiboard | Experimental USB link (WebUSB) |
-| Stock K40 (Lihuiyu) and JCZ galvo boards | USB link foundation merged; the drivers are still in review |
+| JCZ galvo boards | Driver still in review |
 
-**Writes** G-code (`.gcode`, `.nc`, including per-tile files), Ruida `.rd`, KerfDesk projects
+**Writes** G-code (`.gcode`, `.nc`, including per-tile files), Ruida `.rd`, K40 `.egv`, KerfDesk projects
 (`.lf2`), SVG and PNG exports, traced vectors (SVG, DXF, PDF, EPS, GeoJSON), material libraries
 and machine profiles.
 LightBurn interoperability is one-way: KerfDesk reads LightBurn files and writes none.

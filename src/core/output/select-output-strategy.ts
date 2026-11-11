@@ -24,11 +24,13 @@ export function selectOutputStrategy(device: DeviceProfile): AnyOutputStrategy {
     case 'fluidnc':
     case undefined:
       return grblStrategy;
-    // Ruida output is NOT G-code — Save routes to the binary .rd encoder
-    // (io/rd) before any strategy runs; a Moshiboard has no file at all and
-    // its USB link encodes programs (io/moshi, ADR-705). The GRBL emitter here
-    // only feeds the on-screen preview/estimate pipeline fallback.
+    // Ruida and Lihuiyu output is NOT G-code — Save routes to the binary .rd
+    // encoder (io/rd) or the .egv writer (io/egv, ADR-703) before any strategy
+    // runs; a Moshiboard has no file at all and its USB link encodes programs
+    // (io/moshi, ADR-705). The GRBL emitter here only feeds the on-screen
+    // preview/estimate pipeline fallback.
     case 'ruida':
+    case 'lihuiyu':
     case 'moshi':
       return grblStrategy;
     default:

@@ -92,7 +92,7 @@ describe('cutting starts at represented raster precision', () => {
       pixelHeight: 2,
       bounds: { minX: 0.0001, maxX: 0.0002, minY: -0.25, maxY: 0.75 },
       sValues: new Uint16Array([500, 500]),
-      bidirectionalScanOffsetMm: 0.00065,
+      bidirectionalScanOffsetMm: 0.0013,
     });
     const job = { groups: [group] };
     expect(firstToolpathProcessPoint(job)).toEqual(emitted(job.groups));

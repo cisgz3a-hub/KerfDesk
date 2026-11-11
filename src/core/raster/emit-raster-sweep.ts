@@ -18,6 +18,7 @@ import {
 } from './emit-raster-travel';
 import { sameRasterHead, type RasterRowLine } from './emit-raster-row-line';
 import type { EmitRasterInput } from './emit-raster';
+import { rasterRowShiftX } from '../job/scan-offset';
 type SweepExtents = {
   readonly activeStartX: number;
   readonly activeEndX: number;
@@ -49,7 +50,7 @@ function sweepExtents(
     endX:
       sweepPlan.sharedLeadEndXWorldMm ??
       (reverse ? activeStartX - sweepPlan.leadOutMm : activeEndX + sweepPlan.leadOutMm),
-    rowShiftX: reverse ? -(input.scanOffsetMm ?? 0) : 0,
+    rowShiftX: rasterRowShiftX(input.scanOffsetMm ?? 0, reverse, input.bidirectional ?? true),
   };
 }
 
