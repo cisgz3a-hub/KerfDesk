@@ -1,8 +1,8 @@
 ## ADR-704 - JCZ LMC galvo lasers over USB (2026-11-11)
 
 **Status:** Accepted. Builds on ADR-702 (the shared USB link) and follows the Ruida pattern of
-ADR-697 (a separate link and store beside the line store). Revises the galvo half of
-`PROJECT.md`'s "Trocen/TopWisdom/galvo stay out of scope" line. Keeps PROJECT.md non-negotiable 21
+ADR-697 (a separate link and store beside the line store). ADR-702 moved EZCad2 galvo boards into
+scope; this ADR is `PROJECT.md` Phase I item I.8. Keeps PROJECT.md non-negotiable 21
 and ADR-565 (frame-first Start) unchanged. Takes project schema 24. **Simulator-tested only; not
 qualified on hardware.** | **Date:** 2026-11-11
 
