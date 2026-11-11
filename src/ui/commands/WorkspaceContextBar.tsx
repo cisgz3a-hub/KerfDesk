@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { commandHelpId, controlHelp } from '../help/help-topics';
 import { handleWorkspaceContextKeyDown } from './workspace-context-keyboard';
@@ -50,6 +51,9 @@ export function WorkspaceContextBar(props: {
       style={{ ...barStyle, ...position }}
       onKeyDown={handleWorkspaceContextKeyDown}
     >
+      {state.lockedObjectId === undefined ? null : (
+        <UnlockObjectButton objectId={state.lockedObjectId} onRun={close} />
+      )}
       {primary.map((command) => (
         <ContextCommandButton key={command.id} command={command} onCommandRun={close} />
       ))}
@@ -80,6 +84,37 @@ export function WorkspaceContextBar(props: {
         </div>
       ) : null}
     </div>
+  );
+}
+
+// A right-click on locked artwork: free that one object and select it, without
+// unlocking everything else (annoyance audit A4-P2-3).
+function UnlockObjectButton(props: {
+  readonly objectId: string;
+  readonly onRun: () => void;
+}): JSX.Element | null {
+  const stillLocked = useStore((s) =>
+    s.project.scene.objects.some(
+      (object) => object.id === props.objectId && object.locked === true,
+    ),
+  );
+  if (!stillLocked) return null;
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      className="lf-menu-item"
+      style={menuItemStyle}
+      title="Unlock this artwork and select it. Other locked artwork stays locked."
+      onClick={() => {
+        const app = useStore.getState();
+        app.unlockObjects([props.objectId]);
+        app.selectObject(props.objectId);
+        props.onRun();
+      }}
+    >
+      Unlock
+    </button>
   );
 }
 

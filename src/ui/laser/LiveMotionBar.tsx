@@ -35,7 +35,7 @@ import {
   pendingCncLiftButton,
   pendingPauseResumeButton,
 } from './LiveMotionActionButton';
-import { pauseControlMessage, resumeControlTitle } from './job-control-copy';
+import { pauseControlTitle, resumeControlTitle } from './job-control-copy';
 import { describeUnowned } from './live-motion-unowned';
 import { LiveMotionAnnouncer, shownForAnnouncer } from './LiveMotionAnnouncer';
 import { LiveMotionAbortButton } from './LiveMotionAbortButton';
@@ -172,12 +172,7 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
     return (
       <LiveMotionActionButton
         label="Pause"
-        title={pauseControlMessage(
-          machineKind,
-          hasRealtimePause,
-          streamPauseBeamOff,
-          controllerKind,
-        )}
+        title={pauseControlTitle(machineKind, hasRealtimePause, streamPauseBeamOff, controllerKind)}
         onClick={pauseJob}
       />
     );

@@ -36,10 +36,12 @@ import {
   noteControllerSettingWrite,
   type OwnedResetSettingsRefs,
 } from './laser-owned-reset-settings';
+import { noteOwnResetWrite, type ResetAlarmRefs } from './laser-reset-alarm';
 
 export type SafeWriteRefs = UntrackedAckLedgerRefs &
   TranscriptBufferRefs &
   JobTransportLedgerRefs &
+  ResetAlarmRefs &
   OwnedResetSettingsRefs & {
     connection: SerialConnection | null;
     readonly driver: ControllerDriver;
@@ -120,6 +122,8 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
     // A `$` assignment may reach EEPROM even when its reply is lost: the
     // settings read before it no longer survive a reset (ADR-648).
     noteControllerSettingWrite(refs, line);
+    // The banner that answers KerfDesk's own soft reset keeps machine position.
+    noteOwnResetWrite(refs, line, refs.driver.realtime.softReset);
     try {
       await conn.write(line);
       assertCurrentWriteEpoch(refs, writeEpoch);

@@ -32,6 +32,8 @@ export type FindMachineFacts = {
   readonly transport: 'serial' | 'file-only';
   readonly controllerLabel: string;
   readonly fileOnlyExplanation: string;
+  /** Replaces "jobs are saved as files" for a controller with its own link. */
+  readonly fileOnlyTitle?: string | undefined;
   readonly baudRate: number;
   readonly connection: ConnectionState;
   readonly qualification: ControllerQualification;
@@ -46,7 +48,11 @@ export type FindMachineFacts = {
 export function findMachinePhase(model: {
   readonly supportsSerial: boolean;
   readonly driver: { readonly capabilities: { readonly transport: 'serial' | 'file-only' } };
-  readonly guide: { readonly label: string; readonly writeExplanation: string };
+  readonly guide: {
+    readonly label: string;
+    readonly writeExplanation: string;
+    readonly fileOnlyTitle?: string | undefined;
+  };
   readonly baudRate: number;
   readonly laser: {
     readonly connection: ConnectionState;
@@ -65,6 +71,7 @@ export function findMachinePhase(model: {
     transport: model.driver.capabilities.transport,
     controllerLabel: model.guide.label,
     fileOnlyExplanation: model.guide.writeExplanation,
+    fileOnlyTitle: model.guide.fileOnlyTitle,
     baudRate: model.baudRate,
     connection: laser.connection,
     qualification: laser.qualification,
@@ -81,7 +88,7 @@ export function phaseFromFacts(facts: FindMachineFacts): FindMachinePhase {
   if (facts.transport === 'file-only') {
     return phase(
       'file-only',
-      `${facts.controllerLabel} jobs are saved as files`,
+      facts.fileOnlyTitle ?? `${facts.controllerLabel} jobs are saved as files`,
       facts.fileOnlyExplanation,
     );
   }

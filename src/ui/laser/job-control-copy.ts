@@ -27,6 +27,32 @@ export function pauseControlMessage(
   );
 }
 
+// A GRBL-family reset raises ALARM:3 and may lose steps only while the machine
+// moves; after a hold that has finished it raises no alarm and keeps position
+// (ADR-215 Amendment 1, GRBL `mc_reset`). The reset still clears a Set origin
+// here origin on stock GRBL and FluidNC, so this names position only.
+export const PAUSE_THEN_ABORT_NOTE =
+  'For a stop that is not urgent, Pause first, wait for the head to stop, then ABORT JOB: ' +
+  'the controller then keeps its position.';
+
+/** The Pause button's tooltip: the notice, and for a laser job on a controller
+ *  with a realtime hold, how to stop without the controller losing position
+ *  (user annoyance audit A3-D-1, ADR-341 Amendment 14). */
+export function pauseControlTitle(
+  machineKind: MachineKind | null,
+  hasRealtimePause: boolean,
+  streamPauseBeamOff = false,
+  controllerKind: ControllerKind | null = null,
+): string {
+  const message = pauseControlMessage(
+    machineKind,
+    hasRealtimePause,
+    streamPauseBeamOff,
+    controllerKind,
+  );
+  return message === PAUSE_HOLD_SAFETY_MESSAGE ? `${message} ${PAUSE_THEN_ABORT_NOTE}` : message;
+}
+
 function streamPauseMessage(hasRealtimePause: boolean, streamPauseBeamOff: boolean): string {
   if (hasRealtimePause) return PAUSE_HOLD_SAFETY_MESSAGE;
   return streamPauseBeamOff ? PAUSE_STREAM_SIDE_BEAM_OFF_MESSAGE : PAUSE_STREAM_SIDE_MESSAGE;

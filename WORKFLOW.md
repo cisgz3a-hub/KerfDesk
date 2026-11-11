@@ -481,6 +481,12 @@ destination and cannot overwrite the template source.
 1. Edit menu `Lock Selection` locks selected artwork and clears selection.
 2. Normal click, marquee, Select All, and transform tools skip locked objects.
 3. Edit menu `Unlock All` unlocks every locked object in the project.
+4. One object can be unlocked on its own (ADR-706). A locked row in the Artwork tree has
+   **Unlock**: an artwork row unlocks that artwork and selects it, and a group row unlocks the
+   locked artwork inside it. A right-click on locked artwork on the canvas opens the context menu
+   with **Unlock** first, which unlocks that object and selects it. Each is one undo step and
+   leaves every other lock in place. The name button of a locked row stays disabled and reads
+   `{name} is locked. Unlock it to select or edit it.`
 
 ---
 
@@ -953,7 +959,8 @@ the linked artwork.
   Numeric typing retains the 300 ms debounce. Mixed values show a neutral, disabled slider until
   an exact value is entered. **More cut settings**
   opens the full draft editor grouped by purpose; **Apply settings** commits the draft and
-  **Cancel** leaves the operation unchanged.
+  **Cancel** leaves the operation unchanged. It opens whatever the machine is doing, and an open
+  draft stays open when a job, jog, Frame or autofocus begins (ADR-706).
 - **Saved defaults** in More cut settings offers **Make Default for #rrggbb**, which remembers
   the operation's applied settings for the colour it names: the colour of the artwork the operation
   was created for, or the operation's own colour when it has no artwork. Further operations in this
@@ -1392,6 +1399,21 @@ that owns those fields, without changing the existing Frame/Start policy.
 1. Click toggle again (or `P`).
 2. Viewport returns to design view.
 3. Scrubber disappears.
+
+#### Editing while Preview is on (ADR-706)
+- Preview shows the job and not the selection, so the canvas only pans (`Space + drag`, the wheel
+  button or the right button) and zooms. Nothing on it can be selected, moved or drawn.
+- The first plain click on the canvas in each visit to Preview shows one line: `Preview shows the
+  job and cannot be edited. Press P or click Preview to go back to the design.` Later clicks in
+  that visit are quiet, a pan never shows it, and the line leaves with Preview.
+- The canvas tools in the left tool strip are disabled, each with the reason `Not available in
+  Preview. Press P or click Preview to edit.` Create artwork and the design library stay available.
+- A key that would change artwork changes nothing and shows the same line: Delete, Backspace, Cut,
+  Paste, Paste in Place, Duplicate, Group, Ungroup, Delete Duplicates, the nudge, flip and rotate
+  keys, the align, Move Together and draw-order keys, and the keys that arm a drawing tool. The key
+  is still consumed, so it never reaches the browser.
+- Undo, Redo, Copy, Select All, Escape, the view keys and `P` work as usual. Menu and toolbar
+  commands and the settings panels are unchanged; Preview rebuilds after each edit (Live updates).
 
 #### Live updates
 - Changes to any Layer's power/speed/passes/visible/output or object transform schedule a preview rebuild outside render. Stale scheduled or asynchronous builds are cancelled; the previous route stays painted until its replacement is ready.
@@ -2001,11 +2023,31 @@ are shown. Nothing here is a gate: Frame, Start and Save are unchanged.
 
 Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 
+#### Which control has the keyboard (ADR-706)
+- A text field keeps every key, so typing, Backspace and its own Undo work as in any field.
+- A control that holds no text keeps only the keys that work it. A slider keeps the arrow keys,
+  Home, End, PgUp and PgDn. A drop-down keeps those, Enter, Space and typed letters, which jump to
+  an option. A radio button keeps the arrows and Space, a tick box Space, and a colour or file
+  button Enter and Space.
+- Every other design shortcut still works while such a control has focus. Delete, Undo, Redo, Copy,
+  Paste and Escape act on the artwork straight after a tick box, slider or drop-down was used, with
+  no click on the canvas first.
+- Enter in a number field that commits on Enter also releases focus. It stays in the field when the
+  value is invalid, inside a dialog, in a table row that sorts on Enter, and on the numeric keypad's Enter (the keypad digits jog a
+  connected machine when no field has focus).
+- The machine keys are stricter: the jog keys and `Cmd/Ctrl+Return` do nothing while any form
+  control has focus.
+- In Preview the editing keys change nothing (F-A8).
+
 #### File
 - `Cmd/Ctrl+N` — New project
 - `Cmd/Ctrl+O` — Open project
 - `Cmd/Ctrl+S` — Save project
 - `Cmd/Ctrl+Shift+S` — Save Project As
+- While a dialog, Design Studio, Image Studio or on-canvas text has the keyboard, both Save keys
+  save nothing and one line says what to do first (apply the drawing or image and close the Studio,
+  finish the text, or close the window). The key never reaches the browser's own "Save page as"
+  (ADR-706)
 - `Cmd/Ctrl+I` — Import SVG, DXF, PDF/compatible AI, HPGL/PLT, PNG/JPG/BMP/GIF/TIFF/PSD or STL through the unified picker
 - `Cmd/Ctrl+Shift+E` — Save G-code (Export)
 
@@ -2031,7 +2073,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - Shift+Arrow — Nudge 10 mm
 - `Cmd/Ctrl+Arrow` — Nudge 0.1 mm (ADR-499; all three distances are set in Settings → Canvas)
 - Holding an arrow key slides the selection as one undo step. An arrow key on a focused tab strip,
-  slider, radio group, list or menu works that control and does not nudge (or align, with Alt);
+  slider, radio group, drop-down, list or menu works that control and does not nudge (or align, with Alt);
   from a plain button it still nudges (ADR-493, ADR-499 Amendment 1).
 - `Alt+Left` / `Alt+Right` / `Alt+Up` / `Alt+Down` — Align left / right / top / bottom (ADR-499)
 - `Alt+PgUp` / `Alt+PgDn` — Align centres on X / Y (ADR-499)
@@ -2496,9 +2538,24 @@ inches hides the position until `$G` or the next Frame (ADR-375 Amendment 11).
    split Frame (ADR-353) the permit arrives when the exact program does; the trace's own motion
    never cancels that program. Each execution permit remains exact and one-use. Power/speed
    edits preserve spatial evidence; changed geometry, output geometry, placement or registration,
-   Jog, Home, origin/probe/reset/disconnect, or coordinate drift expires it and greys Start out
+   Home, origin/probe/reset/disconnect, or coordinate drift expires it and greys Start out
    again, with the reason in the status line. A settled app-owned run retains the unchanged Frame.
    Camera-only UI state does not.
+   - **A jog (ADR-565 Amendment 1).** When the job is placed in **Absolute Coords**, **User
+     Origin** or **Verified Origin**, a plain X/Y jog keeps the Frame: the job lands by the work
+     origin, not by where the head stands. This covers jog-pad steps and hold-to-jog, keyboard
+     jogs, a phone-remote step, **Move to position**, **Go to work zero** and a click-to-position
+     move. While the head moves, Start is disabled and the status line reads **Jogging — the
+     Frame is kept. Start unlocks when the head stops**. When the jog settles at Idle the status
+     line returns to **Ready to start — framed placement unchanged**, and Start's approach leaves
+     from wherever the head now stands.
+   - A jog still expires the Frame when the job is placed at **Current Position**; when the move
+     includes Z or a rotary axis (a focus jog, a CNC Z jog, or a point move that lifts to safe Z);
+     when the job is a rotary job or the move is a rotary test turn; when the jog ends in an
+     alarm, a rejected line (for example `error:15` past the soft limits), a failed or timed-out
+     Cancel, a pendant takeover, a reset or a reconnect; when a phone-remote hold is released;
+     and when the work origin, the controller session or the artwork changed while the head
+     moved, even if the change was undone. Console motion (`$J=`, `G0`) expires it as before.
 5. The user clicks **Start**. The app opens the single **Job Review** dialog (ADR-224,
    ADR-237 and ADR-565) against the latest exact prepared program plus current controller state.
    Settings changed since Frame are prepared before review; no job streams before confirmation.
@@ -2795,6 +2852,23 @@ minimum target size.
    This software action does not prove that the command arrived or that physical energy stopped.
 4. A reset sent into motion leaves a GRBL controller in `Alarm` (ALARM:3); the user clears it with
    `$X` (F-B9). A reset after a completed hold or a cancelled jog raises no alarm.
+5. After the operator's own ABORT JOB, that ALARM:3 shows "You stopped the job" instead of the
+   ordinary alarm card. When the Abort saved a Set origin here origin it offers **Restore saved
+   origin** (**Home, then restore origin** on a profile with homing), **Set origin here** and
+   **$X — Unlock** (ADR-341 Amendment 11).
+6. On a laser without homing, Restore saved origin runs by itself, once: Unlock, then one `G92`,
+   with no motion. It waits until the controller has reported Alarm twice with nothing in flight,
+   and a toast says "Stopped. The laser is off and your origin is restored. Frame to check before
+   starting again." Start still needs a new Frame (ADR-341 Amendment 14).
+   - It applies only to stock GRBL and FluidNC, a laser job, a saved origin, no rotary, a machine
+     zero that has not moved, and no reset required, safety notice, door or E-stop input.
+   - A CNC job, a profile with homing, grblHAL, any other alarm and any stop that was not the
+     operator's Abort keep the card and its buttons.
+   - A press on a card button first keeps the recovery with the operator. A restore that fails is
+     told in a toast, and the card keeps its buttons while the alarm stands.
+7. The Pause button's tooltip on a laser job with a realtime hold adds that Pause, a wait for the
+   head to stop, then ABORT JOB stops without the controller losing its position (ADR-215
+   Amendment 1).
 
 ### F-B9. Alarm
 
@@ -2803,6 +2877,21 @@ minimum target size.
 
 #### Success — unlock
 1. User clicks **$X — Unlock**. App writes `$X\n`. Alarm cleared from UI.
+2. Unlock hides the head position and the work origin only when the alarm it clears can have lost
+   them (ADR-367 Amendment 3). After a soft limit (`ALARM:2`), a failed probe (`ALARM:4` or `5`)
+   or FluidNC's G-code error (`ALARM:17`) the controller stopped the machine under control, so
+   the position and the work offset it reports stay shown, from the rail, the Frame offer and a
+   Console `$X` alike. A soft limit first needs **Reset (Ctrl-X)**; stock GRBL clears an origin
+   set with Set origin here at that reset, grblHAL keeps it. Home, work-Z and Frame evidence are
+   cleared either way.
+3. After any other alarm, an alarm with no code on record (the power-on lock of a machine that
+   must home, or a lock KerfDesk connected into), a soft limit raised during a hold, or one
+   followed by a new connection or a restart KerfDesk did not send, the position stays hidden
+   until Home, Set origin here, a probe or a reconnect. The Console log says which case applied.
+4. While it is hidden, nothing asks the operator to wait for a report. Frame, Move to position
+   (**Go** and **Use current**), the status panel's `Origin:` row and the disabled **Fire**
+   button's tooltip all say: Home the machine (only on a profile with homing), or move the head
+   to where the job should start and use Set origin here.
 
 #### Edge — reset required
 1. After a critical event (hard or soft limit, E-stop, motor fault) the controller accepts only a
@@ -3829,7 +3918,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    Alarm (ADR-367), except a grblHAL E-stop alarm, which must be released first; after Unlock
    the operator sets the origin again, since Unlock does not restore the machine position.
    After a failed probe (ALARM:4 or 5) nothing was lost, so the Frame unlocks and continues
-   once the controller reports Idle (ADR-375).
+   once the controller reports Idle (ADR-375). The same holds after another alarm that keeps
+   the machine position, a soft limit (ALARM:2) above all: the offer says the controller still
+   knows where the head is, and a missing origin is then the Frame's next question (ADR-367
+   Amendment 3).
    A job placed at the head's current position does not frame on after Home, because the cycle
    parks the head at the switches: the Frame stops and asks the operator to jog the head back
    into place and Frame again (ADR-367 Amendment 1).
@@ -3965,8 +4057,9 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 2. A turn the controller rejects (for example `error:15` beyond soft limits), an alarm or a
    disconnect ends the test with a message and no return turn.
 3. **Apply** and **Generate test pattern** are disabled while a test turns.
-4. A test turn is a jog: it expires a completed Frame, and Start stays greyed out until the job
-   is framed again (ADR-372).
+4. A test turn always expires a completed Frame, whichever axis it turns and however the job is
+   placed, and Start stays greyed out until the job is framed again (ADR-372, ADR-565
+   Amendment 1): it may drive a roller, so it is never a plain head move.
 
 #### Success — where a rotary job burns (ADR-127 Amendment 1)
 1. In Current Position, User Origin and Verified Origin the job keeps its placement anchor: the
@@ -4998,7 +5091,9 @@ Y on machine X0 Y0 or work zero until they are typed.
 name (blank gives Position N; the same name replaces the old entry) in the machine profile, so it
 travels with the profile and the project and is one undo step. Each saved row has **Go** and
 **Delete**. Go needs a connected, Idle machine, like the jog arrows; a missing work offset for a
-From origin move is a notice and nothing moves.
+From origin move is a notice and nothing moves. While KerfDesk hides the position after Unlock
+or Release motors, Go and Use current say to Home the machine (on a profile with homing) or to
+move the head to the start and use Set origin here, and nothing moves (ADR-367 Amendment 3).
 
 **After a job** (Machine Setup's laser step, ADR-493; LightBurn's Finish Position) sets where a laser
 job leaves the head: **Go to the work origin** (the default, which stores nothing; a Current
@@ -5111,7 +5206,9 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
    clears `wcoCache`; the status row reads "Origin: not reported yet" until
    the next WCO-bearing report shows what remains ("machine 0,0" unless a
    G54 offset is stored or grblHAL kept the G92, which then reads "reported
-   by controller"). A failed probe
+   by controller"). After an Unlock that hides the position the row reads
+   "unknown (Home, or jog to the start and Set origin here)", without Home
+   on a machine that has none (ADR-367 Amendment 3). A failed probe
    (ALARM:4 or 5) keeps the origin (ADR-375). User re-jogs and re-sets if
    they want the offset back.
 5. **Off-bed risk.** Operator sets origin near the bed edge, then

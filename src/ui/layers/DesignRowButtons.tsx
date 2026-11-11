@@ -28,11 +28,7 @@ export function DesignRowButtons({
       <Button
         data-design-tree-name
         pressed={active}
-        title={
-          row.kind === 'group'
-            ? `Select all ${row.group.objectIds.length} artworks in ${name}.`
-            : `Select ${name} directly for editing.`
-        }
+        title={selectTitle(row, name, locked)}
         disabled={row.kind === 'object' && locked}
         onClick={() =>
           row.kind === 'group'
@@ -70,8 +66,47 @@ export function DesignRowButtons({
       >
         Move
       </Button>
-      {locked ? <span className="lf-muted">Locked</span> : null}
+      {locked ? <UnlockRowButton row={row} name={name} /> : null}
     </>
+  );
+}
+
+function selectTitle(row: DesignTreeRow, name: string, locked: boolean): string {
+  if (row.kind === 'group') return `Select all ${row.group.objectIds.length} artworks in ${name}.`;
+  return locked
+    ? `${name} is locked. Unlock it to select or edit it.`
+    : `Select ${name} directly for editing.`;
+}
+
+// Frees this row alone; Unlock All is no longer the only way (annoyance audit
+// A4-P2-3). A group row unlocks the locked artwork inside it.
+function UnlockRowButton({
+  row,
+  name,
+}: {
+  readonly row: DesignTreeRow;
+  readonly name: string;
+}): JSX.Element {
+  return (
+    <Button
+      aria-label={`Unlock ${name}`}
+      title={
+        row.kind === 'group'
+          ? `Unlock the locked artwork in ${name}. Other locked artwork stays locked.`
+          : `${name} is locked. Unlock it and select it; other locked artwork stays locked.`
+      }
+      onClick={() => {
+        const app = useStore.getState();
+        if (row.kind === 'group') {
+          app.unlockObjects(row.group.objectIds);
+          return;
+        }
+        app.unlockObjects([row.object.id]);
+        app.selectDesignArtwork(row.object.id);
+      }}
+    >
+      Unlock
+    </Button>
   );
 }
 function DesignDragHandle({
