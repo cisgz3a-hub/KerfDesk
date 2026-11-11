@@ -12,7 +12,7 @@ import { readCutSettingsPatch, type LayerPatch } from './cut-settings-draft';
 import {
   changedCutSettingsPatch,
   cutSettingField,
-  withoutUntouchedLineDefaults,
+  withoutUntouchedOptionDefaults,
 } from './cut-settings-field-edits';
 import './laser-operation-settings.css';
 
@@ -67,7 +67,7 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
     props.onApply(
       onlyChangedFields
         ? changedCutSettingsPatch(form, patch, changedFields.current)
-        : withoutUntouchedLineDefaults(form, patch, layer, changedFields.current),
+        : withoutUntouchedOptionDefaults(form, patch, layer, changedFields.current),
     );
   };
   return (
