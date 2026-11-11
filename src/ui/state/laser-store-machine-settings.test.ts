@@ -427,7 +427,9 @@ describe('laser-store machine settings', () => {
     await vi.waitFor(() => expect(writes).toEqual(['$32=0\n', '$$\n']));
     connection.emitLine('ok');
     await cncWrite;
-    expect(writes).toEqual(['$32=0\n', '$$\n']);
+    // The write forgot the last status report, so one status query follows the
+    // read-back and never lands inside it (ADR-674 Amendment 1).
+    await vi.waitFor(() => expect(writes).toEqual(['$32=0\n', '$$\n', '?']));
   });
 
   it('rejects every non-canonical laser $32 Console value before serial write', async () => {

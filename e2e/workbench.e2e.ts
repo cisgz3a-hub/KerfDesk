@@ -675,9 +675,7 @@ baseTest('an interrupted-job checkpoint surfaces isolated optional recovery', as
   await expect(savedRecovery).toBeVisible();
   await expect(page.getByText(/^Last (Start|Frame) attempt blocked$/)).toHaveCount(0);
   await savedRecovery.click();
-  await expect(
-    page.getByText('It is isolated from the current canvas', { exact: false }),
-  ).toBeVisible();
+  await expect(page.getByText('It is kept apart from your work', { exact: false })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Review recovery' })).toBeVisible();
 });
 

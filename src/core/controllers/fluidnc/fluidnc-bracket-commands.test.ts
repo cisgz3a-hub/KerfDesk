@@ -37,7 +37,7 @@ describe('FluidNC [key]value lines (rolling audit v3 G4-P1-1)', () => {
       const result = fluidncDriver.prepareConsoleCommand(input);
       expect(result.ok).toBe(false);
       if (result.ok) return;
-      expect(result.reason).toMatch(/persistent controller command is blocked/);
+      expect(result.reason).toMatch(/KerfDesk does not send this command/);
     },
   );
 

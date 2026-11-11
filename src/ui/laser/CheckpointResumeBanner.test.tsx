@@ -64,8 +64,8 @@ describe('CheckpointResumeBanner', () => {
 
     expect(host?.textContent).toContain('Interrupted job saved');
     expect(host?.textContent).toContain('2 of 4 lines acknowledged');
-    expect(host?.textContent).toContain('isolated from the current canvas');
-    expect(host?.textContent).toContain('ordinary Start');
+    expect(host?.textContent).toContain('kept apart from your work');
+    expect(host?.textContent).toContain('Start does not use it');
     expect(host?.querySelector('details')?.open).toBe(false);
     expect(host?.querySelector('[role="alert"]')).toBeNull();
     expect(button('Review recovery').disabled).toBe(false);

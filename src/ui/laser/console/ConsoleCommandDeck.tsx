@@ -26,6 +26,8 @@ export function ConsoleCommandDeck({
   retainDraft = false,
 }: ConsoleCommandDeckProps): JSX.Element {
   const model = useConsoleCommandDeckModel(enableHistory, onCommandSent, retainDraft);
+  // A refused send, or the reason a blocked one was not sent (A3-P2-4).
+  const notice = model.error ?? model.blockedSubmitReason;
   return (
     <section aria-label={ariaLabel} style={deckStyle}>
       {showQuickCommands && model.driver.consoleQuickCommands.length > 0 ? (
@@ -43,6 +45,7 @@ export function ConsoleCommandDeck({
         isInputDisabled={model.isInputDisabled}
         isSending={model.isSending}
         sendDisabledReason={model.sendDisabledReason}
+        onBlockedSubmit={model.noteBlockedSubmit}
         onChange={model.changeCommand}
         onHistoryKey={model.handleHistoryKey}
         onSend={() => void model.send({ kind: 'manual-draft', input: model.command })}
@@ -62,9 +65,9 @@ export function ConsoleCommandDeck({
           })
         }
       />
-      {model.error !== null ? (
+      {notice !== null ? (
         <div role="alert" style={errorStyle}>
-          {model.error}
+          {notice}
         </div>
       ) : null}
       {enableHistory ? (
@@ -113,6 +116,7 @@ function ConsoleCommandForm(props: {
   readonly isInputDisabled: boolean;
   readonly isSending: boolean;
   readonly sendDisabledReason: string | null;
+  readonly onBlockedSubmit: () => void;
   readonly onChange: (value: string) => void;
   readonly onHistoryKey: (event: KeyboardEvent<HTMLInputElement>) => void;
   readonly onSend: () => void;
@@ -124,6 +128,7 @@ function ConsoleCommandForm(props: {
       onSubmit={checkedSubmit((event) => {
         event.preventDefault();
         if (props.sendDisabledReason === null) props.onSend();
+        else props.onBlockedSubmit();
       })}
     >
       <input
@@ -131,7 +136,16 @@ function ConsoleCommandForm(props: {
         autoFocus={props.autoFocus}
         value={props.command}
         onChange={(event) => props.onChange(event.target.value)}
-        onKeyDown={props.onHistoryKey}
+        onKeyDown={(event) => {
+          // A browser does not submit a form through a disabled Send button,
+          // so Enter on a blocked command is answered here.
+          if (event.key === 'Enter' && props.sendDisabledReason !== null && !props.isSending) {
+            event.preventDefault();
+            props.onBlockedSubmit();
+            return;
+          }
+          props.onHistoryKey(event);
+        }}
         placeholder="$I, $$, $G, G0 X0 Y0..."
         disabled={props.isInputDisabled}
         title={props.sendDisabledReason ?? 'Send one controller command.'}

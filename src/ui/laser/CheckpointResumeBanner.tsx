@@ -20,6 +20,7 @@ import {
 } from '../state/recovery';
 import { useRecoveryRepositorySelection } from '../state/use-recovery-repository';
 import { CncPassRecoveryWizard } from './CncPassRecoveryWizard';
+import { setupControlBlockReason, titleWhenDisabled } from './control-block-reason';
 import { LaserRecoveryReviewDialog } from './LaserRecoveryReviewDialog';
 import { frameRemainingRecoveryArea } from './laser-recovery-frame';
 import { CNC_RECOVERY_OPEN_PROJECT_NOTE } from './cnc-recovery-open-project';
@@ -51,7 +52,7 @@ export function CheckpointResumeBanner(props: {
   return (
     <>
       <details style={bannerStyle} aria-label="Interrupted job recovery">
-        <summary style={summaryStyle} title="Expand the isolated interrupted-job recovery options.">
+        <summary style={summaryStyle} title="Show the options for the interrupted job.">
           <strong>Interrupted job saved</strong>
           <span style={summaryDetailStyle}>
             {' '}
@@ -215,14 +216,14 @@ function RecoveryDescription({
     <div role="status">
       <p style={textStyle}>
         Saved {capsule.artifact.machineKind === 'cnc' ? 'router' : 'laser'} run
-        {startedAt === null ? '' : ` from ${startedAt}`}. It is isolated from the current canvas,
-        project, profile, controller settings, origins, and ordinary Start.
+        {startedAt === null ? '' : ` from ${startedAt}`}. It is kept apart from your work: the open
+        design, the machine profile and the origin do not change it, and Start does not use it.
         {capsule.artifact.machineKind === 'cnc' ? ` ${CNC_RECOVERY_OPEN_PROJECT_NOTE}` : ''}
       </p>
       <p style={textStyle}>
         {exact
-          ? 'Review uses the sealed exact G-code and prepared execution artifact. Archived controller observations are diagnostics only.'
-          : 'This record holds only the program fingerprint, not the exact G-code. Recovery may use the current project only when it compiles to the same fingerprint.'}
+          ? 'Review uses the exact G-code that was running when the job stopped. The machine readings saved with it are for reference only.'
+          : 'This record holds a fingerprint of the program, not its G-code. Recovery can use the open project only if it produces the same program.'}
       </p>
       <p style={causeStyle}>
         <strong>Recorded cause:</strong> {capsule.interruption.message}
@@ -248,6 +249,8 @@ function RecoveryActions(props: {
   readonly claimActive: boolean;
   readonly onReview: () => void;
 }): JSX.Element {
+  // Off while a jog, Frame or controller operation runs; the tooltip says so.
+  const blockReason = useLaserStore(setupControlBlockReason);
   const discard = async (): Promise<void> => {
     if (
       !jobAwareConfirm(
@@ -272,7 +275,11 @@ function RecoveryActions(props: {
         type="button"
         disabled={props.disabled || props.claimActive}
         onClick={props.onReview}
-        title="Open a read-only review. No live state changes until final supervised Start."
+        title={titleWhenDisabled(
+          props.disabled,
+          blockReason,
+          'Open a read-only review. No live state changes until final supervised Start.',
+        )}
       >
         {props.capsule.artifact.machineKind === 'cnc'
           ? 'Review supervised recovery'
@@ -282,7 +289,7 @@ function RecoveryActions(props: {
         type="button"
         disabled={props.disabled}
         onClick={() => void discard()}
-        title="Permanently discard only this isolated recovery capsule."
+        title="Delete this saved job record for good. Nothing else changes."
       >
         Discard
       </button>
