@@ -7,6 +7,7 @@
 // The transport is ADR-702's UsbLinkSession transfer pair, typed here
 // structurally so core never imports the platform layer.
 
+import { errorMessage } from '../../util/error-message';
 import {
   LMC_ENDPOINT_IN,
   LMC_ENDPOINT_OUT,
@@ -106,7 +107,7 @@ export class LmcLink {
       this.failedWith = null;
       return true;
     } catch (error) {
-      this.failedWith = `USB write failed: ${describe(error)}`;
+      this.failedWith = `USB write failed: ${errorMessage(error)}`;
       return false;
     }
   }
@@ -130,14 +131,10 @@ export class LmcLink {
         reply === null ? `The board answered ${result.byteLength} bytes, not 8.` : null;
       return reply;
     } catch (error) {
-      this.failedWith = `USB read failed: ${describe(error)}`;
+      this.failedWith = `USB read failed: ${errorMessage(error)}`;
       return null;
     } finally {
       if (timer !== undefined) clearTimeout(timer);
     }
   }
-}
-
-function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

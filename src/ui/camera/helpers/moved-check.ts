@@ -9,6 +9,12 @@
 // camera may have moved. A warning stays until the view is confirmed where it
 // was or the operator dismisses it. It never blocks anything; a camera on the
 // laser head is not checked.
+//
+// ADR-663 Amendment 6 (rolling audit v14 Z1-P2-1): the check needs only the
+// picture's size and a small thumbnail of it. The thumbnail of a camera that
+// has just started, or of a held picture, is made in the camera picture
+// worker, and the two thumbnails are compared there too (185-290 ms in the
+// window), so neither holds the UI thread while a job runs.
 
 import { isHeadCameraModel } from '../../../core/camera/model/head-camera';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
@@ -26,6 +32,8 @@ import {
   recordFrameRescale,
 } from '../frame-rescale-check';
 import { cameraCaptureBindingForFrame, type ActiveCameraSource } from '../frame-source';
+import { pictureClient, type PictureClient } from '../picture-worker/camera-picture-client';
+import { stillCompanion } from '../still-capture';
 import {
   cameraMovedWarningDismissed,
   furthestChangeMm,
@@ -44,8 +52,79 @@ export {
 /** Weak or failed matches in a row before "the view no longer matches" is said. */
 export const WEAK_CHECKS_FOR_CHANGED = 2;
 
+/** A picture as the check sees it: its own size, and its thumbnail at a given width. */
+export type FrameView = {
+  readonly width: number;
+  readonly height: number;
+  readonly thumbnail: (width: number) => ViewThumbnail;
+};
+
+/** A picture's view; a thumbnail the worker already made for it is used as is. */
+export function rgbaView(frame: RgbaImage): FrameView {
+  return {
+    width: frame.width,
+    height: frame.height,
+    thumbnail: (width) => {
+      const made = stillCompanion(frame)?.thumbnail ?? null;
+      return made !== null && made.width === width ? made : viewThumbnail(frame, width);
+    },
+  };
+}
+
+/** Width of the thumbnail the check compares for `source`, or null when it has no reference. */
+export function movedCheckThumbWidth(source: ActiveCameraSource): number | null {
+  const own = ownCameraModel(useStore.getState().project.device, { kind: 'live', source });
+  if (own === undefined || isHeadCameraModel(own)) return null;
+  return loadViewReference(own)?.width ?? null;
+}
+
 /** Compare `frame` from `source` with the running camera's reference. */
 export function checkCameraMoved(source: ActiveCameraSource, frame: RgbaImage): CameraMovedState {
+  return checkCameraMovedView(source, rgbaView(frame));
+}
+
+/** The same for a picture seen as `view`; null when no picture could be taken. */
+export function checkCameraMovedView(
+  source: ActiveCameraSource,
+  view: FrameView | null,
+): CameraMovedState {
+  const prepared = prepareCheck(source, view);
+  return 'kind' in prepared ? prepared : verdict(prepared.own, compareViews(prepared.compare));
+}
+
+/**
+ * The same, with the thumbnails compared in the camera picture worker. A
+ * verdict for a camera no longer running is dropped. Without the worker, or
+ * when it fails, they are compared here, at once.
+ */
+export async function checkCameraMovedInWorker(
+  source: ActiveCameraSource,
+  view: FrameView | null,
+  client: PictureClient | null = pictureClient(),
+): Promise<CameraMovedState> {
+  const prepared = prepareCheck(source, view);
+  if ('kind' in prepared) return prepared;
+  if (client === null) return verdict(prepared.own, compareViews(prepared.compare));
+  const reply = await client.run({ op: 'compare-views', args: prepared.compare });
+  const now = useCameraStore.getState().sourceState;
+  if (now.kind !== 'live' || now.source !== source) return unknown;
+  return verdict(
+    prepared.own,
+    reply.kind === 'views' ? reply.comparison : compareViews(prepared.compare),
+  );
+}
+
+type PreparedCheck = {
+  readonly own: CameraModelRecord;
+  readonly compare: Parameters<typeof compareViews>[0];
+};
+
+// Everything up to the comparison, which is cheap: a state when there is
+// nothing to compare.
+function prepareCheck(
+  source: ActiveCameraSource,
+  view: FrameView | null,
+): PreparedCheck | CameraMovedState {
   const own = ownCameraModel(useStore.getState().project.device, {
     kind: 'live',
     source,
@@ -53,22 +132,31 @@ export function checkCameraMoved(source: ActiveCameraSource, frame: RgbaImage): 
   const model = activeCameraModelNow();
   if (own === undefined || model === undefined || isHeadCameraModel(own)) return publish(unknown);
   const reference = loadViewReference(own);
-  if (reference === null) return publish(unknown);
-  const binding = cameraCaptureBindingForFrame(source, frame.width, frame.height);
-  checkFrameRescale(model, binding, frame, reference);
-  const forFrame = cameraModelForFrame(model, binding, frame.width, frame.height);
+  if (reference === null || view === null) return publish(unknown);
+  const binding = cameraCaptureBindingForFrame(source, view.width, view.height);
+  const current = view.thumbnail(reference.width);
+  checkFrameRescale(model, binding, view, current, reference);
+  const forFrame = cameraModelForFrame(model, binding, view.width, view.height);
   if (forFrame.kind === 'issue') return publish(unknown);
-  const current = viewThumbnail(frame, reference.width);
   if (current.height !== reference.height) return publish(unknown);
   const { bedWidth, bedHeight } = useStore.getState().project.device;
-  const outcome = compareViews({
-    reference,
-    current,
-    lens: forFrame.lens,
-    pose: forFrame.pose,
-    bedWidthMm: bedWidth,
-    bedHeightMm: bedHeight,
-  });
+  return {
+    own,
+    compare: {
+      reference,
+      current,
+      lens: forFrame.lens,
+      pose: forFrame.pose,
+      bedWidthMm: bedWidth,
+      bedHeightMm: bedHeight,
+    },
+  };
+}
+
+function verdict(
+  own: CameraModelRecord,
+  outcome: ReturnType<typeof compareViews>,
+): CameraMovedState {
   if (outcome.kind === 'none') return publish(unknown);
   if (outcome.kind === 'weak') return publishWeak(own);
   useCameraMovedStore.setState({ weakChecks: 0 });
@@ -90,10 +178,11 @@ export function checkCameraMoved(source: ActiveCameraSource, frame: RgbaImage): 
 function checkFrameRescale(
   model: CameraModelRecord,
   binding: ReturnType<typeof cameraCaptureBindingForFrame>,
-  frame: RgbaImage,
+  size: { readonly width: number; readonly height: number },
+  current: ViewThumbnail,
   reference: ViewThumbnail,
 ): void {
-  const { width, height } = frame;
+  const { width, height } = size;
   if (width === model.lens.imageWidth && height === model.lens.imageHeight) return;
   if (frameRescaleVerdict(model, width, height) === 'resize') return;
   const measuring = cameraModelForFrame(model, binding, width, height, { rescale: 'measuring' });
@@ -101,7 +190,7 @@ function checkFrameRescale(
   const { bedWidth, bedHeight } = useStore.getState().project.device;
   const verdict = frameRescaleFromView({
     reference,
-    frame,
+    current,
     scaledLens: measuring.lens,
     pose: measuring.pose,
     bedWidthMm: bedWidth,

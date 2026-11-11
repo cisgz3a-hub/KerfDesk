@@ -55,11 +55,14 @@ export const CNC_RESUME_PLANNER_RESERVES: Readonly<Record<ControllerKind, Planne
   // `planner_blocks` accepts 10..120 (FluidNC v4.0.3 MachineConfig.cpp:89) and
   // `stepping/segments` 6..20 (Stepping.cpp:216).
   fluidnc: { unmeasured: 140, floor: 64, segmentLag: 20 },
-  // Not CNC targets (cncJobs false); Ruida and a JCZ galvo are never streamed. Placeholders.
+  // Not CNC targets (cncJobs false); Ruida, a JCZ galvo, Lihuiyu and Moshi are
+  // never streamed as lines. Placeholders.
   marlin: { unmeasured: 64, floor: 64, segmentLag: 0 },
   smoothieware: { unmeasured: 64, floor: 64, segmentLag: 0 },
   ruida: { unmeasured: 256, floor: 256, segmentLag: 0 },
   'jcz-lmc': { unmeasured: 256, floor: 256, segmentLag: 0 },
+  lihuiyu: { unmeasured: 64, floor: 64, segmentLag: 0 },
+  moshi: { unmeasured: 256, floor: 256, segmentLag: 0 },
 };
 
 /** Sendable lines to rewind from the acknowledged count: the recorded planner

@@ -17,6 +17,8 @@ export type MachineSetupControllerGuide = {
   readonly configurationSurface: string;
   readonly writePolicy: MachineSetupWritePolicy;
   readonly writeExplanation: string;
+  /** The Find Machine title for a controller with its own link (ADR-705). */
+  readonly fileOnlyTitle?: string;
   readonly homeCommand: string | null;
   readonly statusCommand: string | null;
   readonly streamingExplanation: string;
@@ -99,20 +101,55 @@ export function machineSetupControllerGuide(
           'Set laser_module_maximum_s_value 1.0 (Full-power S stays 1): Smoothieware stores every S word in 12-bit 1.11 fixed point, so any S of 2 or more wraps and fires far below the requested power. Set laser_module_enable true and laser_module_minimum_power 0 for dark S0 feed moves. Edit the config through the Smoothieware USB/SD workflow, then reset and reconnect.',
       };
     case 'ruida':
-      return { ...common, ...RUIDA_GUIDE };
+    case 'lihuiyu':
+    case 'moshi':
+      return linkGuide(kind, common);
     case 'jcz-lmc':
       return { ...common, ...GALVO_GUIDE };
   }
 }
 
-const RUIDA_GUIDE = {
-  identityCommands: [],
-  settingsCommands: [],
-  configurationSurface: 'Ruida controller panel and vendor software',
-  writePolicy: 'file-only',
-  writeExplanation:
-    'This build exports files for Ruida. Connection, jogging, reads, and firmware writes are unavailable.',
-} as const;
+// Controllers outside the line-based store: Ruida files (ADR-097, ADR-697) and
+// the Lihuiyu .egv export and USB link (ADR-703), and the Moshiboard USB link
+// (ADR-705).
+function linkGuide(
+  kind: 'ruida' | 'lihuiyu' | 'moshi',
+  common: ReturnType<typeof commonControllerGuide>,
+): MachineSetupControllerGuide {
+  switch (kind) {
+    case 'ruida':
+      return {
+        ...common,
+        identityCommands: [],
+        settingsCommands: [],
+        configurationSurface: 'Ruida controller panel and vendor software',
+        writePolicy: 'file-only',
+        writeExplanation:
+          'This build exports files for Ruida. Connection, jogging, reads, and firmware writes are unavailable.',
+      };
+    case 'lihuiyu':
+      return {
+        ...common,
+        identityCommands: [],
+        settingsCommands: [],
+        configurationSurface: 'Board model and the machine current knob',
+        writePolicy: 'file-only',
+        writeExplanation:
+          'Lihuiyu boards hold no settings to read or write. Save .egv files, or use the experimental, simulator-tested USB link under Machine details.',
+      };
+    case 'moshi':
+      return {
+        ...common,
+        identityCommands: [],
+        settingsCommands: [],
+        configurationSurface: 'Moshiboard: no settings a host can read or write',
+        fileOnlyTitle: 'Moshiboard connects over its own USB link',
+        writePolicy: 'read-only',
+        writeExplanation:
+          'Experimental: a Moshiboard runs over its own USB link (Machine details), with Frame, Start, Abort and Home only. Laser power is set on the machine. Simulator-tested only, not qualified on hardware.',
+      };
+  }
+}
 
 // ADR-704: a JCZ galvo has no serial console or settings to read or write.
 const GALVO_GUIDE = {
@@ -128,7 +165,12 @@ function commonControllerGuide(kind: ControllerKind, driver: ControllerDriver) {
   return {
     kind,
     label: driver.label,
-    transportLabel: driver.capabilities.transport === 'serial' ? 'USB serial' : 'File export',
+    transportLabel:
+      driver.capabilities.transport === 'serial'
+        ? 'USB serial'
+        : driver.usbLink !== undefined
+          ? 'USB link'
+          : 'File export',
     defaultBaudRate: driver.defaultBaudRate,
     homeCommand: driver.commands.home,
     statusCommand: driver.realtime.statusQuery ?? driver.commands.queuedStatusQuery,
@@ -142,6 +184,16 @@ function commonControllerGuide(kind: ControllerKind, driver: ControllerDriver) {
 
 export function machineSetupControllerGuides(): ReadonlyArray<MachineSetupControllerGuide> {
   return (
-    ['grbl-v1.1', 'grblhal', 'fluidnc', 'marlin', 'smoothieware', 'ruida', 'jcz-lmc'] as const
+    [
+      'grbl-v1.1',
+      'grblhal',
+      'fluidnc',
+      'marlin',
+      'smoothieware',
+      'ruida',
+      'jcz-lmc',
+      'lihuiyu',
+      'moshi',
+    ] as const
   ).map((kind) => machineSetupControllerGuide(kind));
 }

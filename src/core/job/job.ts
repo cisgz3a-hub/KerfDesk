@@ -467,6 +467,9 @@ export type JobDiagnostic =
   // ADR-699: a ramped Fill's grid would need more than its cell limit, so it
   // burns flat, as it would without a ramp.
   | { readonly kind: 'fill-ramp-too-large'; readonly layerName: string; readonly cells: number }
+  // ADR-699 Amd 1: a ramped Fill asks for a scan angle, cross-hatch or an angle
+  // change per pass, but on a rotary it scans every pass along X.
+  | { readonly kind: 'fill-ramp-scan-angle-rotary'; readonly layerName: string }
   | {
       readonly kind: 'raster-source-luma-mismatch';
       readonly layerName: string;

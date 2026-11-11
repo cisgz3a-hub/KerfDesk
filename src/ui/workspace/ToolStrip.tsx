@@ -3,13 +3,16 @@ import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 // drawing tool-mode in the UI store; Select is always available (and Esc
 // returns to it, wired in shortcuts.ts). Mounted as a left rail in App,
 // mirroring the right-side panels. Toggle state shows via aria-pressed (the
-// lf-btn pressed fill); the active name lives on each IconButton.
+// lf-btn pressed fill); the active name lives on each IconButton. In Preview
+// the canvas only pans, so the canvas tools are disabled and say why (annoyance
+// audit A4-P2-5); Create artwork and the library open their own windows and stay.
 
 import { Fragment, useRef } from 'react';
 import { Icon, IconButton, type IconName } from '../kit';
 import { TOOL_HELP, toolHelpId, type ToolHelpKey } from '../help/help-topics';
 import { useUiStore, type ToolMode } from '../state/ui-store';
 import { useStore } from '../state/store';
+import { PREVIEW_TOOL_REASON } from '../state/preview-edit-hint';
 import { curveCommandNode } from '../state/path-node-command-geometry';
 import type { PathNodeRef } from '../state/path-node-edit-actions';
 import type { PathSegmentRef } from '../state/path-segment-actions';
@@ -45,8 +48,13 @@ export function ToolStrip(): JSX.Element {
   const setToolMode = useUiStore((s) => s.setToolMode);
   const resetToolMode = useUiStore((s) => s.resetToolMode);
   const setLibraryDialogOpen = useUiStore((s) => s.setLibraryDialogOpen);
+  const previewMode = useStore((s) => s.previewMode);
   return (
-    <aside aria-label="Drawing tools" className="lf-rail lf-toolstrip">
+    <aside
+      aria-label="Drawing tools"
+      className="lf-rail lf-toolstrip"
+      {...(previewMode ? { 'data-preview': 'true' } : {})}
+    >
       <BooleanCompoundControls />
       <span className="lf-toolstrip__caption" aria-hidden="true">
         Create
@@ -71,7 +79,12 @@ export function ToolStrip(): JSX.Element {
           <IconButton
             icon={tool.icon}
             label={TOOL_HELP[tool.helpKey].label}
-            title={TOOL_HELP[tool.helpKey].tooltip}
+            title={
+              previewMode
+                ? `${PREVIEW_TOOL_REASON} ${TOOL_HELP[tool.helpKey].tooltip}`
+                : TOOL_HELP[tool.helpKey].tooltip
+            }
+            disabled={previewMode}
             helpId={toolHelpId(tool.helpKey)}
             {...(tool.helpKey === 'node' ? { buttonRef: nodeToolButtonRef } : {})}
             onClick={() => {

@@ -25,6 +25,7 @@ import { jogFrameCommandBlockMessage } from '../state/laser-store-helpers';
 import { resolveNativeBedFrame, selectNativeBedEvidence } from '../state/native-bed-frame';
 import { laserStatusReportFieldsOff, missingPositionMessage } from '../state/status-report-fields';
 import { useToastStore } from '../state/toast-store';
+import { positionWithheldMessage } from './frame-position-withheld';
 import { clampJogFeed } from './jog-control-policy';
 import { useJogControlPreferences } from './jog-control-preferences';
 
@@ -55,11 +56,19 @@ export function headMoveBlockMessage(laser: LaserState): string | null {
 }
 
 /** Why the head position or work offset will never arrive although the
- * controller reports: a grblHAL `$10` that sends no WCO (ADR-375 Amendment 2).
- * Null when a status report may still bring it. */
+ * controller reports: KerfDesk withholds it after an Unlock or Release motors
+ * until Home or Set origin here (ADR-367 Amendment 3), or a grblHAL `$10`
+ * sends no WCO (ADR-375 Amendment 2). Null when a status report may still
+ * bring it. */
 export function headPositionUnknownMessage(laser: LaserState): string | null {
+  const withheld = positionWithheldMessage(laser, homingEnabledInProfile());
+  if (withheld !== null) return withheld;
   if (laser.statusReport === null) return null;
   return missingPositionMessage(laserStatusReportFieldsOff(laser));
+}
+
+function homingEnabledInProfile(): boolean {
+  return useStore.getState().project.device.homing.enabled;
 }
 
 /** The head's current position in a frame, or null when it cannot be read. */
@@ -82,6 +91,15 @@ export function dispatchHeadMove(position: HeadPosition, what: string): boolean 
   const blocked = headMoveBlockMessage(laser);
   if (blocked !== null) {
     toast(blocked, 'error');
+    return false;
+  }
+  // While the position is withheld the store refuses every point move for want
+  // of a machine position ("Wait for an Idle status report"), and a From origin
+  // target has no offset to resolve against. Neither wait can end, so the toast
+  // names what does end it (ADR-367 Amendment 3).
+  const withheld = positionWithheldMessage(laser, homingEnabledInProfile());
+  if (withheld !== null) {
+    toast(withheld, 'error');
     return false;
   }
   const resolved = headPositionToNative(position, headFrameContext(laser));

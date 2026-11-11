@@ -72,6 +72,7 @@ function GalvoConnectRow({
           type="file"
           accept=".cor"
           aria-label="Galvo lens correction file"
+          title="Choose the .cor lens correction file EZCad uses for this lens"
           disabled={!disconnected}
           onChange={(event) => void chooseCor(event.target.files?.[0])}
         />

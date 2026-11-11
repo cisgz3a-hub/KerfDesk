@@ -33,6 +33,9 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
       'generic-jcz-fiber-galvo-110',
       'generic-jcz-fiber-galvo-150',
       'generic-jcz-fiber-galvo-200',
+      'k40-lihuiyu-m2-nano',
+      'k40-lihuiyu-m3-nano-pwm',
+      'generic-moshiboard-usb',
     ]);
     for (const entry of GRBL_MACHINE_PROFILE_CATALOG) {
       expect(validateMachineProfile(entry.profile)).toEqual([]);

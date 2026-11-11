@@ -75,10 +75,11 @@ describe('fillRampGrid (ADR-699)', () => {
     });
   });
 
-  it('places the grid one empty cell outside the artwork', () => {
+  it('places the grid on the artwork, with every filled cell kept (ADR-699 Amd 1)', () => {
     const result = fillRampGrid(input());
     if (result.kind !== 'ok') throw new Error(result.kind);
-    expect(result.grid.bounds).toEqual({ minX: -1, minY: -1, maxX: 21, maxY: 21 });
+    expect(result.grid.bounds).toEqual({ minX: 0, minY: 0, maxX: 20, maxY: 20 });
     expect(result.grid.filledCells).toBe(400 - 36);
+    expect(Array.from(result.grid.sValues).filter((value) => value > 0)).toHaveLength(400 - 36);
   });
 });

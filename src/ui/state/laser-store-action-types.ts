@@ -94,11 +94,13 @@ export type LaserStoreActions = {
   readonly clearTranscript: () => void;
   readonly clearIncidentHistory: () => void;
   /** `queueStep`: an operator step press, which may join a running step jog
-   * on a GRBL-family controller instead of being refused (ADR-674). */
+   * on a GRBL-family controller instead of being refused (ADR-674).
+   * `voidsFrame`: a turn of what an axis drives, such as a rotary test turn;
+   * it never keeps a completed Frame (ADR-565 Amendment 1). */
   readonly jog: (
     params: JogParams,
     owner?: MachineExecutionOwner,
-    options?: { readonly queueStep?: boolean },
+    options?: { readonly queueStep?: boolean; readonly voidsFrame?: boolean },
   ) => Promise<void>;
   readonly jogToMachinePosition: (x: number, y: number, feed: number) => Promise<void>;
   readonly centrePositioningLight: (

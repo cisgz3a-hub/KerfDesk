@@ -6,6 +6,7 @@ import { laserDotLit } from '../state/laser-dot-light';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useStore } from '../state/store';
+import { positionWithheldMessage } from './frame-position-withheld';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 
 export function MomentaryFireControl(): JSX.Element | null {
@@ -18,6 +19,10 @@ export function MomentaryFireControl(): JSX.Element | null {
   const fireActive = useLaserStore((state) => state.fireActive);
   const setFireActive = useLaserStore((state) => state.setFireActive);
   const disabled = useLaserStore(fireControlDisabled);
+  // Fire needs a known head position; after Unlock or Release motors the
+  // tooltip names what brings it back (ADR-367 Amendment 3).
+  const homingEnabled = project.device.homing.enabled;
+  const withheld = useLaserStore((state) => positionWithheldMessage(state, homingEnabled));
   const control = availableFireControl(project, labsEnabled, controllerSupportsFire);
   const { held, release } = useMomentaryRelease(setFireActive);
 
@@ -56,7 +61,11 @@ export function MomentaryFireControl(): JSX.Element | null {
         if (isFireKey(event.key)) release();
       }}
       style={fireButtonStyle(fireActive)}
-      title={`Hold to turn on the positioning beam at no more than ${control.maxPowerPercent}%. Release always sends M5.`}
+      title={
+        disabled && withheld !== null
+          ? `Fire is off while the head position is unknown. ${withheld}`
+          : `Hold to turn on the positioning beam at no more than ${control.maxPowerPercent}%. Release always sends M5.`
+      }
     >
       <span style={titleStyle}>Fire</span>
       <span style={stateStyle}>{fireActive ? 'ON' : `HOLD ${control.maxPowerPercent}%`}</span>

@@ -22,6 +22,13 @@ const PROJECT_ROOT = dirname(fileURLToPath(import.meta.url));
 // Also the PostScript reader (ADR-700): it loads on the first EPS/AI import.
 const WORKER_SIDE_IO =
   /\/src\/io\/(?:tiff\/|raster-decode\/|postscript\/|svg\/parse-svg-worker\.ts$|xml\/read-xml-document-from-blob\.ts$)/;
+// USB controller links that load only when a job is saved or their panel opens
+// (ADR-703: the Lihuiyu encoder, link and .egv writer; ADR-704: the JCZ galvo
+// LMC encoder, link and command sequences; ADR-705: the Moshiboard encoder, run
+// loop and output). Only the driver's capability data is boot code, because
+// selectControllerDriver is.
+const LAZY_CONTROLLER_LINKS =
+  /\/src\/(?:core\/controllers\/(?:jcz|lihuiyu|moshi)\/(?!driver\.ts$)|io\/(?:egv|lmc|moshi)\/)/;
 const DESKTOP_RELEASE_VERSION_ENV = 'KERFDESK_DESKTOP_VERSION';
 const BUILD_APP_VERSION = resolveBuildAppVersion(
   appVersion(),
@@ -254,10 +261,7 @@ export default defineConfig({
           if (normalized.endsWith('/src/core/text/cnc-stroke-font-data.ts')) {
             return 'cnc-stroke-fonts';
           }
-          // JCZ galvo (ADR-704): the LMC encoder, link and command sequences
-          // load with the lazy galvo panel; only the driver rides in `core`.
-          if (/\/src\/(?:core\/controllers\/jcz\/(?!driver\.ts$)|io\/lmc\/)/.test(normalized))
-            return undefined;
+          if (LAZY_CONTROLLER_LINKS.test(normalized)) return undefined;
           if (normalized.includes('/src/core/')) return 'core';
           // Worker-side parsers and decoders stay out of the boot `io` chunk:
           // a module forced into a manual chunk takes its dependencies with

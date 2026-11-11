@@ -24,7 +24,10 @@ import type { UntrackedRunRecord } from '../state/recovery/untracked-run-record'
 import { useToastStore } from '../state/toast-store';
 import type { JobReviewModel } from './job-review';
 import { createExecutionProvenance } from '../state/recovery/execution-provenance';
-import { ordinaryExecutionEvidence } from '../state/recovery/execution-workflow-evidence';
+import {
+  ordinaryExecutionEvidence,
+  type ReviewCarriedOverV2,
+} from '../state/recovery/execution-workflow-evidence';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import type { prepareCurrentStartJob } from './start-job-source';
 import { secondPassProjectEligible } from './second-pass/second-pass-eligibility';
@@ -110,6 +113,8 @@ export async function stageFreshExecutionArtifact(args: {
   readonly laserModeStartEvidence?: LaserModeStartEvidence;
   readonly cncSetupAttestation?: CncSetupAttestation;
   readonly completedReplaySourceRunId?: RunId;
+  /** Run again carried this review instead of showing it (ADR-237 Amendment 3). */
+  readonly reviewCarriedOver?: ReviewCarriedOverV2;
   /** Drains the whole-program work; the accepted run's archive yields between
    * slices so Abort and status never wait behind it (ADR-337 Amendment 1). */
   readonly run?: WorkStepsRunner;
@@ -130,6 +135,7 @@ export async function stageFreshExecutionArtifact(args: {
       ...(args.cncSetupAttestation === undefined
         ? {}
         : { cncSetupAttestation: args.cncSetupAttestation }),
+      ...(args.reviewCarriedOver === undefined ? {} : { carriedOver: args.reviewCarriedOver }),
     });
     const createdAtIso = new Date().toISOString();
     const archivedControllerObservation = createArchivedControllerObservation({

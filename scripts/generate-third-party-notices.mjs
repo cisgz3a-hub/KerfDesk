@@ -185,6 +185,8 @@ export function buildThirdPartyNotice(rootDir = REPO_ROOT) {
       .readFileSync(path.join(rootDir, 'docs/licensing/ostromoukhov-error-diffusion.txt'), 'utf8')
       .trim(),
     fs.readFileSync(path.join(rootDir, 'docs/licensing/meerk40t-balormk.txt'), 'utf8').trim(),
+    fs.readFileSync(path.join(rootDir, 'docs/licensing/meerk40t-lihuiyu.txt'), 'utf8').trim(),
+    fs.readFileSync(path.join(rootDir, 'docs/licensing/meerk40t-moshi.txt'), 'utf8').trim(),
     '== Bundled fonts ==',
     ...outlineFontSections(rootDir),
     ...cncStrokeFontSections(),

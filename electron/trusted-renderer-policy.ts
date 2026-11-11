@@ -124,8 +124,13 @@ function isAllowedNonMediaAppPermission(permission: string): boolean {
   // 'local-fonts' backs window.queryLocalFonts for System fonts... (ADR-628):
   // the renderer asks only from the operator's click, and the chosen face is
   // embedded in the project. The list itself is never stored or sent.
+  //
+  // 'usb' backs navigator.usb for the K40 and galvo lasers (ADR-702). Its
+  // chooser is main's select-usb-device, which offers only the known laser
+  // boards, and the device handler grants only the one picked.
   return (
     permission === 'serial' ||
+    permission === 'usb' ||
     permission === 'local-fonts' ||
     permission === 'screen-wake-lock' ||
     permission === 'clipboard-sanitized-write' ||

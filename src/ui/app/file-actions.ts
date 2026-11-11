@@ -228,16 +228,16 @@ export async function handleSaveGcode(
   }
   const placement = options.prebuilt?.placement ?? saveGcodePlacement(ctx);
   if (placement === null) return;
-  // File-only transports export a binary job instead of G-code text (ADR-097:
-  // Ruida .rd today). Route on the driver capability, not `controllerKind ===
-  // 'ruida'` — ADR-094 bans kind checks in ui/, and LaserWindow's sibling gate
-  // already keys on transport. selectControllerDriver normalizes an unknown kind.
-  if (await savedFileOnlyOutput(ctx, placement)) return;
+  if (await savedWithoutGcode(ctx, placement)) return;
   await saveOrdinaryGcode(ctx, placement, options.prebuilt);
 }
 
-/** True when the machine takes no G-code file, and this handled the save. */
-async function savedFileOnlyOutput(
+// File-only transports export a binary job instead of G-code text (ADR-097:
+// Ruida .rd; ADR-703: Lihuiyu .egv). Route on the driver capability, not
+// `controllerKind` — ADR-094 bans kind checks in ui/, and LaserWindow's sibling
+// gate already keys on transport. selectControllerDriver normalizes an unknown
+// kind. True when the save was handled here.
+async function savedWithoutGcode(
   ctx: SaveGcodeCtx,
   placement: Extract<ReturnType<typeof resolveExportJobPlacement>, { readonly ok: true }>,
 ): Promise<boolean> {
@@ -247,7 +247,22 @@ async function savedFileOnlyOutput(
     ctx.pushToast(GALVO_HAS_NO_FILE, 'error');
     return true;
   }
+  // A USB-link controller with no file format (ADR-705: Moshiboard) has
+  // nothing to save: its programs exist only on the link. A USB-link driver
+  // that names a fileFormat (ADR-703: Lihuiyu .egv) saves that file instead.
+  if (driver.usbLink !== undefined && driver.fileFormat === undefined) {
+    ctx.pushToast(
+      `${driver.label} has no job file to save. Run the job from Machine details over its USB link.`,
+      'warning',
+    );
+    return true;
+  }
   if (driver.capabilities.transport !== 'file-only') return false;
+  if (driver.fileFormat === 'egv') {
+    const { handleSaveEgv } = await import('./save-egv-action');
+    await handleSaveEgv(ctx, placement);
+    return true;
+  }
   const { handleSaveRd } = await import('./save-rd-action');
   await handleSaveRd(ctx, placement);
   return true;

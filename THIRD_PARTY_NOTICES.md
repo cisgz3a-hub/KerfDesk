@@ -31,6 +31,22 @@ are in `docs/licensing/photocraft-color-to-alpha.txt` and are included in the
 generated release notices. No upstream editor, artwork or fonts are bundled for
 this feature.
 
+The Lihuiyu M2/M3 Nano (K40) support (ADR-703) reimplements in TypeScript the
+LHYMicro-GL speed codes, distance encoding, packet rules and parser state
+diagram of MeerK40t (MIT, `meerk40t/lihuiyu/` at commit
+`d511944e08788e88077727f682957759884ff5ca`) and carries over its measured
+speed-code constants. The attribution, scope and full MIT notice are in
+`docs/licensing/meerk40t-lihuiyu.txt` and are included in the generated release
+notices. No MeerK40t interface, artwork or Python code is bundled.
+
+The experimental Moshiboard support (ADR-705) reimplements in TypeScript the
+Moshi protocol from MeerK40t (MIT) at commit
+`d511944e08788e88077727f682957759884ff5ca`: the command numbers, the
+command-byte bit permutation and its swizzle table, the program byte layout,
+the status codes and the send order. No MeerK40t source file is bundled. The
+attribution and full permission notice are in `docs/licensing/meerk40t-moshi.txt`
+and are included in the generated release notices.
+
 The JCZ LMC galvo support (ADR-704) is a clean-room TypeScript
 reimplementation of the protocol MeerK40t's MIT-licensed `balormk` module
 documents, at commit `d511944e08788e88077727f682957759884ff5ca`: opcode values,

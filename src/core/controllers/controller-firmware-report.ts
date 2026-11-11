@@ -31,6 +31,8 @@ export function firmwareReportQuery(driver: ControllerDriver): string | null {
       return 'M115';
     case 'ruida':
     case 'jcz-lmc':
+    case 'lihuiyu':
+    case 'moshi':
       return null;
   }
 }

@@ -51,13 +51,15 @@ export function deviceMotionLimits(
   };
 }
 
-/** Uses the same serial default as connection setup; Ruida executes an uploaded binary job. */
+/** Uses the same serial default as connection setup; Ruida, Lihuiyu and Moshi run binary jobs
+ * with no serial link, so they get no baud rate. */
 export function deviceProgramTimingOptions(
   device: DeviceProfile,
   machineKind: 'laser' | 'cnc',
   controllerKind: ControllerKind = device.controllerKind ?? 'grbl-v1.1',
 ): ProgramTimingOptions {
-  const baudRate = device.baudRate ?? selectControllerDriver(controllerKind).defaultBaudRate;
+  const driver = selectControllerDriver(controllerKind);
+  const baudRate = device.baudRate ?? driver.defaultBaudRate;
   const laserPowerControl =
     machineKind === 'laser' ? laserPowerControlForDevice(device) : undefined;
   const plannerBlocks = devicePlannerBlocks(device, controllerKind);
@@ -74,7 +76,8 @@ export function deviceProgramTimingOptions(
       ? { controllerArcToleranceMm: GRBL_DEFAULT_ARC_TOLERANCE_MM }
       : {}),
     ...(laserPowerControl === undefined ? {} : { laserPowerControl }),
-    ...(controllerKind === 'ruida' ? {} : { baudRate }),
+    // Ruida, Lihuiyu and Moshi have no serial link, so no baud rate (ADR-697, ADR-703, ADR-705).
+    ...(driver.capabilities.transport === 'serial' ? { baudRate } : {}),
     ...(plannerBlocks === undefined ? {} : { plannerBlocks }),
     ...laserModeTiming(device, machineKind, controllerKind),
   };

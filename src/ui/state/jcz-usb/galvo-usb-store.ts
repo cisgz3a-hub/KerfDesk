@@ -19,6 +19,7 @@ import {
   pauseLmcProgram,
   resumeLmcProgram,
 } from '../../../core/controllers/jcz/lmc-run';
+import { errorMessage } from '../../../core/util/error-message';
 import { GALVO_FRAME_FIRST, galvoStopOutcome } from './galvo-usb-messages';
 import { runGalvoProgram, type GalvoLive } from './galvo-usb-run';
 import type { GalvoUsbAdapter, GalvoUsbSession } from './galvo-usb-types';
@@ -102,7 +103,7 @@ async function connect(
   try {
     session = await adapter.request(LMC_DEVICE_FILTERS);
   } catch (error) {
-    set({ ...DISCONNECTED, message: errorText(error), tone: 'error' });
+    set({ ...DISCONNECTED, message: errorMessage(error), tone: 'error' });
     return;
   }
   if (session === null) {
@@ -227,10 +228,6 @@ async function abort(set: GalvoSet, get: GalvoGet): Promise<void> {
     message: galvoStopOutcome(stopped),
     tone: stopped ? 'info' : 'error',
   });
-}
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 /** Test support: forget the live link without closing it. */

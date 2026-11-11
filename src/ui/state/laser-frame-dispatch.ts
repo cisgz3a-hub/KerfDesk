@@ -1,5 +1,6 @@
 import {
   markMotionOperationDispatched,
+  withoutHeldJogFrame,
   type LaserMotionOperationId,
 } from './laser-motion-operation';
 import type { LaserState } from './laser-store';
@@ -51,7 +52,10 @@ export function dispatchQueuedMotionLine(
         state.motionOperation?.operationId === operationId &&
         state.motionOperation.mpgInterruptionId === mpgInterruptionId
           ? {
-              motionOperation: { ...state.motionOperation, cancelRequested: true },
+              motionOperation: {
+                ...withoutHeldJogFrame(state.motionOperation),
+                cancelRequested: true,
+              },
               frameVerification: null,
               framedRun: null,
               frameTrace: null,

@@ -28,11 +28,19 @@ export function PositioningLightEditor({
   readonly device: DeviceProfile;
   readonly onChange: LightChange;
 }): JSX.Element {
-  if (device.controllerKind === 'ruida') {
+  if (device.controllerKind === 'moshi') {
     return (
       <p>
-        Ruida uses file output in KerfDesk. Live positioning and light control are unavailable; use
-        the machine panel.
+        A Moshiboard has no light or pointer command KerfDesk can send. Use the switch on the
+        machine.
+      </p>
+    );
+  }
+  if (device.controllerKind === 'ruida' || device.controllerKind === 'lihuiyu') {
+    return (
+      <p>
+        This controller runs from files or its own link in KerfDesk. Live positioning and light
+        control are unavailable; use the machine panel.
       </p>
     );
   }
@@ -304,6 +312,10 @@ function commandHelp(kind: ControllerKind | undefined): string {
       return 'Ruida uses file output; operate the light from the machine panel.';
     case 'jcz-lmc':
       return 'A galvo’s red pointer is its Frame: use Frame in the Galvo USB panel.';
+    case 'lihuiyu':
+      return 'Lihuiyu boards have no light output; switch the light at the machine.';
+    case 'moshi':
+      return 'A Moshiboard has no light command; use the machine switch.';
   }
 }
 

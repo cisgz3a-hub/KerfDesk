@@ -6,6 +6,10 @@
 // recovery uses. A machine without homing is not told to home. Each action
 // clears the alarm first, which unmounts this card, so a failure after that
 // is a toast, not a line on the card (V3-P2-2).
+//
+// On a laser without homing the main action runs by itself once the alarm has
+// settled (abort-auto-restore.ts, ADR-341 Amendment 14). The card then holds
+// its buttons, and a press before that keeps the recovery with the operator.
 
 import { useState } from 'react';
 import type { ControllerKind } from '../../core/devices';
@@ -19,6 +23,7 @@ import {
   restoreOriginAfterAbort,
   setOriginHereAfterAbort,
 } from './abort-alarm-recovery';
+import { noteOperatorAbortRecovery, useAbortAutoRestoreStore } from './abort-auto-restore';
 import { reportControllerActionFailure } from './report-controller-action-failure';
 import { formatOriginMm } from './laser-recovery-origin';
 
@@ -45,11 +50,20 @@ type ActionRun = (action: () => Promise<void>, label: string, done: string) => P
 export function AbortStoppedCard(props: CardProps): JSX.Element {
   const saved = props.request.originAtStopMm ?? null;
   const homeFirst = props.homingEnabled && props.homeFromAlarm;
-  const [running, setRunning] = useState(false);
+  const [pressed, setPressed] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  // The automatic restore (ADR-341 Amendment 14) holds the buttons while it runs.
+  const autoRunning = useAbortAutoRestoreStore((auto) => auto.running === props.request);
+  const running = pressed || autoRunning;
+  // A press makes the recovery the operator's: no automatic restore after it.
+  const pressedBy = (action: () => void) => (): void => {
+    noteOperatorAbortRecovery(props.request);
+    action();
+  };
   const run: ActionRun = async (action, label, done) => {
     if (running) return;
-    setRunning(true);
+    noteOperatorAbortRecovery(props.request);
+    setPressed(true);
     setFailure(null);
     try {
       await action();
@@ -63,7 +77,7 @@ export function AbortStoppedCard(props: CardProps): JSX.Element {
         setFailure(error instanceof Error ? error.message : String(error));
       }
     } finally {
-      setRunning(false);
+      setPressed(false);
     }
   };
   return (
@@ -95,16 +109,38 @@ export function AbortStoppedCard(props: CardProps): JSX.Element {
           showHome={saved === null && homeFirst}
           canUnlock={props.canUnlock}
           running={running}
-          onHome={props.onHome}
-          onUnlock={props.onUnlock}
+          onHome={pressedBy(props.onHome)}
+          onUnlock={pressedBy(props.onUnlock)}
         />
       </div>
+      <AutoRestoreLine request={props.request} running={autoRunning} quiet={failure !== null} />
       {failure !== null && (
         <p role="alert" style={detailStyle}>
           {failure}
         </p>
       )}
     </div>
+  );
+}
+
+export const ABORT_AUTO_RESTORE_RUNNING_NOTE = 'Putting your origin back. The head does not move.';
+
+/** What the automatic restore is doing, or why it did not happen. A failure
+ *  that left the alarm in place leaves this card, and its buttons, in place. */
+function AutoRestoreLine(props: {
+  readonly request: JobStopRequest;
+  readonly running: boolean;
+  readonly quiet: boolean;
+}): JSX.Element | null {
+  const reason = useAbortAutoRestoreStore((auto) =>
+    auto.failure?.request === props.request ? auto.failure.reason : null,
+  );
+  if (props.running) return <p style={detailStyle}>{ABORT_AUTO_RESTORE_RUNNING_NOTE}</p>;
+  if (reason === null || props.quiet) return null;
+  return (
+    <p role="alert" style={detailStyle}>
+      {`Your origin was not restored automatically: ${reason} Use the buttons above.`}
+    </p>
   );
 }
 
@@ -140,9 +176,13 @@ function OriginActions(props: {
             )
           }
           title={
-            homeFirst
+            (homeFirst
               ? `Send ${home}, then write the job's origin back with one G92. The head moves to its home switches first.`
-              : `Send ${unlock}, then write the job's origin back with one G92. The head does not move.`
+              : `Send ${unlock}, then write the job's origin back with one G92. The head does not move.`) +
+            // Rolling audit v14 Z2-P3-1: on an A or Z rotary the part does turn.
+            (props.turn === undefined
+              ? ''
+              : ' Then the rotary turns the part back to where the job started.')
           }
         >
           {running ? 'Working…' : restoreLabel}

@@ -117,6 +117,7 @@ export function GalvoSetupEditor({
         Laser source{' '}
         <select
           aria-label="Galvo laser source"
+          title="The kind of laser source this galvo drives"
           value={setup.source}
           onChange={(event) => change({ source: event.target.value as GalvoLaserSource })}
         >
@@ -132,6 +133,11 @@ export function GalvoSetupEditor({
           <input
             type="checkbox"
             aria-label={`Galvo ${flag}`}
+            title={
+              flag === 'swapXY'
+                ? 'Swap the X and Y axes of the lens field'
+                : `Mirror the ${flag === 'flipX' ? 'X' : 'Y'} axis of the lens field`
+            }
             checked={setup[flag]}
             onChange={(event) => change({ [flag]: event.target.checked })}
           />{' '}
@@ -145,6 +151,7 @@ export function GalvoSetupEditor({
             type="number"
             step="any"
             aria-label={`Galvo ${field.label}`}
+            title={field.title}
             defaultValue={setup[field.key]}
             onChange={(event) => change({ [field.key]: Number(event.target.value) })}
             style={{ width: 96 }}

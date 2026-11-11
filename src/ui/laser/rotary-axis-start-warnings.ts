@@ -57,6 +57,14 @@ function abortTurnWarning(
 ): string | null {
   const axis = rotaryOutputAxis(project.device, project.machine);
   if (turned === null || turned === undefined || axis !== turned.axis) return null;
+  if (turned.restarted === true) {
+    return (
+      `The controller has restarted since the job you stopped on the rotary's ${axis} axis, so ` +
+      'KerfDesk no longer knows the turn that job started from. This job starts from the ' +
+      "part's current turn: turn the part back to where that job started by hand, or set it up " +
+      'again.'
+    );
+  }
   if (turned.since === null) {
     return (
       `KerfDesk cannot read where the rotary's ${axis} axis is since the job you stopped. This ` +

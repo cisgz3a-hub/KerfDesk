@@ -133,6 +133,8 @@ describe('DeviceSetupWizard router commit', () => {
         'Smoothieware — laser only',
         'Ruida (.rd export) — laser only',
         'JCZ LMC galvo (USB, experimental) — laser only',
+        'Lihuiyu M2/M3 Nano (K40) — laser only',
+        'Moshiboard (USB, experimental) — laser only',
       ]);
     } finally {
       await view.unmount();

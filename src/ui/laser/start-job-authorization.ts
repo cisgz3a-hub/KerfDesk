@@ -110,6 +110,9 @@ export function controllerStartPreparationStillCurrent(
   options: {
     readonly ignoreStatusState?: boolean;
     readonly ignoreAdvisoryControllerEvidence?: boolean;
+    /** Only a clean app-owned XY jog under a fixed placement may use this
+     * (ADR-565 Amendment 1). Z and every other identity stay strict. */
+    readonly ignoreXyPosition?: boolean;
   } = {},
 ): boolean {
   const offset = preparationOffset(preparedAgainst);
@@ -126,6 +129,7 @@ export function controllerStartPreparationStillCurrent(
       options.ignoreStatusState === true,
       offset,
       current.controllerSettings?.reportInches === true,
+      options.ignoreXyPosition === true ? Z_ONLY : XYZ,
     ) &&
     current.workOriginActive === preparedAgainst.workOriginActive &&
     current.workOriginSource === preparedAgainst.workOriginSource &&
@@ -158,6 +162,9 @@ function sameControllerEvidence(
 }
 
 type Axes = NonNullable<FramedRunControllerSnapshot['wcoCache']>;
+type AxisName = 'x' | 'y' | 'z';
+const XYZ: ReadonlyArray<AxisName> = ['x', 'y', 'z'];
+const Z_ONLY: ReadonlyArray<AxisName> = ['z'];
 
 function preparationOffset(
   snapshot: Pick<FramedRunControllerSnapshot, 'wcoCache' | 'workOriginActive' | 'workOriginSource'>,
@@ -176,6 +183,7 @@ function sameStartStatus(
   ignoreState: boolean,
   offset: Axes | null,
   reportInches: boolean,
+  axes: ReadonlyArray<AxisName>,
 ): boolean {
   if (current === null || preparedAgainst === null) return current === preparedAgainst;
   // WCO is an intermittent GRBL status field. The stable wcoCache is compared
@@ -184,8 +192,8 @@ function sameStartStatus(
   return (
     (ignoreState ||
       (current.state === preparedAgainst.state && current.subState === preparedAgainst.subState)) &&
-    samePositionField(current, preparedAgainst, 'mPos', offset, reportInches) &&
-    samePositionField(current, preparedAgainst, 'wPos', offset, reportInches)
+    samePositionField(current, preparedAgainst, 'mPos', offset, reportInches, axes) &&
+    samePositionField(current, preparedAgainst, 'wPos', offset, reportInches, axes)
   );
 }
 
@@ -195,12 +203,13 @@ function samePositionField(
   field: 'mPos' | 'wPos',
   offset: Axes | null,
   reportInches: boolean,
+  axes: ReadonlyArray<AxisName>,
 ): boolean {
   const left = current[field];
   const right = preparedAgainst[field];
   // Keep observed movement strict when both samples use the same field. A
   // second reported field must also agree; it cannot hide behind a stable one.
-  if ((left === null) === (right === null)) return sameAxes(left, right);
+  if ((left === null) === (right === null)) return sameAxes(left, right, axes);
   if (offset === null) return false;
   const other = field === 'mPos' ? 'wPos' : 'mPos';
   const sign = field === 'mPos' ? 1 : -1;
@@ -213,7 +222,7 @@ function samePositionField(
   // never for changed offsets or two direct observations of the same field.
   // https://github.com/gnea/grbl/blob/master/grbl/config.h
   const tick = reportInches ? 0.0001 : 0.001;
-  return (['x', 'y', 'z'] as const).every((axis) => {
+  return axes.every((axis) => {
     const a = resolvedLeft[axis];
     const b = resolvedRight[axis];
     if (offset[axis] === 0) return a === b;
@@ -236,13 +245,12 @@ function translatedPosition(position: Axes | null, offset: Axes, sign: number): 
 function sameAxes(
   current: { readonly x: number; readonly y: number; readonly z: number } | null,
   preparedAgainst: { readonly x: number; readonly y: number; readonly z: number } | null,
+  axes: ReadonlyArray<AxisName> = XYZ,
 ): boolean {
   return (
     current === preparedAgainst ||
     (current !== null &&
       preparedAgainst !== null &&
-      current.x === preparedAgainst.x &&
-      current.y === preparedAgainst.y &&
-      current.z === preparedAgainst.z)
+      axes.every((axis) => current[axis] === preparedAgainst[axis]))
   );
 }

@@ -194,11 +194,27 @@ test('renders deterministic notices for every production package and artwork ass
     'the transcribed Ostromoukhov weight table must ship its attribution',
   );
   const meerk40tNotice = fs
-    .readFileSync(path.join(REPO_ROOT, 'docs/licensing/meerk40t-balormk.txt'), 'utf8')
+    .readFileSync(path.join(REPO_ROOT, 'docs/licensing/meerk40t-lihuiyu.txt'), 'utf8')
     .trim()
     .replace(/\r\n?/g, '\n');
   assert.ok(
     first.includes(meerk40tNotice),
+    'the MeerK40t-derived Lihuiyu protocol code must ship its MIT notice',
+  );
+  const meerk40tMoshiNotice = fs
+    .readFileSync(path.join(REPO_ROOT, 'docs/licensing/meerk40t-moshi.txt'), 'utf8')
+    .trim()
+    .replace(/\r\n?/g, '\n');
+  assert.ok(
+    first.includes(meerk40tMoshiNotice),
+    'the Moshi protocol carried over from MeerK40t must ship its MIT notice',
+  );
+  const meerk40tBalormkNotice = fs
+    .readFileSync(path.join(REPO_ROOT, 'docs/licensing/meerk40t-balormk.txt'), 'utf8')
+    .trim()
+    .replace(/\r\n?/g, '\n');
+  assert.ok(
+    first.includes(meerk40tBalormkNotice),
     'the JCZ galvo protocol carried over from MeerK40t must ship its MIT notice',
   );
   assert.match(first, /Electron package license is reproduced below/);

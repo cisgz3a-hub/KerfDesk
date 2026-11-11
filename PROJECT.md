@@ -286,6 +286,13 @@ Verified end-to-end against scripted firmware simulators
   The buffered receive window is bounded by the capacity the controller reports
   (ADR-331). Policy findings are advisory in Job Review; completed Frame for the
   exact job remains the sole ordinary Start policy gate (ADRs 228/230/232/237).
+- **I.7 — Lihuiyu M2/M3 Nano, stock K40** (ADR-703): EXPERIMENTAL `.egv` export (LHYMicro-GL,
+  reimplemented from MeerK40t's MIT driver; works on the web with no driver) and a USB link through
+  the board's CH341 bridge (ADR-702) with Home, relative jog, a laser-off Frame, Start, Pause,
+  Resume, Abort and the status byte; the line-based store still treats Lihuiyu as
+  `transport: 'file-only'`. K40 profiles: 300×200 M2 Nano and M3 Nano with hardware PWM. The M2
+  has no software power control (the machine's knob sets power). Simulator-tested only; NOT
+  qualified on a real board.
 - **I.8 — JCZ LMC galvo** (ADR-704): EXPERIMENTAL fiber, MOPA, UV and CO2 galvo markers on a
   JCZ LMC (EZCad2-class) board over the ADR-702 USB link, reimplemented from MeerK40t's MIT
   `balormk`. The bed is the square lens field (origin at its centre; 110/150/200 mm profiles);
@@ -294,6 +301,11 @@ Verified end-to-end against scripted firmware simulators
   LMC list packets with a red-pointer Frame (laser never fired), Start gated on it, Pause, Resume,
   Abort and status. Image rasters, rotary and EZCad3 boards are not built. Simulator-tested only;
   NOT qualified on a real board.
+- **I.9 — Moshiboard** (ADR-705): EXPERIMENTAL live link over the CH341 USB bridge (ADR-702),
+  from MeerK40t's public Moshi module. Frame (a laser-off program), Start, Abort (estop) and Home
+  only; frame-first Start unchanged. No file export: no public Moshi file format exists. A
+  Moshiboard has no software power control, so layer power above 0 only switches the beam on.
+  Simulator-tested only; NOT qualified on hardware.
 
 **Qualification:** The 2026-09-19 audit found no reproducible physical evidence supporting
 the former Falcon hardware-verification claim. The catalogue now separates researched,
@@ -504,7 +516,7 @@ phase; tracked here so they don't get lost.
 
 ### Maintainer authority
 
-21. **Frame is the only Start guard, and the physical Frame is the spatial source of truth** (ADR-565, amending ADR-228, ADR-230, ADR-232 and ADR-237). A clean completed Frame for the unchanged footprint and placement is the sole ordinary Start authorization on laser and CNC. Power/speed edits, a settled app-owned run and a verified positioning-light travel retaining the captured job placement (ADR-605 Amendment 1) preserve that spatial evidence; a changed prepared motion envelope, placement or coordinate identity requires another Frame. Each Start reviews and claims the current exact executable program once, plus unavoidable live transport/handoff facts. Job Review remains the single warning surface. Calculated bed overhang, configured no-go zones, and controller-setting policy may inform that review but may not refuse Frame or Start. Factual transport inability, an unconstructable executable artifact, and exact-handoff inconsistency remain refusals because no valid command or matching stream can exist. No policy finding may be relabeled as one of those factual categories. The Pro licence check (ADR-540, recorded under ADR-247 by its Amendment 1) is not a Start guard: it never gates Frame, Start, output or a running job.
+21. **Frame is the only Start guard, and the physical Frame is the spatial source of truth** (ADR-565, amending ADR-228, ADR-230, ADR-232 and ADR-237). A clean completed Frame for the unchanged footprint and placement is the sole ordinary Start authorization on laser and CNC. Power/speed edits, a settled app-owned run and a verified positioning-light travel retaining the captured job placement (ADR-605 Amendment 1) preserve that spatial evidence; a changed prepared motion envelope, placement or coordinate identity requires another Frame. Each Start reviews and claims the current exact executable program once, plus unavoidable live transport/handoff facts. The one exception is **Run again** of an unchanged laser job: when its freshly built review asks nothing and shows exactly the warnings the operator accepted for the repeated run in this app and controller session, that confirmation is carried, recorded as carried, and the dialog is not shown again (ADR-237 Amendment 3). Job Review remains the single warning surface. Calculated bed overhang, configured no-go zones, and controller-setting policy may inform that review but may not refuse Frame or Start. Factual transport inability, an unconstructable executable artifact, and exact-handoff inconsistency remain refusals because no valid command or matching stream can exist. No policy finding may be relabeled as one of those factual categories. The Pro licence check (ADR-540, recorded under ADR-247 by its Amendment 1) is not a Start guard: it never gates Frame, Start, output or a running job.
 
 ---
 
@@ -710,7 +722,10 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 
 - ~~Raster engrave (Fill, Image modes).~~ **Shipped in Phase F** (F.1 Fill, F.2 Image) — no longer out of scope.
 - ~~Marlin, Smoothieware, and Ruida export.~~ **Shipped under Phase I** with
-  simulator/evidence labels; Trocen and TopWisdom remain out of scope.
+  simulator/evidence labels. ~~K40 (Lihuiyu, Moshiboard) and EZCad2 galvo.~~ **In scope under
+  ADR-702** (USB link) and its family ADRs, simulator-tested only. Trocen, TopWisdom, EZCad3
+  and BSL remain out of scope until a public protocol source or a maintainer-supplied capture
+  exists.
 - ~~Linux desktop build.~~ **Packaged under ADR-607** (AppImage and `.deb`, x64); publishing Linux downloads is ADR-613. Windows and macOS Preview packaging is in scope under ADR-247/248.
 - ~~Node editing of imported paths.~~ **Shipped as bounded node/Bezier editing** with schema-v2 canonical-curve invalidation rules (ADR-159, ADR-164); a general geometry kernel remains out of scope.
 - Boolean ops.

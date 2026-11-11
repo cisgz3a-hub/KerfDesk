@@ -32,7 +32,7 @@ export type OldProjectBurnNotice = {
   readonly cncJobOrigin: ReadonlyArray<{ readonly xMm: number; readonly yMm: number }>;
   /** A rotary project whose strokes round the part changed energy when each
    *  move's feed was matched to the surface (ADR-127 Amd 2). At most one. */
-  readonly rotaryFeed?: ReadonlyArray<{ readonly yScale: number }>;
+  readonly rotaryFeed?: ReadonlyArray<{ readonly yScale: number; readonly ratio: number }>;
 };
 
 export type LoadedProject = ProjectLoadNoticeFlags & {

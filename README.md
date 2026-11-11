@@ -27,6 +27,8 @@ fidelity**. Be specific about what that means:
 | Ruida `.rd` export | Encode→decode round-trip proven; **never accepted by a real controller** |
 | Ruida network control (desktop) | Simulator only; **never run against a real controller** |
 | JCZ LMC galvo over USB | Simulator only; **never run against a real board** |
+| Lihuiyu M2/M3 Nano (K40) `.egv` export and USB link | Simulator only; **never run against a real board** |
+| Moshiboard USB control (experimental) | Simulator only; **never run against a real Moshiboard** |
 | Laser raster/image engrave | **Not qualified.** Code + tests, plus informal use such as a photo engraving on a Neotronics 4040. |
 | **The entire CNC / router surface** | **Not qualified.** Code + tests, plus informal cuts on a Neotronics 4040. |
 | Box generator physical fit | Never cut and assembled |
@@ -165,7 +167,7 @@ Not supported: `.cdr`, Gerber, OBJ/3MF, and LightBurn `.lbzip` bundles.
 
 ## Controllers
 
-Six firmware families drive the whole app through one `ControllerDriver` seam — connect,
+Seven firmware families drive the whole app through one `ControllerDriver` seam — connect,
 identify, jog, frame, run/pause/resume/abort, recover — with output, streaming, console and UI
 capability-gated per firmware.
 
@@ -178,6 +180,8 @@ capability-gated per firmware.
 | Smoothieware | WebSerial | Simulator only |
 | Ruida | `.rd` file export; experimental UDP network link on the desktop (ADR-697) | `.rd` round-trip proven, never accepted by hardware; network link simulator only |
 | JCZ LMC galvo (fiber, MOPA, UV, CO2) | USB link (ADR-702), experimental (ADR-704); no job file | Simulator only |
+| Lihuiyu M2/M3 Nano (stock K40) | `.egv` file export; experimental USB link through the board's CH341 bridge (ADR-703) | Simulator only; never run against a real board |
+| Moshiboard | Experimental USB link (CH341), Frame/Start/Abort/Home only; no file export (ADR-705) | Simulator only |
 
 No controller family or machine is qualified. An earlier claim that the Falcon was
 hardware-verified, and that this proved the driver refactor on real hardware, was withdrawn after
@@ -192,8 +196,11 @@ Streaming is exercised end-to-end against scripted firmware simulators
 ([`src/__fixtures__/controllers/`](src/__fixtures__/controllers/) — GRBL, Marlin, Smoothieware and
 a Ruida decoder, over a fake serial port) driving the real application store rather than a mock.
 The desktop Ruida network link is exercised against a scripted Ruida UDP simulator built on that
-decoder, driving the real Ruida network store. The JCZ galvo link runs against a scripted LMC
-board behind the USB transfer calls, driving the real galvo store.
+decoder, driving the real Ruida network store. The Lihuiyu USB link is exercised against a
+simulated M2 Nano behind a USB session (LHYMicro-GL decoder, CRC, status bytes), driving the real
+Lihuiyu USB store. The Moshiboard USB link is exercised against a scripted Moshiboard that decodes
+each program with this repo's Moshi decoder, driving the real Moshi USB store. The JCZ galvo link
+runs against a scripted LMC board behind the USB transfer calls, driving the real galvo store.
 grblHAL and FluidNC ride the GRBL driver with capability deltas rather than having simulators of
 their own.
 
