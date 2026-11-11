@@ -143,3 +143,9 @@ Raster budgets are unchanged. The materialized compile holds one more burn-grid 
 (1 byte per cell) while sharpening, and the streamed one a window of up to 20 blurred rows.
 Sharpening is a per-photo engrave adjustment like its tones. It is not a Frame, Start, power,
 speed, licence or output-policy change. Physical qualification on material is separate.
+
+### Amendments
+
+- [Amendment 1](ADR-671-amendment-1-gamma-states-its-direction.md) (2026-11-12): every image Gamma
+  field states that higher gamma lightens the midtones and that LightBurn's Gamma runs the other
+  way. The convention and all burned output are unchanged (Oracle audit O6-P2-1).
