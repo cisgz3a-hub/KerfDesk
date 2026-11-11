@@ -317,6 +317,9 @@ const DXF_GEOMETRY_CODES: ReadonlySet<number> = new Set([
 // Codes that are scaled lengths in machine mm — the magnitude cap applies to
 // these (after scale). Angles/ratios/params/bulge (41/42/50/51) are not lengths.
 const DXF_SCALED_LENGTH_CODES: ReadonlySet<number> = new Set([10, 20, 11, 21, 40]);
+// On a SPLINE, code 40 is a knot value: a curve parameter, not a length, so
+// only its finiteness is checked (audit O2-P3-2).
+export const DXF_SPLINE_SCALED_LENGTH_CODES: ReadonlySet<number> = new Set([10, 20, 11, 21]);
 // Mirror SVG's coordinate cap (SVG_IMPORT_LIMITS.coordinateMagnitudeMm): a
 // finite-but-astronomical coordinate would only fault later at bed-bounds
 // preflight, so reject the entity at the import boundary like SVG does.
@@ -325,15 +328,16 @@ export const DXF_COORDINATE_MAGNITUDE_MM = 1_000_000;
 // True if any geometry-bearing tag holds a value the converters would silently
 // coerce to 0 (non-numeric) or an out-of-range magnitude — i.e. the entity
 // should be skipped and reported rather than imported as corrupt geometry.
-export function hasUnreadableGeometry(tags: ReadonlyArray<DxfTag>, scale: number): boolean {
+export function hasUnreadableGeometry(
+  tags: ReadonlyArray<DxfTag>,
+  scale: number,
+  lengthCodes: ReadonlySet<number> = DXF_SCALED_LENGTH_CODES,
+): boolean {
   for (const tag of tags) {
     if (!DXF_GEOMETRY_CODES.has(tag.code)) continue;
     const value = Number.parseFloat(tag.value);
     if (!Number.isFinite(value)) return true;
-    if (
-      DXF_SCALED_LENGTH_CODES.has(tag.code) &&
-      Math.abs(value * scale) > DXF_COORDINATE_MAGNITUDE_MM
-    ) {
+    if (lengthCodes.has(tag.code) && Math.abs(value * scale) > DXF_COORDINATE_MAGNITUDE_MM) {
       return true;
     }
   }

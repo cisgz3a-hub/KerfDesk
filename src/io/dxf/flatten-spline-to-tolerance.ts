@@ -22,6 +22,10 @@ export function flattenSplineToTolerance(
 
 // Knot insertion gives every non-empty B-spline span an exact Bezier control
 // polygon. The curve is unchanged; only its control representation changes.
+// The two domain ends are raised to multiplicity `degree` as well as the
+// interior knots: an unclamped knot vector (a periodic or "uniform" spline,
+// which AutoCAD writes for every closed spline by default) does not start or
+// end on a control point, so its end spans are not Bezier pieces until then.
 function bezierPieces(spline: SplineData, domainStart: number, domainEnd: number): BezierPiece[] {
   const degree = spline.degree;
   let knots = [...spline.knots];
@@ -30,7 +34,7 @@ function bezierPieces(spline: SplineData, domainStart: number, domainEnd: number
     return { x: point.x * weight, y: point.y * weight, w: weight };
   });
   const interior = [...new Set(knots.filter((knot) => knot > domainStart && knot < domainEnd))];
-  for (const knot of interior) {
+  for (const knot of [domainStart, ...interior, domainEnd]) {
     while (multiplicity(knots, knot) < degree) {
       ({ knots, controls } = insertKnot(knots, controls, degree, knot));
     }
@@ -40,6 +44,7 @@ function bezierPieces(spline: SplineData, domainStart: number, domainEnd: number
     const start = knots[span] as number;
     const end = knots[span + 1] as number;
     if (!(end - start > DOMAIN_EPSILON)) continue;
+    if (start < domainStart - DOMAIN_EPSILON || end > domainEnd + DOMAIN_EPSILON) continue;
     const controlsForSpan = controls.slice(span - degree, span + 1);
     if (controlsForSpan.length === degree + 1) pieces.push(controlsForSpan);
   }
@@ -56,7 +61,7 @@ function insertKnot(
   degree: number,
   knot: number,
 ): { readonly knots: number[]; readonly controls: HomogeneousPoint[] } {
-  const span = findSpan(knots, degree, controls.length, knot);
+  const span = insertionSpan(knots, knot);
   const existingMultiplicity = multiplicity(knots, knot);
   const nextControls: HomogeneousPoint[] = [];
   for (let i = 0; i <= span - degree; i += 1) nextControls.push(controls[i] as HomogeneousPoint);
@@ -140,22 +145,11 @@ function distanceToSegment(point: Vec2, a: Vec2, b: Vec2): number {
   return Math.hypot(point.x - (a.x + t * dx), point.y - (a.y + t * dy));
 }
 
-function findSpan(
-  knots: ReadonlyArray<number>,
-  degree: number,
-  controlPointCount: number,
-  u: number,
-): number {
-  const last = controlPointCount - 1;
-  if (u >= (knots[controlPointCount] as number)) return last;
-  if (u <= (knots[degree] as number)) return degree;
-  let low = degree;
-  let high = controlPointCount;
-  let mid = Math.floor((low + high) / 2);
-  while (u < (knots[mid] as number) || u >= (knots[mid + 1] as number)) {
-    if (u < (knots[mid] as number)) high = mid;
-    else low = mid;
-    mid = Math.floor((low + high) / 2);
-  }
-  return mid;
+// Boehm insertion (Piegl & Tiller A5.1) needs the LAST span whose start is at
+// or below the knot: for a repeated knot that is its last copy. Searching from
+// the end also covers the domain end, which lies inside no domain span.
+function insertionSpan(knots: ReadonlyArray<number>, knot: number): number {
+  let span = knots.length - 2;
+  while (span > 0 && (knots[span] as number) > knot + DOMAIN_EPSILON) span -= 1;
+  return span;
 }

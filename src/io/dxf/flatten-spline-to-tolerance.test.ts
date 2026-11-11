@@ -114,4 +114,91 @@ describe('flattenSplineToTolerance', () => {
       distanceToPolyline({ x: spanCount - 0.5, y: 5 }, sampledPoints(spline)),
     ).toBeLessThanOrEqual(0.025 + 1e-9);
   });
+
+  // Oracle O2-P1-1: the closed form of a uniform cubic B-spline, not this
+  // module. With integer knots, the curve at knot k is
+  // (P[k-3] + 4 P[k-2] + P[k-1]) / 6 and halfway to the next knot it is
+  // (P[k-3] + 23 P[k-2] + 23 P[k-1] + P[k]) / 48. An unclamped curve does not
+  // start or end on a control point.
+  function uniformCubicOracle(controls: ReadonlyArray<Vec2>): Vec2[] {
+    const at = (index: number) => controls[index] as Vec2;
+    const points: Vec2[] = [];
+    for (let k = 3; k < controls.length; k += 1) {
+      points.push({
+        x: (at(k - 3).x + 4 * at(k - 2).x + at(k - 1).x) / 6,
+        y: (at(k - 3).y + 4 * at(k - 2).y + at(k - 1).y) / 6,
+      });
+      points.push({
+        x: (at(k - 3).x + 23 * at(k - 2).x + 23 * at(k - 1).x + at(k).x) / 48,
+        y: (at(k - 3).y + 23 * at(k - 2).y + 23 * at(k - 1).y + at(k).y) / 48,
+      });
+    }
+    const last = controls.length;
+    points.push({
+      x: (at(last - 3).x + 4 * at(last - 2).x + at(last - 1).x) / 6,
+      y: (at(last - 3).y + 4 * at(last - 2).y + at(last - 1).y) / 6,
+    });
+    return points;
+  }
+
+  it('starts and ends an open unclamped (uniform) cubic where the B-spline does', () => {
+    const controlPoints = [
+      { x: 0, y: 0 },
+      { x: 30, y: 60 },
+      { x: 60, y: -30 },
+      { x: 90, y: 30 },
+      { x: 120, y: 0 },
+    ];
+    const points = sampledPoints({
+      degree: 3,
+      knots: [0, 1, 2, 3, 4, 5, 6, 7, 8],
+      controlPoints,
+      weights: [],
+      closed: false,
+    });
+    const oracle = uniformCubicOracle(controlPoints);
+    expect(points[0]?.x).toBeCloseTo(oracle[0]?.x as number, 9);
+    expect(points[0]?.y).toBeCloseTo(oracle[0]?.y as number, 9);
+    expect(points.at(-1)?.x).toBeCloseTo(oracle.at(-1)?.x as number, 9);
+    expect(points.at(-1)?.y).toBeCloseTo(oracle.at(-1)?.y as number, 9);
+    for (const point of oracle) {
+      expect(distanceToPolyline(point, points)).toBeLessThanOrEqual(0.025 + 1e-9);
+    }
+  });
+
+  it('closes a periodic cubic written with wrapped controls and unclamped knots', () => {
+    // How ezdxf's set_closed() and AutoCAD's default closed SPLINE store a
+    // periodic curve: the first `degree` controls repeated at the end and a
+    // uniform knot vector with no repeated end knots.
+    const square = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+    ];
+    const controlPoints = [...square, ...square.slice(0, 3)];
+    const points = sampledPoints({
+      degree: 3,
+      knots: Array.from({ length: controlPoints.length + 4 }, (_, index) => index),
+      controlPoints,
+      weights: [],
+      closed: true,
+    });
+    const oracle = uniformCubicOracle(controlPoints);
+    expect(points[0]?.x).toBeCloseTo(25 / 3, 9);
+    expect(points[0]?.y).toBeCloseTo(5 / 3, 9);
+    expect(
+      Math.hypot(
+        (points.at(-1)?.x as number) - (points[0]?.x as number),
+        (points.at(-1)?.y as number) - (points[0]?.y as number),
+      ),
+    ).toBeLessThan(1e-9);
+    for (const point of oracle) {
+      expect(distanceToPolyline(point, points)).toBeLessThanOrEqual(0.025 + 1e-9);
+    }
+    // The curve stays inside the control square's hull (x in [5/12, 115/12]).
+    const xs = points.map((point) => point.x);
+    expect(Math.min(...xs)).toBeGreaterThan(0.4);
+    expect(Math.max(...xs)).toBeLessThan(9.6);
+  });
 });
