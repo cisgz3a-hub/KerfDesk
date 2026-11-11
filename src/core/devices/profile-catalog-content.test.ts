@@ -19,6 +19,8 @@ const RECORDED: Readonly<Record<string, string>> = {
   'generic-marlin-laser': '2026-09-19 33d9199ef3c16b7d',
   'generic-ruida-rd-export': '2026-09-19 6aaf6ae9e05882e6',
   'generic-smoothieware': '2026-09-19 9237f81b2f61a647',
+  'k40-lihuiyu-m2-nano': '2026-11-11 e068084438639369',
+  'k40-lihuiyu-m3-nano-pwm': '2026-11-11 e160944194be6d3e',
   'neotronics-4040-max-lt4lds-v2-20w': '2026-09-19 e822e875ef5fa911',
   'ortur-laser-master-3': '2026-10-22 996224e3d8a6eee3',
   'ortur-laser-master-3-20w': '2026-10-22 2cbaf7e39bcb8523',

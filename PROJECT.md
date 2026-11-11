@@ -286,6 +286,13 @@ Verified end-to-end against scripted firmware simulators
   The buffered receive window is bounded by the capacity the controller reports
   (ADR-331). Policy findings are advisory in Job Review; completed Frame for the
   exact job remains the sole ordinary Start policy gate (ADRs 228/230/232/237).
+- **I.7 — Lihuiyu M2/M3 Nano, stock K40** (ADR-703): EXPERIMENTAL `.egv` export (LHYMicro-GL,
+  reimplemented from MeerK40t's MIT driver; works on the web with no driver) and a USB link through
+  the board's CH341 bridge (ADR-702) with Home, relative jog, a laser-off Frame, Start, Pause,
+  Resume, Abort and the status byte; the line-based store still treats Lihuiyu as
+  `transport: 'file-only'`. K40 profiles: 300×200 M2 Nano and M3 Nano with hardware PWM. The M2
+  has no software power control (the machine's knob sets power). Simulator-tested only; NOT
+  qualified on a real board.
 
 **Qualification:** The 2026-09-19 audit found no reproducible physical evidence supporting
 the former Falcon hardware-verification claim. The catalogue now separates researched,

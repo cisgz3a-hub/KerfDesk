@@ -24,10 +24,11 @@ export function selectOutputStrategy(device: DeviceProfile): AnyOutputStrategy {
     case 'fluidnc':
     case undefined:
       return grblStrategy;
-    // Ruida output is NOT G-code — Save routes to the binary .rd encoder
+    // Ruida and Lihuiyu output is NOT G-code (.rd, .egv) — Save routes to the binary .rd encoder
     // (io/rd) before any strategy runs. The GRBL emitter here only feeds
     // the on-screen preview/estimate pipeline fallback.
     case 'ruida':
+    case 'lihuiyu':
       return grblStrategy;
     default:
       return assertNeverControllerKind(kind);

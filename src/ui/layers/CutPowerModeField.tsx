@@ -14,6 +14,14 @@ export function CutPowerModeField(props: {
       </p>
     );
   }
+  if (props.controllerKind === 'lihuiyu') {
+    return (
+      <p className="lf-subheading">
+        A Lihuiyu M2 Nano has no software power control: the machine&apos;s current knob sets the
+        power. An M3 with hardware PWM takes this layer power as one value per layer.
+      </p>
+    );
+  }
   if (props.controllerKind === 'ruida') {
     return (
       <p className="lf-subheading">

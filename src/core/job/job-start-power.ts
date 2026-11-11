@@ -20,6 +20,8 @@ export function vectorPowerReachesController(power: number, device?: DeviceProfi
   if (!(power > 0)) return false;
   if (device === undefined) return true;
   if (device.controllerKind === 'ruida') return encodePower14(power).some((byte) => byte !== 0);
+  // A Lihuiyu board fires every layer above 0 % (ADR-703).
+  if (device.controllerKind === 'lihuiyu') return true;
   // Smoothie and Marlin fan emission use their raster compilation ranges;
   // GRBL's canonical scaleS retains its own fractional-range rounding.
   const scale =

@@ -99,6 +99,19 @@ export function machineSetupControllerGuide(
           'Set laser_module_maximum_s_value 1.0 (Full-power S stays 1): Smoothieware stores every S word in 12-bit 1.11 fixed point, so any S of 2 or more wraps and fires far below the requested power. Set laser_module_enable true and laser_module_minimum_power 0 for dark S0 feed moves. Edit the config through the Smoothieware USB/SD workflow, then reset and reconnect.',
       };
     case 'ruida':
+    case 'lihuiyu':
+      return linkGuide(kind, common);
+  }
+}
+
+// Controllers outside the line-based store: Ruida files (ADR-097, ADR-697) and
+// the Lihuiyu .egv export and USB link (ADR-703).
+function linkGuide(
+  kind: 'ruida' | 'lihuiyu',
+  common: ReturnType<typeof commonControllerGuide>,
+): MachineSetupControllerGuide {
+  switch (kind) {
+    case 'ruida':
       return {
         ...common,
         identityCommands: [],
@@ -107,6 +120,16 @@ export function machineSetupControllerGuide(
         writePolicy: 'file-only',
         writeExplanation:
           'This build exports files for Ruida. Connection, jogging, reads, and firmware writes are unavailable.',
+      };
+    case 'lihuiyu':
+      return {
+        ...common,
+        identityCommands: [],
+        settingsCommands: [],
+        configurationSurface: 'Board model and the machine current knob',
+        writePolicy: 'file-only',
+        writeExplanation:
+          'Lihuiyu boards hold no settings to read or write. Save .egv files, or use the experimental, simulator-tested USB link under Machine details.',
       };
   }
 }
@@ -128,7 +151,7 @@ function commonControllerGuide(kind: ControllerKind, driver: ControllerDriver) {
 }
 
 export function machineSetupControllerGuides(): ReadonlyArray<MachineSetupControllerGuide> {
-  return (['grbl-v1.1', 'grblhal', 'fluidnc', 'marlin', 'smoothieware', 'ruida'] as const).map(
-    (kind) => machineSetupControllerGuide(kind),
-  );
+  return (
+    ['grbl-v1.1', 'grblhal', 'fluidnc', 'marlin', 'smoothieware', 'ruida', 'lihuiyu'] as const
+  ).map((kind) => machineSetupControllerGuide(kind));
 }

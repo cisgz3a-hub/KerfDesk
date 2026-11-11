@@ -225,18 +225,29 @@ export async function handleSaveGcode(
   }
   const placement = options.prebuilt?.placement ?? saveGcodePlacement(ctx);
   if (placement === null) return;
-  // File-only transports export a binary job instead of G-code text (ADR-097:
-  // Ruida .rd today). Route on the driver capability, not `controllerKind ===
-  // 'ruida'` — ADR-094 bans kind checks in ui/, and LaserWindow's sibling gate
-  // already keys on transport. selectControllerDriver normalizes an unknown kind.
-  if (
-    selectControllerDriver(ctx.project.device.controllerKind).capabilities.transport === 'file-only'
-  ) {
-    const { handleSaveRd } = await import('./save-rd-action');
-    await handleSaveRd(ctx, placement);
-    return;
-  }
+  if (await savedWithoutGcode(ctx, placement)) return;
   await saveOrdinaryGcode(ctx, placement, options.prebuilt);
+}
+
+// File-only transports export a binary job instead of G-code text (ADR-097:
+// Ruida .rd; ADR-703: Lihuiyu .egv). Route on the driver capability, not
+// `controllerKind` — ADR-094 bans kind checks in ui/, and LaserWindow's sibling
+// gate already keys on transport. selectControllerDriver normalizes an unknown
+// kind. True when the save was handled here.
+async function savedWithoutGcode(
+  ctx: SaveGcodeCtx,
+  placement: Extract<ReturnType<typeof resolveExportJobPlacement>, { readonly ok: true }>,
+): Promise<boolean> {
+  const driver = selectControllerDriver(ctx.project.device.controllerKind);
+  if (driver.capabilities.transport !== 'file-only') return false;
+  if (driver.fileFormat === 'egv') {
+    const { handleSaveEgv } = await import('./save-egv-action');
+    await handleSaveEgv(ctx, placement);
+    return true;
+  }
+  const { handleSaveRd } = await import('./save-rd-action');
+  await handleSaveRd(ctx, placement);
+  return true;
 }
 
 async function saveOrdinaryGcode(

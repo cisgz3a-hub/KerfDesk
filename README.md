@@ -26,6 +26,7 @@ fidelity**. Be specific about what that means:
 | FluidNC · Marlin · Smoothieware | Simulator-verified only |
 | Ruida `.rd` export | Encode→decode round-trip proven; **never accepted by a real controller** |
 | Ruida network control (desktop) | Simulator only; **never run against a real controller** |
+| Lihuiyu M2/M3 Nano (K40) `.egv` export and USB link | Simulator only; **never run against a real board** |
 | Laser raster/image engrave | **Not qualified.** Code + tests, plus informal use such as a photo engraving on a Neotronics 4040. |
 | **The entire CNC / router surface** | **Not qualified.** Code + tests, plus informal cuts on a Neotronics 4040. |
 | Box generator physical fit | Never cut and assembled |
@@ -164,7 +165,7 @@ Not supported: `.cdr`, Gerber, OBJ/3MF, and LightBurn `.lbzip` bundles.
 
 ## Controllers
 
-Six firmware families drive the whole app through one `ControllerDriver` seam — connect,
+Seven firmware families drive the whole app through one `ControllerDriver` seam — connect,
 identify, jog, frame, run/pause/resume/abort, recover — with output, streaming, console and UI
 capability-gated per firmware.
 
@@ -176,6 +177,7 @@ capability-gated per firmware.
 | Marlin | WebSerial | Simulator only |
 | Smoothieware | WebSerial | Simulator only |
 | Ruida | `.rd` file export; experimental UDP network link on the desktop (ADR-697) | `.rd` round-trip proven, never accepted by hardware; network link simulator only |
+| Lihuiyu M2/M3 Nano (stock K40) | `.egv` file export; experimental USB link through the board's CH341 bridge (ADR-703) | Simulator only; never run against a real board |
 
 No controller family or machine is qualified. An earlier claim that the Falcon was
 hardware-verified, and that this proved the driver refactor on real hardware, was withdrawn after
@@ -183,14 +185,16 @@ the 2026-09-19 audit found no reproducible evidence for it; see ADR-322 in
 [`DECISIONS.md`](DECISIONS.md).
 
 Output dialects: `grbl-compatible`, `grbl-dynamic`, `grbl-raster`, `neotronics-4040-safe`, plus
-`marlin-inline` (LASER_FEATURE) and `marlin-fan` (fan-mosfet). Eighteen device profiles and nine
+`marlin-inline` (LASER_FEATURE) and `marlin-fan` (fan-mosfet). Twenty device profiles and nine
 CNC machine presets ship in the catalog.
 
 Streaming is exercised end-to-end against scripted firmware simulators
 ([`src/__fixtures__/controllers/`](src/__fixtures__/controllers/) — GRBL, Marlin, Smoothieware and
 a Ruida decoder, over a fake serial port) driving the real application store rather than a mock.
 The desktop Ruida network link is exercised against a scripted Ruida UDP simulator built on that
-decoder, driving the real Ruida network store.
+decoder, driving the real Ruida network store. The Lihuiyu USB link is exercised against a
+simulated M2 Nano behind a USB session (LHYMicro-GL decoder, CRC, status bytes), driving the real
+Lihuiyu USB store.
 grblHAL and FluidNC ride the GRBL driver with capability deltas rather than having simulators of
 their own.
 

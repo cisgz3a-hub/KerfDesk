@@ -257,9 +257,9 @@ function assertCentreLightAvailable(framed = false): void {
   const issue = devicePositioningLightIssue(project.device);
   if (project.device.positioningLight === undefined || issue !== null)
     throw new Error(issue ?? 'Set up the separate positioning light in Machine Setup first.');
-  if (project.device.controllerKind === 'ruida')
+  if (project.device.controllerKind === 'ruida' || project.device.controllerKind === 'lihuiyu')
     throw new Error(
-      'Ruida is file export only. Position the head and switch its light at the machine.',
+      'This controller has no live light control. Position the head and switch its light at the machine.',
     );
   if (machineKindOf(project.machine) !== 'laser')
     throw new Error('Centre & LED is available in Laser mode.');

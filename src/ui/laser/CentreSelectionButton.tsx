@@ -25,7 +25,8 @@ export function CentreSelectionButton({
   const { targets, target, chooseTarget } = useArtworkLightChoice();
   const laserMode = machineKindOf(project.machine) === 'laser';
   const needsSetup = positioningSetupNeeded(project.device);
-  const fileOnly = project.device.controllerKind === 'ruida';
+  const fileOnly =
+    project.device.controllerKind === 'ruida' || project.device.controllerKind === 'lihuiyu';
   const lightEnabled = useLaserStore((state) => state.positioningLightEnabled);
   // Centring puts the dot out before it moves, so the dot's own latch is no block.
   const machineBlocked = useLaserStore((state) =>
