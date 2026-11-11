@@ -83,7 +83,9 @@ ADR-490 Amendment 2. ADR-663 Amendment 6 does the same for the camera-moved chec
   checks that:
   - the overlay drew the stream and the still;
   - the window never shrank a picture or read a camera-sized picture's pixels;
-  - no UI task ran over 50 ms;
+  - no UI task ran over 50 ms. The job first runs alone for 8 s as a control. On a shared CI runner,
+    which streams the job itself with 50–84 ms tasks, the ceiling is the larger of 100 ms and the
+    control's worst task: an in-window 4K shrink is 118–243 ms;
   - the job was still streaming throughout.
 - `src/ui/camera/overlay/machine-frame-feed-worker.test.ts`: a 4K picture is shrunk in the worker
   and never in the window, a 1,920 px picture is not shrunk for a 1,917 px canvas, and a picture is
