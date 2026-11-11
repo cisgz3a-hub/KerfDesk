@@ -74,11 +74,12 @@ export async function transmitPreparedStart(input: {
   };
   // Observe before the first possible stream transition. A short program may
   // settle while startJob or recovery persistence is still awaiting a write.
-  const advancement = armVariableStreamAdvancement(
-    input.args.project,
-    input.runId,
-    input.args.outputScope,
-  );
+  // A painted second pass re-burns a finished part: it consumes nothing
+  // (oracle audit O1, O5-P3-5).
+  const advancement =
+    input.args.prepared.laserSecondPassChain === undefined
+      ? armVariableStreamAdvancement(input.args.project, input.runId, input.args.outputScope)
+      : { accept: () => undefined, cancel: () => undefined };
   const jigCompletion =
     input.args.prepared.laserSecondPassChain === undefined
       ? armRegistrationJigCompletion({

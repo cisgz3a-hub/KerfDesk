@@ -139,3 +139,44 @@ describe('halftone tone tracking', () => {
     }
   });
 });
+
+// O6-P3-1 (ADR-242 Amendment 2): a typed fractional pitch reached the screen
+// as-is. On the axes the threshold array then did not apply and coverage
+// missed ink by up to 11%; solid black kept white rows. Pitch is whole pixels.
+describe('fractional pitch', () => {
+  it('keeps solid black solid on a fractional line pitch at 0 degrees', () => {
+    const doc = createRgbaBuffer(64, 64);
+    fill(doc, 0);
+    halftoneScreenInPlace(doc, { spacingPx: 6.4, angleDeg: 0, shape: 'line' }, null, null);
+    expect(blackRatio(doc)).toBe(1);
+  });
+
+  it.each([
+    [4.5, 'line'],
+    [8.5, 'line'],
+    [4.5, 'dot'],
+    [7.07, 'dot'],
+  ] as const)('screens pitch %s (%s) exactly as its whole-pixel pitch', (pitch, shape) => {
+    for (const angleDeg of [0, 45, 90]) {
+      for (const grey of [32, 128, 200]) {
+        const typed = createRgbaBuffer(60, 60);
+        const whole = createRgbaBuffer(60, 60);
+        fill(typed, grey);
+        fill(whole, grey);
+        halftoneScreenInPlace(typed, { spacingPx: pitch, angleDeg, shape }, null, null);
+        const rounded = Math.round(pitch);
+        halftoneScreenInPlace(whole, { spacingPx: rounded, angleDeg, shape }, null, null);
+        expect(typed.data).toEqual(whole.data);
+      }
+    }
+  });
+
+  it('tracks ink within one threshold step at 0 degrees for a typed 4.5 px line pitch', () => {
+    for (const grey of [16, 64, 128, 191, 240]) {
+      const doc = createRgbaBuffer(60, 60);
+      fill(doc, grey);
+      halftoneScreenInPlace(doc, { spacingPx: 4.5, angleDeg: 0, shape: 'line' }, null, null);
+      expect(Math.abs(blackRatio(doc) - (1 - grey / 255))).toBeLessThanOrEqual(1 / 25);
+    }
+  });
+});
