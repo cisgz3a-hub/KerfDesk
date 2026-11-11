@@ -11,6 +11,7 @@
 import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore, type LaserState } from '../state/laser-store';
+import { unlockPositionVerdict } from '../state/position-kept-alarm';
 import { isProbeFailureAlarm } from '../state/probe-failure-alarm';
 import { useToastStore } from '../state/toast-store';
 import { repairFailed, settleThenRetry, type BlockedStartRepair } from './start-blocked-repair';
@@ -36,6 +37,19 @@ export const PROBE_UNLOCK_OFFER_PROMPT =
   'Unlock clears the alarm. A failed probe keeps the machine position and the work ' +
   'origin, so Frame can continue. Only continue if the head is safe where it is and the ' +
   'touch plate is out of the way.\n\n' +
+  'OK: unlock now and continue when the controller is Idle.\n' +
+  'Cancel: leave it blocked.';
+
+// An alarm the firmware raises only after a controlled stop, a soft limit above
+// all, keeps the machine position too (position-kept-alarm.ts, ADR-367
+// Amendment 3). The reset a soft limit asks for clears an origin set with Set
+// origin here on stock GRBL, so the prompt promises the position, not the
+// origin; a missing origin is the Frame's next refusal.
+export const POSITION_KEPT_UNLOCK_OFFER_PROMPT =
+  'The controller is in Alarm.\n\n' +
+  'Unlock clears the alarm. The controller stopped the machine under control before this ' +
+  'alarm, so it still knows where the head is and Frame can continue. If a reset cleared ' +
+  'your origin, Frame asks for it next. Only continue if the head is safe where it is.\n\n' +
   'OK: unlock now and continue when the controller is Idle.\n' +
   'Cancel: leave it blocked.';
 
@@ -106,20 +120,22 @@ function isGrblHalEStopAlarm(laser: LaserState): boolean {
 // it (controllerUnlockedPatch), so no Frame or Start can continue straight
 // from here: hand the operator the one step that can. After a failed probe,
 // Unlock leaves a trusted position and the origin as they were, so the Frame
-// goes on once the controller reports Idle.
+// goes on once the controller reports Idle. So it does after an alarm that
+// keeps the position (a soft limit), when the Unlock did keep it.
 async function offerUnlock(): Promise<BlockedStartRepair> {
   const laser = useLaserStore.getState();
   if (!laser.capabilities.unlock) return 'unrepaired';
-  const keepsPosition =
-    isProbeFailureAlarm(laser.alarmCode) && laser.positionEvidenceSuppressed !== true;
-  if (!jobAwareConfirm(keepsPosition ? PROBE_UNLOCK_OFFER_PROMPT : UNLOCK_OFFER_PROMPT)) {
-    return 'unrepaired';
-  }
+  const prompt = unlockOfferPrompt(laser);
+  if (!jobAwareConfirm(prompt)) return 'unrepaired';
   try {
     await useLaserStore.getState().unlockAlarm();
   } catch (cause) {
     return repairFailed('Unlock failed', cause);
   }
+  // The Unlock itself decides (controllerUnlockedPatch): a restart between the
+  // prompt and its reply hides the position after all.
+  const keepsPosition =
+    prompt !== UNLOCK_OFFER_PROMPT && useLaserStore.getState().positionEvidenceSuppressed !== true;
   if (keepsPosition) {
     return settleThenRetry(
       (state) => state.alarmCode === null && state.statusReport?.state === 'Idle',
@@ -129,6 +145,16 @@ async function offerUnlock(): Promise<BlockedStartRepair> {
   }
   useToastStore.getState().pushToast(UNLOCKED_NEXT_STEP_MESSAGE, 'info');
   return 'handled';
+}
+
+// Which Unlock is on offer: after a failed probe, after another alarm that
+// keeps the position, or the one that hands over to Set origin here.
+function unlockOfferPrompt(laser: LaserState): string {
+  if (laser.positionEvidenceSuppressed === true) return UNLOCK_OFFER_PROMPT;
+  if (isProbeFailureAlarm(laser.alarmCode)) return PROBE_UNLOCK_OFFER_PROMPT;
+  return unlockPositionVerdict(laser, laser.alarmCode).kept
+    ? POSITION_KEPT_UNLOCK_OFFER_PROMPT
+    : UNLOCK_OFFER_PROMPT;
 }
 
 async function offerHomeCycle(): Promise<BlockedStartRepair> {

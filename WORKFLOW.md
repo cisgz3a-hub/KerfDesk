@@ -2796,6 +2796,21 @@ minimum target size.
 
 #### Success — unlock
 1. User clicks **$X — Unlock**. App writes `$X\n`. Alarm cleared from UI.
+2. Unlock hides the head position and the work origin only when the alarm it clears can have lost
+   them (ADR-367 Amendment 3). After a soft limit (`ALARM:2`), a failed probe (`ALARM:4` or `5`)
+   or FluidNC's G-code error (`ALARM:17`) the controller stopped the machine under control, so
+   the position and the work offset it reports stay shown, from the rail, the Frame offer and a
+   Console `$X` alike. A soft limit first needs **Reset (Ctrl-X)**; stock GRBL clears an origin
+   set with Set origin here at that reset, grblHAL keeps it. Home, work-Z and Frame evidence are
+   cleared either way.
+3. After any other alarm, an alarm with no code on record (the power-on lock of a machine that
+   must home, or a lock KerfDesk connected into), a soft limit raised during a hold, or one
+   followed by a new connection or a restart KerfDesk did not send, the position stays hidden
+   until Home, Set origin here, a probe or a reconnect. The Console log says which case applied.
+4. While it is hidden, nothing asks the operator to wait for a report. Frame, Move to position
+   (**Go** and **Use current**), the status panel's `Origin:` row and the disabled **Fire**
+   button's tooltip all say: Home the machine (only on a profile with homing), or move the head
+   to where the job should start and use Set origin here.
 
 #### Edge — reset required
 1. After a critical event (hard or soft limit, E-stop, motor fault) the controller accepts only a
@@ -3822,7 +3837,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    Alarm (ADR-367), except a grblHAL E-stop alarm, which must be released first; after Unlock
    the operator sets the origin again, since Unlock does not restore the machine position.
    After a failed probe (ALARM:4 or 5) nothing was lost, so the Frame unlocks and continues
-   once the controller reports Idle (ADR-375).
+   once the controller reports Idle (ADR-375). The same holds after another alarm that keeps
+   the machine position, a soft limit (ALARM:2) above all: the offer says the controller still
+   knows where the head is, and a missing origin is then the Frame's next question (ADR-367
+   Amendment 3).
    A job placed at the head's current position does not frame on after Home, because the cycle
    parks the head at the switches: the Frame stops and asks the operator to jog the head back
    into place and Frame again (ADR-367 Amendment 1).
@@ -4980,7 +4998,9 @@ Y on machine X0 Y0 or work zero until they are typed.
 name (blank gives Position N; the same name replaces the old entry) in the machine profile, so it
 travels with the profile and the project and is one undo step. Each saved row has **Go** and
 **Delete**. Go needs a connected, Idle machine, like the jog arrows; a missing work offset for a
-From origin move is a notice and nothing moves.
+From origin move is a notice and nothing moves. While KerfDesk hides the position after Unlock
+or Release motors, Go and Use current say to Home the machine (on a profile with homing) or to
+move the head to the start and use Set origin here, and nothing moves (ADR-367 Amendment 3).
 
 **After a job** (Machine Setup's laser step, ADR-493; LightBurn's Finish Position) sets where a laser
 job leaves the head: **Go to the work origin** (the default, which stores nothing; a Current
@@ -5093,7 +5113,9 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
    clears `wcoCache`; the status row reads "Origin: not reported yet" until
    the next WCO-bearing report shows what remains ("machine 0,0" unless a
    G54 offset is stored or grblHAL kept the G92, which then reads "reported
-   by controller"). A failed probe
+   by controller"). After an Unlock that hides the position the row reads
+   "unknown (Home, or jog to the start and Set origin here)", without Home
+   on a machine that has none (ADR-367 Amendment 3). A failed probe
    (ALARM:4 or 5) keeps the origin (ADR-375). User re-jogs and re-sets if
    they want the offset back.
 5. **Off-bed risk.** Operator sets origin near the bed edge, then
