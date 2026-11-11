@@ -27,7 +27,8 @@ import {
   type MoshiBounds,
   type MoshiStep,
 } from './moshi-units';
-import { planCutGroupSteps, planFillGroupSteps } from './moshi-vector-plan';
+import { planFillGroupSteps } from './moshi-fill-plan';
+import { planCutGroupSteps } from './moshi-vector-plan';
 
 /** Raster speed is one byte of cm/s (builder.py L408-411). */
 const MOSHI_RASTER_SPEED_MAX_MM_S = 2560;
@@ -98,7 +99,7 @@ function planGroup(
   notes: Set<string>,
 ): MoshiStep[] {
   if (group.kind === 'cut') return planCutGroupSteps(group);
-  if (group.kind === 'fill') return planFillGroupSteps(group);
+  if (group.kind === 'fill') return planFillGroupSteps(group, device);
   const raster = planRasterGroupSteps(group, device);
   if (raster.greyLevels)
     notes.add(
