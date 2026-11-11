@@ -146,3 +146,6 @@ Review, licences and output policy are unchanged.
 **Amendment 1 (2026-11-02):** [a recipe's Auto tones wait for the preview, read only the pixels
 that burn, and light marks say how to keep a background](ADR-685-amendment-1-recipe-tones-wait-for-the-preview.md):
 fixes rolling audit v9 R8-P2-3, R8-P3-1 and R8-P3-2.
+
+**Amendment 2 (2026-11-12):** [Auto tones round toward the clip](ADR-685-amendment-2-auto-tones-round-toward-the-clip.md):
+fixes Oracle audit O6-P3-2.
