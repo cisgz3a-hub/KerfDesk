@@ -1,7 +1,7 @@
 // The Moshi USB store (ADR-705) driving the scripted Moshiboard: Frame-first
 // Start, a laser-off Frame, Start sending exactly the encoded programs, Abort
 // mid-run with the estop, and the factual refusals. Simulator only.
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   MoshiSimulator,
   type MoshiSimulatorScript,
@@ -195,6 +195,16 @@ describe('Moshi USB store', () => {
     await ctx.store.getState().frame(compiled());
     expect(ctx.store.getState().phase).toBe('disconnected');
     expect(ctx.store.getState().message).toContain('may still be running');
+  });
+
+  it('runs the job completion (variable advance) once the job finishes, not after a Frame', async () => {
+    const { store } = await connected();
+    const completed = vi.fn();
+    const job = { ...compiled(), completed };
+    await store.getState().frame(job);
+    expect(completed).not.toHaveBeenCalled();
+    await store.getState().start(job);
+    expect(completed).toHaveBeenCalledTimes(1);
   });
 
   it('Home runs MeerK40t’s move to 0,0', async () => {

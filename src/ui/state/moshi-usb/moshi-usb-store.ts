@@ -218,6 +218,8 @@ async function run(
   if (live !== current || current.cancelled) return;
   if (result.ok) {
     set({ phase: 'idle', sending: null, ...finishedState(kind, job), tone: 'info' });
+    // "After completed job" variable advance (code quality audit C2 D2-P2-3).
+    if (kind === 'job') job?.completed?.();
     return;
   }
   set({

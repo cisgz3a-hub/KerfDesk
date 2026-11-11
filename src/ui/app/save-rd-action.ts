@@ -6,12 +6,8 @@
 import type { Project } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
 import { withTextGlyphCheck } from '../../io/gcode/prepare-output-snapshot';
-import {
-  emitPreparedRdFile,
-  rdPreparationOptions,
-  type EmitRdOptions,
-  type EmitRdResult,
-} from '../../io/rd';
+import { rdPreparationOptions, type EmitRdOptions, type EmitRdResult } from '../../io/rd';
+import { emitPreparedRdWithJobWarnings } from '../laser/rd-job-warnings';
 import type { SaveTarget } from '../../platform/types';
 import type { ResolvedJobPlacement } from '../job-placement';
 import {
@@ -65,7 +61,7 @@ export async function handleSaveRd(
 // (ADR-591 Amendment 2).
 async function emitRdChecked(project: Project, options: EmitRdOptions): Promise<EmitRdResult> {
   const prepared = prepareOutput(project, rdPreparationOptions(options));
-  return emitPreparedRdFile(
+  return emitPreparedRdWithJobWarnings(
     await withTextGlyphCheck(prepared, project, outputTextRenderer),
     options,
   );
@@ -122,6 +118,7 @@ async function writeRdResult(
     for (const advisory of result.advisories) {
       ctx.pushToast(advisory.message, 'warning');
     }
+    for (const warning of result.jobWarnings ?? []) ctx.pushToast(warning, 'warning');
     ctx.pushToast(RD_EXPERIMENTAL_WARNING, 'warning');
   } catch (err) {
     ctx.pushToast(`Could not save .rd file: ${errorMessage(err)}`, 'error');

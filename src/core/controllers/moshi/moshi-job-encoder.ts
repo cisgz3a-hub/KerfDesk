@@ -28,6 +28,7 @@ import {
   type MoshiStep,
 } from './moshi-units';
 import { planFillGroupSteps } from './moshi-fill-plan';
+import { moshiPowerNotes } from './moshi-power-notes';
 import { planCutGroupSteps } from './moshi-vector-plan';
 
 /** Raster speed is one byte of cm/s (builder.py L408-411). */
@@ -90,6 +91,8 @@ export function encodeMoshiJob(job: Job, device: DeviceProfile): MoshiEncodeResu
   const footprint = unionMoshiBounds(motion.map((part) => part.bounds));
   if (footprint === null || !motion.some((part) => part.steps.some((step) => step.cut)))
     return { ok: false, error: { kind: 'empty-job' } };
+  // What the board cannot express, named for this job (ADR-705 Amd 4).
+  for (const note of moshiPowerNotes(job)) notes.add(note);
   return { ok: true, programs, motion, footprint, notes: [...notes] };
 }
 
