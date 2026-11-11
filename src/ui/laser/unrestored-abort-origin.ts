@@ -197,8 +197,13 @@ export async function offerRestoreAbortOrigin(
 }
 
 /** ADR-695 Amendment 1: on an A or Z rotary, how far the part has turned since
- *  the stopped job started, and that the offer's button turns it back. */
-export function abortTurnOfferNote(turn: RotaryStartTurn | undefined, button: string): string {
+ *  the stopped job started, and that the offer's button turns it back. Called
+ *  with the turn alone, as before ADR-707, it names the button the offer shows
+ *  on this machine. */
+export function abortTurnOfferNote(
+  turn: RotaryStartTurn | undefined,
+  button: string = restoreOriginOfferButton(abortRestoreHomesFirst()),
+): string {
   if (turn === undefined) return '';
   const since = rotaryTurnSinceStart(useLaserStore.getState(), turn);
   const how =

@@ -25,7 +25,11 @@ import {
 } from './start-blocked-alarm-offers';
 import { SET_ORIGIN_OFFER_BUTTON, SET_ORIGIN_OFFER_PROMPT } from './start-blocked-setup-offers';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
-import { restoreOriginOfferButton, unrestoredOriginOfferPrompt } from './unrestored-abort-origin';
+import {
+  abortTurnOfferNote,
+  restoreOriginOfferButton,
+  unrestoredOriginOfferPrompt,
+} from './unrestored-abort-origin';
 
 const original = {
   unlockAlarm: useLaserStore.getState().unlockAlarm,
@@ -220,6 +224,21 @@ describe('the offers’ wording', () => {
       'Restore origin',
       'Home and restore origin',
     ]);
+  });
+
+  // Other branches call this with the turn alone; that shape still works and
+  // names the button this machine's offer shows.
+  it('names the restore button in the rotary note, with or without being told it', () => {
+    const turn = { axis: 'A', machine: 0 } as const;
+
+    expect(abortTurnOfferNote(undefined)).toBe('');
+    expect(abortTurnOfferNote(turn)).toContain(
+      '"Restore origin" also turns it back to where the job started.',
+    );
+    expect(abortTurnOfferNote(turn, 'Home and restore origin')).toContain(
+      '"Home and restore origin" also turns it back to where the job started.',
+    );
+    expect(abortTurnOfferNote(turn)).not.toMatch(/\bOK\b/);
   });
 
   // ADR-367: the offers are deliberate. Their safety sentences are unchanged.
