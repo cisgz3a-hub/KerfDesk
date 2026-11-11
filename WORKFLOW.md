@@ -60,11 +60,17 @@ The splash becomes visible only after its complete markup is parsed, even when t
 arrives in chunks. The workspace does not accept pointer or keyboard input behind it.
 Workspace overlays, including the controller pause panel, stay beneath the startup screen
 through its hold and fade. Live machine controls regain their normal priority after dismissal.
-Reduced motion uses a static indicator. Both web and desktop hold the screen for at least four
-visible seconds from its first frame after the workspace module starts, then fade it over
-750 ms once the workspace canvas has had a paint opportunity. Time before that frame or while
-the browser document or native desktop window is hidden does not consume the hold
-(ADR-049 Amendment 2). A
+Reduced motion uses a static indicator. On the first launch of each app version on a device (a
+fresh install or an update; a desktop release, or a new major.minor number of the web app), both web
+and desktop hold the screen for at least four visible seconds from its first frame after the
+workspace module starts, then fade it over 750 ms once the workspace canvas has had a paint
+opportunity. Time before that frame or while the browser document or native desktop window is
+hidden does not consume the hold (ADR-049 Amendment 2).
+Every other launch and every reload starts the same fade as soon as the workspace canvas, or
+the settled licence window, has had its paint opportunity, with no hold; input returns when
+the screen is gone, as before. The version that has had its hold is remembered on the device
+once the hold completes, so a launch cut short holds again; when the browser refuses storage,
+no launch holds (ADR-049 Amendment 3). A
 startup crash is shown at once. It introduces no startup interaction or modal.
 
 1. App opens to **empty workspace** state (see F-A2).
@@ -111,8 +117,9 @@ startup crash is shown at once. It introduces no startup interaction or modal.
    your changes before closing KerfDesk?" with **Save** (the default), **Don't Save** and
    **Cancel** (ADR-549). **Save** runs File > Save (the Save dialog for a new project) and closes
    only once the save finishes; a cancelled or failed save keeps the window open. **Don't Save**
-   permits the close and **Cancel** keeps the window and project unchanged. A page navigation in
-   Electron still asks **Leave** or **Stay**.
+   permits the close and **Cancel** keeps the window and project unchanged. After **Don't Save**
+   the work stays under **File > Recover unsaved work** and the next launch does not ask about it
+   (F-C3, ADR-688 Amendment 3). A page navigation in Electron still asks **Leave** or **Stay**.
 3. Active-job unload retains its independent stop-and-recovery behavior and does not show this dirty
    prompt. This flow does not create, change, or consume a Frame permit.
 
@@ -1276,6 +1283,9 @@ that owns those fields, without changing the existing Frame/Start policy.
    than 8,000,000 cells burns flat with a Job Review warning; raise the line interval or split the
    artwork. Ruida `.rd` export refuses a ramped fill, as it refuses images.
 5. Depth depends on the laser and stock. Test the length and floor on scrap first.
+6. On a rotary a ramped fill scans every pass along X in one direction, as an image does
+   (ADR-699 Amendment 1): its scan angle, Cross-hatch and angle per pass are set aside, and Job
+   Review says so when any of them was set.
 
 ### F-A7f. Material Test grids that vary any two settings (ADR-497)
 
@@ -4184,6 +4194,17 @@ discarded.
 4. Each session is one row with its newest copy, though a tab closed with unsaved work leaves an
    interval copy and a newer close copy. Restore never removes a copy newer than the one restored
    (ADR-688 Amendment 1).
+
+#### Alternate — Don't Save when closing the desktop app
+1. Closing the desktop app with unsaved changes asks Save, Don't Save or Cancel (F-A1, ADR-549).
+   After **Don't Save** the window still writes its close copy to the slot.
+2. The next launch shows no card for that copy: the question was answered at the close. The copy
+   is kept and **File > Recover unsaved work…** lists it (ADR-688 Amendment 3).
+3. Only that copy is quiet. Work autosaved later is asked about as usual, and so is the last
+   interval copy when the close copy could not be written.
+4. A crash, a forced kill, the system ending the session, a reload and the browser's own **Leave
+   site?** are not that answer: the next launch shows the card. Don't Save before New or Open
+   still discards the session's copy (F-A13).
 
 #### Edge — browser without file pickers (Firefox, Safari)
 1. A banner above the workspace reads **This browser can't open or save files. Use Chrome or Edge,

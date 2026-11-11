@@ -6,7 +6,7 @@ import {
   collectFillSegmentsForLayer,
   islandFillGroupsForLayer,
 } from './layer-fill';
-import { fillRampApplies, rampedFillGroups } from './fill-ramp';
+import { fillRampApplies, rampedFillGroups, rotaryRampLayer } from './fill-ramp';
 import type { LaserPowerScaleVersion } from '../output/laser-power-scale-version';
 import { buildFillGroup } from './fill-group-build';
 import { hasExecutableFillSweep } from './fill-group-emission';
@@ -169,9 +169,20 @@ function vectorGroupsForLayer(
   suppliedContours?: ReadonlyArray<Polyline>,
   laserPowerScaleVersion?: LaserPowerScaleVersion,
 ): VectorCompilation {
+  // ADR-699 Amd 1: a ramped Fill on a rotary scans one way along X, as an image does.
+  const rotaryRamp = rotaryRampLayer(layer, device);
+  const rotaryNotice: VectorCompilation = {
+    groups: [],
+    diagnostics:
+      rotaryRamp?.turnedAside === true
+        ? [{ kind: 'fill-ramp-scan-angle-rotary', layerName: layer.name }]
+        : NO_DIAGNOSTICS,
+  };
   // ADR-492: with an angle change per pass, each angle hatches as its own group.
-  return vectorCompilation(
-    fillPassLayers(layer).map((passLayer) => {
+  const passLayers = rotaryRamp === null ? fillPassLayers(layer) : [rotaryRamp.layer];
+  return vectorCompilation([
+    rotaryNotice,
+    ...passLayers.map((passLayer) => {
       if (!fillRampApplies(passLayer))
         return flatFillGroups(
           objects,
@@ -196,7 +207,7 @@ function vectorGroupsForLayer(
         flatFillGroups(objects, passLayer, device, powerSource, sourceObjectId, suppliedContours),
       ]);
     }),
-  );
+  ]);
 }
 
 function flatFillGroups(
