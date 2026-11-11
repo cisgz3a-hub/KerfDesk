@@ -38,6 +38,21 @@
   line-height: 1.25;
 }
 
+/* A background save is failing (BackgroundSaveStatus.tsx, ADR-305 Amendment 1).
+   It sits in the fixed action rail, so it never scrolls out of view. */
+.lf-status-bar__alert {
+  flex: 0 0 auto;
+  padding: 0 8px;
+  /* Drawn inside the box: a border would make the bar two pixels taller. */
+  box-shadow: inset 0 0 0 1px var(--lf-warning);
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-tint-warning);
+  color: var(--lf-warning-fg);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: help;
+}
+
 /* Links to the pricing and policy pages in the web app (ADR-524 Amendment 3).
    They give way on a narrow bar, so the Update action always stays in view. */
 .lf-status-bar__site-links {

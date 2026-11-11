@@ -2148,6 +2148,9 @@ Left to right:
 - **Device** — `Default 400×400`
 - **Zoom** — `100%`
 - **Job estimate** — Phase C feature; not in Phase A.
+- **Background save signs** — at the right, shown only while they apply: `Autosave failed`,
+  `Autosave waiting for job` and `Machine settings not saved`. Each stays until the save it
+  names succeeds, and its tooltip says what to do (F-C3, ADR-305 Amendment 1).
 
 Status bar messages (toasts that appear in the bar for 3 s) for non-blocking events.
 
@@ -4160,7 +4163,7 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 
 - F-C1. Settings → Device Profile editor
 - F-C2. Settings → Preferences
-- F-C3. Autosave + recovery — specified below (ADR-305, ADR-688)
+- F-C3. Autosave + recovery — specified below (ADR-305 and its Amendment 1, ADR-688)
 - F-C4. Re-import changed SVG with diff
 - F-C5. Copy / paste / duplicate
   Copy and Paste carry the imported fonts used by copied text across documents, so that text stays
@@ -4173,7 +4176,8 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 
 Every 30 s, and when the window closes, unsaved work is written to this window's autosave slot in
 the browser's storage (ADR-305). Each window session has its own slot, kept until it is restored or
-discarded.
+discarded. The copy is prepared and written in a worker, and it keeps being written while a job
+runs (ADR-305 Amendment 1).
 
 #### Success — return to unsaved work
 1. The user reopens KerfDesk to an empty, untouched project while an earlier session's slot holds
@@ -4205,6 +4209,29 @@ discarded.
 4. A crash, a forced kill, the system ending the session, a reload and the browser's own **Leave
    site?** are not that answer: the next launch shows the card. Don't Save before New or Open
    still discards the session's copy (F-A13).
+
+#### Alternate — while a job runs (ADR-305 Amendment 1)
+1. Work drawn while a job streams or is paused is autosaved every 30 s like any other work. The
+   job, Pause and Abort do not wait for it.
+2. A heavy project waits for the job to end: from about two 12-megapixel photos, a trace of
+   470,000 points, or 7,500 objects. Copying one could take the UI thread, or the PC's memory, from
+   the job. The status bar then shows **Autosave waiting for job**. Its tooltip says that changes
+   made during the job have no recovery copy yet, and to save the project to keep them now.
+3. The sign goes when the job ends and the copy is written, or when the project is saved.
+4. Autosave also waits for the job to end while copies cannot reach the browser's database and
+   fall back to localStorage, and after a hand-over that measured more than 30 ms during that job.
+5. Closing the window writes the close copy as before, whatever the job is doing.
+
+#### Failure — the copy cannot be written
+1. A toast says so once for each cause, for example **Autosave could not preserve the newest
+   project. Save the .lf2 file manually; image-heavy projects can exceed browser storage.**
+2. The status bar shows **Autosave failed** for as long as the newest work has no copy. Its
+   tooltip repeats the cause and what to do.
+3. The sign goes with the next copy that is written, or when the project is saved. Autosave keeps
+   trying on every interval; a project that storage refused for its size is tried again once it
+   changes.
+4. Machine settings that cannot be saved for the next session follow the same pattern: one toast,
+   and **Machine settings not saved** in the status bar until a later machine change is saved.
 
 #### Edge — browser without file pickers (Firefox, Safari)
 1. A banner above the workspace reads **This browser can't open or save files. Use Chrome or Edge,

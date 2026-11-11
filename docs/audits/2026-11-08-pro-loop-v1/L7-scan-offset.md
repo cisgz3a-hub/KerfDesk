@@ -7,8 +7,8 @@
   `ScanOffsetMeasurementFormatControls.tsx`, `ScanOffsetCalibrationDialog.tsx`)
 - **Governing:** ADR-052 and Amendment 1
 - **Lenses run:** L1, L2 (LightBurn Scanning Offset guide), L3 (seven twins of the row shift).
-- **Counts:** 1 raised → P2 1. **Not fixed: held for the maintainer** (reverses an explicit ADR
-  decision and moves every calibrated machine's fills and images).
+- **Counts:** 1 raised → P2 1. **Fixed in #1623** (ADR-052 Amendment 2) after the maintainer chose
+  LightBurn's rule on 2026-11-08.
 
 ## Headline
 

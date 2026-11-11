@@ -1,9 +1,12 @@
 import type { Project } from '../../core/scene';
 import { clearAutosave } from './autosave';
 import type { AutosaveWriteFailure } from './autosave-record';
-import type { AutosaveWriteResult } from './autosave-record';
+import type { AutosaveRecord, AutosaveWriteResult } from './autosave-record';
 import { UnsupportedAutosaveVersionError } from './autosave-record';
-import { prepareAutosaveRecordOffThread } from './autosave-preparation-client';
+import {
+  prepareAutosaveForWorkerCommit,
+  prepareAutosaveRecordOffThread,
+} from './autosave-preparation-client';
 import { projectSealReady } from '../licensing/project-seal';
 import {
   autosaveStorageKeyForSession,
@@ -73,6 +76,9 @@ export class AutosaveDurableService {
   private readonly repository: AutosaveDurableRepository;
   private readonly locks: AutosaveSessionLocks;
   private readonly rotateSessionId: () => string;
+  // The default repository is the real IndexedDB database, which a worker can
+  // open too: the interval commit then runs there (ADR-305 Amendment 1).
+  private readonly commitsOffThread: boolean;
   private readonly epochs = new Map<string, number>();
   private sessionIdHint: string;
   // Only the first claim can meet a slot left by an earlier page (claimSession).
@@ -82,6 +88,7 @@ export class AutosaveDurableService {
 
   constructor(options: AutosaveDurableOptions = {}) {
     this.repository = options.repository ?? new IndexedDbAutosaveRepository();
+    this.commitsOffThread = options.repository === undefined;
     this.locks = options.locks ?? new AutosaveSessionLocks();
     this.sessionIdHint = options.initialSessionId ?? currentAutosaveSessionId();
     this.rotateSessionId = options.rotateSessionId ?? replaceAutosaveSessionId;
@@ -258,19 +265,20 @@ export class AutosaveDurableService {
       // A blocked localStorage read need not prevent a durable IndexedDB write.
     }
     await projectSealReady();
-    const prepared = await prepareAutosaveRecordOffThread(
-      project,
-      savedAt,
-      session.sessionId,
-      storageKey,
-    );
-    if (prepared.kind !== 'ok') return prepared;
+    const prepare = this.commitsOffThread
+      ? prepareAutosaveForWorkerCommit
+      : prepareAutosaveRecordOffThread;
+    const prepared = await prepare(project, savedAt, session.sessionId, storageKey);
+    if (prepared.kind === 'failed') return prepared;
     try {
       const epoch = await this.epoch(storageKey);
-      const result = await this.repository.commit(
-        { ...prepared.record, sessionId: session.sessionId, storageKey },
-        epoch,
-      );
+      const result =
+        prepared.kind === 'held'
+          ? await prepared.commit(epoch)
+          : await this.repository.commit(
+              { ...prepared.record, sessionId: session.sessionId, storageKey },
+              epoch,
+            );
       if (result.kind === 'conflict') {
         this.epochs.set(storageKey, result.actualEpoch);
         return { kind: 'superseded' };
@@ -286,7 +294,13 @@ export class AutosaveDurableService {
       if (hasNewerSynchronousLocalAutosave(storageKey, localWriteRevision)) {
         return { kind: 'superseded' };
       }
-      return localFallback(prepared.record, storageKey, indexedDbError);
+      const record = await recordForFallback(prepared);
+      if (record === null)
+        return { kind: 'failed', reason: 'storage-error', error: indexedDbError };
+      return localFallback(record, storageKey, indexedDbError);
+    } finally {
+      // A worker that still holds the record keeps its heap and the memory lane.
+      if (prepared.kind === 'held') prepared.release();
     }
   }
 
@@ -432,6 +446,19 @@ function combineClearResults(
 
 function localClearResult(result: LocalAutosaveClearResult): AutosaveDurableClearResult {
   return combineClearResults({ kind: 'ok' }, [result]);
+}
+
+// The record the localStorage fallback writes. A worker that committed for the
+// window still holds it; null when that worker is gone.
+async function recordForFallback(
+  prepared: Exclude<Awaited<ReturnType<typeof prepareAutosaveForWorkerCommit>>, { kind: 'failed' }>,
+): Promise<AutosaveRecord | null> {
+  if (prepared.kind === 'ok') return prepared.record;
+  try {
+    return await prepared.takeRecord();
+  } catch {
+    return null;
+  }
 }
 
 function localFallback(

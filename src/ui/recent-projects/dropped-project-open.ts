@@ -4,8 +4,7 @@
 // the banner instead.
 
 import type { FileHandle, PlatformAdapter } from '../../platform/types';
-import { useLaserStore } from '../state/laser-store';
-import { isActiveJob } from '../state/laser-store-helpers';
+import { anyMachineJobActive } from '../state/link-machine-work';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { handleExternalProjectOpen, type ExternalProjectOpenDeps } from './external-project-open';
@@ -21,7 +20,7 @@ export function appProjectOpenDeps(platform: PlatformAdapter): ExternalProjectOp
   return {
     platform,
     pushToast: (message, variant) => useToastStore.getState().pushToast(message, variant),
-    jobActive: () => isActiveJob(useLaserStore.getState().streamer),
+    jobActive: anyMachineJobActive,
     dialogOpen: () => useUiStore.getState().modalDepth > 0,
   };
 }
