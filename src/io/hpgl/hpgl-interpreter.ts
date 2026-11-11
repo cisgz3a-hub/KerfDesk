@@ -4,7 +4,9 @@ import { flushStroke, movePlotterPoint } from './hpgl-paths';
 import { plotterPoint, setInputPoints, setScaling } from './hpgl-scaling';
 import {
   finitePoint,
+  HPGL_IGNORED_ATTRIBUTE_COMMANDS,
   HpglError,
+  note,
   PLOTTER_MAPPING,
   requireArgs,
   type HpglCommand,
@@ -35,6 +37,8 @@ const HANDLERS: Readonly<Record<string, Handler>> = {
   FP: (state) => drawPolygon(state, true),
   LT: continuousLine,
   FT: solidFill,
+  PG: advancePage,
+  ...Object.fromEntries(HPGL_IGNORED_ATTRIBUTE_COMMANDS.map((name) => [name, ignoreAttribute])),
 };
 const POLYGON_COMMANDS = new Set([
   'IN',
@@ -69,6 +73,7 @@ export function createHpglState(): HpglState {
     workPoints: 0,
     outputPoints: 0,
     diagnostics: new Map(),
+    pageAdvance: null,
   };
 }
 
@@ -165,5 +170,34 @@ function solidFill(state: HpglState): void {
       'unsupported-style',
       'Only solid FT1/FT2 fills are supported. Convert hatch/pattern fills to geometry.',
       state.command,
+    );
+}
+
+// Speed, force, pen width, colour and the like draw nothing; a laser cuts the
+// centre line (ADR-357 Amendment 5).
+function ignoreAttribute(state: HpglState): void {
+  note(
+    state,
+    'ignored-attributes',
+    `Ignored ${state.command.name} and any other commands that only set plotter speed, force, pen width or colour; they draw nothing.`,
+  );
+}
+
+// PG ends a page. One trailing PG (how plotter drivers end a job) changes
+// nothing; drawing after it would stack a second page on the first, so
+// parseHpgl refuses that (assertSinglePage).
+function advancePage(state: HpglState): void {
+  requireArgs(state.command, [0, 1]);
+  flushStroke(state);
+  state.pageAdvance ??= { command: state.command, paths: state.paths.length };
+}
+
+export function assertSinglePage(state: HpglState): void {
+  const page = state.pageAdvance;
+  if (page !== null && state.paths.length > page.paths)
+    throw new HpglError(
+      'multiple-pages',
+      'This file draws on more than one page (PG). No partial artwork was imported; save each page as its own file.',
+      page.command,
     );
 }

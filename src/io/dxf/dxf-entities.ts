@@ -27,6 +27,7 @@ import {
   sampleCircle,
   sampleEllipse,
 } from './dxf-curve-sampling';
+import { fitPointSpline } from './dxf-fit-spline';
 import { sampleSpline } from './dxf-spline';
 import { bulgeCurveSegment, circleCurve, ellipseArcCurve } from './dxf-native-curves';
 
@@ -174,24 +175,27 @@ function ellipseInOcs(
 export function splineToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): EntityConversion {
   const flags = Math.trunc(firstNumber(tags, 70));
   const flaggedClosed = (flags & (CLOSED_FLAG_BIT | PERIODIC_SPLINE_FLAG_BIT)) !== 0;
-  const controlPoints: Vec2[] = [];
-  for (const tag of tags) {
-    if (tag.code === 10) controlPoints.push({ x: parseNumber(tag.value) * scale, y: 0 });
-    else if (tag.code === 20 && controlPoints.length > 0) {
-      const last = controlPoints.length - 1;
-      controlPoints[last] = {
-        x: (controlPoints[last] as Vec2).x,
-        y: parseNumber(tag.value) * scale,
-      };
-    }
-  }
-  const result = sampleSpline({
-    degree: Math.trunc(firstNumber(tags, 71, 3)),
-    knots: allNumbers(tags, 40),
-    controlPoints,
-    weights: allNumbers(tags, 41),
-    closed: flaggedClosed,
-  });
+  const controlPoints = pointPairs(tags, 10, 20, scale);
+  const fitPoints = pointPairs(tags, 11, 21, scale);
+  // Fit points only (codes 11/21, no 10/20): the CAD program builds the curve
+  // through them, so this import does too (audit O2-P2-1).
+  const spline =
+    controlPoints.length === 0 && fitPoints.length >= MIN_POLYLINE_POINTS
+      ? fitPointSpline({
+          fitPoints,
+          closed: flaggedClosed,
+          startTangent: optionalVector(tags, 12, 22),
+          endTangent: optionalVector(tags, 13, 23),
+        })
+      : {
+          degree: Math.trunc(firstNumber(tags, 71, 3)),
+          knots: allNumbers(tags, 40),
+          controlPoints,
+          weights: allNumbers(tags, 41),
+          closed: flaggedClosed,
+        };
+  if (spline === null) return SKIP;
+  const result = sampleSpline(spline);
   if (result.kind === 'error') return { kind: 'skip', reason: `SPLINE skipped: ${result.reason}` };
   const { points, closed } = withoutRepeatedSeam(result.points, flaggedClosed);
   if (points.length < MIN_POLYLINE_POINTS) return SKIP;
@@ -281,6 +285,29 @@ function normalizedSweep(startParam: number, endParam: number): number {
   let sweep = endParam - startParam;
   while (sweep <= 0) sweep += FULL_TURN;
   return Math.min(sweep, FULL_TURN);
+}
+
+// Each X code starts a point; the Y code that follows it completes it.
+function pointPairs(
+  tags: ReadonlyArray<DxfTag>,
+  xCode: number,
+  yCode: number,
+  scale: number,
+): Vec2[] {
+  const points: Vec2[] = [];
+  for (const tag of tags) {
+    if (tag.code === xCode) points.push({ x: parseNumber(tag.value) * scale, y: 0 });
+    else if (tag.code === yCode && points.length > 0) {
+      const last = points.length - 1;
+      points[last] = { x: (points[last] as Vec2).x, y: parseNumber(tag.value) * scale };
+    }
+  }
+  return points;
+}
+
+function optionalVector(tags: ReadonlyArray<DxfTag>, xCode: number, yCode: number): Vec2 | null {
+  if (!tags.some((tag) => tag.code === xCode)) return null;
+  return { x: firstNumber(tags, xCode), y: firstNumber(tags, yCode) };
 }
 
 export function firstNumber(tags: ReadonlyArray<DxfTag>, code: number, fallback = 0): number {
