@@ -76,6 +76,7 @@ type HeaderImageInfo = {
   readonly oriented: ImageDimensions;
   readonly orientation: ExifOrientation;
   readonly format: 'png' | 'jpeg';
+  readonly colourProfile: boolean;
 };
 
 export async function loadImageAsRawData(
@@ -174,9 +175,10 @@ export function fitDecodeToStoredGrid(
 // at its own size: drawn from an <img>, its decode ran inside the canvas
 // snapshot on the UI thread (about 0.5 s for 9 MP). The pixels are identical
 // either way, measured in Chromium over 8- and 16-bit grey, RGB, palette with
-// tRNS, grey-alpha and RGBA, gAMA, cHRM, sRGB, a Display P3 ICC profile,
-// Adam7, APNG and eXIf turns. A JPEG keeps the element: the canvas converts
-// its YUV on the GPU, which differs by 1 in some bytes from a bitmap decode.
+// tRNS, grey-alpha and RGBA, gAMA, cHRM, sRGB, Adam7, APNG and eXIf turns. A
+// JPEG keeps the element: the canvas converts its YUV on the GPU, which differs
+// by 1 in some bytes from a bitmap decode. So does a PNG with an embedded colour
+// profile: Linux Chrome converted a Display P3 profile differently both ways.
 async function decodeImageBitmap(
   file: File,
   header: HeaderImageInfo,
@@ -185,7 +187,8 @@ async function decodeImageBitmap(
 ): Promise<ImageBitmap | null> {
   const source = header.oriented;
   const needsResize = source.width !== target.width || source.height !== target.height;
-  if ((!needsResize && header.format !== 'png') || typeof createImageBitmap !== 'function') {
+  const ownSizeAsBitmap = header.format === 'png' && !header.colourProfile;
+  if ((!needsResize && !ownSizeAsBitmap) || typeof createImageBitmap !== 'function') {
     return null;
   }
   try {
@@ -365,6 +368,7 @@ async function readHeaderImageInfo(
     oriented: orientedDimensions(parsed.stored, parsed.orientation),
     orientation: parsed.orientation,
     format: png === null ? 'jpeg' : 'png',
+    colourProfile: png?.colourProfile ?? true,
   };
 }
 

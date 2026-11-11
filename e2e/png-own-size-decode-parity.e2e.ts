@@ -1,8 +1,9 @@
 // ADR-357 Amendment 4: a PNG at its own size is decoded by createImageBitmap
 // off the UI thread instead of by an <img> inside the canvas snapshot. That
-// is allowed only because Chromium gives the same pixels both ways; a JPEG
-// does not (its canvas converts YUV on the GPU) and keeps the <img>. This
-// holds the claim in the real browser for every PNG kind the loader meets.
+// is allowed only because Chromium gives the same pixels both ways. A JPEG
+// does not (its canvas converts YUV on the GPU), and neither does a PNG with an
+// embedded colour profile on Linux Chrome, so both keep the <img>. This holds
+// the claim in the real browser for every PNG kind the loader meets.
 
 import { expect, test } from './fixtures/kerfdesk-test';
 
@@ -21,7 +22,9 @@ test('the loader draws every kind of PNG at its own size with the pixels an <img
 
   expect(rows).toHaveLength(18);
   for (const row of rows) {
-    expect(row, row.name).toMatchObject({ differingBytes: 0, decodedAsBitmap: true });
+    // The Display P3 file carries an iCCP profile, which keeps the <img>.
+    const decodedAsBitmap = row.name !== 'display-p3.png';
+    expect(row, row.name).toMatchObject({ differingBytes: 0, decodedAsBitmap });
   }
   // eXIf Orientation 6 turns the frame on both routes.
   expect(rows.find((row) => row.name === 'RGB eXIf 6.png')?.size).toEqual([203, 301]);

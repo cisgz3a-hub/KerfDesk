@@ -29,7 +29,12 @@ way.
    the UI thread. The canvas, the snapshot and the readback are unchanged.
 2. **A JPEG keeps the `<img>` route.** The GPU YUV difference above still applies. Any other
    format the header reader does not recognise also keeps it.
-3. **An engine that ignores the image's Orientation still falls back.** If the bitmap comes
+3. **So does a PNG with an embedded colour profile** (an `iCCP` or `cICP` chunk before the
+   image data, or a header that cannot be read through to it). On Windows Chrome with a GPU
+   canvas a Display P3 PNG matched on both routes, but on CI's Linux Chrome 29,408 of its
+   244,412 bytes differed: the profile is converted differently for an `<img>` drawn on a
+   canvas than for a bitmap decode. `gAMA`, `cHRM` and `sRGB` matched on both.
+4. **An engine that ignores the image's Orientation still falls back.** If the bitmap comes
    back with the stored (unturned) aspect, it is closed and the `<img>` route turns the image,
    as the resized route already does.
 
@@ -39,8 +44,9 @@ way.
   compares the loader's route against the previous `<img>` route for 18 PNG kinds: 8- and 16-bit
   grey, RGB and RGBA, palette with tRNS, grey-alpha, gAMA 1.8 and 2.2, sRGB, cHRM, a Display P3
   ICC profile, Adam7 at 8 and 16 bits, eXIf Orientation 6 and 3, and a two-frame APNG. Every
-  byte matched, and the test checks that each file was decoded as a bitmap. At the commit grid
-  above, the committed trace's `paths` had the same SHA-256 as on `origin/main`.
+  byte matches on Windows and on CI's Linux runner, and the test checks which route each file
+  took: every kind as a bitmap except the Display P3 file, which keeps the `<img>`. At the commit
+  grid above, the committed trace's `paths` had the same SHA-256 as on `origin/main`.
 - **The block.** In runs alternating between the two builds, the decode task at that commit
   took 97-876 ms on `origin/main` (six runs) and 8-11 ms with this change (three runs), or
   149 ms in one run while other work held the PC's CPUs at about 70%. What stays on the UI thread
