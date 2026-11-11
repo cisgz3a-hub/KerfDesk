@@ -10,10 +10,17 @@ import { useStore } from '../state';
 import { MOSHI_NOT_QUALIFIED, MOSHI_POWER_NOTE } from '../state/moshi-usb/moshi-usb-messages';
 import { prepareMoshiUsbJob } from '../state/moshi-usb/moshi-usb-job';
 import { useMoshiUsbStore, type MoshiUsbState } from '../state/moshi-usb/moshi-usb-store';
-import type { MoshiUsbOpener } from '../state/moshi-usb/moshi-usb-types';
+import type { UsbLinkAdapter } from '../../platform/usb-link-types';
+import { CONNECTION_HELP_EVENT } from '../help/connection-help';
+import { moshiUsbOpener } from '../state/moshi-usb/moshi-usb-link';
 
-export default function MoshiUsbDetails({ open }: { readonly open: MoshiUsbOpener }): JSX.Element {
+export default function MoshiUsbDetails({
+  usbLink,
+}: {
+  readonly usbLink: UsbLinkAdapter;
+}): JSX.Element {
   const moshi = useMoshiUsbStore();
+  const [open] = useState(() => moshiUsbOpener(usbLink));
   const disconnected = moshi.phase === 'disconnected';
   return (
     <details>
@@ -47,6 +54,15 @@ export default function MoshiUsbDetails({ open }: { readonly open: MoshiUsbOpene
         <p role="status" data-tone={moshi.tone}>
           {moshi.message}
         </p>
+      )}
+      {disconnected && moshi.tone === 'error' && (
+        <button
+          type="button"
+          title="Driver, cable and permission steps for USB lasers."
+          onClick={() => window.dispatchEvent(new Event(CONNECTION_HELP_EVENT))}
+        >
+          Can’t connect?
+        </button>
       )}
       {moshi.advisories.length > 0 && (
         <ul aria-label="Job warnings">

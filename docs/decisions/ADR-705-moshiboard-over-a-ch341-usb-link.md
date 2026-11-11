@@ -53,9 +53,15 @@ read for this decision and reimplemented in TypeScript (no source copied; the MI
    `transport: 'file-only'` for the line-based store, so its Connect, jog, console and Start stay
    off, and it lists the optional `usbLink` capabilities ADR-703 adds (`MOSHI_USB_CAPABILITIES`). The
    Moshi USB store (`ui/state/moshi-usb/`) drives `core/controllers/moshi/moshi-link-session.ts`
-   over the shared CH341 EPP driver (ADR-702). The panel mounts only when the platform has a USB
-   link and the driver lists `usbLink` (no `kind` check, ADR-094), and loads lazily: the encoder,
-   run loop and store stay out of the boot bundle (`vite.config.ts` `LAZY_CONTROLLER_LINKS`).
+   over the shared CH341 EPP driver (ADR-702), opened with `openCh341Epp(session, { status:
+   'control' })` — MeerK40t's `bulk=False` status read for a Moshiboard. The panel mounts only
+   when the platform has the USB link (Chromium browsers and the desktop app) and the driver lists
+   `usbLink`; because the Lihuiyu driver (ADR-703) lists it too and has its own panel, the
+   driver's `kind` picks the Moshi panel. It loads lazily: the encoder, run loop and store stay
+   out of the boot bundle (`vite.config.ts` `LAZY_CONTROLLER_LINKS`). Connect shows the device
+   chooser every time instead of reopening a granted device: a Lihuiyu board has the same CH341
+   chip, so a silent reopen could pick the wrong machine. A device Windows has not given WinUSB
+   says so and points to Help → "Can't connect?".
 
 2. **Only what MeerK40t documents.** Frame, Start, Abort (estop), Home (MeerK40t's move to 0,0)
    and the status byte. Pause and Resume stay off: MeerK40t's hold only stops sending the next
@@ -105,6 +111,12 @@ read for this decision and reimplemented in TypeScript (no source copied; the MI
   Frame and after the job moves; Start sends exactly the encoded programs; Abort mid-run sends the
   estop, no data after it, and voids the Frame; an error status sends nothing; a lost link warns
   that a held program may run on; Home.
+- `moshi-usb-store.usb.test.ts` runs the same store end to end through the ADR-702 foundation:
+  the real opener and CH341 EPP driver (A6/A7 framing, vendor 0x52 status, never bulk A0) over
+  the fake USB device, with the board behind `moshi-usb-simulator.ts`: Frame then Start, Abort
+  mid-run with the estop on the wire and no data after it, an unplug, and the open failures.
+- `MoshiUsbPanel.test.tsx`: the panel is absent without the USB link and for other controllers,
+  and through its buttons frames first, then runs the project's own programs.
 
 None of this is evidence that a real Moshiboard accepts these bytes.
 
