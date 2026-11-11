@@ -10,8 +10,8 @@ import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
 import { useToastStore } from '../../state/toast-store';
 import { activeCameraModelNow, ownCameraModel } from '../active-camera-model';
-import { captureSourceFrame } from '../frame-source';
-import { captureOverlayStill } from '../capture-overlay-still';
+import type { captureSourceFrame } from '../frame-source';
+import { captureHeldPicture, captureOverlayStill } from '../capture-overlay-still';
 
 export type RefreshOutcome =
   | 'refreshed'
@@ -23,7 +23,7 @@ export type RefreshOutcome =
 
 /** Take a new held picture with the running, calibrated camera and show it. */
 export async function refreshCameraPicture(
-  capture: typeof captureSourceFrame = captureSourceFrame,
+  capture: typeof captureSourceFrame = captureHeldPicture,
 ): Promise<RefreshOutcome> {
   const { sourceState } = useCameraStore.getState();
   if (sourceState.kind !== 'live') return 'no-camera';

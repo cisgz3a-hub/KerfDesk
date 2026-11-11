@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useLaserStore } from '../../state/laser-store';
+import { OVERLAY_MAX_WIDTH } from '../picture-worker/picture-size';
 import { isActiveJob } from '../../state/laser-store-helpers';
 import type { ActiveCameraSource } from '../frame-source';
 import {
@@ -48,8 +49,8 @@ export function useMachineFrame(
   return frame;
 }
 
-/** Widest the overlay needs a bridge picture, device pixels: a little over the canvas, at most 1920. */
+/** Widest the overlay needs a bridge picture, device pixels: a little over the canvas, at most 1,920. */
 export function overlayDisplayWidth(cssWidth: number | null, devicePixelRatio: number): number {
   const ratio = devicePixelRatio > 0 ? devicePixelRatio : 1;
-  return Math.min(1920, Math.round((cssWidth ?? 1280) * ratio * 1.5));
+  return Math.min(OVERLAY_MAX_WIDTH, Math.round((cssWidth ?? 1280) * ratio * 1.5));
 }

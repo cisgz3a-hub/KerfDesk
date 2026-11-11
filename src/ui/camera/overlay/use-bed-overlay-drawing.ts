@@ -23,6 +23,9 @@ export type OverlayFrame =
       readonly kind: 'still';
       readonly image: RgbaImage;
       readonly capture: CameraCaptureBinding | null;
+      // The still shrunk in the camera picture worker, drawn in its place
+      // (ADR-440 Amendment 11); the image's own size still places it.
+      readonly display?: ImageBitmap | null;
     }
   | {
       readonly kind: 'live';
@@ -238,6 +241,7 @@ const stillTextures = new WeakMap<RgbaImage, ImageData>();
 function textureSource(frame: OverlayFrame): TexImageSource {
   if (frame.kind === 'live') return frame.element;
   if (frame.kind === 'bitmap') return frame.bitmap;
+  if (frame.display !== undefined && frame.display !== null) return frame.display;
   const cached = stillTextures.get(frame.image);
   if (cached !== undefined) return cached;
   const image = new ImageData(
