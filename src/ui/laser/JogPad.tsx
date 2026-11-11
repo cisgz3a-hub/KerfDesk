@@ -38,6 +38,8 @@ const QUEUE_STEP = { queueStep: true } as const;
 
 type Props = {
   readonly disabled: boolean;
+  /** Why the pad is off, shown as the disabled arrows' tooltip (A3-P3-4). */
+  readonly disabledReason?: string | null;
   /** With `disabled`: XY step presses may still join the running step jog. */
   readonly stepJogsOnly?: boolean;
   readonly machineHome?: ReactNode;
@@ -46,6 +48,7 @@ type Props = {
 
 export function JogPad({
   disabled,
+  disabledReason = null,
   stepJogsOnly = false,
   machineHome,
   machineActions,
@@ -64,7 +67,6 @@ export function JogPad({
   const maxFeed = deviceForActiveHead(device, project.machine).maxFeed;
   const continuousJogSupported = useLaserStore((s) => s.capabilities.jogCancel);
   const feed = clampJogFeed(selectedFeed, maxFeed);
-  const focusFeed = Math.min(maxFeed, FOCUS_FEED_MM_PER_MIN);
   const signs = useMemo(() => jogAxisSignsForOrigin(device.origin), [device.origin]);
   const focusReady = focusJogReady(device, machineKind);
   // Manual Air sends the laser profile's air output (M7/M8), which on a router
@@ -73,7 +75,7 @@ export function JogPad({
   const airAssistOn = useLaserStore((s) => s.airAssistOn);
   const showManualAir = machineKind === 'laser' || airAssistOn;
 
-  const { sendVector, sendFocus, cancelContinuousJog } = useJogSenders(focusStep, focusFeed);
+  const { sendVector, sendFocus, cancelContinuousJog } = useJogSenders(focusStep, maxFeed);
   const handleZeroZ = useZeroZAction();
 
   useJogPadShortcuts({
@@ -98,6 +100,7 @@ export function JogPad({
         <JogArrows
           centerAction={machineHome}
           disabled={arrowsDisabled}
+          disabledReason={disabledReason}
           stepMm={step}
           feed={feed}
           signs={signs}
@@ -134,7 +137,7 @@ export function JogPad({
 // A step press may join a running step jog (ADR-674); a hold never does.
 function useJogSenders(
   focusStep: number,
-  focusFeed: number,
+  maxFeed: number,
 ): {
   readonly sendVector: (vector: JogVector, mode?: 'step' | 'hold') => void;
   readonly sendFocus: (direction: 1 | -1) => void;
@@ -142,6 +145,7 @@ function useJogSenders(
 } {
   const jog = useLaserStore((s) => s.jog);
   const cancelJog = useLaserStore((s) => s.cancelJog);
+  const focusFeed = Math.min(maxFeed, FOCUS_FEED_MM_PER_MIN);
   const sendVector = useCallback(
     (vector: JogVector, mode: 'step' | 'hold' = 'step'): void => {
       const sent = mode === 'step' ? jog(vector, undefined, QUEUE_STEP) : jog(vector);

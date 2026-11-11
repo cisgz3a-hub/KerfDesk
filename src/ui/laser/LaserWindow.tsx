@@ -7,10 +7,6 @@ import { CollapsedRail, RailPanelHeading } from '../common';
 import { useStore } from '../state';
 import { runningJobMachineKind } from '../state/job-motion-machine';
 import { useLaserStore } from '../state/laser-store';
-import {
-  jogFrameCommandBlockMessage,
-  setupBlockingJobCommandBlockMessage,
-} from '../state/laser-store-helpers';
 import { useMachineRailVisibility } from '../state/use-machine-rail-visibility';
 import { canQueueStepJog } from '../state/step-jog-queue';
 import { machineControlsLabel, machineDisplayName } from '../machine/machine-labels';
@@ -19,6 +15,7 @@ import { ConsolePanel } from './ConsolePanel';
 import { SuperConsoleLauncher } from './super-console/SuperConsoleLauncher';
 import { AlarmCard } from './AlarmBanner';
 import { alarmControllerKind } from './alarm-card-advice';
+import { jogPadBlockReason } from './control-block-reason';
 import { operatorAbortAlarm } from './abort-alarm-recovery';
 import { ControllerPinNotice } from './ControllerPinNotice';
 import { HeldResumeTailNotice } from './HeldResumeTailNotice';
@@ -75,18 +72,22 @@ export function LaserWindow({ dockedJobActions = false }: Props = {}): JSX.Eleme
   const machineKind = useLaserStore((s) => runningJobMachineKind(s)) ?? projectKind;
   const machineOperationBusy = machineBusy(autofocusBusy, motionOperation, controllerOperation);
   // H6: mid-job jog acks corrupt RX accounting, so gate them like Home/Frame/Start.
-  const jogBlocked = useJogBlocked();
+  // The reason is the disabled arrows' tooltip (A3-P3-4).
+  const jogBlockReason = useLaserStore(jogPadBlockReason);
   const controllerDisplay = controllerDisplayState(controllerState, alarmCode, control);
   const connected = connection.kind === 'connected';
   const jogPadDisabled = isJogPadDisabled(
     connected,
     controllerDisplay.idle,
     machineOperationBusy,
-    jogBlocked,
+    jogBlockReason !== null,
   );
-  // A running step jog takes more step presses (ADR-674); nothing else on the
-  // pad is enabled while it runs.
-  const stepJogsOnly = useLaserStore(canQueueStepJog) && jogPadDisabled && !jogBlocked;
+  // A running step jog takes more step presses; nothing else on the pad is
+  // enabled while it runs. The store's own rule decides, and it already refuses
+  // a job, a tool-change hold, Fire and a controller operation. The running jog
+  // is itself a jog block, so asking for "no jog block" as well left this
+  // always false and dropped every quick second tap (ADR-674 Amendment 1).
+  const stepJogsOnly = useLaserStore(canQueueStepJog);
   if (!machinePanel.isExpanded) {
     return <CollapsedMachineRail machineKind={machineKind} onExpand={machinePanel.toggle} />;
   }
@@ -120,6 +121,7 @@ export function LaserWindow({ dockedJobActions = false }: Props = {}): JSX.Eleme
         {controllerDisplay.sleep && <SleepBanner onWake={control.runWake} />}
         <MachineJogControls
           disabled={jogPadDisabled}
+          disabledReason={jogBlockReason}
           stepJogsOnly={stepJogsOnly}
           setupDisabled={setupDisabled}
           setupBusy={setupBusy}
@@ -174,6 +176,7 @@ function MachineUtilityControls(props: {
 
 function MachineJogControls(props: {
   readonly disabled: boolean;
+  readonly disabledReason: string | null;
   readonly stepJogsOnly: boolean;
   readonly setupDisabled: boolean;
   readonly setupBusy: boolean;
@@ -181,6 +184,7 @@ function MachineJogControls(props: {
   return (
     <JogPad
       disabled={props.disabled}
+      disabledReason={props.disabledReason}
       stepJogsOnly={props.stepJogsOnly}
       machineHome={
         <JobSetupControls
@@ -207,12 +211,6 @@ function MachineJogControls(props: {
       }
     />
   );
-}
-
-function useJogBlocked(): boolean {
-  const jobBlocked = useLaserStore((s) => setupBlockingJobCommandBlockMessage(s) !== null);
-  const controllerBlocked = useLaserStore((s) => jogFrameCommandBlockMessage(s) !== null);
-  return jobBlocked || controllerBlocked;
 }
 
 function useControllerActions(): {

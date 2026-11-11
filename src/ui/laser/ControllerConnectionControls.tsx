@@ -14,6 +14,7 @@ import { loadAutoConnectPreference, saveAutoConnectPreference } from '../state/s
 import { pauseAutoConnect, useAutoConnectSession } from '../state/auto-connect-session';
 import { ConnectionBar, type ConnectionBarProps } from './ConnectionBar';
 import { connectMachine } from './connect-machine';
+import { connectionControlBlockReason } from './control-block-reason';
 import {
   isFileOnlyController,
   useControllerQualificationRetry,
@@ -127,6 +128,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
               }
         }
         disabled={!supportsSerial || controlsBusy || isFileOnlyProfile}
+        disabledReason={controlsBusy ? connectionControlBlockReason(props.motionOperation) : null}
       />
     </>
   );

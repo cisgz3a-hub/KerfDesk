@@ -30,6 +30,9 @@ type ConsoleCommandDeckModel = {
   readonly error: string | null;
   readonly isSending: boolean;
   readonly sendDisabledReason: string | null;
+  /** The block reason, once Enter or Send was tried against it (A3-P2-4). */
+  readonly blockedSubmitReason: string | null;
+  readonly noteBlockedSubmit: () => void;
   readonly isInputDisabled: boolean;
   readonly send: (submission: ConsoleCommandSubmission) => Promise<void>;
   readonly handleHistoryKey: (event: KeyboardEvent<HTMLInputElement>) => void;
@@ -61,6 +64,23 @@ function useConsoleCommandAvailabilityState(
   };
 }
 
+// Enter on a blocked command used to do nothing, and the reason was only a
+// hover tooltip. The reason is shown once a send was tried against it, and it
+// follows the live state: it goes when the block does or the draft changes.
+function useBlockedSubmitNotice(reason: string | null): {
+  readonly shown: string | null;
+  readonly note: () => void;
+  readonly clear: () => void;
+} {
+  const [tried, setTried] = useState(false);
+  if (tried && reason === null) setTried(false);
+  return {
+    shown: tried ? reason : null,
+    note: () => setTried(true),
+    clear: () => setTried(false),
+  };
+}
+
 export function useConsoleCommandDeckModel(
   enableHistory: boolean,
   onCommandSent: ((command: string) => void) | undefined,
@@ -80,11 +100,13 @@ export function useConsoleCommandDeckModel(
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sendDisabledReason = consoleCommandDisabledReason(driver, command, availabilityState);
+  const blockedSubmit = useBlockedSubmitNotice(sendDisabledReason);
 
   const send = async (submission: ConsoleCommandSubmission): Promise<void> => {
     if (isSending) return;
     setIsSending(true);
     setError(null);
+    blockedSubmit.clear();
     try {
       const result = await runConsoleCommand(
         driver,
@@ -121,6 +143,7 @@ export function useConsoleCommandDeckModel(
     setHistory(navigation.history);
     setCommand(navigation.value);
     setError(null);
+    blockedSubmit.clear();
   };
 
   return {
@@ -130,6 +153,8 @@ export function useConsoleCommandDeckModel(
     error,
     isSending,
     sendDisabledReason,
+    blockedSubmitReason: blockedSubmit.shown,
+    noteBlockedSubmit: blockedSubmit.note,
     isInputDisabled: connection.kind !== 'connected' || !driver.capabilities.console,
     send,
     handleHistoryKey,
@@ -137,6 +162,7 @@ export function useConsoleCommandDeckModel(
       setCommand(value);
       setHistory((current) => ({ ...current, cursor: null, draft: '' }));
       setError(null);
+      blockedSubmit.clear();
     },
   };
 }

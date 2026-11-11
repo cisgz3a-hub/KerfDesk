@@ -37,7 +37,7 @@ describe('console command availability', () => {
   it('requires a known Idle report only for commands whose driver marks them Idle-only', () => {
     expect(
       consoleCommandDisabledReason(grblDriver, '$32=1', state({ machineState: null })),
-    ).toContain('status is not known');
+    ).toContain('Waiting for the controller to report its status');
     expect(
       consoleCommandDisabledReason(grblDriver, '$32=1', state({ machineState: 'Run' })),
     ).toContain('currently Run');
@@ -52,7 +52,7 @@ describe('console command availability', () => {
   it('surfaces every active-operation owner used by the console gate', () => {
     expect(
       consoleCommandDisabledReason(grblDriver, '$$', state({ motionOperation: {} })),
-    ).toContain('jog or frame');
+    ).toContain('jog or Frame');
     expect(
       consoleCommandDisabledReason(
         grblDriver,
@@ -92,7 +92,9 @@ describe('console command availability', () => {
     expect(consoleCommandDisabledReason(grblDriver, '[RST]#', fluidnc)).toBe(
       consoleCommandDisabledReason(grblDriver, '$RST=#', fluidnc),
     );
-    expect(consoleCommandDisabledReason(grblDriver, '[RST]#', fluidnc)).toMatch(/blocked/);
+    expect(consoleCommandDisabledReason(grblDriver, '[RST]#', fluidnc)).toMatch(
+      /does not send this command/,
+    );
     expect(consoleCommandDisabledReason(grblDriver, '[RST]#', state())).toBeNull();
   });
 });
