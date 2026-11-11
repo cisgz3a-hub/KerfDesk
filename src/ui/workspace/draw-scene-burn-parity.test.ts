@@ -102,13 +102,13 @@ describe('a click picks what the canvas shows (R5)', () => {
   it('the workspace asks with the view it is showing', () => {
     // R5-P2-2: a Line square drawn before a Fill plate that covers it.
     const current = project([square(), plate()], [fillOp(), lineOp()]);
-    expect(workspaceHitTest(current.scene, CENTRE)).toBe('plate');
-    expect(workspaceHitTestCandidates(current.scene, CENTRE)[0]).toBe('plate');
+    expect(workspaceHitTest(current.scene, CENTRE, 0.4)).toBe('plate');
+    expect(workspaceHitTestCandidates(current.scene, CENTRE, 0.4)[0]).toBe('plate');
 
     useUiStore.setState({ wireframeView: true });
-    expect(workspaceHitTest(current.scene, CENTRE)).toBe('square');
-    expect(workspaceHitTest(current.scene, SQUARE_EDGE)).toBe('square');
-    expect(workspaceHitTestCandidates(current.scene, CENTRE)[0]).toBe('square');
+    expect(workspaceHitTest(current.scene, CENTRE, 0.4)).toBe('square');
+    expect(workspaceHitTest(current.scene, SQUARE_EDGE, 0.4)).toBe('square');
+    expect(workspaceHitTestCandidates(current.scene, CENTRE, 0.4)[0]).toBe('square');
   });
 });
 

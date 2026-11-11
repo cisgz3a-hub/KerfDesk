@@ -19,7 +19,6 @@ import { isRegistrationBox } from './registration-layer';
 import type { Scene } from './scene';
 import type { Bounds, ColoredPath, Polyline, SceneObject, Transform, Vec2 } from './scene-object';
 import { applyTransform } from './transform';
-import { flattenColoredPathCurves } from './curve-path';
 import { objectGeometryExtent } from './object-extent';
 import {
   resolveVisibleOperationForPath,
@@ -28,16 +27,46 @@ import {
 } from './visibility';
 import { pointInPolygon } from '../geometry/point-in-polygon';
 import { boxCorners } from '../geometry/box-math';
+import {
+  DEFAULT_STROKE_HIT_TOLERANCE_MM,
+  distanceToPolyline,
+  hitTestPolylines,
+  pointToSegmentDistance,
+  strokeReachMm,
+} from './hit-test-polylines';
 
-const VECTOR_STROKE_HIT_TOLERANCE_MM = 2;
+export { DEFAULT_STROKE_HIT_TOLERANCE_MM };
+
 const BOUNDS_EDGE_EPSILON_MM = 1e-9;
+// Two lines this close to equally near are a tie, which stacking order settles.
+const NEAREST_TIE_MM = 1e-9;
 
+/**
+ * A primary hit is on the object itself. `covers` says it is painted over the
+ * point (a filled area, an image); otherwise the point is within reach of one
+ * of its lines, `distanceMm` away.
+ */
 export type HitTestObjectResult =
   | { readonly kind: 'none' }
-  | { readonly kind: 'primary' }
+  | { readonly kind: 'primary'; readonly distanceMm: number; readonly covers: boolean }
   | { readonly kind: 'line-interior'; readonly area: number };
 
 const NO_HIT: HitTestObjectResult = { kind: 'none' };
+const COVERED: HitTestObjectResult = { kind: 'primary', distanceMm: 0, covers: true };
+
+export type HitTestOptions = {
+  readonly includeLocked?: boolean;
+  readonly wireframe?: boolean;
+  /**
+   * How far from a line a click still picks it, in scene millimetres. The
+   * workspace passes a screen distance at the live zoom (ADR-196 Amendment 1);
+   * a caller with no view gets 2 mm.
+   */
+  readonly strokeToleranceMm?: number;
+};
+
+/** `direct`: on a line or a painted area. `interior`: inside an outline not filled there. */
+export type SceneHit = { readonly id: string; readonly kind: 'direct' | 'interior' };
 
 /**
  * Selection skips locked artwork. `includeLocked` is for display-only uses
@@ -45,33 +74,63 @@ const NO_HIT: HitTestObjectResult = { kind: 'none' };
  * answer even if it cannot be picked. `wireframe` is the Wireframe view, which
  * outlines Fill artwork (ADR-410), so its interiors are not solid to a click.
  */
-export function hitTest(
+export function hitTest(scene: Scene, point: Vec2, options: HitTestOptions = {}): string | null {
+  return hitTestDetailed(scene, point, options)?.id ?? null;
+}
+
+/**
+ * The object a click picks and how it was hit (ADR-196 Amendment 1). Of the
+ * lines within reach the nearest wins, and stacking order settles a tie. An
+ * object painted over the point hides everything beneath it, and gives way
+ * only to a line drawn above it. With no such hit, the smallest outline
+ * around the point is picked by its interior.
+ */
+export function hitTestDetailed(
   scene: Scene,
   point: Vec2,
-  options: { readonly includeLocked?: boolean; readonly wireframe?: boolean } = {},
-): string | null {
+  options: HitTestOptions = {},
+): SceneHit | null {
+  const reachMm = strokeReachMm(options.strokeToleranceMm);
   const layerByColor = sceneLayerVisibilityLookup(scene.layers);
   const pools =
-    options.wireframe === true ? OUTLINES_ONLY : fillPoolParityAt(scene, layerByColor, point);
-  let bestLineInterior: { readonly id: string; readonly area: number } | null = null;
+    options.wireframe === true
+      ? OUTLINES_ONLY
+      : fillPoolParityAt(scene, layerByColor, point, reachMm);
+  const includeLocked = options.includeLocked === true;
+  let nearestLine: NearLine | null = null;
+  let bestLineInterior: EnclosingOutline | null = null;
 
-  // Topmost first: later-added objects render on top so direct hits win first.
+  // Topmost first: later-added objects render on top.
   for (let i = scene.objects.length - 1; i >= 0; i -= 1) {
     const obj = scene.objects[i];
-    if (obj === undefined || !isHitCandidate(obj, layerByColor, options.includeLocked === true)) {
-      continue;
-    }
-
-    const hit = hitTestObject(layerByColor, obj, point, pools);
-    if (hit.kind === 'primary') return obj.id;
-    if (
-      hit.kind === 'line-interior' &&
-      (bestLineInterior === null || hit.area < bestLineInterior.area)
-    ) {
-      bestLineInterior = { id: obj.id, area: hit.area };
+    if (obj === undefined || !isHitCandidate(obj, layerByColor, includeLocked)) continue;
+    const hit = hitTestObject(layerByColor, obj, point, pools, reachMm);
+    if (hit.kind === 'primary') {
+      if (hit.covers) return { id: nearestLine?.id ?? obj.id, kind: 'direct' };
+      nearestLine = nearerLine(nearestLine, { id: obj.id, distanceMm: hit.distanceMm });
+    } else if (hit.kind === 'line-interior') {
+      bestLineInterior = smallerOutline(bestLineInterior, { id: obj.id, area: hit.area });
     }
   }
-  return bestLineInterior?.id ?? null;
+  return lineOrInterior(nearestLine, bestLineInterior);
+}
+
+// A line in reach is on the object itself and beats any outline around the point.
+function lineOrInterior(line: NearLine | null, outline: EnclosingOutline | null): SceneHit | null {
+  if (line !== null) return { id: line.id, kind: 'direct' };
+  return outline === null ? null : { id: outline.id, kind: 'interior' };
+}
+
+type NearLine = { readonly id: string; readonly distanceMm: number };
+type EnclosingOutline = { readonly id: string; readonly area: number };
+
+// `best` was met first, so it is stacked above `next` and keeps a tie.
+function nearerLine(best: NearLine | null, next: NearLine): NearLine {
+  return best === null || next.distanceMm < best.distanceMm - NEAREST_TIE_MM ? next : best;
+}
+
+function smallerOutline(best: EnclosingOutline | null, next: EnclosingOutline): EnclosingOutline {
+  return best === null || next.area < best.area ? next : best;
 }
 
 function isHitCandidate(
@@ -92,15 +151,17 @@ export function hitTestObject(
   obj: SceneObject,
   point: Vec2,
   pools?: FillPoolParity,
+  strokeToleranceMm?: number,
 ): HitTestObjectResult {
   const paths = vectorPathsFor(obj);
   if (paths === null) {
-    return pointInTransformedObjectBounds(point, obj) ? { kind: 'primary' } : NO_HIT;
+    return pointInTransformedObjectBounds(point, obj) ? COVERED : NO_HIT;
   }
-  if (!pointInExpandedObjectBBox(point, obj, VECTOR_STROKE_HIT_TOLERANCE_MM)) return NO_HIT;
+  const reachMm = strokeReachMm(strokeToleranceMm);
+  if (!pointInExpandedObjectBBox(point, obj, reachMm)) return NO_HIT;
   // The canvas paints a jig box by itself, never in a pool (fill-pools.ts).
   const pooled = pools !== OUTLINES_ONLY && isRegistrationBox(obj) ? undefined : pools;
-  return hitVectorObject(layerByColor, obj, paths, point, pooled);
+  return hitVectorObject(layerByColor, obj, paths, { point, reachMm }, pooled);
 }
 
 /** Whether this object's Fill pool covers the point an odd number of times, so the canvas paints it there. */
@@ -121,7 +182,9 @@ export function fillPoolParityAt(
   scene: Scene,
   layerByColor: ReadonlyMap<string, Layer>,
   point: Vec2,
+  strokeToleranceMm?: number,
 ): FillPoolParity {
+  const reachMm = strokeReachMm(strokeToleranceMm);
   const parity = new Map<string, boolean>();
   let runs: FillPoolRuns | undefined;
   return (object, fill) => {
@@ -131,7 +194,7 @@ export function fillPoolParityAt(
     let odd = parity.get(key);
     if (odd === undefined) {
       const covering = scene.objects.filter((candidate) =>
-        coversInPool(layerByColor, candidate, key, runOf, point),
+        coversInPool(layerByColor, candidate, { key, runOf }, { point, reachMm }),
       );
       odd = covering.length % 2 === 1;
       parity.set(key, odd);
@@ -140,26 +203,32 @@ export function fillPoolParityAt(
   };
 }
 
+// The point a click is tested at, and its reach to a line.
+type Probe = { readonly point: Vec2; readonly reachMm: number };
+
 function coversInPool(
   layerByColor: ReadonlyMap<string, Layer>,
   object: SceneObject,
-  key: string,
-  runOf: FillPoolRuns,
-  point: Vec2,
+  pool: { readonly key: string; readonly runOf: FillPoolRuns },
+  probe: Probe,
 ): boolean {
   const paths = vectorPathsFor(object);
   if (paths === null || isRegistrationBox(object)) return false;
-  if (!pointInExpandedObjectBBox(point, object, VECTOR_STROKE_HIT_TOLERANCE_MM)) return false;
+  if (!pointInExpandedObjectBBox(probe.point, object, probe.reachMm)) return false;
   // Winding in object space: a dense pool asks every member on each hover.
-  const local = objectSpacePoint(point, object.transform);
-  return (
-    local !== null &&
-    paths.some(
-      (path) =>
-        pathFillOperations(object, path, layerByColor).some(
-          (fill) => fillPoolKey(fill, runOf(object)) === key,
-        ) && pointInFilledPath(object, path, hitTestPolylines(path), local),
-    )
+  const local = objectSpacePoint(probe.point, object.transform);
+  if (local === null) return false;
+  return paths.some(
+    (path) =>
+      pathFillOperations(object, path, layerByColor).some(
+        (fill) => fillPoolKey(fill, pool.runOf(object)) === pool.key,
+      ) &&
+      pointInFilledPath(
+        object,
+        path,
+        hitTestPolylines(path, object.transform, probe.reachMm),
+        local,
+      ),
   );
 }
 
@@ -181,14 +250,15 @@ function hitVectorObject(
   layerByColor: ReadonlyMap<string, Layer>,
   obj: SceneObject,
   paths: ReadonlyArray<ColoredPath>,
-  point: Vec2,
+  probe: Probe,
   pools: FillPoolParity | undefined,
 ): HitTestObjectResult {
   let hasPolyline = false;
   let lineInteriorArea: number | null = null;
+  let nearestLineMm: number | null = null;
   for (const path of paths) {
     if (!resolveVisibleOperationForPath(obj, path, layerByColor).visible) continue;
-    const polylines = worldPolylines(path, obj.transform);
+    const polylines = worldPolylines(path, obj.transform, probe.reachMm);
     if (polylines.length === 0) continue;
     hasPolyline = true;
     const solid = (): boolean => {
@@ -198,9 +268,12 @@ function hitVectorObject(
       const mode = effectiveLayerMode(obj, pathStylingOperation(obj, path, layerByColor));
       return mode === 'fill' || mode === 'image';
     };
-    const hit = hitPath(obj, path, polylines, point, solid);
-    if (hit.kind === 'primary') return hit;
-    if (hit.kind === 'line-interior') {
+    const hit = hitPath(obj, path, polylines, probe, solid);
+    if (hit.kind === 'primary') {
+      if (hit.covers) return hit;
+      nearestLineMm =
+        nearestLineMm === null ? hit.distanceMm : Math.min(nearestLineMm, hit.distanceMm);
+    } else if (hit.kind === 'line-interior') {
       lineInteriorArea =
         lineInteriorArea === null ? hit.area : Math.min(lineInteriorArea, hit.area);
     }
@@ -209,24 +282,8 @@ function hitVectorObject(
   // for diagnostics and repair, but must not turn invisible artwork into a
   // direct-hit slab over real objects underneath.
   if (!hasPolyline) return NO_HIT;
+  if (nearestLineMm !== null) return { kind: 'primary', distanceMm: nearestLineMm, covers: false };
   return lineInteriorArea === null ? NO_HIT : { kind: 'line-interior', area: lineInteriorArea };
-}
-
-// Hover and click hit tests flatten the same immutable paths on every pointer
-// move, and chord-optimal flattening (ADR-453) costs several times the old
-// midpoint splitter, so each path's hit polylines are kept while it lives.
-const hitTestPolylineCache = new WeakMap<ColoredPath, ReadonlyArray<Polyline>>();
-
-function hitTestPolylines(path: ColoredPath): ReadonlyArray<Polyline> {
-  const cached = hitTestPolylineCache.get(path);
-  if (cached !== undefined) return cached;
-  const flattened = flattenColoredPathCurves(path, {
-    toleranceMm: VECTOR_STROKE_HIT_TOLERANCE_MM / 8,
-    segmentBudget: 100_000,
-  });
-  const polylines = flattened.kind === 'ok' ? flattened.polylines : path.polylines;
-  hitTestPolylineCache.set(path, polylines);
-  return polylines;
 }
 
 // A filled path is solid only where the canvas fills it: by its own rule over
@@ -238,15 +295,19 @@ function hitPath(
   obj: SceneObject,
   path: ColoredPath,
   polylines: ReadonlyArray<Polyline>,
-  point: Vec2,
+  probe: Probe,
   solid: () => boolean,
 ): HitTestObjectResult {
-  if (polylines.some((polyline) => pointNearPolyline(point, polyline.points, polyline.closed))) {
-    return { kind: 'primary' };
-  }
+  const { point } = probe;
   const closed = polylines.filter((polyline) => polyline.closed);
-  if (!closed.some((polyline) => pointInPolygon(point, polyline.points))) return NO_HIT;
-  if (pointInFilledPath(obj, path, closed, point) && solid()) return { kind: 'primary' };
+  const inside = closed.some((polyline) => pointInPolygon(point, polyline.points));
+  if (inside && pointInFilledPath(obj, path, closed, point) && solid()) return COVERED;
+  let distanceMm = Number.POSITIVE_INFINITY;
+  for (const polyline of polylines) {
+    distanceMm = Math.min(distanceMm, distanceToPolyline(point, polyline.points, polyline.closed));
+  }
+  if (distanceMm <= probe.reachMm) return { kind: 'primary', distanceMm, covers: false };
+  if (!inside) return NO_HIT;
   return { kind: 'line-interior', area: bboxArea(transformedBBox(obj)) };
 }
 
@@ -300,45 +361,13 @@ function effectiveLayerMode(obj: SceneObject, layer: Layer | undefined): LayerMo
     : effectiveOperationForObject(layer, obj).mode;
 }
 
-function worldPolylines(path: ColoredPath, transform: Transform): Polyline[] {
-  return hitTestPolylines(path)
+function worldPolylines(path: ColoredPath, transform: Transform, reachMm: number): Polyline[] {
+  return hitTestPolylines(path, transform, reachMm)
     .filter((polyline) => polyline.points.length > 0)
     .map((polyline) => ({
       closed: polyline.closed,
       points: polyline.points.map((point) => applyTransform(point, transform)),
     }));
-}
-
-function pointNearPolyline(point: Vec2, points: ReadonlyArray<Vec2>, closed: boolean): boolean {
-  for (let i = 1; i < points.length; i += 1) {
-    const a = points[i - 1];
-    const b = points[i];
-    if (
-      a !== undefined &&
-      b !== undefined &&
-      pointToSegmentDistance(point, a, b) <= VECTOR_STROKE_HIT_TOLERANCE_MM
-    ) {
-      return true;
-    }
-  }
-  const first = points[0];
-  const last = points[points.length - 1];
-  return (
-    closed &&
-    first !== undefined &&
-    last !== undefined &&
-    pointToSegmentDistance(point, last, first) <= VECTOR_STROKE_HIT_TOLERANCE_MM
-  );
-}
-
-function pointToSegmentDistance(point: Vec2, a: Vec2, b: Vec2): number {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq === 0) return Math.hypot(point.x - a.x, point.y - a.y);
-  const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lenSq));
-  const closest = { x: a.x + t * dx, y: a.y + t * dy };
-  return Math.hypot(point.x - closest.x, point.y - closest.y);
 }
 
 function pointInTransformedObjectBounds(point: Vec2, obj: SceneObject): boolean {
