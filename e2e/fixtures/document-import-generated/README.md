@@ -1,6 +1,6 @@
 # Document import browser fixtures
 
-These seven small fixtures were authored for KerfDesk's September 2026 import audit. They contain no third-party artwork. `generate.mjs` reproduces them from explicit PDF/HPGL/BMP/GIF bytes and the existing independently encoded TIFF fixture builder in `src/__fixtures__/tiff-document.ts`:
+These eight small fixtures were authored for KerfDesk's September 2026 import audit. They contain no third-party artwork. `generate.mjs` reproduces them from explicit PDF/HPGL/BMP/GIF bytes and the existing independently encoded TIFF fixture builder in `src/__fixtures__/tiff-document.ts`:
 
 ```sh
 node e2e/fixtures/document-import-generated/generate.mjs
@@ -10,7 +10,8 @@ node e2e/fixtures/document-import-generated/generate.mjs
 | --- | --- |
 | `two-pages.pdf` | Two 144 × 72 point pages (50.8 × 25.4 mm): red editable paths, then blue Helvetica text requiring whole-page image fallback. |
 | `compatible.ai` | Exactly the same PDF bytes with an AI filename, exercising PDF-compatible Illustrator routing, not general Illustrator support. |
-| `legacy.ai` | PostScript-only Illustrator-like input that must be rejected without insertion. |
+| `legacy.ai` | PostScript-only input with nothing drawn: the PostScript reader (ADR-700) finds no paths and rejects it without insertion. |
+| `illustrator-3.ai` | An Illustrator 3 script with one stroked 72 × 36 point (25.4 × 12.7 mm) rectangle, imported as editable paths by the AI 3–8 operators (ADR-700). |
 | `oriented-pages.tif` | Two 2 × 3 grayscale pages at 100 × 200 DPI. Page 2 has orientation 6: clockwise 3 × 2 pixels `[200,100,0,250,150,50]`, 0.381 × 0.508 mm. |
 | `density-150x300.bmp` | 8 × 4, black left half and white right half. Independent embedded density axes normalize to 150 × 300 whole DPI under the existing image-density contract. |
 | `black-then-white.gif` | Two 64 × 32 frames: black then white. Import must preserve the first frame as a frozen PNG. |
@@ -20,7 +21,7 @@ The browser tests intercept only the platform file-picker/save boundary. Product
 
 ## Optional pinned upstream corpus
 
-Set `KERFDESK_DOCUMENT_CORPUS_ROOT` to a separately attributed directory containing `fixtures/` and `reference/`. Without it, upstream cases are explicitly skipped; the seven authored fixture cases still run. The test helper verifies input SHA256 values. Donor files are not vendored because their attribution/licensing record belongs with the independent audit corpus.
+Set `KERFDESK_DOCUMENT_CORPUS_ROOT` to a separately attributed directory containing `fixtures/` and `reference/`. Without it, upstream cases are explicitly skipped; the authored fixture cases still run. The test helper verifies input SHA256 values. Donor files are not vendored because their attribution/licensing record belongs with the independent audit corpus.
 
 | Case | Original upstream source | Reference |
 | --- | --- | --- |
