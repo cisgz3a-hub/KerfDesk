@@ -12,6 +12,7 @@ import { type ImagePresetId, PresetField } from './AdjustImageDialog.presets';
 import * as styles from './AdjustImageDialog.styles';
 import type { AdjustImageDraft } from './AdjustImageDialog.types';
 import type { UserImagePreset } from './AdjustImageDialog.user-presets';
+import { IMAGE_GAMMA_DIRECTION_HINT } from './gamma-direction';
 import { imageDensityBounds, type NumberBounds } from './image-density-bounds';
 import { roundToDecimals } from '../../core/util/rounding';
 
@@ -75,6 +76,9 @@ export function AdjustFields(props: {
         step={0.05}
         onChange={(gamma) => update({ gamma })}
       />
+      <p style={{ gridColumn: '1 / -1', margin: 0, color: 'var(--lf-text-muted)' }}>
+        {IMAGE_GAMMA_DIRECTION_HINT}
+      </p>
       <RasterSettingsFields
         draft={draft}
         storedLinesPerMm={props.storedLinesPerMm}
@@ -294,6 +298,8 @@ function numberFieldTitle(name: string, label: string): string {
       return 'Compensate for physical laser dot width when raster engraving. Shortens each burned line at both ends, where the beam turns on and off along the scan; power changes inside a line are not trimmed. It cannot widen white lines that run parallel to the scan.';
     case 'minPower':
       return 'Lowest laser power used by grayscale image engraving.';
+    case 'gamma':
+      return IMAGE_GAMMA_DIRECTION_HINT;
     default:
       return `Adjust image ${label.toLowerCase()}.`;
   }
