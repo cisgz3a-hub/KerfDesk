@@ -141,6 +141,18 @@ export function timeBoundStartInputsFor(
   return remembered.get(key(fingerprint));
 }
 
+/**
+ * The variable-text clock the program on screen was compiled with, as a
+ * preparation hook. Job Review recompiled at each Confirm with a fresh clock
+ * and never reproduced a shown seconds field, so the review could not be
+ * confirmed (oracle audit O1, O5-P2-2). Its rebuild keeps the shown clock, so
+ * the burn carries the date and time the operator approved.
+ */
+export function shownProgramClock(gcode: string): { readonly evaluatedAtIso?: string } {
+  const shown = remembered.get(key(fingerprintGcode(gcode)));
+  return shown === undefined ? {} : { evaluatedAtIso: shown.evaluatedAtIso };
+}
+
 /** Test seam: a fresh session has compiled nothing. */
 export function forgetTimeBoundStartInputsForTests(): void {
   remembered.clear();

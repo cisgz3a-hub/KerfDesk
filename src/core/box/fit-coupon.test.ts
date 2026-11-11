@@ -73,6 +73,38 @@ describe('generateFitCoupon', () => {
     expect(result.issues[0]?.message).toContain('top rung');
   });
 
+  // O4-P2-1: the generator leaves kerf to the cutting layer (default kerf
+  // offset 0), so on such a layer every rung ≥ 0 is loose by about twice the kerf. The
+  // ladder must reach the press fits (negative clearance) the Box Generator
+  // accepts, with the same |c| < min(f, T)/2 bound.
+  it('starts the ladder below zero to reach press fits, bounded like the generator', () => {
+    const press = { ...SPEC, startClearanceMm: -0.2 };
+    const result = generateFitCoupon(press);
+    expect(result.kind).toBe('generated');
+    if (result.kind !== 'generated') return;
+    const tabTips = runs(result.parts[0]?.rings.outline ?? { closed: true, points: [] }, 13);
+    const notchFloors = runs(
+      result.parts[1]?.rings.outline ?? { closed: true, points: [] },
+      10 + 3 + 6 + 10,
+    );
+    expect(tabTips).toHaveLength(press.rungCount);
+    expect(notchFloors).toHaveLength(press.rungCount);
+    for (let i = 0; i < press.rungCount; i += 1) {
+      const c = fitCouponClearanceMm(press, i);
+      const tab = tabTips[i];
+      const notch = notchFloors[i];
+      if (tab === undefined || notch === undefined) throw new Error('rung missing');
+      expect(tab[1] - tab[0]).toBeCloseTo(9 - c / 2, 9);
+      expect(notch[1] - notch[0]).toBeCloseTo(9 + c / 2, 9);
+    }
+    expect(fitCouponClearanceMm(press, 0)).toBeLessThan(0);
+    // Half of min(f, T) = 1.5 mm is the generator's clearance bound too.
+    const tooTight = generateFitCoupon({ ...SPEC, startClearanceMm: -1.5 });
+    expect(tooTight.kind).toBe('invalid');
+    if (tooTight.kind === 'invalid') expect(tooTight.issues[0]?.message).toContain('first rung');
+    expect(generateFitCoupon({ ...SPEC, startClearanceMm: Number.NaN }).kind).toBe('invalid');
+  });
+
   it('rejects non-integer or out-of-range rung counts', () => {
     expect(generateFitCoupon({ ...SPEC, rungCount: 1 }).kind).toBe('invalid');
     expect(generateFitCoupon({ ...SPEC, rungCount: 2.5 }).kind).toBe('invalid');

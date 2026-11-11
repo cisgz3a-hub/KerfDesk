@@ -9245,17 +9245,26 @@ Simulator-tested only; no real Ruida has run this path.
    finger width, ladder start/step/count (defaults 0.05/0.05/6), and in
    CNC mode the relief tool. Machine-aware defaults follow F-K3.
 2. **Generate** inserts two strips — a tab comb and a slot strip — as
-   one undo step. Rung i carries i+1 index nicks; its joint play is
-   exactly start + i·step, split across tab and notch like production
-   panels.
-3. The operator cuts both strips, presses each rung, and types the
-   winning rung's clearance into the Box Generator.
+   one undo step. The strips carry no index marks: rung 0 sits half a
+   finger from the start, the last rung two fingers from the end
+   (ADR-119 Amendment 1). Rung i's joint play is exactly start + i·step,
+   split across tab and notch like production panels.
+3. The operator cuts both strips on the layer the box will use, presses
+   each rung, and types the winning rung's clearance into the Box
+   Generator.
+
+#### Edge — laser layer without a kerf offset
+
+1. Kerf is compensated by the cutting layer, not the coupon. On a layer
+   whose kerf offset is 0 every rung is loose by about twice the kerf. The
+   ladder start may be negative (a press fit) down to the same bound as
+   the Box Generator, and the laser dialog says so.
 
 #### Error — ladder exceeds the joint limit
 
 1. A ladder whose top rung reaches half the finger width (or half the
-   thickness) reports the count/step fields; **Generate** stays
-   disabled.
+   thickness), or whose first rung is that far below zero, reports the
+   ladder fields; **Generate** stays disabled.
 
 #### Empty
 
