@@ -572,17 +572,36 @@ async function installWorkerProbe(page: Page): Promise<void> {
           } else {
             request.settledAt = now;
             request.ticksAtEnd = probe.ticks;
-            request.outcome = reply.kind;
-            if (reply.kind === 'error') request.message = reply.message;
-            else {
-              request.geometryJson = JSON.stringify(reply.paths);
-              for (const path of reply.paths)
+            if (reply.kind === 'error') {
+              request.message = reply.message;
+              request.outcome = reply.kind;
+              return;
+            }
+            // The geometry usually arrives packed (trace-result-transfer.ts);
+            // rebuild it with the app's own module. The outcome is recorded
+            // once the counts and geometry are.
+            void (async (): Promise<void> => {
+              let paths = reply.paths ?? [];
+              if (reply.packedPaths !== undefined) {
+                const transferPath = '/src/ui/trace/trace-result-transfer.ts';
+                const stepsPath = '/src/core/trace/trace-steps.ts';
+                const transfer = (await import(
+                  /* @vite-ignore */ transferPath
+                )) as typeof import('../src/ui/trace/trace-result-transfer');
+                const steps = (await import(
+                  /* @vite-ignore */ stepsPath
+                )) as typeof import('../src/core/trace/trace-steps');
+                paths = steps.runTraceSteps(transfer.unpackTracePathsSteps(reply.packedPaths));
+              }
+              request.geometryJson = JSON.stringify(paths);
+              for (const path of paths)
                 for (const line of path.polylines) {
                   request.polylines++;
                   if (line.closed) request.closedPolylines++;
                   request.vertices += line.points.length;
                 }
-            }
+              request.outcome = reply.kind;
+            })();
           }
         });
         const post = worker.postMessage.bind(worker);

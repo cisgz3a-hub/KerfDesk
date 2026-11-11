@@ -95,6 +95,7 @@ export async function delaySecondSvgBitmap(page: Page): Promise<void> {
     const imageUrls = new Map<string, number>();
     const originalUrl = URL.createObjectURL.bind(URL);
     let fileCount = 0;
+    let consumed = false;
     URL.createObjectURL = (blob) => {
       const url = originalUrl(blob);
       if (blob instanceof File && blob.name === 'embedded.png') {
@@ -103,10 +104,27 @@ export async function delaySecondSvgBitmap(page: Page): Promise<void> {
       }
       return url;
     };
+    // A PNG at its own size decodes with createImageBitmap rather than an
+    // <img> (ADR-357 Amendment 4), so hold the second bitmap on either route.
+    const nativeBitmap = window.createImageBitmap.bind(window);
+    window.createImageBitmap = ((source: ImageBitmapSource, ...rest: never[]) => {
+      if (source instanceof File && source.name === 'embedded.png') {
+        if (!files.has(source)) files.set(source, ++fileCount);
+        if (!consumed && files.get(source) === 2) {
+          consumed = true;
+          state.held = true;
+          return new Promise<ImageBitmap>((resolve, reject) => {
+            state.release = () => {
+              nativeBitmap(source, ...rest).then(resolve, reject);
+            };
+          });
+        }
+      }
+      return nativeBitmap(source, ...rest);
+    }) as typeof window.createImageBitmap;
     const descriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
     if (descriptor?.set === undefined) throw new Error('Native image src setter unavailable');
     const nativeSet = descriptor.set;
-    let consumed = false;
     Object.defineProperty(HTMLImageElement.prototype, 'src', {
       ...descriptor,
       set(this: HTMLImageElement, value: string) {
