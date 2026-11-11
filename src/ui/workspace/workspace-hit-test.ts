@@ -7,13 +7,14 @@
 // the snap reach, not by millimetres of artwork (ADR-196 Amendment 1): 2 mm
 // was 1.5 px on a 1300 mm bed at fit and 75 px on a 400 mm bed zoomed right in.
 
+import type { Scene, Vec2 } from '../../core/scene';
+// From the module, not the scene barrel: that barrel is over its export cap
+// and may only shrink (scripts/check-index-exports.mjs).
 import {
   DEFAULT_STROKE_HIT_TOLERANCE_MM,
   hitTestDetailed,
-  type Scene,
   type SceneHit,
-  type Vec2,
-} from '../../core/scene';
+} from '../../core/scene/hit-test';
 import { hitTestCandidates } from '../../core/scene/hit-test-candidates';
 import { useUiStore } from '../state/ui-store';
 
