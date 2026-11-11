@@ -16,7 +16,11 @@ import { PlatformProvider } from '../app/platform-context';
 import { useMaterialLibraryPersistence } from '../app/use-material-library-persistence';
 import { libraryDocument } from '../state/material-library-collection';
 import { restoreCollection } from '../state/material-library-persistence';
+import { createStreamer, step } from '../../core/controllers/grbl';
 import { useStore } from '../state';
+import { answerAppDialogs, clearAppDialogs } from '../state/app-dialog-test-helpers';
+import { JOB_ACTIVE_CONFIRM_BLOCKED } from '../state/job-aware-dialogs';
+import { useLaserStore } from '../state/laser-store';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { SavedLibrariesDialog } from './SavedLibrariesDialog';
@@ -109,6 +113,7 @@ afterEach(async () => {
     mounted = null;
   }
   resetStore();
+  clearAppDialogs();
   useToastStore.setState({ toasts: [] });
   vi.restoreAllMocks();
 });
@@ -203,23 +208,58 @@ describe('SavedLibrariesDialog', () => {
     expect(useStore.getState().materialLibrary?.name).toBe('Beta'); // active unchanged
   });
 
-  it('deletes a library after confirmation', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+  it('deletes a library after an in-app confirmation with a named button', async () => {
+    const native = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const answers = answerAppDialogs(() => true);
     const { host } = await renderDialog();
 
     await click(host, 'Delete Alpha');
+    answers.stop();
 
     expect(libraryNames()).not.toContain('Alpha');
     expect(libraryNames()).toContain('Beta');
+    expect(native).not.toHaveBeenCalled();
+    expect(answers.asked.map((request) => request.options)).toEqual([
+      {
+        title: 'Delete library?',
+        message: 'Delete library "Alpha" and the presets saved in it?',
+        confirmLabel: 'Delete',
+        tone: 'danger',
+      },
+    ]);
   });
 
   it('keeps a library when delete is cancelled', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const answers = answerAppDialogs(() => false);
     const { host } = await renderDialog();
 
     await click(host, 'Delete Alpha');
+    answers.stop();
 
+    expect(answers.asked).toHaveLength(1);
     expect(libraryNames()).toContain('Alpha');
+  });
+
+  // Annoyance audit A1-P2-4: during a job the native confirm was refused with
+  // "A job is running — stop it before discarding or replacing work.", which
+  // a library delete is not.
+  it('can delete a library while a job is running', async () => {
+    useLaserStore.setState({ streamer: step(createStreamer('G1 X1 S100')).state });
+    const answers = answerAppDialogs(() => true);
+    try {
+      const { host } = await renderDialog();
+
+      await click(host, 'Delete Alpha');
+
+      expect(answers.asked).toHaveLength(1);
+      expect(libraryNames()).not.toContain('Alpha');
+      expect(useToastStore.getState().toasts.map((toast) => toast.message)).not.toContain(
+        JOB_ACTIVE_CONFIRM_BLOCKED,
+      );
+    } finally {
+      answers.stop();
+      useLaserStore.setState({ streamer: null });
+    }
   });
 
   it('imports a library from a file', async () => {

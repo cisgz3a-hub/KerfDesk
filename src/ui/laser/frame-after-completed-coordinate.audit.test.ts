@@ -33,6 +33,10 @@ vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
   jobAwareConfirm: vi.fn(() => true),
 }));
+// Frame's offers are asked in the app (ADR-707); the operator accepts them.
+vi.mock('../state/app-dialogs', () => ({
+  appConfirm: vi.fn(async () => true),
+}));
 vi.mock('./output-preparation-worker-client', async (importOriginal) => ({
   ...(await importOriginal<typeof OutputPreparationWorker>()),
   prepareStartOutputOffThread: async (
