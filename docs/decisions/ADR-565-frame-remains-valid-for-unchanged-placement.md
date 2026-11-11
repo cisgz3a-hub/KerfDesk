@@ -2,6 +2,8 @@
 
 **Status:** Accepted by the maintainer's explicit instruction on 2026-10-02. Software, release and physical-machine qualification remain separate evidence.
 
+**Amended by [Amendment 1](ADR-565-amendment-1-a-clean-jog-keeps-a-fixed-placement-frame.md):** a clean app-owned X/Y jog keeps the Frame of a job placed by Absolute Coords, User Origin or Verified Origin.
+
 **Context.** The maintainer requested that one completed Frame remain valid while changing power and speed, and that only coordinate changes require another Frame. Binding the physical trace to a full execution signature invalidated it after a process-setting edit and after each Start. Ignoring that signature alone would instead send the old prepared power and speed.
 
 **Decision.** A clean completed Frame records reusable spatial evidence for the job's framed footprint and resolved placement in the current controller session. Ordinary power and speed edits preserve that evidence. Starting or completing an app-owned job does not by itself discard it. Geometry, size, placement, output geometry, registration, work origin or coordinate-session drift invalidates the evidence. An interrupted Frame issues none. Reset, reconnect, alarm, interrupted execution and machine mutations retain their existing coordinate-evidence invalidation.
