@@ -13,6 +13,7 @@ import {
   type LegacyCheckpointStorage,
 } from '../state/recovery/testing';
 import { RecoveryRepository } from '../state/recovery';
+import { forgetSessionReviewedRuns } from '../state/session-reviewed-runs';
 import { resetStore } from '../state/test-helpers';
 import {
   framedRunPermitForCurrentState,
@@ -217,6 +218,10 @@ describe('completed Current Position replay', () => {
       throw new Error('Expected completed run evidence.');
     }
     vi.mocked(useLaserStore.getState().startJob).mockClear();
+    // An unchanged job reviewed in this session runs again without Job Review
+    // (ADR-237 Amendment 3). This case needs the dialog, so it is a replay the
+    // session no longer remembers reviewing, as after a reload.
+    forgetSessionReviewedRuns();
 
     uninstallAutoReview();
     let approvals = 0;

@@ -109,11 +109,15 @@ export async function editAdvisoryProfileValues(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Save machine setup', exact: true }).click();
 }
 
+/** `review` says what the press does first. Start always shows Job Review. Run
+ * again of an unchanged laser job reviewed in this session carries that review
+ * and starts with no dialog (ADR-237 Amendment 3). */
 export async function runAndFinish(
   page: Page,
   kerfdesk: KerfDeskFixture,
   action = 'Start',
   reviewWarning?: RegExp,
+  review: 'shown' | 'carried' = 'shown',
 ): Promise<string[]> {
   await selectWorkspacePanel(page, 'Machine');
   const start = page.getByRole('button', { name: action, exact: true });
@@ -121,20 +125,28 @@ export async function runAndFinish(
   await kerfdesk.setAutoAcknowledge(false);
   const events = await kerfdesk.events();
   const baselineLines = serialWriteLineCount(events);
-  await start.click();
-  const review = page.getByRole('dialog', { name: 'Review job before starting' });
-  await expect(review).toBeVisible();
-  if (reviewWarning !== undefined) await expect(review).toContainText(reviewWarning);
-  reviewEstimateTimes.set(
-    page,
-    await review.getByText('Estimated time', { exact: true }).locator('..').innerText(),
-  );
-  await confirmJobReview(
-    page,
-    kerfdesk,
-    undefined,
-    reportAt(settledHeads.get(page) ?? { x: 0, y: 0 }),
-  );
+  const reviewDialog = page.getByRole('dialog', { name: 'Review job before starting' });
+  const startReport = reportAt(settledHeads.get(page) ?? { x: 0, y: 0 });
+  if (review === 'carried') {
+    // The press itself hands the job to the controller. Had a dialog opened,
+    // the handoff below would wait for a click nobody makes and time out.
+    await confirmJobReview(page, kerfdesk, start, startReport);
+    await expect(reviewDialog).toHaveCount(0);
+    await expect(
+      page.getByRole('button', {
+        name: /^Dismiss info notification: Running the same reviewed job again/,
+      }),
+    ).toBeVisible();
+  } else {
+    await start.click();
+    await expect(reviewDialog).toBeVisible();
+    if (reviewWarning !== undefined) await expect(reviewDialog).toContainText(reviewWarning);
+    reviewEstimateTimes.set(
+      page,
+      await reviewDialog.getByText('Estimated time', { exact: true }).locator('..').innerText(),
+    );
+    await confirmJobReview(page, kerfdesk, undefined, startReport);
+  }
   await acknowledgeJobLinesOnly(page, kerfdesk, baselineLines);
   await expect
     .poll(async () => programLinesSince(await kerfdesk.events(), events.length).at(-1))

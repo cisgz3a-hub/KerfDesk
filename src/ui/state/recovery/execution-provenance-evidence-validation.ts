@@ -16,6 +16,7 @@ import {
   isRunId,
   isSafeNonNegativeInteger,
 } from './execution-provenance-validation-helpers';
+import { hasValidCarriedOver } from './execution-review-carried-over-validation';
 import type { ExecutionWorkflowV2 } from './execution-workflow-evidence';
 import { isLaserSecondPassChain } from './laser-second-pass-lineage';
 
@@ -31,7 +32,11 @@ export function hasValidV2Review(provenance: ExecutionProvenanceV2): boolean {
   if (!hasValidReviewAcknowledgement(value['acknowledgement'])) return false;
   if (!hasValidOptionalStartEvidence(value)) return false;
   if (!startEvidenceMatchesController(value, provenance.controller)) return false;
-  return hasValidWorkflow(provenance.workflow) && workflowMatchesReview(provenance.workflow, value);
+  return (
+    hasValidWorkflow(provenance.workflow) &&
+    workflowMatchesReview(provenance.workflow, value) &&
+    hasValidCarriedOver(value, provenance.workflow)
+  );
 }
 
 function startEvidenceMatchesController(

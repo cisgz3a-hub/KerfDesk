@@ -17,6 +17,7 @@ import type { PreparedJobMetrics } from '../laser/prepared-job-metrics';
 import type { ControllerKind } from '../../core/devices';
 import type { CanvasJobTimingPlanResult } from './canvas-job-timing-plan';
 import type { LaserSecondPassChain } from './recovery/laser-second-pass-lineage';
+import type { ReviewCarriedOverV2 } from './recovery/execution-workflow-evidence';
 import { matchesCncFrameReturnWorkZ } from './framed-run-cnc-return-position';
 import type { LaserPowerScale } from '../laser/connected-laser-power-scale';
 
@@ -46,6 +47,10 @@ export type FramedRunReviewEvidence = {
   readonly reviewModel: JobReviewModel;
   readonly laserModeStartEvidence?: LaserModeStartEvidence;
   readonly cncSetupAttestation?: CncSetupAttestation;
+  /** Present when Run again carried an earlier confirmation instead of showing
+   * the dialog (ADR-237 Amendment 3). Everything else here is still built from
+   * this run's own fresh preparation. */
+  readonly carriedOver?: ReviewCarriedOverV2;
 };
 
 /** Immutable exact prepared input carried by the Frame motion until physical completion. */
