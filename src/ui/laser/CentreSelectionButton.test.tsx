@@ -242,7 +242,7 @@ describe('Centre selection in the jog pad', () => {
         },
       })),
     );
-    expect(centreButton().title).toContain('file export only');
+    expect(centreButton().title).toContain('runs from files or its own USB link');
     expect(host.textContent).not.toContain('Set up LED');
     expect(jog).not.toHaveBeenCalled();
   });

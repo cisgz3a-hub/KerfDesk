@@ -26,6 +26,7 @@ describe('machineSetupControllerGuide', () => {
       'marlin',
       'smoothieware',
       'ruida',
+      'lihuiyu',
       'moshi',
     ]);
     for (const guide of guides) {
