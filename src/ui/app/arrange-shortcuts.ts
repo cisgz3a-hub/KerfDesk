@@ -17,7 +17,7 @@ import { arrangeShortcutCommandId } from '../commands/arrange-shortcut-keys';
 import type { CommandId } from '../commands/command-types';
 import { DRAW_ORDER_STEPS, MOVE_TOGETHER_STEPS } from '../commands/layout-commands';
 import { selectedObjectIds, selectionUnitCount } from '../commands/selection-command-state';
-import { isEditableShortcutTarget, isScrollRegionTarget } from '../common/keyboard-targets';
+import { focusedControlOwnsKey, isScrollRegionTarget } from '../common/keyboard-targets';
 import { useStore } from '../state/store';
 import { withUndoStepName } from '../state/undo-step-names';
 
@@ -36,7 +36,7 @@ export function handleArrangeShortcut(
   context: () => ArrangeShortcutCtx,
 ): boolean {
   // A tab strip that already switched tabs on Alt+arrow keeps the key to itself.
-  if (isEditableShortcutTarget(e.target) || e.defaultPrevented) return false;
+  if (focusedControlOwnsKey(e) || e.defaultPrevented) return false;
   const id = arrangeShortcutCommandId(e);
   if (id === null) return false;
   if (isDrawOrderKey(id) && isScrollRegionTarget(e.target)) return false;

@@ -6,6 +6,8 @@ import type { AppState } from './store';
 export type SceneLockActions = {
   readonly lockSelection: () => void;
   readonly unlockAllObjects: () => void;
+  /** Unlocks just these objects, as one undo step (annoyance audit A4-P2-3). */
+  readonly unlockObjects: (ids: ReadonlyArray<string>) => void;
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -14,6 +16,7 @@ export function sceneLockActions(set: Setter): SceneLockActions {
   return {
     lockSelection: () => set((state) => lockSelectionInState(state)),
     unlockAllObjects: () => set((state) => unlockAllObjectsInState(state)),
+    unlockObjects: (ids) => set((state) => unlockObjectsInState(state, ids)),
   };
 }
 
@@ -43,6 +46,24 @@ function unlockAllObjectsInState(state: AppState): AppState | Partial<AppState> 
   return {
     project: nextProject,
     undoStack: pushUndo(state.project, state.undoStack),
+    redoStack: [],
+    dirty: true,
+  };
+}
+
+function unlockObjectsInState(
+  state: AppState,
+  ids: ReadonlyArray<string>,
+): AppState | Partial<AppState> {
+  const wanted = new Set(ids);
+  if (wanted.size === 0) return state;
+  const nextProject = mapObjects(state.project, (object) =>
+    wanted.has(object.id) && object.locked === true ? unlockedObject(object) : object,
+  );
+  if (nextProject === state.project) return state;
+  return {
+    project: nextProject,
+    undoStack: pushUndo(state.project, state.undoStack, 'Unlock'),
     redoStack: [],
     dirty: true,
   };

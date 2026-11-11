@@ -41,8 +41,7 @@ export function LaserOperationFields(props: {
   const setObjectsOverride = useStore((state) => state.setObjectsOperationOverrideForOperation);
   const setOverride = (patch: Partial<ReturnType<typeof captureLayerOperationSettings>>): void =>
     setObjectsOverride(props.objectIds, props.baseOperation.id, patch);
-  const { settingsOpen, cutSettingsBlocked, openSettings, closeSettings } =
-    useCutSettingsLauncher();
+  const { settingsOpen, openSettings, closeSettings } = useCutSettingsLauncher();
   const commit = (patch: Partial<ReturnType<typeof captureLayerOperationSettings>>): void => {
     if (props.editObjectOverride) setOverride(patch);
     else setLayerParam(props.baseOperation.id, patch);
@@ -90,7 +89,6 @@ export function LaserOperationFields(props: {
           target={target}
           airAssistMixed={props.mixedFields.airAssist === true}
           modeMixed={modeMixed}
-          cutSettingsBlocked={cutSettingsBlocked}
           onOpenCutSettings={openSettings}
         />
       )}
@@ -118,7 +116,6 @@ function AdvancedLaserFields(props: {
   readonly target: LayerOperationControlTarget;
   readonly airAssistMixed: boolean;
   readonly modeMixed: boolean;
-  readonly cutSettingsBlocked: boolean;
   readonly onOpenCutSettings: () => void;
 }): JSX.Element {
   const { operation, target } = props;
@@ -135,7 +132,6 @@ function AdvancedLaserFields(props: {
       </div>
       <MoreCutSettingsButton
         mode={props.modeMixed ? null : operation.mode}
-        disabled={props.cutSettingsBlocked}
         onOpen={props.onOpenCutSettings}
       />
     </>
@@ -184,7 +180,6 @@ const MORE_SETTINGS_SUMMARY: Record<LayerMode, string> = {
 
 function MoreCutSettingsButton(props: {
   readonly mode: LayerMode | null;
-  readonly disabled: boolean;
   readonly onOpen: () => void;
 }): JSX.Element {
   const summary =
@@ -195,7 +190,6 @@ function MoreCutSettingsButton(props: {
       aria-label="More cut settings"
       title={`Open Cut Settings: ${summary}`}
       onClick={props.onOpen}
-      disabled={props.disabled}
       className="lf-laser-more"
     >
       <span>

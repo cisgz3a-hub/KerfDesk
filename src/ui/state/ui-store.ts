@@ -124,6 +124,8 @@ export type WorkspaceContextBarState = {
   readonly x: number;
   readonly y: number;
   readonly context: 'workspace-empty' | 'workspace-selection';
+  /** The locked object under the right-click, which the menu offers to unlock. */
+  readonly lockedObjectId?: string;
 };
 
 export type FloatingPanelPosition = {
