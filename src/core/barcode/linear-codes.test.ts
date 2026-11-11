@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { readCode128, readCode39, readEan } from '../../__fixtures__/barcode/linear-decoders';
+import {
+  CODE128_READER_PATTERNS,
+  readCode128,
+  readCode39,
+  readEan,
+} from '../../__fixtures__/barcode/linear-decoders';
 import { CODE128_WIDTHS, code128Values, encodeCode128 } from './code128';
 import { encodeCode39 } from './code39';
 import { encodeEanUpc, gs1CheckDigit, type EanKind } from './ean-upc';
@@ -31,6 +36,11 @@ describe('Code 128', () => {
       expect(((elements[0] ?? 0) + (elements[2] ?? 0) + (elements[4] ?? 0)) % 2).toBe(0);
     }
     expect(CODE128_WIDTHS[106]).toBe('2331112');
+  });
+
+  it('agrees with the test reader, whose table is transcribed separately (O1-P3-1)', () => {
+    expect(CODE128_READER_PATTERNS).not.toBe(CODE128_WIDTHS);
+    expect(CODE128_WIDTHS.slice(0, 106)).toEqual(CODE128_READER_PATTERNS);
   });
 
   it('matches the published check-character example (PJJ123C)', () => {

@@ -1,7 +1,10 @@
 // QR Code data masking (ISO/IEC 18004 §7.8): the eight mask conditions and
 // the four penalty rules used to pick the least ambiguous mask. The finder-
 // like rule counts a 1:1:3:1:1 run only when four light modules inside the
-// symbol flank it, the widely deployed reading of the rule.
+// symbol flank it. That is ZXing's reading (MaskUtil.isWhiteHorizontal), which
+// the reference symbols in the tests pin; Nayuki's generator counts modules
+// beyond the edge as light instead, so the two can pick different masks for
+// the same data. Either mask scans (Oracle audit O1-P3-2).
 
 import type { QrGrid } from './qr-matrix';
 

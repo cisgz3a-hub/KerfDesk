@@ -11,6 +11,7 @@ import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/wor
 import type { Project } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
 import { detectActiveWcsMismatchWarnings } from './active-wcs-warnings';
+import { detectBarcodeLineIntervalWarnings } from './barcode-line-interval-warnings';
 import { detectCncAngledToolFeedWarnings } from './cnc-angled-tool-feed-warnings';
 import { detectCompiledReliefDepthWarningsForJob } from './cnc-compiled-depth-warnings';
 import { detectCncContourPrecisionWarnings } from './cnc-contour-precision-warnings';
@@ -90,6 +91,7 @@ export function detectMachineJobWarnings(
     ...machineWarnings,
     // Machine-agnostic like the WCS check: a code either machine engraves.
     ...detectDataMatrixScanWarnings(project),
+    ...detectBarcodeLineIntervalWarnings(project),
   ];
 }
 
