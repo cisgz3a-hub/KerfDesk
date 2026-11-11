@@ -49,8 +49,9 @@ export function MeasuredScanOffsetApply(props: {
     <div style={panelStyle}>
       <ScanOffsetMeasurementFormatControls format={format} onChange={handleFormatChange} />
       <p style={mutedStyle}>
-        Sign is preserved from the selected source convention. Positive moves reverse rows along
-        their travel direction; negative moves them opposite. Blank offset rows are ignored.
+        Sign is preserved from the selected source convention. Each row moves half the value;
+        positive moves it along its own travel direction, negative opposite. Blank offset rows are
+        ignored.
       </p>
       <ScanOffsetOverrideNotice project={project} />
       <div style={measurementListStyle}>

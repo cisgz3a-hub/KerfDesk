@@ -34,9 +34,10 @@ export function SettingsGeneralSection(): JSX.Element {
       <section style={settingsGroupStyle}>
         <h3 style={settingsHeadingStyle}>Autosave</h3>
         <p style={settingsNoteStyle}>
-          Unsaved work is copied to this computer every {AUTOSAVE_INTERVAL_MS / 1000} seconds,
-          except while a job is running, and offered back the next time KerfDesk starts. The
-          interval is fixed.
+          Unsaved work is copied to this computer every {AUTOSAVE_INTERVAL_MS / 1000} seconds and
+          offered back the next time KerfDesk starts. It keeps running while a job runs, unless
+          copying the project could disturb the job: the status bar then shows{' '}
+          <strong>Autosave waiting for job</strong> until the job ends. The interval is fixed.
         </p>
       </section>
     </>

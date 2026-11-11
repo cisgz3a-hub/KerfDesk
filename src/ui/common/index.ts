@@ -1,3 +1,4 @@
+export { AppDialogHost } from './AppDialogHost';
 export { ConfirmSaveDialog } from './ConfirmSaveDialog';
 export { SaveFilenamePanel } from './SaveFilenamePanel';
 export { StatusBar } from './StatusBar';

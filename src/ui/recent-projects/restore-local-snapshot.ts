@@ -4,8 +4,7 @@ import { completeNativeProjectOpen } from '../app/project-open-completion';
 import { parseOpenedProjectFile } from '../app/project-open-parser';
 import { claimProjectOpenRequest } from '../app/project-open-request-owner';
 import { useStore } from '../state';
-import { useLaserStore } from '../state/laser-store';
-import { isActiveJob } from '../state/laser-store-helpers';
+import { anyMachineJobActive } from '../state/link-machine-work';
 import type { ToastVariant } from '../state/toast-store';
 import type { LocalSnapshotStorage } from './local-snapshot-storage';
 
@@ -73,7 +72,7 @@ export async function restoreLocalSnapshot(
 }
 
 function jobActive(): boolean {
-  return isActiveJob(useLaserStore.getState().streamer);
+  return anyMachineJobActive();
 }
 
 function canRestore(isCurrent: () => boolean): boolean {

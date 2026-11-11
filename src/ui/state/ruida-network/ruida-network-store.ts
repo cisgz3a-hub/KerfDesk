@@ -33,6 +33,7 @@ import {
   ruidaStopOutcome,
 } from './ruida-network-messages';
 import { watchRuidaRun, type RuidaMonitor } from './ruida-network-monitor';
+import { reportLinkMachineWork, type LinkMachineWork } from '../link-machine-work';
 
 export type RuidaNetworkPhase =
   | 'disconnected'
@@ -188,7 +189,8 @@ async function run(set: Set, get: Get, kind: 'frame' | 'job', job: RuidaNetworkJ
   set({
     phase: frame ? 'framing' : 'running',
     status,
-    advisories: frame ? [] : job.advisories,
+    // The job's warnings show from its Frame on (code quality audit C2 D1-P2-1).
+    advisories: job.advisories,
     message: frame ? 'Sending the Frame (laser off)…' : 'Sending the job…',
     tone: 'info',
   });
@@ -261,7 +263,7 @@ function watchToEnd(
     status: (status, positionMm) => set({ status, positionMm }),
     paused: () => get().phase === 'paused',
     silent: () => set({ message: RUIDA_STATUS_SILENT, tone: 'warning' }),
-    finished: () => {
+    finished: (sawBusy) => {
       current.monitor = null;
       // Only a run still in progress finishes; a stopped one never counts as a Frame.
       const phase = get().phase;
@@ -271,7 +273,9 @@ function watchToEnd(
           ? {
               phase: 'idle',
               framed: footprint,
-              message: 'Frame finished. Start is available for this footprint.',
+              message: sawBusy
+                ? 'Frame finished. Start is available for this footprint.'
+                : 'Frame finished: the controller took the whole frame and read idle before any status read caught it moving (a short frame). Start is available for this footprint.',
               tone: 'info',
             }
           : {
@@ -335,3 +339,27 @@ export function resetRuidaNetworkStoreForTests(): void {
   live = null;
   useRuidaNetworkStore.setState({ ...DISCONNECTED, message: '', tone: 'info' });
 }
+
+// Active work is reported where the always-mounted guards can see it without
+// loading this store (link-machine-work.ts; ADR-705 Amendment 3).
+const ACTIVE_WORK: Partial<Record<RuidaNetworkPhase, LinkMachineWork['activity']>> = {
+  framing: 'framing',
+  running: 'running',
+  paused: 'paused',
+  stopping: 'stopping',
+};
+
+useRuidaNetworkStore.subscribe((state) => {
+  const activity = ACTIVE_WORK[state.phase];
+  reportLinkMachineWork(
+    'ruida-network',
+    activity === undefined
+      ? null
+      : {
+          controller: 'Ruida',
+          activity,
+          advisories: state.advisories,
+          abort: () => useRuidaNetworkStore.getState().abort(),
+        },
+  );
+});

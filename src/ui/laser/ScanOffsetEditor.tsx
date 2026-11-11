@@ -35,13 +35,13 @@ export function ScanOffsetEditor(props: ScanOffsetEditorProps): JSX.Element {
     <Row label="Scan offset">
       <div
         style={editorStyle}
-        title="Calibrated bidirectional scan compensation. Positive values shift reverse raster/fill sweeps along their travel direction. This only changes generated G-code; it does not write firmware."
+        title="Calibrated bidirectional scan compensation. Each raster/fill sweep moves half the value; positive moves it along its own travel direction. This only changes generated G-code; it does not write firmware."
       >
         <p style={conventionNoteStyle}>
-          Stored values are KerfDesk mm/min plus the full signed separation; reverse rows move and
-          forward rows stay on design coordinates. A LightBurn Line Shift is half the pair gap, so
-          double its signed magnitude here. LightBurn Initial Offset and .lbso import are not
-          represented; Raster Diagnostics provides assisted conversion.
+          Stored values are mm/min plus the full signed separation; each row moves half of it,
+          forward rows one way and reverse rows the other, as LightBurn does. A LightBurn Line Shift
+          is half the pair gap, so double its signed magnitude here. LightBurn Initial Offset and
+          .lbso import are not represented; Raster Diagnostics provides assisted conversion.
         </p>
         {points.length === 0 ? (
           <span style={emptyStyle}>No calibrated offsets</span>
@@ -102,7 +102,7 @@ function ScanOffsetRow(props: {
         onValueChange={(offsetMm) => props.onChange({ offsetMm })}
         style={numInputStyle}
         aria-label={`Scan offset value ${rowNumber}`}
-        title="Offset in millimeters. Positive shifts reverse scanlines along their travel direction."
+        title="Full forward-to-reverse separation in millimeters. Each scanline moves half of it; positive moves it along its own travel direction."
       />
       <span style={unitStyle}>mm</span>
       <button

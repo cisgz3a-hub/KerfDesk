@@ -1,8 +1,11 @@
 // Watches a Ruida job or frame to its end over status reads (ADR-697), as
 // meerk40t's status monitor does (controller.py _status_monitor, 0.2 s between
-// reads of STATUS_ADDRESSES). A run counts as finished only after the
-// controller reported busy at least once and then idle twice in a row, so a
-// read taken before the controller begins never ends a run early. No bit for
+// reads of STATUS_ADDRESSES). The first read goes out as soon as the last
+// datagram is acknowledged. A run counts as finished after the controller
+// reported busy at least once and then idle twice in a row; a run so short
+// that no read ever saw it busy (a small Frame near the head) counts once the
+// controller, holding the whole file, reads idle four times in a row, so it
+// can never wait forever (code quality audit C2 D1-P2-2). No bit for
 // "paused" is known (rdjob.py L232-234), so while paused nothing finishes.
 
 import {
@@ -17,6 +20,8 @@ import type { RuidaLinkExchange } from './ruida-link-exchange';
 
 export const RUIDA_STATUS_POLL_MS = 400;
 const IDLE_READS_TO_FINISH = 2;
+/** Idle reads that end a run no read saw busy: 0, 0.4, 0.8 and 1.2 s. */
+export const IDLE_READS_WITHOUT_BUSY = 4;
 const SILENT_READS_TO_WARN = 3;
 
 export type RuidaMonitorEvents = {
@@ -24,7 +29,8 @@ export type RuidaMonitorEvents = {
     status: RuidaMachineStatus,
     positionMm: { x: number; y: number } | null,
   ) => void;
-  readonly finished: () => void;
+  /** `sawBusy` is false when the run ended before any read saw it busy. */
+  readonly finished: (sawBusy: boolean) => void;
   readonly silent: () => void;
   readonly paused: () => boolean;
 };
@@ -55,18 +61,18 @@ export function watchRuidaRun(
       if (ruidaStatusBusy(status)) {
         busySeen = true;
         idleReads = 0;
-      } else if (busySeen && !events.paused()) {
+      } else if (!events.paused()) {
         idleReads += 1;
       }
-      if (idleReads >= IDLE_READS_TO_FINISH) {
+      if (idleReads >= (busySeen ? IDLE_READS_TO_FINISH : IDLE_READS_WITHOUT_BUSY)) {
         stopped = true;
-        events.finished();
+        events.finished(busySeen);
         return;
       }
     }
     timer = setTimeout(() => void poll(), RUIDA_STATUS_POLL_MS);
   };
-  timer = setTimeout(() => void poll(), RUIDA_STATUS_POLL_MS);
+  timer = setTimeout(() => void poll(), 0);
   return {
     stop: () => {
       stopped = true;

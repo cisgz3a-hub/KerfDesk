@@ -30,6 +30,21 @@ export type AutosaveSnapshotFn = () => {
   readonly isStreaming: boolean;
 };
 
+export type AutosaveLoopOptions = {
+  /**
+   * Whether this project may be written while a job streams (ADR-305
+   * Amendment 1). Absent means never: the default writer is the synchronous
+   * localStorage one, which serialises the whole project on the canvas thread
+   * the job needs. Only a caller whose writer works off that thread passes it.
+   */
+  readonly writeDuringJob?: (project: Project) => boolean;
+  /**
+   * Told on every tick whether unsaved work is waiting for the job to end:
+   * true when a write was due and the job held it back.
+   */
+  readonly onWaitingForJob?: (waiting: boolean) => void;
+};
+
 // What the last attempted tick did, to which Project value, and against which
 // state of the slot. Store slices replace `project` with a new value on every
 // edit and never mutate one in place (undo/redo swap whole Project objects), so
@@ -87,17 +102,21 @@ export function startAutosaveLoop(
   intervalMs: number = AUTOSAVE_INTERVAL_MS,
   onWriteFailure?: (failure: AutosaveWriteFailure) => void,
   writer: AutosaveLoopWriter = writeAutosave,
+  options: AutosaveLoopOptions = {},
 ): () => void {
   let memo: AutosaveTickMemo = { kind: 'no-attempt' };
   let inFlight = false;
   const handle = setInterval(() => {
     const snap = getSnapshot();
-    if (!snap.dirty) return;
-    if (snap.isStreaming) return;
     // Read once per tick so the redundancy check and the memo it produces are
     // both stamped with the same slot generation.
     const generation = autosaveSlotGeneration();
-    if (isTickRedundant(memo, snap.project, generation)) return;
+    const due = snap.dirty && !isTickRedundant(memo, snap.project, generation);
+    // A job holds a write back unless the caller vouches for this project.
+    // Nothing is waiting when the slot already holds the project.
+    const held = due && snap.isStreaming && options.writeDuringJob?.(snap.project) !== true;
+    options.onWaitingForJob?.(held);
+    if (!due || held) return;
     if (inFlight) return;
     inFlight = true;
     const finish = (result: AutosaveLoopWriteResult): void => {
