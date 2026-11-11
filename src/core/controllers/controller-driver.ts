@@ -170,6 +170,8 @@ export type ControllerDriver = {
   /** Present when the app can reach this controller over its own USB link
    *  (ADR-703); absent for every serial driver. */
   readonly usbLink?: UsbLinkCapabilities;
+  /** The binary job file a file-only driver saves; absent: .rd (ADR-097). */
+  readonly fileFormat?: 'rd' | 'egv';
   readonly realtime: ControllerRealtime;
   readonly commands: ControllerCommands;
   /** Classify one inbound line into the firmware-neutral event union. */
