@@ -7,6 +7,7 @@
 // the encoder refuses those instead.
 
 import type { Vec2 } from '../../scene';
+import { maxOf, minOf } from '../../util';
 
 export const MM_PER_MIL = 0.0254;
 export const MOSHI_MAX_POSITION_MILS = 32767;
@@ -58,9 +59,9 @@ export function stepBounds(steps: ReadonlyArray<MoshiPoint>): MoshiBounds | null
 export function unionMoshiBounds(all: ReadonlyArray<MoshiBounds>): MoshiBounds | null {
   if (all.length === 0) return null;
   return {
-    minX: Math.min(...all.map((b) => b.minX)),
-    minY: Math.min(...all.map((b) => b.minY)),
-    maxX: Math.max(...all.map((b) => b.maxX)),
-    maxY: Math.max(...all.map((b) => b.maxY)),
+    minX: minOf(all.map((b) => b.minX)),
+    minY: minOf(all.map((b) => b.minY)),
+    maxX: maxOf(all.map((b) => b.maxX)),
+    maxY: maxOf(all.map((b) => b.maxY)),
   };
 }

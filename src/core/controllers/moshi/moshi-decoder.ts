@@ -137,6 +137,7 @@ function applyCommand(cursor: Cursor, command: number, steps: MoshiDecodedStep[]
     default:
       return;
   }
-  const cut = command === MOSHI_CUT_ABS || command === MOSHI_CUT_HORIZ || command === MOSHI_CUT_VERT;
+  const cut =
+    command === MOSHI_CUT_ABS || command === MOSHI_CUT_HORIZ || command === MOSHI_CUT_VERT;
   steps.push({ x: cursor.x, y: cursor.y, cut });
 }

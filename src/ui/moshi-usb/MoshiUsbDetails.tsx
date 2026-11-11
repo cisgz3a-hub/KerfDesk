@@ -12,11 +12,7 @@ import { prepareMoshiUsbJob } from '../state/moshi-usb/moshi-usb-job';
 import { useMoshiUsbStore, type MoshiUsbState } from '../state/moshi-usb/moshi-usb-store';
 import type { MoshiUsbOpener } from '../state/moshi-usb/moshi-usb-types';
 
-export default function MoshiUsbDetails({
-  open,
-}: {
-  readonly open: MoshiUsbOpener;
-}): JSX.Element {
+export default function MoshiUsbDetails({ open }: { readonly open: MoshiUsbOpener }): JSX.Element {
   const moshi = useMoshiUsbStore();
   const disconnected = moshi.phase === 'disconnected';
   return (

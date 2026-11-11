@@ -98,7 +98,15 @@ describe('Moshi USB store', () => {
         group.kind === 'cut'
           ? {
               ...group,
-              segments: [{ polyline: [{ x: 20, y: 10 }, { x: 60, y: 10 }], closed: false }],
+              segments: [
+                {
+                  polyline: [
+                    { x: 20, y: 10 },
+                    { x: 60, y: 10 },
+                  ],
+                  closed: false,
+                },
+              ],
             }
           : group,
       ),
@@ -138,9 +146,7 @@ describe('Moshi USB store', () => {
     });
     store = ctx.store;
     const long = compiled({
-      groups: JOB.groups.map((group) =>
-        group.kind === 'cut' ? { ...group, passes: 20 } : group,
-      ),
+      groups: JOB.groups.map((group) => (group.kind === 'cut' ? { ...group, passes: 20 } : group)),
     });
     await ctx.store.getState().frame(long);
     const dataBeforeStart = ctx.board.events.filter((event) => event.kind === 'data').length;

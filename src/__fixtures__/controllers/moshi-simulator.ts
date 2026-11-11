@@ -101,7 +101,8 @@ export class MoshiSimulator implements MoshiEppPort {
       this.events.push({ kind: 'estop' });
       this.receiving = false;
       this.buffer = [];
-      if (this.running !== null) this.runs.push({ program: this.running.program, completed: false });
+      if (this.running !== null)
+        this.runs.push({ program: this.running.program, completed: false });
       this.running = null;
     } else {
       this.events.push({ kind: 'unknown-address', byte });

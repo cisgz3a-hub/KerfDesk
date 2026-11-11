@@ -2,7 +2,7 @@
 // MeerK40t runs a raster as one raster-mode program whose moves are all
 // horizontal or vertical (meerk40t/moshi/driver.py `_goto_absolute` L817-845
 // at d511944e: a raster step that is neither is dropped) and supports only
-// horizontal scans (device.py `get_raster_instructions` L520-531 marks the
+// horizontal scans (device.py `get_raster_instructions` L533-545 marks the
 // diagonal, spiral and greedy orders unsupported). So each row here is a
 // vertical move to the row, a horizontal move to its entry runway, then
 // horizontal cuts across dark pixels and moves across light ones. A Moshi has
@@ -39,8 +39,12 @@ export function planRasterGroupSteps(group: RasterGroup): MoshiRasterPlan {
       head = planRow(steps, head, {
         y,
         reverse,
-        entryX: mmToMils(Math.max(0, reverse ? edge(runs.last) + runwayMm : edge(runs.first) - runwayMm)),
-        exitX: mmToMils(Math.max(0, reverse ? edge(runs.first) - runwayMm : edge(runs.last) + runwayMm)),
+        entryX: mmToMils(
+          Math.max(0, reverse ? edge(runs.last) + runwayMm : edge(runs.first) - runwayMm),
+        ),
+        exitX: mmToMils(
+          Math.max(0, reverse ? edge(runs.first) - runwayMm : edge(runs.last) + runwayMm),
+        ),
         startX: mmToMils(edge(runs.first)),
         runs: runs.runs.map((run) => ({ x: mmToMils(edge(run.endPixel)), on: run.on })),
       });

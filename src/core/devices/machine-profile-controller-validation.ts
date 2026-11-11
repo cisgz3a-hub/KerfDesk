@@ -28,9 +28,7 @@ function controllerKindIssues(profile: DeviceProfile): ReadonlyArray<string> {
   if (profile.controllerKind === undefined || isKnownControllerKind(profile.controllerKind)) {
     return [];
   }
-  return [
-    `controllerKind must be one of: ${KNOWN_CONTROLLER_KINDS.join(', ')}`,
-  ];
+  return [`controllerKind must be one of: ${KNOWN_CONTROLLER_KINDS.join(', ')}`];
 }
 
 function dialectIssues(profile: DeviceProfile): ReadonlyArray<string> {

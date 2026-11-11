@@ -101,6 +101,19 @@ export function machineSetupControllerGuide(
           'Set laser_module_maximum_s_value 1.0 (Full-power S stays 1): Smoothieware stores every S word in 12-bit 1.11 fixed point, so any S of 2 or more wraps and fires far below the requested power. Set laser_module_enable true and laser_module_minimum_power 0 for dark S0 feed moves. Edit the config through the Smoothieware USB/SD workflow, then reset and reconnect.',
       };
     case 'ruida':
+    case 'moshi':
+      return linkGuide(kind, common);
+  }
+}
+
+// Controllers outside the line-based store: Ruida files (ADR-097, ADR-697) and
+// the Moshiboard USB link (ADR-705).
+function linkGuide(
+  kind: 'ruida' | 'moshi',
+  common: ReturnType<typeof commonControllerGuide>,
+): MachineSetupControllerGuide {
+  switch (kind) {
+    case 'ruida':
       return {
         ...common,
         identityCommands: [],

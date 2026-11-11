@@ -225,10 +225,19 @@ export async function handleSaveGcode(
   }
   const placement = options.prebuilt?.placement ?? saveGcodePlacement(ctx);
   if (placement === null) return;
-  // File-only transports export a binary job instead of G-code text (ADR-097:
-  // Ruida .rd today). Route on the driver capability, not `controllerKind ===
-  // 'ruida'` — ADR-094 bans kind checks in ui/, and LaserWindow's sibling gate
-  // already keys on transport. selectControllerDriver normalizes an unknown kind.
+  if (await savedWithoutGcode(ctx, placement)) return;
+  await saveOrdinaryGcode(ctx, placement, options.prebuilt);
+}
+
+// File-only transports export a binary job instead of G-code text (ADR-097:
+// Ruida .rd today). Route on the driver capability, not `controllerKind ===
+// 'ruida'` — ADR-094 bans kind checks in ui/, and LaserWindow's sibling gate
+// already keys on transport. selectControllerDriver normalizes an unknown kind.
+// True when the save was handled here.
+async function savedWithoutGcode(
+  ctx: SaveGcodeCtx,
+  placement: Extract<ReturnType<typeof resolveExportJobPlacement>, { readonly ok: true }>,
+): Promise<boolean> {
   const driver = selectControllerDriver(ctx.project.device.controllerKind);
   // A USB-link controller with no public file format (ADR-705: Moshiboard)
   // has nothing to save: its programs exist only on the link.
@@ -237,14 +246,12 @@ export async function handleSaveGcode(
       `${driver.label} has no job file to save. Run the job from Machine details over its USB link.`,
       'warning',
     );
-    return;
+    return true;
   }
-  if (driver.capabilities.transport === 'file-only') {
-    const { handleSaveRd } = await import('./save-rd-action');
-    await handleSaveRd(ctx, placement);
-    return;
-  }
-  await saveOrdinaryGcode(ctx, placement, options.prebuilt);
+  if (driver.capabilities.transport !== 'file-only') return false;
+  const { handleSaveRd } = await import('./save-rd-action');
+  await handleSaveRd(ctx, placement);
+  return true;
 }
 
 async function saveOrdinaryGcode(

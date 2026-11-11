@@ -31,7 +31,8 @@ export function PositioningLightEditor({
   if (device.controllerKind === 'moshi') {
     return (
       <p>
-        A Moshiboard has no light or pointer command KerfDesk can send. Use the switch on the machine.
+        A Moshiboard has no light or pointer command KerfDesk can send. Use the switch on the
+        machine.
       </p>
     );
   }

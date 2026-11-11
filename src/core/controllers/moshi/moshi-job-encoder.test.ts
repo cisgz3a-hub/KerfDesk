@@ -99,8 +99,22 @@ describe('encodeMoshiJob', () => {
       airAssist: false,
       overscanMm: 2,
       segments: [
-        { polyline: [{ x: 10, y: 10 }, { x: 20, y: 10 }], closed: false, reverse: false },
-        { polyline: [{ x: 20, y: 11 }, { x: 10, y: 11 }], closed: false, reverse: true },
+        {
+          polyline: [
+            { x: 10, y: 10 },
+            { x: 20, y: 10 },
+          ],
+          closed: false,
+          reverse: false,
+        },
+        {
+          polyline: [
+            { x: 20, y: 11 },
+            { x: 10, y: 11 },
+          ],
+          closed: false,
+          reverse: true,
+        },
       ],
     };
     const [program] = decodeAll({ groups: [fill] });
@@ -157,7 +171,15 @@ describe('encodeMoshiJob', () => {
       groups: [
         {
           ...LINE,
-          segments: [{ polyline: [{ x: -1, y: 0 }, { x: 5, y: 5 }], closed: false }],
+          segments: [
+            {
+              polyline: [
+                { x: -1, y: 0 },
+                { x: 5, y: 5 },
+              ],
+              closed: false,
+            },
+          ],
         },
       ],
     };
@@ -165,7 +187,15 @@ describe('encodeMoshiJob', () => {
       groups: [
         {
           ...LINE,
-          segments: [{ polyline: [{ x: 0, y: 0 }, { x: 900, y: 5 }], closed: false }],
+          segments: [
+            {
+              polyline: [
+                { x: 0, y: 0 },
+                { x: 900, y: 5 },
+              ],
+              closed: false,
+            },
+          ],
         },
       ],
     };

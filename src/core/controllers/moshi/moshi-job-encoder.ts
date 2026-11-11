@@ -78,8 +78,7 @@ export function encodeMoshiJob(job: Job, _device: DeviceProfile): MoshiEncodeRes
     const bounds = stepBounds(planned);
     if (bounds === null) continue;
     const outside = planned.find((step) => !isMoshiPosition(step.x) || !isMoshiPosition(step.y));
-    if (outside !== undefined)
-      return { ok: false, error: outOfRange(group.layerId, outside) };
+    if (outside !== undefined) return { ok: false, error: outOfRange(group.layerId, outside) };
     motion.push({ group, steps: planned, bounds });
     programs.push(...groupPrograms(group, planned, bounds, notes));
   }
@@ -89,7 +88,10 @@ export function encodeMoshiJob(job: Job, _device: DeviceProfile): MoshiEncodeRes
   return { ok: true, programs, motion, footprint, notes: [...notes] };
 }
 
-function planGroup(group: Exclude<Group, { readonly kind: 'cnc' }>, notes: Set<string>): MoshiStep[] {
+function planGroup(
+  group: Exclude<Group, { readonly kind: 'cnc' }>,
+  notes: Set<string>,
+): MoshiStep[] {
   if (group.kind === 'cut') return planCutGroupSteps(group);
   if (group.kind === 'fill') return planFillGroupSteps(group);
   const raster = planRasterGroupSteps(group);

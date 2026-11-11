@@ -59,8 +59,8 @@ export function machineProtocolInventory(device: DeviceProfile, laser: LaserStat
         driver.kind === 'moshi'
           ? 'None: a Moshiboard runs only what its USB link streams (experimental)'
           : driver.kind === 'ruida'
-          ? 'Experimental vector .rd export; run from the machine panel'
-          : 'Save executable output and use a separately qualified controller/file workflow',
+            ? 'Experimental vector .rd export; run from the machine panel'
+            : 'Save executable output and use a separately qualified controller/file workflow',
     },
     {
       name: 'Firmware flashing',
