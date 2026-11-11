@@ -13,7 +13,7 @@ Every encoder is right. A decoder written from the standards, sharing no table o
 - 3,000 fuzzed 1D codes across the nine linear symbologies;
 - the engraved outlines of every symbology, normal and inverted.
 
-Every one decoded to exactly the typed data, with the quiet zone clear (or fully burned when inverted). The refuter's different generators (exact capacity boundaries, segmentation DP optimality, pad paths, UPC-E expansions) found nothing either.
+Every one decoded to exactly the typed data, with the quiet zone clear (or fully burned when inverted). The refuter's different generators (exact capacity boundaries, segmentation DP optimality, pad paths, UPC-E expansions) found nothing either. A second, third-party QR reader agreed on every symbol it was given (see Verified clean).
 
 The weak point is the step after the geometry. A scanline Fill burns one line every line interval. When the interval is wider than a module, whole rows of modules are never burned and the code cannot scan, and nothing in KerfDesk said so. That is **O1-P2-1**, fixed by a Job Review warning in #1780.
 
@@ -159,6 +159,7 @@ Readers decode all of these, so this is P3. Any change moves geometry or adds UI
 | QR codewords | ISO/IEC 18004 Annex I "01234567" 1-M: all 26 codewords exact | — |
 | QR round trip | 2,000 auditor and 1,360 refuter symbols decode exactly; pads, terminator and remainder bits correct | — |
 | QR segmentation | Refuter's exact O(n²) DP: 900/900 bit-optimal at v1, v10 and v27 | — |
+| QR, second independent reader | `@nuintun/qrcode` 5.0.3 (MIT; already in the `services/remote-control` lockfile, run from scratch, not added to the app) read 600 encoder matrices (L/M/Q/H, numeric, alphanumeric, byte, UTF-8) and the engraved outlines of 40 codes, normal and inverted. All 680 decode to the typed text two ways: module grid straight into its decoder, and its full image pipeline (4 px/module render with the quiet zone, binarize, finder detection, decode). No codeword needed error correction | — |
 | QR quiet zone 4X | `MIN_QUIET_ZONE.qr = 4` | VERIFIED: qrcode.com "four-module wide margin"; GS1 §5.7.4.2; ISO 18004:2015 clause 6.3.8 |
 | Data Matrix sizes, RS, placement, pads | All 24 sizes decode in ISO order; ISO "123456" → 142 164 186 \| 114 25 5 88 102; 396 auditor and 438 refuter strings decode; fixed corner exact | — |
 | Data Matrix quiet zone 1X | `MIN_QUIET_ZONE['data-matrix'] = 1` (default 2) | VERIFIED: GS1 §5.6.2 "one module wide on all four sides" |
