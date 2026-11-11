@@ -1269,6 +1269,9 @@ that owns those fields, without changing the existing Frame/Start policy.
    than 8,000,000 cells burns flat with a Job Review warning; raise the line interval or split the
    artwork. Ruida `.rd` export refuses a ramped fill, as it refuses images.
 5. Depth depends on the laser and stock. Test the length and floor on scrap first.
+6. On a rotary a ramped fill scans every pass along X in one direction, as an image does
+   (ADR-699 Amendment 1): its scan angle, Cross-hatch and angle per pass are set aside, and Job
+   Review says so when any of them was set.
 
 ### F-A7f. Material Test grids that vary any two settings (ADR-497)
 

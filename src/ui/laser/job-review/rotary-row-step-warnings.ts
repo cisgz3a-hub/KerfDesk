@@ -118,7 +118,8 @@ function rowStepWarning(group: RasterGroup, axis: AxisSteps): string | null {
     fittingRowIntervals(heightMm, steps, axis.scale, axis.stepsPerUnit),
   );
   return (
-    `Image layer ${group.layerId} on this rotary: one ${axis.stepsText} turns ` +
+    // ADR-699 Amd 1 (Z3-P3-4): a ramped Fill burns as a raster but is a Fill.
+    `${group.fillRamp === true ? 'Fill' : 'Image'} layer ${group.layerId} on this rotary: one ${axis.stepsText} turns ` +
     `the part ${mm(stepMm)} mm, and the ${mm(pitchMm)} mm line interval is ` +
     `${steps.toFixed(2)} steps, ${effect}. ${advice}`
   );
