@@ -30,6 +30,7 @@ export function firmwareReportQuery(driver: ControllerDriver): string | null {
     case 'smoothieware':
       return 'M115';
     case 'ruida':
+    case 'moshi':
       return null;
   }
 }
