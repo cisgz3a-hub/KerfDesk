@@ -164,11 +164,11 @@ describe('MeasuredScanOffsetApply', () => {
     }
   });
 
-  it('explains the reverse-only full signed measurement and previews the candidate table', async () => {
+  it('explains the full signed measurement, moved half each way, and previews the candidate table', async () => {
     const { host, unmount } = await renderMeasuredApply();
     try {
       expect(host.textContent).toContain('Do not divide the measurement in half');
-      expect(host.textContent).toContain('shifts reverse rows only');
+      expect(host.textContent).toContain('moves each row half of it');
       await changeInput(host, 'Measured offset 1', '0.07');
       const preview = host.querySelector('table[aria-label="Candidate scan-offset table"]');
       expect(preview?.textContent).toContain('+0.07 mm');
