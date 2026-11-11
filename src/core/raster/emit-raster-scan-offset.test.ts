@@ -17,7 +17,9 @@ function makeInput(overrides: Partial<EmitRasterInput> = {}): EmitRasterInput {
 }
 
 describe('emitRasterGroup scan-offset compensation', () => {
-  it('shifts only reverse rows by scan offset, including overscan coordinates', () => {
+  // ADR-052 Amendment 2: every row of a two-way scan moves half the table value
+  // along its own travel, forward rows +X and reverse rows -X, as LightBurn does.
+  it('moves forward and reverse rows half the scan offset each, including overscan coordinates', () => {
     const out = emitRasterGroup(
       makeInput({
         width: 4,
@@ -31,19 +33,19 @@ describe('emitRasterGroup scan-offset compensation', () => {
 
     const motion = out.split('\n').filter((line) => line.startsWith('G'));
     expect(motion).toEqual([
-      'G0 X-1.000 Y0.500 S0',
-      'G1 X0.000 F6000 S0 ; kerfdesk:laser-off-motion',
-      'G1 X2.000 S500',
-      'G1 X3.000 S0 ; kerfdesk:laser-off-motion',
-      'G0 X4.750 Y1.500 S0',
-      'G1 X3.750 S0 ; kerfdesk:laser-off-motion',
-      'G1 X1.750 S700',
-      'G1 X0.750 S0 ; kerfdesk:laser-off-motion',
+      'G0 X-0.875 Y0.500 S0',
+      'G1 X0.125 F6000 S0 ; kerfdesk:laser-off-motion',
+      'G1 X2.125 S500',
+      'G1 X3.125 S0 ; kerfdesk:laser-off-motion',
+      'G0 X4.875 Y1.500 S0',
+      'G1 X3.875 S0 ; kerfdesk:laser-off-motion',
+      'G1 X1.875 S700',
+      'G1 X0.875 S0 ; kerfdesk:laser-off-motion',
     ]);
   });
 
-  // A negative table moves reverse rows against their travel: +X here.
-  it('shifts reverse rows the other way for a negative scan offset', () => {
+  // A negative table moves each row against its travel: forward -X, reverse +X.
+  it('moves each row against its travel for a negative scan offset', () => {
     const out = emitRasterGroup(
       makeInput({
         width: 4,
@@ -57,18 +59,18 @@ describe('emitRasterGroup scan-offset compensation', () => {
 
     const motion = out.split('\n').filter((line) => line.startsWith('G'));
     expect(motion).toEqual([
-      'G0 X-1.000 Y0.500 S0',
-      'G1 X0.000 F6000 S0 ; kerfdesk:laser-off-motion',
-      'G1 X2.000 S500',
-      'G1 X3.000 S0 ; kerfdesk:laser-off-motion',
-      'G0 X5.250 Y1.500 S0',
-      'G1 X4.250 S0 ; kerfdesk:laser-off-motion',
-      'G1 X2.250 S700',
-      'G1 X1.250 S0 ; kerfdesk:laser-off-motion',
+      'G0 X-1.125 Y0.500 S0',
+      'G1 X-0.125 F6000 S0 ; kerfdesk:laser-off-motion',
+      'G1 X1.875 S500',
+      'G1 X2.875 S0 ; kerfdesk:laser-off-motion',
+      'G0 X5.125 Y1.500 S0',
+      'G1 X4.125 S0 ; kerfdesk:laser-off-motion',
+      'G1 X2.125 S700',
+      'G1 X1.125 S0 ; kerfdesk:laser-off-motion',
     ]);
   });
 
-  it('applies scan offset to every corrected reverse-row X coordinate', () => {
+  it('applies half the scan offset to every corrected reverse-row X coordinate', () => {
     const out = emitRasterGroup(
       makeInput({
         width: 4,
@@ -83,10 +85,10 @@ describe('emitRasterGroup scan-offset compensation', () => {
 
     const motion = out.split('\n').filter((line) => line.startsWith('G'));
     expect(motion.slice(4)).toEqual([
-      'G0 X2.750 Y1.500 S0',
-      'G1 X2.500 S0',
-      'G1 X1.000 S500',
-      'G1 X0.750 S0',
+      'G0 X2.875 Y1.500 S0',
+      'G1 X2.625 S0',
+      'G1 X1.125 S500',
+      'G1 X0.875 S0',
     ]);
   });
 

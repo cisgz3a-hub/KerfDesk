@@ -16,6 +16,7 @@ import { AutosavePreparationTimeoutError } from '../state/autosave-preparation-c
 import { IndexedDbAutosaveRepository } from '../state/autosave-indexeddb';
 import { AutosaveSessionLocks } from '../state/autosave-session-lock';
 import { useToastStore } from '../state/toast-store';
+import { useBackgroundSaveHealth } from '../state/background-save-health';
 import { keptTracePhotosMessage } from '../state/project-load-notices';
 import { legacyTraceDocument } from '../../__fixtures__/legacy-trace-source-project';
 import {
@@ -25,6 +26,7 @@ import {
   AUTOSAVE_RECOVERY_STORAGE_MESSAGE,
   AUTOSAVE_RECOVERY_VERSION_MESSAGE,
   createAutosaveFailureReporter,
+  reportingAutosaveWriter,
   runAutosaveRecovery,
 } from './use-autosave';
 
@@ -60,6 +62,73 @@ describe('createAutosaveFailureReporter', () => {
     ]);
     expect(AUTOSAVE_TIMEOUT_MESSAGE).not.toContain('storage');
     expect(AUTOSAVE_TIMEOUT_MESSAGE).toContain('Save the .lf2 file manually');
+  });
+});
+
+describe('reportingAutosaveWriter', () => {
+  const written = { kind: 'ok', savedAt: 1, storageKey: 'slot', backend: 'indexeddb' } as const;
+
+  afterEach(() => useBackgroundSaveHealth.setState({ signs: {} }));
+
+  it('tells the job gate each result and whether a job was running when it began', async () => {
+    const noteWrite = vi.fn();
+    let jobActive = true;
+    const write = reportingAutosaveWriter(
+      async () => {
+        // The job ended while the worker was busy: the hand-off was still in it.
+        jobActive = false;
+        return written;
+      },
+      { noteWrite },
+      () => jobActive,
+    );
+
+    await write(createProject());
+    await write(createProject());
+
+    expect(noteWrite.mock.calls).toEqual([
+      [written, true],
+      [written, false],
+    ]);
+  });
+
+  it('clears the failure sign on a good write and leaves it on any other result', async () => {
+    const report = createAutosaveFailureReporter(vi.fn());
+    report();
+    const sign = () => useBackgroundSaveHealth.getState().signs.autosave;
+    expect(sign()?.state).toBe('failed');
+
+    await reportingAutosaveWriter(
+      async () => ({ kind: 'superseded' }) as const,
+      { noteWrite: vi.fn() },
+      () => false,
+    )(createProject());
+    expect(sign()?.state).toBe('failed');
+
+    await reportingAutosaveWriter(
+      async () => written,
+      { noteWrite: vi.fn() },
+      () => false,
+    )(createProject());
+    expect(sign()).toBeUndefined();
+  });
+
+  it('reports a writer that throws to the gate as a failed write', async () => {
+    const noteWrite = vi.fn();
+    const error = new Error('worker lost');
+    const write = reportingAutosaveWriter(
+      async () => {
+        throw error;
+      },
+      { noteWrite },
+      () => true,
+    );
+
+    await expect(write(createProject())).rejects.toBe(error);
+    expect(noteWrite).toHaveBeenCalledWith(
+      { kind: 'failed', reason: 'storage-error', error },
+      true,
+    );
   });
 });
 

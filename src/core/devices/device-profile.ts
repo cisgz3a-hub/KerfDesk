@@ -25,6 +25,7 @@ export type ControllerKind =
   | 'marlin'
   | 'smoothieware'
   | 'ruida'
+  | 'lihuiyu'
   | 'moshi';
 
 /** Single source of truth for validators (catalog, .lfmachine shape, .lf2
@@ -36,8 +37,13 @@ export const KNOWN_CONTROLLER_KINDS: ReadonlyArray<ControllerKind> = [
   'marlin',
   'smoothieware',
   'ruida',
+  'lihuiyu',
   'moshi',
 ];
+
+/** Lihuiyu boards (ADR-703, MeerK40t's board list); 'M3-pwm' is an M3 whose
+ *  firmware (2024.01.18g or newer) takes hardware PWM power. */
+export type LihuiyuBoardId = 'M2' | 'M3' | 'M3-pwm' | 'B2' | 'M' | 'M1' | 'A' | 'B' | 'B1';
 
 export function isKnownControllerKind(value: unknown): value is ControllerKind {
   return (KNOWN_CONTROLLER_KINDS as ReadonlyArray<unknown>).includes(value);
@@ -236,6 +242,9 @@ export type DeviceProfile = {
   readonly machineFamily?: string;
   readonly controllerKind?: ControllerKind;
   readonly controllerCommandSet?: ControllerCommandSet;
+  /** The Lihuiyu board a 'lihuiyu' profile drives (ADR-703); it picks the
+   *  speed-code equations. Absent is the stock M2 Nano. */
+  readonly lihuiyuBoard?: LihuiyuBoardId;
   // Serial baud rate override. Absent = the controller driver's default
   // (GRBL family 115200; Marlin profiles typically 250000).
   readonly baudRate?: number;

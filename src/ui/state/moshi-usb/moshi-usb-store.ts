@@ -31,6 +31,7 @@ import {
   moshiDisconnectedMessage,
 } from './moshi-usb-messages';
 import type { MoshiUsbConnection, MoshiUsbJob, MoshiUsbOpener } from './moshi-usb-types';
+import { reportLinkMachineWork, type LinkMachineWork } from '../link-machine-work';
 
 export type MoshiUsbPhase =
   | 'disconnected'
@@ -190,7 +191,9 @@ async function run(
   current.cancelled = false;
   set({
     phase: RUN_PHASE[kind],
-    advisories: kind === 'job' && job !== null ? job.advisories : [],
+    // The job's warnings show from its Frame on, not only once it is sent
+    // (code quality audit C2 D1-P2-1); Home carries none.
+    advisories: job === null ? [] : job.advisories,
     message: RUN_START[kind],
     tone: 'info',
     sending: { sent: 0, total: 0 },
@@ -271,3 +274,27 @@ export function resetMoshiUsbStoreForTests(): void {
   live = null;
   useMoshiUsbStore.setState({ ...DISCONNECTED, message: '', tone: 'info' });
 }
+
+// Active work is reported where the always-mounted guards can see it without
+// loading this store (link-machine-work.ts; ADR-705 Amendment 3).
+const ACTIVE_WORK: Partial<Record<MoshiUsbPhase, LinkMachineWork['activity']>> = {
+  framing: 'framing',
+  running: 'running',
+  homing: 'homing',
+  stopping: 'stopping',
+};
+
+useMoshiUsbStore.subscribe((state) => {
+  const activity = ACTIVE_WORK[state.phase];
+  reportLinkMachineWork(
+    'moshi-usb',
+    activity === undefined
+      ? null
+      : {
+          controller: 'Moshiboard',
+          activity,
+          advisories: state.advisories,
+          abort: () => useMoshiUsbStore.getState().abort(),
+        },
+  );
+});

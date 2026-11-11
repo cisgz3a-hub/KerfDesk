@@ -1,14 +1,19 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { createProject, DEFAULT_CNC_MACHINE_CONFIG, DEFAULT_CNC_TILING } from '../../core/scene';
 import { useStore } from '../state';
+import { useBackgroundSaveHealth } from '../state/background-save-health';
+import { useToastStore } from '../state/toast-store';
 import { loadLastMachineSelection, rememberLastMachine } from '../state/last-machine-persistence';
 import { createStartupProject } from '../state/startup-project';
 import { resetStore } from '../state/test-helpers';
 import type { CncMachinePatch } from '../state/machine-actions';
-import { useMachineProfilePersistence } from './use-machine-profile-persistence';
+import {
+  MACHINE_SETTINGS_NOT_SAVED_MESSAGE,
+  useMachineProfilePersistence,
+} from './use-machine-profile-persistence';
 import { runAutosaveRecovery } from './use-autosave';
 
 (
@@ -52,6 +57,38 @@ afterEach(async () => {
 });
 
 describe('application machine persistence', () => {
+  it('keeps a status bar sign while machine settings cannot be saved (A5-P2-1)', () => {
+    const sign = () => useBackgroundSaveHealth.getState().signs['machine-settings'];
+    const warned = () =>
+      useToastStore
+        .getState()
+        .toasts.filter((toast) => toast.message === MACHINE_SETTINGS_NOT_SAVED_MESSAGE).length;
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('storage full', 'QuotaExceededError');
+    });
+    try {
+      useStore.getState().replaceDeviceProfile(saved);
+      expect(sign()).toEqual({ state: 'failed', message: MACHINE_SETTINGS_NOT_SAVED_MESSAGE });
+      expect(warned()).toBe(1);
+
+      // A second refused change keeps the sign and adds no second toast.
+      useStore.getState().replaceDeviceProfile({ ...saved, bedWidth: 322 });
+      expect(sign()?.state).toBe('failed');
+      expect(warned()).toBe(1);
+    } finally {
+      setItem.mockRestore();
+    }
+
+    // The next change that is saved clears it.
+    useStore.getState().replaceDeviceProfile({ ...saved, bedWidth: 323 });
+    expect(sign()).toBeUndefined();
+    expect(loadLastMachineSelection(localStorage)?.profile.bedWidth).toBe(323);
+    useBackgroundSaveHealth.setState({ signs: {} });
+    for (const toast of useToastStore.getState().toasts) {
+      useToastStore.getState().dismissToast(toast.id);
+    }
+  });
+
   it('retains committed machine changes across New and startup without persisting job settings', () => {
     useStore.getState().replaceDeviceProfile(saved);
     useStore.getState().setJobPlacement({ startFrom: 'current-position', anchor: 'center' });
