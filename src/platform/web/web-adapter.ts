@@ -62,6 +62,27 @@ function savesByDownload(): boolean {
   return typeof window.showSaveFilePicker !== 'function' && downloadsAvailable();
 }
 
+// Chromium opens a file dialog only within 5 s of the last click or key press,
+// in the browser and the desktop app alike, and refuses with SecurityError
+// after that (ADR-656 Amendment 4). Callers that can outlast the click ask for
+// a fresh one first; this is what a refusal that still gets through says.
+export const FILE_DIALOG_NEEDS_A_CLICK =
+  'The file dialog did not open, because too much time had passed since your last click or key press. Try again.';
+
+/** A picker refusal for want of a click, reworded; any other error as it came. */
+function pickerError(err: unknown): unknown {
+  if (typeof err !== 'object' || err === null) return err;
+  const { name, message } = err as { readonly name?: unknown; readonly message?: unknown };
+  if (name !== 'SecurityError') return err;
+  const activation = (navigator as Partial<Pick<Navigator, 'userActivation'>>).userActivation;
+  // A SecurityError while a click is still active has some other cause.
+  const lapsed =
+    activation === undefined
+      ? /user (gesture|activation)/i.test(String(message))
+      : !activation.isActive;
+  return lapsed ? new Error(FILE_DIALOG_NEEDS_A_CLICK, { cause: err }) : err;
+}
+
 async function pickFilesForOpen(req: FileOpenRequest): Promise<ReadonlyArray<FileHandle>> {
   if (typeof window.showOpenFilePicker !== 'function') {
     throw new Error(BROWSER_CANNOT_OPEN_FILES);
@@ -74,7 +95,7 @@ async function pickFilesForOpen(req: FileOpenRequest): Promise<ReadonlyArray<Fil
     });
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') return [];
-    throw err;
+    throw pickerError(err);
   }
   const out: FileHandle[] = [];
   for (const handle of handles) {
@@ -100,7 +121,7 @@ async function pickFileForSave(req: FileSaveRequest): Promise<SaveTarget | null>
     });
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') return null;
-    throw err;
+    throw pickerError(err);
   }
   return fileHandleTarget(handle);
 }
@@ -129,7 +150,7 @@ async function reserveSaveDirectory(): Promise<SaveDirectoryTarget | null> {
     directory = await window.showDirectoryPicker({ mode: 'readwrite' });
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') return null;
-    throw err;
+    throw pickerError(err);
   }
   return {
     file: (displayName) => directoryFileTarget(directory, displayName),

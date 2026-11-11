@@ -89,6 +89,9 @@ and opening one does not use the activation up. `navigator.userActivation.isActi
   that answered **Save changes?**, so a save picker left open for more than 5 s leaves it no
   activation and Open reports the browser's error. Checked for a small project too, whose path
   this amendment does not touch (`docs/audits/2026-11-11-annoyance-a1/F6-fix-save-dialogs.md`).
+  *(Fixed by
+  [Amendment 5](ADR-656-amendment-5-an-open-that-outlasted-its-click-asks-for-a-fresh-one.md):
+  the Open then asks for a fresh **Choose file…** click.)*
 - Tests that used the dialog as their slow path now state it: `lapseUserActivation()` in unit
   tests, `lapseClickActivation(page)` in e2e. Playwright runs its page calls with a user gesture,
   so an e2e cannot reach the lapse by waiting.

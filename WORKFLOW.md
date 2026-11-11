@@ -414,7 +414,9 @@ Variable text with a different dataset needs a new or matching project.
 
 Use **File → Save template** for a complete reusable project, including unused operations and
 notes. **File → Open template** starts a dirty new project. Its first ordinary Save asks for a
-destination and cannot overwrite the template source.
+destination and cannot overwrite the template source. Over unsaved work it asks **Save changes?**
+first; when saving took more than 5 s, **Open template** asks for **Choose file…** before the OS
+Open dialog (F-A12, ADR-656 Amendment 5).
 
 #### Single object — click
 1. Click on an object's visible geometry.
@@ -1826,6 +1828,21 @@ the completed physical Frame is the spatial source of truth.
 5. If equal: project loaded. Window title updates.
 6. Save writes over the opened file (F-A11, ADR-550).
 
+#### Edge — unsaved work, and saving it took more than 5 s (ADR-656 Amendment 5)
+1. `File → Open` (or `Cmd/Ctrl+O`) over unsaved work asks **Save changes?** first (F-A13). With
+   no file yet, **Save** opens the OS Save dialog.
+2. The OS Open dialog is due once the project is saved. It opens by itself when that is within
+   5 s of the **Save** click. The browser and the desktop app refuse a file dialog after that.
+3. Past 5 s, **Open project** appears instead: `<name> is saved. Choose the project to open.`
+   with **Choose file…** (focused) and **Cancel**. **Choose file…** opens the OS Open dialog.
+4. **Cancel**, Esc, or closing the OS Open dialog without a file keeps the saved project open.
+5. The dialog closes by itself, with no file dialog, if another Open or a recovery takes the
+   project while it waits. A file that arrives from the operating system meanwhile waits in its
+   banner (F-DESK4). A project opened from Recent Projects or the operating system has its file
+   already and never shows this dialog.
+6. Should a file dialog still be refused, the toast says `Could not open project: The file dialog
+   did not open, because too much time had passed since your last click or key press. Try again.`
+
 #### Success — schema older
 1. Migration runs to current version.
 2. Toast (info) identifies the migration, for example: `Project migrated from v1 to v2.` Any change
@@ -2007,6 +2024,13 @@ are shown. Nothing here is a gate: Frame, Start and Save are unchanged.
 3. `File → Open` over unsaved work asks the same question. `Save` then shows at most the OS Save
    dialog (none when the project already has a file) and the OS Open dialog; a large project no
    longer adds **Save project** between them when it validates within 5 s (ADR-656 Amendment 4).
+4. When that save ends more than 5 s after the **Save** click (the OS Save dialog was left open,
+   or the write was slow), the OS Open dialog cannot open by itself: the browser and the desktop
+   app open a file dialog only within 5 s of a click or key press. A small dialog, **Open
+   project**, then reads `<name> is saved. Choose the project to open.` **Choose file…** has the
+   focus, so Enter continues, and opens the OS Open dialog. **Cancel** or Esc keeps the saved
+   project open and unchanged. `File → Open template` does the same under **Open template**
+   (ADR-656 Amendment 5).
 
 ---
 

@@ -46,6 +46,7 @@ import {
 import { claimProjectOpenRequest } from './project-open-request-owner';
 import { rememberOpenedProject } from '../recent-projects/recent-project-record';
 import { chosenOrPickedProjectFiles } from './chosen-project-file';
+import { pickFilesToOpen } from './pick-files-to-open';
 import {
   bindImportActionsToDocument,
   captureImportDocumentOwner,
@@ -357,11 +358,17 @@ export async function handleOpenProject(
   };
   let files: ReadonlyArray<OpenProjectFile>;
   try {
+    // The Save changes? question may have outlasted the click (ADR-656 Amendment 5).
     files = await chosenOrPickedProjectFiles(chosenFile, () =>
-      ctx.platform.pickFilesForOpen({
-        accept: ['.lf2', '.lbrn', '.lbrn2'],
-        multiple: false,
-      }),
+      pickFilesToOpen(
+        ctx.platform,
+        { accept: ['.lf2', '.lbrn', '.lbrn2'], multiple: false },
+        {
+          title: 'Open project',
+          choice: 'the project to open',
+          stillWanted: () => owner.isCurrent() && ctx.stillAllowed?.() !== false,
+        },
+      ),
     );
   } catch (err) {
     ownedCtx.pushToast(`Could not open project: ${errorMessage(err)}`, 'error');
