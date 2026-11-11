@@ -95,7 +95,7 @@ test('an ordinary raster prepares its estimate, markers and full Preview in real
       'transfer-complete',
     ]),
   );
-  await saveProjectAs(page, kerfdesk, { expectPreparation: true });
+  await saveProjectAs(page, kerfdesk);
   await expect.poll(async () => Object.keys(await kerfdesk.savedFiles()).length).toBeGreaterThan(0);
   const entry = Object.entries(await kerfdesk.savedFiles()).find(([name]) => name.endsWith('.lf2'));
   if (entry === undefined) throw Error('Saved raster project is missing');

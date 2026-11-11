@@ -4,9 +4,10 @@ import { createStreamer, step } from '../../core/controllers/grbl';
 import { DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import { DEFAULT_JOB_PLACEMENT } from '../job-placement';
+import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import type { ImportOutcome } from '../state/store';
-import { useUiStore } from '../state/ui-store';
+import { useGcodeSaveFlowStore } from './gcode-save-flow';
 import { handleFileShortcut, type FileCtx } from './shortcuts';
 
 function contextForFileShortcut(platform: PlatformAdapter): FileCtx {
@@ -35,6 +36,8 @@ function contextForFileShortcut(platform: PlatformAdapter): FileCtx {
 
 describe('File shortcuts while a job is active', () => {
   beforeEach(() => {
+    // Save G-code compiles the open project as it stands at the key press.
+    useStore.setState({ project: projectWithLine() });
     useLaserStore.setState({
       streamer: step(createStreamer('G1 X1 S100')).state,
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
@@ -44,7 +47,8 @@ describe('File shortcuts while a job is active', () => {
     useLaserStore.setState({ streamer: null } as Partial<
       ReturnType<typeof useLaserStore.getState>
     >);
-    useUiStore.getState().closeGcodeSaveDialog();
+    useGcodeSaveFlowStore.setState({ flow: null });
+    useStore.getState().newProject();
   });
 
   it.each([
@@ -53,7 +57,7 @@ describe('File shortcuts while a job is active', () => {
     ['Save', { key: 's', ctrlKey: true }, 'save'],
     ['Save As', { key: 's', ctrlKey: true, shiftKey: true }, 'save'],
     ['Import artwork', { key: 'i', ctrlKey: true }, 'open'],
-    ['Save G-code', { key: 'e', ctrlKey: true, shiftKey: true }, 'dialog'],
+    ['Save G-code', { key: 'e', ctrlKey: true, shiftKey: true }, 'save'],
   ] as const)(
     'keeps %s available without an active-job refusal',
     async (_label, init, expectedEffect) => {
@@ -78,11 +82,10 @@ describe('File shortcuts while a job is active', () => {
         expect(context.confirmDiscard).toHaveBeenCalled();
       } else if (expectedEffect === 'open') {
         await vi.waitFor(() => expect(pickFilesForOpen).toHaveBeenCalled());
-      } else if (expectedEffect === 'save') {
-        await vi.waitFor(() => expect(pickFileForSave).toHaveBeenCalled());
       } else {
-        expect(useUiStore.getState().gcodeSaveDialogOpen).toBe(true);
-        expect(pickFileForSave).not.toHaveBeenCalled();
+        // Save G-code too: prepared, then straight to the file dialog.
+        await vi.waitFor(() => expect(pickFileForSave).toHaveBeenCalled());
+        await vi.waitFor(() => expect(useGcodeSaveFlowStore.getState().flow).toBeNull());
       }
     },
   );
