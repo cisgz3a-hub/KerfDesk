@@ -28,6 +28,7 @@ import {
 } from '../state/status-report-fields';
 import { useStore } from '../state/store';
 import { controllerStateGloss } from './controller-state-gloss';
+import { positionWithheldMessage, positionWithheldOriginLabel } from './frame-position-withheld';
 import { controllerReportsWorkOffset } from './work-offset-assumption';
 import { useLengthUnit } from '../state/display-units';
 import { feedUnitLabel, MM_PER_INCH, type DisplayLengthUnit } from '../display-length';
@@ -66,13 +67,13 @@ export function StatusDisplay({
       ) : (
         <UnknownMachinePositionRow fieldsOff={fieldsOff} />
       )}
-      <div
-        style={customOrigin ? originCustomStyle : originDefaultStyle}
+      <StatusOriginRow
+        customOrigin={customOrigin}
+        label={originLabel(customOrigin, wcoMm, reportsOffset, originName, unit, fieldsOff)}
         title={originTitle(wcoMm, fieldsOff)}
-      >
-        <strong>Origin:</strong>{' '}
-        {originLabel(customOrigin, wcoMm, reportsOffset, originName, unit, fieldsOff)}
-      </div>
+        offsetKnown={wcoMm !== null}
+      />
+
       {feedMmPerMin !== null && (
         <div style={feedRowStyle}>
           <strong>F:</strong> {feedText(feedMmPerMin, unit)} <strong>S:</strong>{' '}
@@ -85,6 +86,28 @@ export function StatusDisplay({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// After Unlock or Release motors KerfDesk withholds the position, and no report
+// brings the origin back: the row names what does, where it read "not reported
+// yet" (user annoyance audit A1, A3-P2-1; ADR-367 Amendment 3).
+function StatusOriginRow(props: {
+  readonly customOrigin: boolean;
+  readonly label: string;
+  readonly title: string | undefined;
+  readonly offsetKnown: boolean;
+}): JSX.Element {
+  const homingEnabled = useStore((s) => s.project.device.homing.enabled);
+  const withheld = useLaserStore((s) => positionWithheldMessage(s, homingEnabled));
+  const hidden = !props.offsetKnown && withheld !== null;
+  return (
+    <div
+      style={props.customOrigin ? originCustomStyle : originDefaultStyle}
+      title={hidden ? withheld : props.title}
+    >
+      <strong>Origin:</strong> {hidden ? positionWithheldOriginLabel(homingEnabled) : props.label}
     </div>
   );
 }
