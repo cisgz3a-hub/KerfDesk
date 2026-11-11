@@ -355,6 +355,10 @@ async function stopWithOwnedReset(
             reason,
             streamerEpoch: state.streamerEpoch,
             ...g92OriginAtStop(state),
+            // Read here too: the stop outcome clears the job's own kind.
+            ...(state.activeJobMachineKind === null
+              ? {}
+              : { jobMachineKind: state.activeJobMachineKind }),
           },
         }),
     ...(state.streamer === null

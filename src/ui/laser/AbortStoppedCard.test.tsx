@@ -10,9 +10,11 @@ import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import {
   AbortStoppedCard,
+  ABORT_AUTO_RESTORE_RUNNING_NOTE,
   ABORT_SET_ORIGIN_HERE_NOTE,
   ABORT_STOPPED_TITLE,
 } from './AbortStoppedCard';
+import { installAbortAutoRestore, useAbortAutoRestoreStore } from './abort-auto-restore';
 import { AlarmCard } from './AlarmBanner';
 import { operatorAbortAlarm, restoreOriginAfterAbort } from './abort-alarm-recovery';
 import type * as AbortAlarmRecovery from './abort-alarm-recovery';
@@ -185,6 +187,107 @@ describe('AbortStoppedCard', () => {
       }),
     ]);
     await view.unmount();
+  });
+});
+
+describe('AbortStoppedCard and the automatic restore (ADR-341 Amendment 14)', () => {
+  afterEach(() => {
+    useAbortAutoRestoreStore.setState({ running: null, failure: null });
+  });
+
+  it('holds its buttons and says so while the origin is being put back', async () => {
+    const view = await render(card());
+    await act(async () => useAbortAutoRestoreStore.setState({ running: REQUEST }));
+    expect(view.host.textContent).toContain(ABORT_AUTO_RESTORE_RUNNING_NOTE);
+    expect(view.host.textContent).toContain(ABORT_STOPPED_TITLE);
+    const all = Array.from(view.host.querySelectorAll('button'));
+    expect(all.length).toBe(3);
+    expect(all.every((button) => button.disabled)).toBe(true);
+    await act(async () => all[0]?.click());
+    expect(restoreOriginAfterAbort).not.toHaveBeenCalled();
+    await view.unmount();
+  });
+
+  it('says a failed automatic restore did not happen and keeps its buttons', async () => {
+    const view = await render(card());
+    await act(async () =>
+      useAbortAutoRestoreStore.setState({
+        failure: { request: REQUEST, reason: 'The door is open.' },
+      }),
+    );
+    expect(view.host.textContent).toContain(
+      'Your origin was not restored automatically: The door is open. Use the buttons above.',
+    );
+    expect(buttons(view.host)).toEqual(['Restore saved origin', 'Set origin here', '$X — Unlock']);
+    expect(Array.from(view.host.querySelectorAll('button')).some((button) => button.disabled)).toBe(
+      false,
+    );
+    await view.unmount();
+  });
+
+  it("ignores another Abort's automatic restore", async () => {
+    const other = { reason: 'operator', streamerEpoch: 3 } as const;
+    const view = await render(card());
+    await act(async () =>
+      useAbortAutoRestoreStore.setState({
+        running: other,
+        failure: { request: other, reason: 'old' },
+      }),
+    );
+    expect(view.host.textContent).not.toContain(ABORT_AUTO_RESTORE_RUNNING_NOTE);
+    expect(view.host.textContent).not.toContain('old');
+    await view.unmount();
+  });
+
+  it('a press on Unlock keeps the recovery with the operator: no automatic restore after', async () => {
+    const request = { ...REQUEST, originMachineZeroEpoch: 0, jobMachineKind: 'laser' } as const;
+    const report = {
+      state: 'Alarm',
+      subState: null,
+      mPos: { x: 41, y: 37, z: 0 },
+      wPos: null,
+      feed: 0,
+      spindle: 0,
+      wco: null,
+    } as const;
+    const settle = (): void => {
+      for (let sequence = 1; sequence <= 3; sequence += 1) {
+        useLaserStore.setState({ statusReport: { ...report }, statusSequence: sequence });
+      }
+    };
+    const abortedState = {
+      connection: { kind: 'connected' },
+      activeControllerKind: 'grbl-v1.1',
+      alarmCode: 3,
+      streamerEpoch: 4,
+      streamReset: { streamerEpoch: 4, positionMayBeLost: true },
+      machineZeroEpoch: 0,
+    } as const;
+    const uninstall = installAbortAutoRestore();
+    try {
+      // The control: with no press, the same reports restore the origin.
+      const unpressed = { ...request };
+      useLaserStore.setState({ ...abortedState, jobStopRequest: unpressed });
+      settle();
+      await act(async () => undefined);
+      expect(restoreOriginAfterAbort).toHaveBeenCalledTimes(1);
+      vi.mocked(restoreOriginAfterAbort).mockClear();
+
+      useLaserStore.setState({ ...abortedState, jobStopRequest: request, statusReport: null });
+      const onUnlock = vi.fn();
+      const view = await render(card({ request, onUnlock }));
+      const unlock = Array.from(view.host.querySelectorAll('button')).find(
+        (button) => button.textContent === '$X — Unlock',
+      );
+      await act(async () => unlock?.click());
+      expect(onUnlock).toHaveBeenCalledTimes(1);
+      settle();
+      await act(async () => undefined);
+      expect(restoreOriginAfterAbort).not.toHaveBeenCalled();
+      await view.unmount();
+    } finally {
+      uninstall();
+    }
   });
 });
 
