@@ -27,6 +27,8 @@ export function RotarySetupDialog(props: {
   readonly axes?: ReadonlyArray<RotaryAxis>;
   readonly artwork?: RotaryArtworkExtent | null;
   readonly outputDescription?: string;
+  /** A word about how this controller takes a rotary job (ADR-127 Amd 5). */
+  readonly controllerNote?: string;
 }): JSX.Element {
   const [edit, setEdit] = useState(() => startRotaryEdit(props.setup ?? NEW_ROTARY_SETUP));
   const test = useRotaryTestRotation();
@@ -47,6 +49,7 @@ export function RotarySetupDialog(props: {
           ? {}
           : { outputDescription: props.outputDescription })}
       />
+      {props.controllerNote === undefined ? null : <p>{props.controllerNote}</p>}
       {!valid ? <p style={errorStyle}>{invalidRotaryMessage(setup)}</p> : null}
       <RotaryTestRotationPanel
         setup={setup}

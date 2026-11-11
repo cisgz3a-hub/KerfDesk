@@ -9,6 +9,14 @@ import { RotarySetupDialog } from './RotarySetupDialog';
 import { rotaryArtworkExtent } from './rotary-wrap-preview';
 import { newRotarySetupFor } from './rotary-setup-edit';
 
+// ADR-127 Amd 5 (code quality audit C2 D2-P3-5): the .rd file carries
+// KerfDesk's own Y scale and surface speeds. Not yet checked on a Ruida
+// machine, so the note says so.
+export const RUIDA_ROTARY_NOTE =
+  "On a Ruida, KerfDesk writes the rotary into the .rd file itself: it scales Y and sets each stroke's " +
+  "speed for the part's surface. Leave the controller's own rotary function off, or Y may be scaled " +
+  'twice. This has not been checked on a Ruida machine yet, so run a test pattern first.';
+
 export function RotarySetupHost(props: { readonly onClose: () => void }): JSX.Element {
   const setup = useStore((s) => s.project.device.rotary);
   const machineFamily = useStore((s) => s.project.device.machineFamily);
@@ -62,6 +70,7 @@ export function RotarySetupHost(props: { readonly onClose: () => void }): JSX.El
       axes={rotaryAxesForController({ controllerKind: controller })}
       artwork={rotaryArtworkExtent(scene)}
       outputDescription={`${controller}${dialect === undefined ? '' : ` / ${dialect}`}`}
+      {...(controller === 'ruida' ? { controllerNote: RUIDA_ROTARY_NOTE } : {})}
     />
   );
 }

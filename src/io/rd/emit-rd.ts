@@ -89,7 +89,11 @@ export function emitPreparedRdFile(
     ok: true,
     bytes: encoded.bytes,
     footprint,
-    advisories: withoutRepeats([...(prepared.advisories ?? []), ...checks]),
+    advisories: withoutRepeats([
+      ...(prepared.advisories ?? []),
+      ...checks,
+      ...rotaryDoseAdvisory(encoded.rotaryDose),
+    ]),
   };
 }
 
@@ -126,9 +130,27 @@ function describeRdEncodeError(error: RdEncodeError): string {
       return `Layer ${error.layerId} uses Fill/Image raster output, which the experimental .rd encoder does not support yet. Use Line mode layers for Ruida export.`;
     case 'too-many-layers':
       return `The job has ${error.count} layers; Ruida files support at most 100.`;
+    case 'rotary-too-many-speeds':
+      return `On this rotary each layer is written as one part per surface speed, and this job needs more than the ${error.maxParts} parts a Ruida file holds. Use fewer vector layers, or run it as G-code. No output bytes were produced.`;
     case 'coordinate-out-of-range':
       return `Compiled coordinate ${error.path} (${error.valueUm} µm) is outside Ruida's signed 35-bit range (${error.minUm}..${error.maxUm} µm). No output bytes were produced.`;
     case 'speed-out-of-range':
       return `Layer ${error.layerId} speed (${error.valueUmPerSec} µm/s) is outside Ruida's signed 35-bit representation (${error.minUmPerSec}..${error.maxUmPerSec} µm/s). No output bytes were produced.`;
   }
+}
+
+// ADR-127 Amd 5: a Ruida layer carries one speed, so a rotary layer runs as
+// several parts and the classes leave a small dose spread; say when it shows.
+function rotaryDoseAdvisory(
+  dose: { readonly minDose: number; readonly maxDose: number } | undefined,
+): ReadonlyArray<PreflightIssue> {
+  if (dose === undefined || (dose.minDose >= 0.95 && dose.maxDose <= 1.05)) return [];
+  return [
+    {
+      code: 'rotary-rd-speed-classes',
+      message:
+        `On this rotary the Ruida file runs each layer as parts at a few surface speeds, so strokes burn between ` +
+        `${Math.round(dose.minDose * 100)} % and ${Math.round(dose.maxDose * 100)} % of the set energy.`,
+    },
+  ];
 }
