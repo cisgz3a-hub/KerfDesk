@@ -176,9 +176,13 @@ function OriginActions(props: {
             )
           }
           title={
-            homeFirst
+            (homeFirst
               ? `Send ${home}, then write the job's origin back with one G92. The head moves to its home switches first.`
-              : `Send ${unlock}, then write the job's origin back with one G92. The head does not move.`
+              : `Send ${unlock}, then write the job's origin back with one G92. The head does not move.`) +
+            // Rolling audit v14 Z2-P3-1: on an A or Z rotary the part does turn.
+            (props.turn === undefined
+              ? ''
+              : ' Then the rotary turns the part back to where the job started.')
           }
         >
           {running ? 'Working…' : restoreLabel}

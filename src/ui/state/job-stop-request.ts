@@ -33,7 +33,14 @@ export type JobStopRequest = {
 };
 
 /** Where a dedicated-axis rotary job started, in machine units of its axis. */
-export type RotaryStartTurn = { readonly axis: 'A' | 'Z'; readonly machine: number };
+export type RotaryStartTurn = {
+  readonly axis: 'A' | 'Z';
+  readonly machine: number;
+  /** The store's machineZeroEpoch when the turn was read. A later one means a
+   *  power-up or port reopen cleared machine position, so the turn no longer
+   *  names a place on the part (rolling audit v14 Z2-P1-1, ADR-695 Amd 2). */
+  readonly machineZeroEpoch: number;
+};
 
 /** A soft reset KerfDesk sent against the stream of `streamerEpoch` (Abort,
  * the fail-dark stop, the automatic stop after a rejected line), and whether

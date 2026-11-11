@@ -19,11 +19,12 @@ const STATUS_QUERY_INTERVAL_MS = 100;
  * cannot answer realtime status queries. */
 export async function waitForControllerStatus(
   satisfied: (laser: LaserState) => boolean,
+  timeoutMs: number = STATUS_WAIT_TIMEOUT_MS,
 ): Promise<boolean> {
   const before = useLaserStore.getState();
   if (satisfied(before)) return true;
   if (!answersStatusQueries(before)) return false;
-  const deadline = Date.now() + STATUS_WAIT_TIMEOUT_MS;
+  const deadline = Date.now() + timeoutMs;
   let nextQuery = Date.now();
   while (Date.now() <= deadline) {
     const current = useLaserStore.getState();
