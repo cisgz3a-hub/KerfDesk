@@ -57,6 +57,19 @@ export function unknownNativeBedWarning(
   ].join(' ');
 }
 
+/** The same warning from a Start preparation's own inputs. */
+export function startUnknownNativeBedWarning(options: {
+  readonly placement: { readonly jobOrigin?: JobOriginPlacement | undefined };
+  readonly machine: RestoredOriginEvidence & NativeBedEvidence;
+  readonly project: { readonly device: DeviceProfile };
+}): string {
+  return unknownNativeBedWarning(
+    options.placement.jobOrigin,
+    options.machine,
+    options.project.device,
+  );
+}
+
 // Absolute and Current Position jobs do not place from the work origin.
 function runsFromRestoredOrigin(
   jobOrigin: JobOriginPlacement | undefined,

@@ -76,7 +76,11 @@ function firmwareWhy(
       return "Smoothieware's homing position is in the board's config file, which KerfDesk does not read. So Home does not tell KerfDesk where the bed is.";
     case 'vendor-mismatch':
       return "The controller's greeting does not match the controller type in the machine profile, so KerfDesk does not apply either one's coordinate rules. Check the controller type in Machine Setup.";
-    default:
+    case 'grbl-v1.1':
+    case 'grblhal':
+    case 'ruida':
+    case 'moshi':
+    case 'lihuiyu':
       return 'This controller does not report how its coordinates map to the bed.';
   }
 }

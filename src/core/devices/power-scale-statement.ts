@@ -87,20 +87,33 @@ export function isOperatorPowerScaleStatement(
   if (typeof value !== 'object' || value === null) return false;
   const record = value as Record<string, unknown>;
   const maxPowerS = record['maxPowerS'];
-  const statedAtIso = record['statedAtIso'];
-  const dialectId = record['dialectId'];
   return (
     typeof maxPowerS === 'number' &&
     Number.isFinite(maxPowerS) &&
     maxPowerS > 0 &&
     (record['controllerKind'] === 'marlin' || record['controllerKind'] === 'smoothieware') &&
-    typeof dialectId === 'string' &&
-    dialectId.length > 0 &&
-    dialectId.length <= 64 &&
-    typeof statedAtIso === 'string' &&
-    statedAtIso.length <= 40 &&
-    Number.isFinite(Date.parse(statedAtIso))
+    isShortText(record['dialectId'], 64) &&
+    isTimestamp(record['statedAtIso'])
   );
+}
+
+function isShortText(value: unknown, maxLength: number): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= maxLength;
+}
+
+function isTimestamp(value: unknown): boolean {
+  return isShortText(value, 40) && Number.isFinite(Date.parse(value));
+}
+
+/** The field for a loaded project: a well-formed statement, else explicitly
+ *  absent, so a malformed one in the file is dropped. */
+export function normalizedPowerScaleStatement(value: unknown): {
+  readonly operatorPowerScaleStatement: OperatorPowerScaleStatement | undefined;
+} {
+  return {
+    operatorPowerScaleStatement:
+      operatorPowerScaleStatementEntry(value).operatorPowerScaleStatement,
+  };
 }
 
 /** For canonical profile and project forms: the field only when it is valid. */

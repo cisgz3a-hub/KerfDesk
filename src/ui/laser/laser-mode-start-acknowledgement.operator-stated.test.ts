@@ -68,7 +68,7 @@ describe.each([
   it('is asked in its own words, with no GRBL advice it cannot follow', () => {
     const review = laserModeStartReview(project, noSettings);
     expect(review).toEqual({ kind: 'unverified', prompt: unreportedPowerScaleStartPrompt(device) });
-    const confirm = vi.fn(() => true);
+    const confirm = vi.fn((_message: string) => true);
     const evidence = confirmLaserModeStartEvidence(project, noSettings, confirm);
     const prompt = confirm.mock.calls[0]?.[0] ?? '';
     expect(prompt).toContain(`${name} does not report its laser power scale`);

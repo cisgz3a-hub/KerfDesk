@@ -45,13 +45,18 @@ describe('who can state a power scale', () => {
     });
   });
 
-  it.each(['grbl-v1.1', 'grblhal', 'fluidnc', 'ruida', 'moshi', undefined] as const)(
+  it.each(['grbl-v1.1', 'grblhal', 'fluidnc', 'ruida', 'moshi'] as const)(
     'a %s profile cannot: its report, or another path, is the evidence',
     (controllerKind) => {
       const device = { ...DEFAULT_DEVICE_PROFILE, controllerKind };
       expect(createOperatorPowerScaleStatement(device, STATED_AT)).toBeNull();
     },
   );
+
+  it('a profile with no controller kind is GRBL, and cannot', () => {
+    const { controllerKind: _kind, ...device } = DEFAULT_DEVICE_PROFILE;
+    expect(createOperatorPowerScaleStatement(device, STATED_AT)).toBeNull();
+  });
 });
 
 describe('what a statement stands for', () => {

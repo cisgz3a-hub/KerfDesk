@@ -198,7 +198,10 @@ describe('B3-P2-2 on the firmware fakes', () => {
     await useLaserStore.getState().connect(sim.adapter, { controllerKind: 'fluidnc' });
     await pump(1_200);
     await home();
-    expect(bedMapping()).toEqual({ frame: null, reason: { kind: 'firmware', firmware: 'fluidnc' } });
+    expect(bedMapping()).toEqual({
+      frame: null,
+      reason: { kind: 'firmware', firmware: 'fluidnc' },
+    });
   });
 
   it('a grblHAL earns the mapping from its own settings once it is homed', async () => {

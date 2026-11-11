@@ -50,7 +50,8 @@ export function remoteReviewAcknowledgement(
       return { kind: 'laser-verified', prompt: safety };
     case 'laser-operator-stated':
       return { kind: 'laser-unverified', prompt: `${safety}\n\n${acknowledgement.statement}` };
-    default:
+    case 'laser-unverified':
+    case 'cnc':
       return { kind: acknowledgement.kind, prompt: `${safety}\n\n${acknowledgement.prompt}` };
   }
 }

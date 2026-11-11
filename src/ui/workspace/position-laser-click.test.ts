@@ -155,9 +155,18 @@ describe('dispatchPositionLaser', () => {
   });
 
   it.each([
-    ['marlin', /^Move laser here needs to know where the bed is\. Marlin's home position and travel are fixed in the firmware build.* Jog the head to the point instead\.$/],
-    ['smoothieware', /Smoothieware's homing position is in the board's config file.* Jog the head to the point instead\.$/],
-    ['fluidnc', /FluidNC does not report where its homed coordinates sit on the bed.* Jog the head to the point instead\.$/],
+    [
+      'marlin',
+      /^Move laser here needs to know where the bed is\. Marlin's home position and travel are fixed in the firmware build.* Jog the head to the point instead\.$/,
+    ],
+    [
+      'smoothieware',
+      /Smoothieware's homing position is in the board's config file.* Jog the head to the point instead\.$/,
+    ],
+    [
+      'fluidnc',
+      /FluidNC does not report where its homed coordinates sit on the bed.* Jog the head to the point instead\.$/,
+    ],
   ] as const)('tells a homed %s why no Home can help, and to jog', (kind, expected) => {
     const device = {
       ...deviceWith('front-left'),

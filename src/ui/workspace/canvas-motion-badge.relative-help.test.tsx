@@ -5,7 +5,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../../core/devices';
+import {
+  DEFAULT_DEVICE_PROFILE,
+  type ControllerKind,
+  type DeviceProfile,
+} from '../../core/devices';
 import { buildMotionManifest } from '../../core/job/motion-manifest';
 import { fingerprintGcode } from '../../core/recovery';
 import { CANVAS_MOTION_SLOT_ID } from '../common/status-bar-slots';
@@ -15,7 +19,10 @@ import { initialLaserState } from '../state/laser-store-helpers';
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
 import { CanvasMotionBadge } from './canvas-motion-badge';
-import { burnCheckBlocker, UNKNOWN_BED_POSITION_BURN_CHECK } from '../camera/job-watch/burn-check-run';
+import {
+  burnCheckBlocker,
+  UNKNOWN_BED_POSITION_BURN_CHECK,
+} from '../camera/job-watch/burn-check-run';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -69,7 +76,7 @@ afterEach(async () => {
   resetStore();
 });
 
-function profile(controllerKind: DeviceProfile['controllerKind'], homing: boolean): DeviceProfile {
+function profile(controllerKind: ControllerKind, homing: boolean): DeviceProfile {
   return {
     ...DEFAULT_DEVICE_PROFILE,
     controllerKind,

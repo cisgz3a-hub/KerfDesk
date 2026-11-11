@@ -136,34 +136,46 @@ export function nativeBedFrameStatus(
   evidence: NativeBedEvidence,
 ): NativeBedFrameStatus {
   const family = mappingFamily(device, evidence);
-  if (family.kind === 'unsupported')
+  if (family.kind === 'unsupported') {
     return unknown({ kind: 'firmware', firmware: family.firmware });
+  }
   if (!device.homing.enabled) return unknown({ kind: 'homing-off' });
   if (evidence.homingState !== 'confirmed') return unknown({ kind: 'not-homed' });
   if (family.kind === 'vendor') {
     return framed(device, { minX: 0, minY: 0, maxX: device.bedWidth, maxY: device.bedHeight });
   }
-  // Both `$$` readings need the banner that names the firmware they are for.
-  if (evidence.detectedControllerKind == null) return unknown({ kind: 'settings-unread' });
-  const settings = evidence.controllerSettings;
+  const bounds = reportedNativeBounds(family.kind, evidence);
+  return typeof bounds === 'string' ? unknown({ kind: bounds }) : framed(device, bounds);
+}
+
+/** The homed envelope this session's reports give, or which evidence is missing. */
+function reportedNativeBounds(
+  family: 'stock' | 'grblhal',
+  evidence: NativeBedEvidence,
+): NativeXyBounds | 'settings-unread' | 'report-incomplete' {
+  const settings = currentSessionSettings(evidence);
+  if (settings === null) return 'settings-unread';
+  if (family === 'grblhal') return grblHalNativeBounds(settings) ?? 'report-incomplete';
+  const build = currentSessionBuildInfo(evidence);
+  if (build === null) return 'settings-unread';
+  return stockNativeBounds(settings, build) ?? 'report-incomplete';
+}
+
+// Both `$$` readings need the banner that names the firmware they are for.
+function currentSessionSettings(evidence: NativeBedEvidence): ControllerSettingsSnapshot | null {
   const epoch = evidence.controllerSessionEpoch;
-  if (
-    settings == null ||
-    epoch === undefined ||
-    evidence.controllerSettingsObservation?.sessionEpoch !== epoch
-  ) {
-    return unknown({ kind: 'settings-unread' });
-  }
-  if (family.kind === 'grblhal') {
-    const bounds = grblHalNativeBounds(settings);
-    return bounds === null ? unknown({ kind: 'report-incomplete' }) : framed(device, bounds);
-  }
-  const build = evidence.controllerBuildInfo;
-  if (build == null || evidence.controllerBuildInfoObservation?.sessionEpoch !== epoch) {
-    return unknown({ kind: 'settings-unread' });
-  }
-  const bounds = stockNativeBounds(settings, build);
-  return bounds === null ? unknown({ kind: 'report-incomplete' }) : framed(device, bounds);
+  const current =
+    evidence.detectedControllerKind != null &&
+    epoch !== undefined &&
+    evidence.controllerSettingsObservation?.sessionEpoch === epoch;
+  return current ? (evidence.controllerSettings ?? null) : null;
+}
+
+function currentSessionBuildInfo(evidence: NativeBedEvidence): GrblBuildInfo | null {
+  const epoch = evidence.controllerSessionEpoch;
+  const current =
+    epoch !== undefined && evidence.controllerBuildInfoObservation?.sessionEpoch === epoch;
+  return current ? (evidence.controllerBuildInfo ?? null) : null;
 }
 
 function unknown(reason: NativeBedUnknownReason): NativeBedFrameStatus {
@@ -186,24 +198,29 @@ type MappingFamily =
 
 function mappingFamily(device: DeviceProfile, evidence: NativeBedEvidence): MappingFamily {
   if (hasVendorPositiveContract(device, evidence)) return { kind: 'vendor' };
-  const active = evidence.activeControllerKind ?? device.controllerKind ?? 'grbl-v1.1';
-  const detected = evidence.detectedControllerKind ?? null;
-  // A command set whose contract did not hold, or a banner naming another
-  // family than the driver in use: neither path's reading of `$$` applies.
+  // A command set whose contract did not hold: neither reading of `$$` applies.
   if (evidence.activeControllerCommandSet != null) {
     return { kind: 'unsupported', firmware: 'vendor-mismatch' };
   }
-  if (active === 'grbl-v1.1') {
-    return detected === null || detected === 'grbl-v1.1'
-      ? { kind: 'stock' }
-      : { kind: 'unsupported', firmware: detected };
+  const active = evidence.activeControllerKind ?? device.controllerKind ?? 'grbl-v1.1';
+  if (active !== 'grbl-v1.1' && active !== 'grblhal') {
+    return { kind: 'unsupported', firmware: active };
   }
-  if (active === 'grblhal') {
-    return detected === null || detected === 'grblhal'
-      ? { kind: 'grblhal' }
-      : { kind: 'unsupported', firmware: detected === 'grbl-v1.1' ? 'vendor-mismatch' : detected };
+  return grblFamily(active, evidence.detectedControllerKind ?? null);
+}
+
+// The profile's driver is one of the two GRBL families. The greeting must not
+// name another firmware: between the two GRBL families the profile's
+// controller type is what to correct, and any other family gets its own reason.
+function grblFamily(
+  active: 'grbl-v1.1' | 'grblhal',
+  detected: ControllerKind | null,
+): MappingFamily {
+  if (detected === null || detected === active) {
+    return { kind: active === 'grblhal' ? 'grblhal' : 'stock' };
   }
-  return { kind: 'unsupported', firmware: active };
+  const otherGrblFamily = detected === 'grbl-v1.1' || detected === 'grblhal';
+  return { kind: 'unsupported', firmware: otherGrblFamily ? 'vendor-mismatch' : detected };
 }
 
 function hasVendorPositiveContract(device: DeviceProfile, evidence: NativeBedEvidence): boolean {
