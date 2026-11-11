@@ -11,6 +11,8 @@ import { frameProofReset } from '../state/laser-session-reset';
 import { framedRunDriftReason, framedRunReadinessIssue } from './framed-run-readiness';
 import { noteFrameExpired } from './frame-expiry-note';
 import { jobStartMarkOwnsFrame, jobStartMarkAcceptsStatus } from '../state/job-start-mark';
+import { heldJogFrameActivityInvalidates } from '../state/jog-held-frame';
+import { withoutHeldJogFrame } from '../state/laser-motion-operation';
 
 type InvalidationLifecycle = { readonly owner: symbol | null };
 
@@ -39,6 +41,28 @@ function expireCurrentPermitIfNeeded(owner: symbol): void {
   expireCompletedFrame(laser);
   expireStalePermit(laser);
   expireStaleTrace(laser);
+  expireHeldJogFrame(laser);
+}
+
+/** A Frame set aside by an app-owned XY jog (ADR-565 Amendment 1) expires at
+ * the first drift like any other proof, so an edit made and undone during the
+ * move, or an origin change, cannot return it. Only the head's X and Y and the
+ * controller's motion state may differ while the jog runs; Z may not. */
+function expireHeldJogFrame(laser: ReturnType<typeof useLaserStore.getState>): void {
+  const operation = laser.motionOperation;
+  const held = operation?.heldFrame;
+  if (operation === null || held === undefined) return;
+  const drift = framedRunDriftReason(held.frame, undefined, laser, {
+    ignoreControllerStatusState: true,
+    ignoreControllerXyPosition: true,
+  });
+  if (drift === null && !heldJogFrameActivityInvalidates(laser)) return;
+  useLaserStore.setState((current) =>
+    current.motionOperation === operation
+      ? { motionOperation: withoutHeldJogFrame(operation) }
+      : {},
+  );
+  if (drift !== null) noteFrameExpired(drift);
 }
 
 function expireCompletedFrame(laser: ReturnType<typeof useLaserStore.getState>): void {

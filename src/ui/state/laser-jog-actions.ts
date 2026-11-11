@@ -10,9 +10,11 @@ import { unconfirmedReportUnitsMessage } from './console-report-units';
 import { currentWorkZMm, inferCurrentMachinePosition } from './infer-machine-position';
 import { buildFrameDispatchPlan, frameRouteNoGoWarnings } from './laser-frame-motion-plan';
 import { runHomeAction } from './laser-home-action';
+import { jogStartPatch, queuedStepHeldFramePatch } from './jog-held-frame';
 import {
   markMotionOperationDispatched,
   startMotionOperation,
+  withoutHeldJogFrame,
   type LaserMotionOperation,
   type LaserMotionOperationId,
 } from './laser-motion-operation';
@@ -118,7 +120,7 @@ async function runJogToMachinePosition(
   warnJogMotionPolicy(set, get, params);
   const operation = startSettledJogOperation(refs);
   assertManualMotionNotCancelled(refs, cancelGeneration);
-  set({ motionOperation: operation, frameVerification: null, framedRun: null, frameTrace: null });
+  set(jogStartPatch(get(), operation, {}));
   // CNC: after readiness is proven, lift Z to the configured safe height
   // before the XY traverse so the bit does not drag across stock or clamps.
   // Laser projects have no Z retract seam and keep the flat move (F105).
@@ -149,7 +151,10 @@ async function runJog(
 ): Promise<void> {
   assertMachineExecutionOwner(owner);
   const stepPress = options?.queueStep === true && owner === undefined && params.relative !== false;
-  if (stepPress && queueStepJog(context.set, context.get, context.refs.driver, params)) return;
+  if (stepPress && queueStepJog(context.set, context.get, context.refs.driver, params)) {
+    context.set((state) => queuedStepHeldFramePatch(state, params));
+    return;
+  }
   context = { ...context, safeWrite: ownedMachineWrite(context.safeWrite, owner) };
   const { set, get, refs } = context;
   assertAutofocusIdle(get());
@@ -158,15 +163,17 @@ async function runJog(
   const cancelGeneration = await confirmUncancelledFreshIdle(context, 'jog');
   assertMachineExecutionOwner(owner);
   warnJogMotionPolicy(set, get, params);
-  // Any deliberate head move consumes the placement proof even if the
-  // head later returns to numerically identical coordinates.
+  // Any deliberate head move takes the placement proof out of the store, even
+  // if the head later returns to numerically identical coordinates. Only a
+  // fixed-placement Frame rides on a clean XY jog and comes back when it
+  // settles (jog-held-frame.ts, ADR-565 Amendment 1).
   const operation = {
     ...startSettledJogOperation(refs),
     ...(owner === undefined ? {} : { executionOwner: owner }),
     ...(stepPress ? { stepJogQueue: firstStepJogQueue(get, params) } : {}),
   };
   assertManualMotionNotCancelled(refs, cancelGeneration);
-  set({ motionOperation: operation, frameVerification: null, framedRun: null, frameTrace: null });
+  set(jogStartPatch(get(), operation, params, options));
   owner?.onMotionOwner?.(operation.operationId);
   try {
     await dispatchOwnedJog(context, params, operation);
@@ -355,7 +362,7 @@ function failOwnedMotionOperation(
   )
     return {};
   return {
-    motionOperation: { ...state.motionOperation, cancelRequested: true },
+    motionOperation: { ...withoutHeldJogFrame(state.motionOperation), cancelRequested: true },
     frameVerification: null,
     framedRun: null,
     frameTrace: null,
