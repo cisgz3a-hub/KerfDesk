@@ -935,7 +935,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
     recovery.getByRole('button', { name: 'Review recovery', exact: true }),
   ).toBeVisible();
   await expect(
-    recovery.getByTitle('Permanently discard only this isolated recovery capsule.'),
+    recovery.getByTitle('Delete this saved job record for good. Nothing else changes.'),
   ).toBeVisible();
 
   // Make the live canvas differ from the archived run before opening its review.

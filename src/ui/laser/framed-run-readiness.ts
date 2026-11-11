@@ -22,6 +22,9 @@ type ReadinessOptions = {
   readonly ignoreControllerStatusState?: boolean;
   /** Only the execution owned by completedFrameRunOwner may use this. */
   readonly ignoreControllerPosition?: boolean;
+  /** Only a Frame held through an app-owned XY jog may use this (ADR-565
+   * Amendment 1): X and Y may differ, Z and every other identity may not. */
+  readonly ignoreControllerXyPosition?: boolean;
 };
 
 export function currentCompletedFrame(
@@ -71,16 +74,23 @@ export function framedRunDriftReason(
         ? { ...permit.controller, statusReport: laser.statusReport }
         : permit.controller,
       laser,
-      {
-        ...(options.ignoreControllerStatusState === true ? { ignoreStatusState: true } : {}),
-        // $30/$32 and build-info observations may be refreshed after Frame.
-        // They are advisory review evidence, not permit identity; wire dispatch
-        // later checks only that review evidence still binds the exact M7 shape.
-        ignoreAdvisoryControllerEvidence: true,
-      },
+      controllerComparisonOptions(options),
     )
   ) {
     return CONTROLLER_CHANGED_AFTER_FRAME_REASON;
   }
   return null;
+}
+
+function controllerComparisonOptions(
+  options: ReadinessOptions,
+): NonNullable<Parameters<typeof controllerStartPreparationStillCurrent>[2]> {
+  return {
+    ...(options.ignoreControllerStatusState === true ? { ignoreStatusState: true } : {}),
+    ...(options.ignoreControllerXyPosition === true ? { ignoreXyPosition: true } : {}),
+    // $30/$32 and build-info observations may be refreshed after Frame.
+    // They are advisory review evidence, not permit identity; wire dispatch
+    // later checks only that review evidence still binds the exact M7 shape.
+    ignoreAdvisoryControllerEvidence: true,
+  };
 }

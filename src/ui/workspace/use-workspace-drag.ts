@@ -12,6 +12,7 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { notePreviewIgnoredClick } from '../state/preview-edit-hint';
 import { computeMouseDownDrag, type DragState } from './drag-state';
 import { panOffsetForDrag } from './pan-drag';
 import { applyTransformDrag } from './apply-transform-drag';
@@ -201,7 +202,7 @@ function beginWorkspaceDrag(args: {
     const tool = beginToolDrag(args);
     if (tool.kind === 'handled') return tool.drag;
   }
-  return computeMouseDownDrag({
+  const drag = computeMouseDownDrag({
     e: args.e,
     ref: args.ref,
     project: args.project,
@@ -213,6 +214,11 @@ function beginWorkspaceDrag(args: {
     selectionAnchor: args.selectionAnchor,
     panOnly: args.previewMode,
   });
+  // Preview only pans. A plain click that did nothing says so once per visit
+  // (annoyance audit A4-P2-5); a pan with Space, the wheel button or the right
+  // button is what the click was for and stays quiet.
+  if (args.previewMode && drag === null && args.e.button === 0) notePreviewIgnoredClick();
+  return drag;
 }
 
 // A primary click routed by the active tool. 'fallthrough' = the select tool

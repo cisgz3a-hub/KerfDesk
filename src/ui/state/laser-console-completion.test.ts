@@ -17,13 +17,15 @@ import { EMPTY_SETTINGS_RESPONSE_MESSAGE } from './laser-console-completion';
 
 const IDLE = '<Idle|MPos:1.000,2.000,0.000|FS:0,0|Ov:100,100,100>';
 
-async function connectedIdle(): Promise<{ connection: FakeConnection; wire: string[] }> {
+async function connectedIdle(
+  autoRespondToStatusQuery = true,
+): Promise<{ connection: FakeConnection; wire: string[] }> {
   const wire: string[] = [];
   const connection = makeConnection(
     async (data) => {
       wire.push(data);
     },
-    { autoRespondToStatusQuery: true },
+    { autoRespondToStatusQuery },
   );
   await connectWith(connection);
   connection.emitLine(IDLE);
@@ -73,8 +75,11 @@ describe('Console command completion', () => {
   // The acknowledgement alone does not prove the unlock: FluidNC acks `$X` in
   // its Critical state (controller audit 2026-09-25 HF-2). The next report that
   // is not Alarm clears the latch.
+  // KerfDesk asks for that report as soon as `$X` is answered (ADR-674
+  // Amendment 1), so this controller leaves status queries unanswered and the
+  // test sends the report itself.
   it('clears the alarm latch once the controller reports Idle after acknowledging $X', async () => {
-    const { connection, wire } = await connectedIdle();
+    const { connection, wire } = await connectedIdle(false);
     useLaserStore.setState({ alarmCode: 5 });
     wire.length = 0;
 
@@ -192,7 +197,14 @@ describe('Console setting writes', () => {
     await vi.waitFor(() => expect(writes).toContain('$$\n'));
     connection.emitLine('ok');
     await settingWrite;
-    expect(writes.slice(-3)).toEqual(['?', '$32=1\n', '$$\n']);
+    // One status query follows the read-back, because the write forgot the
+    // last report; it never lands inside the read-back (ADR-674 Amendment 1).
+    // The background poll may add a query of its own before the write, so the
+    // order is checked around the write.
+    await vi.waitFor(() => {
+      const sent = writes.indexOf('$32=1\n');
+      expect(writes.slice(sent - 1, sent + 3)).toEqual(['?', '$32=1\n', '$$\n', '?']);
+    });
     await flushConnect();
     writes.length = 0;
 
@@ -228,7 +240,7 @@ describe('Console setting writes', () => {
     connection.emitLine('ok');
     await secondWrite;
 
-    expect(writes.slice(-2)).toEqual(['$32=1\n', '$$\n']);
+    expect(writes.filter((line) => line !== '?').slice(-2)).toEqual(['$32=1\n', '$$\n']);
     expect(useLaserStore.getState()).toMatchObject({
       controllerSettings: null,
       detectedSettings: null,

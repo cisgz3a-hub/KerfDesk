@@ -25,9 +25,11 @@ export function selectOutputStrategy(device: DeviceProfile): AnyOutputStrategy {
     case undefined:
       return grblStrategy;
     // Ruida output is NOT G-code — Save routes to the binary .rd encoder
-    // (io/rd) before any strategy runs. The GRBL emitter here only feeds
-    // the on-screen preview/estimate pipeline fallback.
+    // (io/rd) before any strategy runs; a Moshiboard has no file at all and
+    // its USB link encodes programs (io/moshi, ADR-705). The GRBL emitter here
+    // only feeds the on-screen preview/estimate pipeline fallback.
     case 'ruida':
+    case 'moshi':
       return grblStrategy;
     default:
       return assertNeverControllerKind(kind);

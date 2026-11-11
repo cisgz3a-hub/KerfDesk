@@ -105,6 +105,7 @@ function appendOperationCompilation(
         `vector:${output.vectorRun++}:${operationLayer.id}`,
         output.keepLeadRings,
         output.kerfSides,
+        laserPowerScaleVersion,
       );
       for (const group of vector.groups) {
         if (!hasFocusOutputIntent(group, operationLayer)) continue;

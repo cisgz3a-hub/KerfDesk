@@ -70,7 +70,7 @@ it('toggles between perspective and orthographic', () => {
   try {
     render('perspective');
     const ortho = (): HTMLButtonElement | undefined =>
-      Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Ortho');
+      host.querySelector<HTMLButtonElement>('button[aria-label="Ortho"]') ?? undefined;
     expect(ortho()?.getAttribute('aria-pressed')).toBe('false');
     act(() => ortho()?.click());
     expect(onProjectionChange).toHaveBeenLastCalledWith('orthographic');

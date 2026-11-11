@@ -126,6 +126,11 @@ test('laser settings keep stacked sliders and exact entries aligned at every pan
 
 // The Dither swatches wrap onto more rows rather than overflow the rail, keep
 // every thumbnail at full size, and answer the arrow keys like radios.
+// Twelve dithers plus 3D Sliced (ADR-699), which comes last.
+const DITHER_SWATCHES = 13;
+// At least three swatches a row even at 240 px.
+const MIN_SWATCHES_PER_ROW = 3;
+
 test('Image dither swatches fit and stay keyboard-operable at every panel width', async ({
   page,
 }) => {
@@ -137,7 +142,7 @@ test('Image dither swatches fit and stay keyboard-operable at every panel width'
     .getByRole('radio', { name: /^Image/ })
     .check({ force: true });
   const dither = panel.getByRole('radiogroup', { name: /^Dither for/ });
-  await expect(dither.getByRole('radio')).toHaveCount(12);
+  await expect(dither.getByRole('radio')).toHaveCount(DITHER_SWATCHES);
 
   for (const width of [240, 260, 280, 300, 320, 360, 400]) {
     await setPanelWidth(page, panel, width);
@@ -162,9 +167,9 @@ test('Image dither swatches fit and stay keyboard-operable at every panel width'
       };
     });
     expect(layout.outside).toBe(0);
-    // Three swatches a row even at 240 px keeps the picker to four rows.
-    expect(layout.rows).toBeLessThanOrEqual(4);
-    expect(layout.thumbnails).toEqual(Array.from({ length: 12 }, () => 44));
+    // Three swatches a row even at 240 px keeps the picker to five rows.
+    expect(layout.rows).toBeLessThanOrEqual(Math.ceil(DITHER_SWATCHES / MIN_SWATCHES_PER_ROW));
+    expect(layout.thumbnails).toEqual(Array.from({ length: DITHER_SWATCHES }, () => 44));
   }
 
   const grayscale = dither.getByRole('radio', { name: 'Grayscale', exact: true });
@@ -172,10 +177,16 @@ test('Image dither swatches fit and stay keyboard-operable at every panel width'
   await expect(panel.getByRole('spinbutton', { name: /^Minimum power for/ })).toBeVisible();
   await grayscale.focus();
   await page.keyboard.press('ArrowRight');
+  // 3D Sliced burns every slice at full Power, so Min power leaves with it.
+  const sliced = dither.getByRole('radio', { name: '3D Sliced', exact: true });
+  await expect(sliced).toBeChecked();
+  await expect(sliced).toBeFocused();
+  await expect(panel.getByRole('spinbutton', { name: /^Minimum power for/ })).toHaveCount(0);
+  // The last swatch wraps round to the first.
+  await page.keyboard.press('ArrowRight');
   const threshold = dither.getByRole('radio', { name: 'Threshold', exact: true });
   await expect(threshold).toBeChecked();
   await expect(threshold).toBeFocused();
-  await expect(panel.getByRole('spinbutton', { name: /^Minimum power for/ })).toHaveCount(0);
   await page.keyboard.press('ArrowRight');
   await expect(dither.getByRole('radio', { name: 'Floyd-Steinberg', exact: true })).toBeChecked();
 

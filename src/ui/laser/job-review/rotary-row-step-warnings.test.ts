@@ -101,7 +101,7 @@ describe('detectRotaryRowStepWarnings (ADR-315 Amd 1 and 2)', () => {
     expect(warning).toContain('so 96 of its 300 rows land on the row before and burn twice');
     expect(warning).toContain(
       'No line interval this layer accepts lands every row on its own step; 0.1473 mm ' +
-        '(6.79 lines/mm, 1 step) comes closest, with 7 of 204 rows doubled.',
+        '(6.79 lines/mm, 1 step) comes closest, with 15 of 204 rows doubled.',
     );
   });
 
@@ -114,7 +114,7 @@ describe('detectRotaryRowStepWarnings (ADR-315 Amd 1 and 2)', () => {
     });
     expect(warning).toContain('one A step ($103 = 8.9 steps/°) turns the part 0.0784 mm');
     expect(warning).toContain(
-      '0.0784 mm (12.76 lines/mm, 1 step) or 0.1569 mm (6.37 lines/mm, 2 steps)',
+      'For even rows, set the line interval to 0.1569 mm (6.37 lines/mm, 2 steps).',
     );
     expect(warning).toContain('1.27 steps');
     expect(

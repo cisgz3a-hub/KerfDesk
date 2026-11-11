@@ -18,7 +18,7 @@
 // Shift on that key types a full stop or comma, the chord stays the 90° turn,
 // Abort or Settings, whichever it was.
 
-import { isEditableShortcutTarget } from '../common/keyboard-targets';
+import { focusedControlOwnsKey } from '../common/keyboard-targets';
 import { isAltLetterChord } from './shortcuts';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
@@ -47,7 +47,7 @@ const SHIFT_ROTATE_DEG = 45;
 const CTRL_SHIFT_ROTATE_DEG = 1.5;
 
 export function handleEditingToolShortcut(e: KeyboardEvent, ctx: EditingToolCtx): boolean {
-  if (isEditableShortcutTarget(e.target)) return false;
+  if (focusedControlOwnsKey(e)) return false;
   return (
     tryRotate(e, ctx) ||
     tryRotateStep(e, ctx) ||

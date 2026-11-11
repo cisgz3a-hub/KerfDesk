@@ -68,6 +68,8 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   20: migrateV20RecoverFrameLineRule,
   // Schema 22 adds an optional rotary taper; no earlier file has one.
   21: (raw) => ({ ...raw, schemaVersion: 22 }),
+  // Schema 23 adds an optional Fill ramp (ADR-699); no earlier file has one.
+  22: (raw) => ({ ...raw, schemaVersion: 23 }),
 };
 
 function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {

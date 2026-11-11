@@ -71,14 +71,14 @@ class DesktopMachineConnection implements SerialConnection {
   // with every byte it had queued, so all that reached it before then has
   // been delivered (ADR-356 Amendment 2).
   private readThroughAt = Date.now();
-  /** True when a worker was asked for and could not take the session. */
-  readonly backgroundStreamingUnavailable: boolean;
+  /** Set when a worker was asked for and could not take the session. */
+  readonly backgroundStreamingUnavailable?: 'worker-unavailable';
   constructor(
     private readonly request: MachineNetworkRequest,
     private readonly id: string,
     hostingRequested: boolean,
   ) {
-    this.backgroundStreamingUnavailable = hostingRequested;
+    if (hostingRequested) this.backgroundStreamingUnavailable = 'worker-unavailable';
   }
   onLine(handler: (line: string) => void): () => void {
     this.lines.add(handler);

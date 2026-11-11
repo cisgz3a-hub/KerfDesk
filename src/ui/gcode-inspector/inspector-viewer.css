@@ -1,4 +1,24 @@
+/* The G-code viewer (ADR-701). The header and transport are app chrome and
+   follow the app theme. Everything drawn OVER the 3D scene uses the viewer's
+   own tokens instead: the scene's background is dark in every app theme
+   (viewer3d-theme.ts), so light-theme cards on it read as pasted on. */
 .gcode-viewer-body {
+  --lf-viewer-scene: #1c1f24;
+  --lf-viewer-glass: rgb(18 20 24 / 84%);
+  --lf-viewer-glass-solid: rgb(18 20 24 / 94%);
+  --lf-viewer-edge: rgb(255 255 255 / 11%);
+  --lf-viewer-ink: #e7eaee;
+  --lf-viewer-ink-muted: #9ba4ae;
+  --lf-viewer-hover: rgb(255 255 255 / 8%);
+  --lf-viewer-pressed: rgb(255 255 255 / 15%);
+  --lf-viewer-accent: #f2a35e;
+  --lf-viewer-live: #5fd38d;
+  /* The scrubber's bands: cutting in the app accent, travel in the scene's
+     traversal red (LightBurn's convention, viewer3d-theme.ts), the rest amber. */
+  --lf-viewer-band-cut: var(--lf-accent);
+  --lf-viewer-band-travel: rgb(212 72 60 / 55%);
+  --lf-viewer-band-other: rgb(201 138 43 / 80%);
+
   display: flex;
   flex: 1;
   min-height: 0;
@@ -14,6 +34,8 @@
   container-type: inline-size;
 }
 
+/* ---- Header: the job at a glance, then the look and layout switches ---- */
+
 .gcode-viewer-header {
   display: flex;
   align-items: center;
@@ -22,42 +44,155 @@
   /* A whole-pixel height keeps the 3D view below it on a pixel boundary
      (tokens.css, .lf-dialog--gcode-inspector). */
   box-sizing: border-box;
-  min-height: 62px;
-  padding: 12px 16px;
+  min-height: 44px;
+  padding: 6px 10px 6px 14px;
   border-bottom: 1px solid var(--lf-border);
   background: var(--lf-bg-1);
 }
 
+.gcode-viewer-header--bar {
+  justify-content: flex-start;
+}
+
 .gcode-viewer-heading {
-  display: grid;
-  gap: 3px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
   min-width: 0;
 }
 
-.gcode-viewer-eyebrow {
-  color: var(--lf-accent-fg);
-  font-size: var(--lf-text-xs);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.gcode-viewer-subtitle {
-  color: var(--lf-text-muted);
-  font-size: var(--lf-text-sm);
-}
-
-.gcode-viewer-header-actions {
+.gcode-viewer-lead {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  font-size: var(--lf-text-sm);
 }
+
+.gcode-viewer-lead-name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gcode-viewer-lead-stale {
+  color: var(--lf-warning-fg);
+  font-size: var(--lf-text-xs);
+}
+
+.gcode-viewer-live-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--lf-text-sm);
+  font-weight: 600;
+}
+
+.gcode-viewer-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gcode-viewer-stats li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--lf-text-muted);
+  background: var(--lf-bg-2);
+  font-size: var(--lf-text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.gcode-viewer-stats .lf-icon {
+  opacity: 0.8;
+}
+
+.gcode-viewer-header-actions,
+.gcode-viewer-header-icons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gcode-viewer-header-icons {
+  gap: 2px;
+}
+
+.gcode-viewer-segmented {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--lf-border);
+  border-radius: 7px;
+  background: var(--lf-bg-0);
+}
+
+.gcode-viewer-button.lf-btn,
+.gcode-viewer-text-button.lf-btn {
+  min-height: 26px;
+  padding: 3px 9px;
+  border-color: transparent;
+  border-radius: 5px;
+  background: transparent;
+  font-size: var(--lf-text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.gcode-viewer-text-button.lf-btn {
+  border-color: var(--lf-border);
+}
+
+.gcode-viewer-button.lf-btn[aria-pressed='true'],
+.gcode-viewer-button.lf-btn[aria-pressed='true']:hover:not(:disabled) {
+  color: var(--lf-text);
+  border-color: var(--lf-border);
+  background: var(--lf-bg-1);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+}
+
+/* Icon-only chrome buttons: header toggles and the transport. */
+.gcode-viewer-icon-button.lf-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  border-color: transparent;
+  border-radius: 6px;
+  color: var(--lf-text-muted);
+  background: transparent;
+}
+
+.gcode-viewer-icon-button.lf-btn:hover:not(:disabled) {
+  color: var(--lf-text);
+  background: var(--lf-bg-2);
+}
+
+.gcode-viewer-icon-button.lf-btn[aria-pressed='true'] {
+  color: var(--lf-accent-fg);
+  background: var(--lf-accent-wash);
+}
+
+/* ---- The 3D view ---- */
 
 .gcode-viewer-viewport {
   position: relative;
   flex: 1;
   min-height: 160px;
   overflow: hidden;
+  background: var(--lf-viewer-scene);
 }
 
 .gcode-viewer-canvas {
@@ -68,88 +203,120 @@
 
 /* The moves read so far while the worker reads a big program (ADR-485). */
 .gcode-viewer-preview {
+  --lf-viewer-glass: rgb(18 20 24 / 84%);
+  --lf-viewer-glass-solid: rgb(18 20 24 / 94%);
+  --lf-viewer-edge: rgb(255 255 255 / 11%);
+  --lf-viewer-ink: #e7eaee;
+  --lf-viewer-ink-muted: #9ba4ae;
+  --lf-viewer-live: #5fd38d;
+
   position: relative;
   flex: 1;
   min-height: 160px;
   overflow: hidden;
-  background: var(--lf-bg-0);
+  background: #1c1f24;
 }
 
 .gcode-viewer-preview-progress {
   width: 100%;
   height: 4px;
-  accent-color: var(--lf-accent);
+  accent-color: var(--lf-viewer-accent, #f2a35e);
 }
 
 .gcode-viewer-viewport:not([data-viewer-state='ready']) .gcode-viewer-canvas {
   visibility: hidden;
 }
 
+/* Everything over the scene shares one material: dark glass, a hairline edge. */
+.gcode-viewer-hud,
+.gcode-viewer-controls,
+.gcode-viewer-view-hint,
+.gcode-viewer-message,
+.gcode-viewer-lens,
+.gcode-viewer-stock-panel {
+  /* App tokens re-scoped, so anything inside written against them (the
+     legend, the stock switches) reads light on the dark glass. */
+  --lf-text: var(--lf-viewer-ink);
+  --lf-text-muted: var(--lf-viewer-ink-muted);
+  --lf-text-faint: var(--lf-viewer-ink-muted);
+  --lf-border: var(--lf-viewer-edge);
+  --lf-bg-input: var(--lf-viewer-glass-solid);
+
+  border: 1px solid var(--lf-viewer-edge);
+  color: var(--lf-viewer-ink);
+  /* No backdrop blur: it would re-blur the WebGL canvas every playback frame. */
+  background: var(--lf-viewer-glass);
+}
+
 .gcode-viewer-controls {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 10px;
+  right: 10px;
   z-index: 2;
-  display: grid;
-  gap: 4px;
-  max-width: calc(100% - 24px);
-  padding: 6px;
-  border: 1px solid var(--lf-border);
-  border-radius: 10px;
-  background: var(--lf-bg-1);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100% - 20px);
+  padding: 3px;
+  border-radius: 9px;
 }
 
-.gcode-viewer-control-row {
+.gcode-viewer-control-group {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 3px;
+  gap: 1px;
 }
 
-.gcode-viewer-control-label {
-  margin-right: auto;
-  padding: 0 6px;
-  color: var(--lf-text-muted);
-  font-size: var(--lf-text-xs);
-  font-weight: 600;
+.gcode-viewer-control-group + .gcode-viewer-control-group {
+  margin-left: 3px;
+  padding-left: 4px;
+  border-left: 1px solid var(--lf-viewer-edge);
 }
 
-.gcode-viewer-button.lf-btn {
+.gcode-viewer-tool-button.lf-btn {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
   min-height: 28px;
-  padding: 4px 8px;
-  border-color: transparent;
-  border-radius: 5px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--lf-viewer-ink-muted);
+  background: transparent;
   font-size: var(--lf-text-xs);
   font-weight: 500;
-  white-space: nowrap;
 }
 
-.gcode-viewer-button.lf-btn[aria-pressed='true'],
-.gcode-viewer-button.lf-btn[aria-pressed='true']:hover:not(:disabled) {
-  color: var(--lf-accent-fg);
-  border-color: var(--lf-accent);
-  background: var(--lf-tint-info);
+.gcode-viewer-tool-button.lf-btn:hover:not(:disabled) {
+  color: var(--lf-viewer-ink);
+  background: var(--lf-viewer-hover);
 }
 
-.gcode-viewer-play-button.lf-btn {
-  min-width: 50px;
-  color: var(--lf-on-fill);
-  background: var(--lf-accent);
+.gcode-viewer-tool-button.lf-btn[aria-pressed='true'],
+.gcode-viewer-tool-button.lf-btn[aria-pressed='true']:hover:not(:disabled) {
+  color: var(--lf-viewer-accent);
+  background: var(--lf-viewer-pressed);
 }
 
-.gcode-viewer-play-button.lf-btn:hover:enabled {
-  color: var(--lf-on-fill);
-  background: var(--lf-accent-hover);
+.gcode-viewer-tool-button.lf-btn:disabled {
+  opacity: 0.4;
+}
+
+.gcode-viewer-tool-button.lf-btn:focus-visible {
+  outline: 2px solid var(--lf-viewer-accent);
+  outline-offset: -2px;
 }
 
 .gcode-viewer-hud {
   position: absolute;
-  top: 12px;
-  left: 12px;
+  top: 10px;
+  left: 10px;
   z-index: 1;
   display: grid;
-  gap: 5px;
+  gap: 2px;
   /* One whole-pixel size while playback moves: whole-pixel line boxes, and a
      width that holds the usual readouts ("Line 23", "X 27.00 Y 27.00 ..."),
      so the card does not resize between the start and end of a program. A
@@ -157,11 +324,9 @@
      level differently in Chrome's software renderer. */
   box-sizing: border-box;
   min-width: 208px;
-  max-width: calc(100% - 24px);
-  padding: 9px 11px;
-  border: 1px solid var(--lf-border);
-  border-radius: 8px;
-  background: var(--lf-bg-1);
+  max-width: calc(100% - 20px);
+  padding: 8px 11px;
+  border-radius: 9px;
   font-size: var(--lf-text-xs);
   line-height: 16px;
   pointer-events: none;
@@ -174,19 +339,27 @@
   gap: 7px;
 }
 
+.gcode-viewer-hud-status {
+  color: var(--lf-viewer-ink-muted);
+}
+
 .gcode-viewer-hud-title {
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  color: var(--lf-viewer-ink);
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .gcode-viewer-hud-detail {
-  color: var(--lf-text-muted);
+  color: var(--lf-viewer-ink-muted);
+  font-family: var(--lf-font-mono);
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
 /* A sentence under the readouts wraps rather than widening the HUD. */
 .gcode-viewer-hud-note {
   max-width: 34ch;
+  font-family: inherit;
 }
 
 .gcode-viewer-hud-dot,
@@ -199,39 +372,122 @@
   background: var(--lf-accent);
 }
 
-.gcode-viewer-hud-dot[data-live='true'],
+.gcode-viewer-hud-dot {
+  background: var(--lf-viewer-accent);
+}
+
+.gcode-viewer-hud-dot[data-live='true'] {
+  background: var(--lf-viewer-live);
+}
+
 .gcode-viewer-status-dot[data-live='true'] {
   background: var(--lf-success);
 }
 
+/* Bottom left: the travel switch, and a hint only while one helps. */
 .gcode-viewer-view-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  left: 12px;
-  width: fit-content;
-  max-width: calc(100% - 24px);
-  padding: 5px 8px;
-  border: 1px solid var(--lf-border);
-  border-radius: var(--lf-radius-lg);
-  color: var(--lf-text-muted);
-  background: var(--lf-bg-1);
+  gap: 4px 10px;
+  max-width: calc(100% - 80px);
+  padding: 3px 10px 3px 4px;
+  border-radius: 9px;
   font-size: var(--lf-text-xs);
   pointer-events: auto;
+}
+
+.gcode-viewer-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 6px;
+  border-radius: 6px;
+  color: var(--lf-viewer-ink-muted);
+  cursor: pointer;
+}
+
+.gcode-viewer-switch:hover {
+  color: var(--lf-viewer-ink);
+  background: var(--lf-viewer-hover);
+}
+
+.gcode-viewer-switch[data-checked='true'] {
+  color: var(--lf-viewer-ink);
+}
+
+.gcode-viewer-switch input {
+  margin: 0;
+  accent-color: var(--lf-viewer-accent);
+}
+
+.gcode-viewer-travel-swatch {
+  width: 12px;
+  height: 0;
+  border-top: 2px dashed rgb(212 72 60 / 90%);
+}
+
+.gcode-viewer-switch[data-checked='false'] .gcode-viewer-travel-swatch {
+  opacity: 0.35;
+}
+
+.gcode-viewer-hint-text {
+  color: var(--lf-viewer-ink-muted);
+}
+
+/* The preview's colour legend, bottom left above the travel switch. */
+.gcode-viewer-lens {
+  position: absolute;
+  left: 10px;
+  bottom: 50px;
+  z-index: 2;
+  width: 230px;
+  max-width: calc(100% - 20px);
+  box-sizing: border-box;
+  padding: 7px 9px;
+  border-radius: 9px;
+  font-size: var(--lf-text-xs);
+}
+
+/* The carved stock's switches on the canvas view (ADR-580), bottom right. */
+.gcode-viewer-stock-panel {
+  position: absolute;
+  right: 10px;
+  bottom: 60px;
+  z-index: 2;
+  width: 240px;
+  max-width: calc(100% - 20px);
+  box-sizing: border-box;
+  padding: 7px 9px;
+  border-radius: 9px;
+  font-size: var(--lf-text-xs);
+}
+
+.gcode-viewer-stock-panel summary {
+  margin-bottom: 4px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.gcode-viewer-lens select,
+.gcode-viewer-stock-panel select {
+  color: var(--lf-viewer-ink);
+  border-color: var(--lf-viewer-edge);
+  background: var(--lf-viewer-glass-solid);
 }
 
 .gcode-viewer-message {
   position: absolute;
   inset: 50% 16px auto;
-  margin: 0;
-  padding: 12px;
-  border: 1px solid var(--lf-border);
-  border-radius: var(--lf-radius-lg);
-  background: var(--lf-bg-1);
+  width: fit-content;
+  max-width: calc(100% - 32px);
+  margin: 0 auto;
+  padding: 10px 14px;
+  border-radius: 9px;
   font-size: var(--lf-text-sm);
   text-align: center;
 }
@@ -248,11 +504,13 @@
   inset: auto 16px 16px;
 }
 
+/* ---- Transport ---- */
+
 .gcode-viewer-timeline {
   display: grid;
   flex: 0 0 auto;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 6px 12px 6px 8px;
   border-top: 1px solid var(--lf-border);
   background: var(--lf-bg-1);
 }
@@ -273,46 +531,137 @@
 
 .gcode-viewer-time-readout {
   display: flex;
-  gap: 10px;
+  align-items: baseline;
+  gap: 5px;
+  font-family: var(--lf-font-mono);
+  font-size: var(--lf-text-xs);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .gcode-viewer-time-readout strong {
   color: var(--lf-accent-fg);
 }
 
+.gcode-viewer-time-total {
+  color: var(--lf-text-muted);
+}
+
 .gcode-viewer-transport {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 6px 12px;
 }
 
 .gcode-viewer-transport-buttons {
   display: flex;
-  gap: 2px;
+  align-items: center;
+  gap: 1px;
+}
+
+.gcode-viewer-play-button.lf-btn,
+.gcode-viewer-play-button.lf-btn:hover:enabled,
+.gcode-viewer-play-button.lf-btn[aria-pressed='true'] {
+  margin: 0 2px;
+  border-radius: 50%;
+  color: var(--lf-on-fill);
+  background: var(--lf-accent);
+}
+
+.gcode-viewer-play-button.lf-btn:hover:enabled {
+  background: var(--lf-accent-hover);
+}
+
+/* The scrubber: a banded track under a transparent range input. */
+.gcode-viewer-scrub {
+  position: relative;
+  flex: 1;
+  min-width: 80px;
+  height: 24px;
+}
+
+.gcode-viewer-scrub-track {
+  position: absolute;
+  top: 9px;
+  right: 0;
+  left: 0;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background-color: var(--lf-bg-2);
+}
+
+.gcode-viewer-scrub-rest {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--lf-bg-1);
+  opacity: 0.62;
 }
 
 .gcode-viewer-scrubber {
-  flex: 1;
-  min-width: 80px;
-  height: 26px;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   margin: 0;
-  accent-color: var(--lf-accent);
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
-.gcode-viewer-speed {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--lf-text-muted);
-  font-size: var(--lf-text-xs);
+.gcode-viewer-scrubber:disabled {
+  cursor: default;
 }
 
-.gcode-viewer-speed select {
-  min-height: 28px;
-  padding: 3px 5px;
+.gcode-viewer-scrubber::-webkit-slider-runnable-track {
+  height: 100%;
+  background: transparent;
+}
+
+.gcode-viewer-scrubber::-moz-range-track {
+  background: transparent;
+}
+
+.gcode-viewer-scrubber::-webkit-slider-thumb {
+  width: 4px;
+  height: 18px;
+  margin-top: 3px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--lf-text);
+  box-shadow: 0 0 0 2px var(--lf-bg-1);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.gcode-viewer-scrubber::-moz-range-thumb {
+  width: 4px;
+  height: 18px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--lf-text);
+  box-shadow: 0 0 0 2px var(--lf-bg-1);
+}
+
+.gcode-viewer-scrubber:focus-visible {
+  outline: 2px solid var(--lf-focus-accent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+.gcode-viewer-chip-select {
+  min-height: 26px;
+  padding: 2px 6px;
+  border: 1px solid var(--lf-border);
+  border-radius: 6px;
+  color: var(--lf-text);
+  background: var(--lf-bg-1);
   font-size: var(--lf-text-xs);
+  font-variant-numeric: tabular-nums;
 }
 
 .gcode-viewer-live-track {
@@ -338,15 +687,6 @@
   border: 1px dashed var(--lf-border-strong);
 }
 
-.gcode-viewer-segmented {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--lf-border);
-  border-radius: 7px;
-  background: var(--lf-bg-0);
-}
-
 /* View cube hit area: the scene draws the cube underneath (ADR-426). */
 .gcode-viewer-view-cube {
   position: absolute;
@@ -359,12 +699,20 @@
    single scroll step does not flicker them. */
 .gcode-viewer-hud,
 .gcode-viewer-controls,
-.gcode-viewer-view-hint {
+.gcode-viewer-view-hint,
+.gcode-viewer-lens,
+.gcode-viewer-stock-panel {
   transition: opacity 160ms ease;
 }
 
 .gcode-viewer-viewport[data-moving='true']
-  :is(.gcode-viewer-hud, .gcode-viewer-controls, .gcode-viewer-view-hint) {
+  :is(
+    .gcode-viewer-hud,
+    .gcode-viewer-controls,
+    .gcode-viewer-view-hint,
+    .gcode-viewer-lens,
+    .gcode-viewer-stock-panel
+  ) {
   opacity: 0.22;
   transition-delay: 140ms;
 }
@@ -372,7 +720,9 @@
 @media (prefers-reduced-motion: reduce) {
   .gcode-viewer-hud,
   .gcode-viewer-controls,
-  .gcode-viewer-view-hint {
+  .gcode-viewer-view-hint,
+  .gcode-viewer-lens,
+  .gcode-viewer-stock-panel {
     transition: none;
   }
 }
@@ -425,23 +775,15 @@
 
 @container (max-width: 660px) {
   .gcode-viewer-hud {
-    top: 94px;
+    top: 52px;
   }
 
-  .gcode-viewer-timeline {
-    padding: 8px 10px;
+  .gcode-viewer-stats li:nth-child(n + 2) {
+    display: none;
   }
 
-  .gcode-viewer-scrubber {
+  .gcode-viewer-scrub {
     flex-basis: 100%;
     order: -1;
-  }
-
-  .gcode-viewer-speed {
-    margin-left: auto;
-  }
-
-  .gcode-viewer-trail {
-    margin-left: 0;
   }
 }

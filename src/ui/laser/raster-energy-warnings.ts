@@ -67,7 +67,9 @@ function describeRasterEnergy(
 ): string | null {
   const layer = operations.find((operation) => operation.id === group.layerId);
   const obj = project.scene.objects.find((candidate) => candidate.id === group.sourceObjectId);
-  if (layer === undefined || obj === undefined) return null;
+  // ADR-699: a ramped Fill also burns as a raster; its density is its line
+  // interval, which Fill already shows, so only images are measured here.
+  if (layer === undefined || obj?.kind !== 'raster-image') return null;
   const op = effectiveOperationForObject(layer, obj);
   // group.power is the burned power after the artwork's Power scale.
   if (!(op.power > 0) || !(group.power > 0)) return null;

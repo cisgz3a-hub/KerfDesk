@@ -80,7 +80,7 @@ describe('Wake continuation belongs to its exact recovery owner', () => {
     const afterAbort = useLaserStore.getState();
     port.emitLine(IDLE);
     await microtasks();
-    expect(wake.value).toContain('superseded');
+    expect(wake.value).toContain('took over');
     expect(useLaserStore.getState().lastWriteError).toBe(afterAbort.lastWriteError);
     expect(useLaserStore.getState().log).toEqual([...afterAbort.log, IDLE]);
   });
@@ -131,7 +131,7 @@ describe('Wake continuation belongs to its exact recovery owner', () => {
       );
       const late = outcome(actions.wakeController());
       await microtasks();
-      expect(late.value).toContain('superseded');
+      expect(late.value).toContain('took over');
       expect(state.controllerOperation).toBe(continuedState.controllerOperation);
       expect(state.trustedPositionEpoch).toBe(continuedState.trustedPositionEpoch);
       expect(state.log).toEqual(continuedState.log);
@@ -225,7 +225,7 @@ describe('Wake continuation belongs to its exact recovery owner', () => {
     );
     const late = outcome(actions.wakeController());
     await microtasks();
-    expect(late.value).toContain('superseded');
+    expect(late.value).toContain('took over');
     expect(state.controllerOperation).toBe(replacement);
     expect(state.trustedPositionEpoch).toBe(replacementState.trustedPositionEpoch);
     expect(state.log).toEqual(replacementState.log);
@@ -317,7 +317,7 @@ describe('Wake continuation belongs to its exact recovery owner', () => {
       held.release(settlement === 'failure');
       await microtasks();
       expect(late.value).toContain(
-        settlement === 'failure' ? 'Old reset write rejected' : 'superseded',
+        settlement === 'failure' ? 'Old reset write rejected' : 'took over',
       );
       expect(useLaserStore.getState().controllerOperation).toBe(before.controllerOperation);
       expect(useLaserStore.getState().lastWriteError).toBe(before.lastWriteError);

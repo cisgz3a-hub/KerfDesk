@@ -17,10 +17,8 @@ import type { CameraPose, LensModel } from '../../core/camera/model/camera-model
 import {
   measureViewShift,
   surroundMask,
-  viewThumbnail,
   type ViewThumbnail,
 } from '../../core/camera/model/view-shift';
-import type { RgbaImage } from '../../core/camera/rgba-image';
 
 /** `resize`: the same view, smaller or larger. `differs`: not the view the
  * calibration saw (a cut-out of it, or the camera moved as well). */
@@ -81,13 +79,14 @@ export function resetFrameRescaleChecks(): void {
  */
 export function frameRescaleFromView(args: {
   readonly reference: ViewThumbnail;
-  readonly frame: RgbaImage;
+  /** The picture's thumbnail at the reference's width. */
+  readonly current: ViewThumbnail;
   readonly scaledLens: LensModel;
   readonly pose: CameraPose;
   readonly bedWidthMm: number;
   readonly bedHeightMm: number;
 }): FrameRescaleVerdict | null {
-  const current = viewThumbnail(args.frame, args.reference.width);
+  const { current } = args;
   if (current.height !== args.reference.height) return 'differs';
   const mask = surroundMask({
     lens: args.scaledLens,

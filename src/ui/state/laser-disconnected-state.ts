@@ -1,4 +1,5 @@
 import { disconnectedControllerQualification } from './laser-controller-qualification';
+import { NO_JOB_STREAM_HOST } from './laser-connect-attempt';
 import { sessionScopedJobStateReset } from './laser-session-reset';
 import type { LaserState } from './laser-store';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
@@ -9,7 +10,7 @@ export function disconnectedStatePatch(state: LaserState): Partial<LaserState> {
     ...sessionScopedJobStateReset(),
     connection: { kind: 'disconnected' },
     serialPortInfo: null,
-    jobStreamHost: null,
+    ...NO_JOB_STREAM_HOST,
     connectedBaudRate: null,
     statusReport: null,
     controllerSessionEpoch: state.controllerSessionEpoch + 1,

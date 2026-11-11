@@ -30,34 +30,53 @@ export function CanvasGcodeView(props: { readonly active: boolean }): JSX.Elemen
   );
   const inspection = useGcodeInspection(source);
 
+  const lead = (
+    <span className="gcode-viewer-lead">
+      <span className="gcode-viewer-lead-name">
+        {state.kind === 'ready' ? state.programName : 'Current design'}
+      </span>
+      {stale ? <span className="gcode-viewer-lead-stale">Design changed</span> : null}
+      <button
+        type="button"
+        className="lf-btn gcode-viewer-text-button"
+        title={activeRun ? 'Showing the exact started program' : "Recompile this project's G-code"}
+        onClick={refresh}
+        disabled={state.kind === 'compiling' || activeRun}
+      >
+        {state.kind === 'compiling' ? 'Compiling…' : followingRun ? 'Current design' : 'Refresh'}
+      </button>
+    </span>
+  );
+
   return (
     <div style={wrapStyle} aria-label="G-code canvas view">
-      <div style={barStyle}>
-        <span style={nameStyle}>
-          {state.kind === 'ready' ? state.programName : 'Current design'}
-        </span>
-        {stale ? <span style={staleStyle}>Design changed</span> : null}
-        <button
-          type="button"
-          className="lf-btn"
-          style={refreshStyle}
-          title={
-            activeRun ? 'Showing the exact started program' : "Recompile this project's G-code"
-          }
-          onClick={refresh}
-          disabled={state.kind === 'compiling' || activeRun}
-        >
-          {state.kind === 'compiling' ? 'Compiling…' : followingRun ? 'Current design' : 'Refresh'}
-        </button>
-      </div>
-      <Body inspection={inspection} state={state} />
+      <Body inspection={inspection} state={state} lead={lead} />
     </div>
   );
 }
 
+// The name and Refresh lead the viewer's own header once there is a program
+// to show (ADR-701); until then they sit in a bar of their own.
 function Body(props: {
   readonly inspection: InspectionState;
   readonly state: CurrentGcode;
+  readonly lead: React.ReactNode;
+}): JSX.Element {
+  const ready =
+    props.inspection.kind === 'ready' && hasGcodeInspectorAnalysis(props.inspection.result);
+  if (ready && currentGcodeMessage(props.state) === null) return <BodyContent {...props} />;
+  return (
+    <>
+      <div className="gcode-viewer-header gcode-viewer-header--bar">{props.lead}</div>
+      <BodyContent {...props} />
+    </>
+  );
+}
+
+function BodyContent(props: {
+  readonly inspection: InspectionState;
+  readonly state: CurrentGcode;
+  readonly lead: React.ReactNode;
 }): JSX.Element {
   const stateMessage = currentGcodeMessage(props.state);
   if (stateMessage !== null) return <p style={messageStyle}>{stateMessage}</p>;
@@ -95,6 +114,7 @@ function Body(props: {
         analysis={props.inspection.result.analysis}
         source={props.inspection.source}
         variant="preview"
+        lead={props.lead}
       />
     </>
   );
@@ -133,29 +153,6 @@ const wrapStyle: React.CSSProperties = {
   background: 'var(--lf-bg-1)',
   color: 'var(--lf-text)',
   zIndex: 2,
-};
-
-const barStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-  padding: '6px 10px',
-  borderBottom: '1px solid var(--lf-border)',
-  background: 'var(--lf-bg-0)',
-  fontSize: 'var(--lf-text-sm)',
-};
-
-const nameStyle: React.CSSProperties = { fontWeight: 600 };
-
-const staleStyle: React.CSSProperties = {
-  color: 'var(--lf-warning-fg)',
-  fontSize: 'var(--lf-text-xs)',
-};
-
-const refreshStyle: React.CSSProperties = {
-  marginLeft: 'auto',
-  padding: '1px 8px',
-  fontSize: 'var(--lf-text-xs)',
 };
 
 const messageStyle: React.CSSProperties = { margin: 16 };

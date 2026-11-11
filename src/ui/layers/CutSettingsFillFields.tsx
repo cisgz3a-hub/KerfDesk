@@ -9,6 +9,7 @@ import { scanLineOverscanNote } from './fill-overscan-fallback';
 import { PassAngleStepField } from './CutSettingsScanPatternFields';
 import { AutoOverscanSwitch, automaticOverscanNote } from './CutSettingsAutoOverscan';
 import { boundsAdmitting } from './CutSettingsInputs';
+import { CutSettingsFillRampFields } from './CutSettingsFillRampFields';
 
 export function CutSettingsFillFields(props: {
   readonly layer: Layer;
@@ -73,6 +74,9 @@ export function CutSettingsFillFields(props: {
       />
       {props.showCutSettingsExtras === true && fillStyle !== 'offset' ? (
         <PassAngleStepField layer={props.layer} />
+      ) : null}
+      {props.showCutSettingsExtras === true && fillStyle !== 'offset' ? (
+        <CutSettingsFillRampFields layer={props.layer} />
       ) : null}
     </fieldset>
   );

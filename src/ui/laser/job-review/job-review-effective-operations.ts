@@ -306,7 +306,8 @@ function laserGroupSummary(
 
 function laserGroupKindLabel(group: Exclude<Group, CncGroup>): string {
   if (group.kind === 'fill') return 'Fill';
-  if (group.kind === 'raster') return 'Image';
+  // ADR-699: a ramped Fill burns as a raster but is still a Fill.
+  if (group.kind === 'raster') return group.fillRamp === true ? 'Fill' : 'Image';
   // ADR-494: the group that burns a Line operation's tab spans.
   return group.tabSpanPowerPercent === undefined
     ? 'Line'

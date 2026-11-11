@@ -14,6 +14,7 @@ import { loadAutoConnectPreference, saveAutoConnectPreference } from '../state/s
 import { pauseAutoConnect, useAutoConnectSession } from '../state/auto-connect-session';
 import { ConnectionBar, type ConnectionBarProps } from './ConnectionBar';
 import { connectMachine } from './connect-machine';
+import { connectionControlBlockReason } from './control-block-reason';
 import {
   isFileOnlyController,
   useControllerQualificationRetry,
@@ -29,6 +30,7 @@ import { LaserModuleRow } from './LaserModuleRow';
 import { DeviceSetupControls } from './device-setup';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { MachineNetworkConnect } from './MachineNetworkConnect';
+import { MoshiUsbPanel } from './MoshiUsbPanel';
 import { RuidaNetworkPanel } from './RuidaNetworkPanel';
 import { RECONNECT_DURING_JOB_TITLE, reconnectWithSavedProfile } from './reconnect-job-guard';
 import {
@@ -126,6 +128,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
               }
         }
         disabled={!supportsSerial || controlsBusy || isFileOnlyProfile}
+        disabledReason={controlsBusy ? connectionControlBlockReason(props.motionOperation) : null}
       />
     </>
   );
@@ -148,6 +151,7 @@ function MachineDetailsContent(): JSX.Element {
       <LaserModuleRow />
       <MachineNetworkConnect />
       <RuidaNetworkPanel />
+      <MoshiUsbPanel />
     </>
   );
 }

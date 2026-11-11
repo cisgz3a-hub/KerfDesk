@@ -6,6 +6,10 @@
 placement may reuse a clean completed Frame. Each replay still claims its own exact reviewed
 program, and a newly framed Current Position placement remains authoritative over receipt origin.
 
+**Amended by [ADR-237 Amendment 3](ADR-237-amendment-3-run-again-carries-an-unchanged-review.md):**
+decision 1's "single Job Review" is not shown again for an unchanged laser job already reviewed in
+the same app and controller session. The Frame rule here is unchanged.
+
 ### Context
 
 ADR-372 made Start wait for a clean Frame of the exact job and stream that Frame's one-run permit.

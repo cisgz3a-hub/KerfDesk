@@ -20,16 +20,18 @@ export type RampStop = { readonly offset: number; readonly opacity: number };
 
 const thumbnails = new Map<DitherAlgorithm, DitherThumbnail>();
 let rampLuma: Uint8Array | null = null;
+const THUMBNAIL_SLICES = 5;
 
 export function ditherThumbnail(algorithm: DitherAlgorithm): DitherThumbnail {
   const cached = thumbnails.get(algorithm);
   if (cached !== undefined) return cached;
   const power = dither(
     { luma: thumbnailRampLuma(), width: DITHER_THUMBNAIL_COLUMNS, height: DITHER_THUMBNAIL_ROWS },
-    { algorithm, sMax: S_MAX },
+    // ADR-699: 3D Sliced shows a few slices as steps of depth.
+    { algorithm, sMax: S_MAX, sliceCount: THUMBNAIL_SLICES },
   );
   const thumbnail: DitherThumbnail =
-    algorithm === 'grayscale'
+    algorithm === 'grayscale' || algorithm === '3d-sliced'
       ? { kind: 'ramp', stops: rampStops(power) }
       : { kind: 'dots', path: burnedRunsPath(power) };
   thumbnails.set(algorithm, thumbnail);

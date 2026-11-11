@@ -10,12 +10,22 @@
 // then uploads that small bitmap once per new picture. One decode runs at a
 // time; parts that arrive meanwhile are dropped but the newest, and while a
 // job runs pictures are taken at most every JOB_FRAME_MS.
+//
+// ADR-440 Amendment 11 (rolling audit v14 Z1-P1-1): Chromium decodes off the
+// UI thread but shrinks a picture on the thread that receives the bitmap, so
+// in the window a 4K picture's shrink to 1,920 px held the UI thread 118-243
+// ms, during a job too. The shrink now runs in the camera picture worker,
+// which hands the bitmap back. Without that worker the picture is decoded at
+// full size and the GPU scales it; nothing is ever shrunk in the window. A
+// shrink that would save under a tenth of the width is skipped.
 
 import {
   MACHINE_JPEG_POLL_INTERVAL_MS,
   withCacheBuster,
   type ActiveCameraSource,
 } from '../frame-source';
+import { pictureClient } from '../picture-worker/camera-picture-client';
+import { shrinkWidth } from '../picture-worker/picture-size';
 import { jpegSize, MjpegPartReader } from './mjpeg-parts';
 
 export type MachineFrame = {
@@ -79,8 +89,10 @@ function latestOnlyDecoder(options: FrameFeedOptions, signal: AbortSignal): Deco
     if (size === null) return;
     busy = true;
     lastAt = now();
-    const width = Math.min(size.width, Math.max(1, Math.round(options.displayWidth())));
-    decode(new Blob([bytes], { type: 'image/jpeg' }), width < size.width ? width : undefined)
+    decode(
+      new Blob([bytes], { type: 'image/jpeg' }),
+      shrinkWidth(size.width, options.displayWidth()),
+    )
       .then((bitmap) => {
         if (signal.aborted) bitmap.close();
         else options.onFrame({ bitmap, ...size });
@@ -97,10 +109,12 @@ function latestOnlyDecoder(options: FrameFeedOptions, signal: AbortSignal): Deco
   };
 }
 
-function defaultDecode(blob: Blob, resizeWidth: number | undefined): Promise<ImageBitmap> {
-  return resizeWidth === undefined
-    ? createImageBitmap(blob)
-    : createImageBitmap(blob, { resizeWidth, resizeQuality: 'medium' });
+// A plain decode is off the UI thread anywhere; a shrink only in the worker.
+async function defaultDecode(blob: Blob, resizeWidth: number | undefined): Promise<ImageBitmap> {
+  const client = resizeWidth === undefined ? null : pictureClient();
+  if (client === null || resizeWidth === undefined) return createImageBitmap(blob);
+  const reply = await client.run({ op: 'decode', blob, resizeWidth });
+  return reply.kind === 'bitmap' ? reply.bitmap : createImageBitmap(blob);
 }
 
 async function readStream(

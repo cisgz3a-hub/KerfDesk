@@ -345,3 +345,40 @@ describe('native serial connection ownership', () => {
     log.mockRestore();
   });
 });
+
+// ADR-676 Amendment 5: Job Review's lit-stop advice names why the window kept
+// the port, since only an identical adapter is fixed by unplugging one.
+describe('why the native worker left the port to the window', () => {
+  it.each([
+    ['an identical adapter is granted', 'adapter-not-unique'],
+    ['the adapter changes during the probe', 'adapter-not-unique'],
+    ['the worker cannot be created', 'worker-unavailable'],
+    ['the worker cannot reach the port', 'worker-unavailable'],
+  ] as const)('reports %s as %s', async (situation, expected) => {
+    const h = harness();
+    if (situation === 'an identical adapter is granted')
+      h.serial.getPorts.mockResolvedValue([h.selected, port()]);
+    if (situation === 'the adapter changes during the probe')
+      h.serial.getPorts.mockResolvedValueOnce([h.selected]).mockResolvedValue([]);
+    if (situation === 'the worker cannot be created')
+      h.createWorker.mockImplementation(() => {
+        throw new Error('no module workers');
+      });
+    if (situation === 'the worker cannot reach the port')
+      h.worker.respond = (request) => {
+        if (request.kind === 'native-probe')
+          h.worker.reply({ kind: 'native-unavailable', id: request.id, reason: 'no serial' });
+      };
+    const reasons: string[] = [];
+    const opened = await tryOpenNativeSerialConnection({
+      port: h.selected,
+      serial: h.serial,
+      createWorker: h.createWorker,
+      options: { baudRate: 115_200, bufferSize: 4096 },
+      timeoutMs: 25,
+      onFallback: (reason) => reasons.push(reason),
+    });
+    expect(opened).toBeNull();
+    expect(reasons).toEqual([expected]);
+  });
+});

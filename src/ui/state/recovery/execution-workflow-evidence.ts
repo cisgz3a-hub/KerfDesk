@@ -88,12 +88,28 @@ export type ExecutionReviewAcknowledgementV2 =
       readonly cncSetupConfirmed: true;
     };
 
+/** Job Review was not shown for this run (ADR-237 Amendment 3). Run again
+ * found that the review of the freshly prepared program was the one the
+ * operator had already confirmed, and carried that confirmation over. */
+export type ReviewCarriedOverV2 = {
+  /** The completed run this one repeats; its review is the one carried. */
+  readonly fromRunId: string;
+  /** The run whose Job Review the operator confirmed with a click. It is
+   * `fromRunId` unless that run was itself a repeat with a carried review. */
+  readonly operatorReviewedRunId: string;
+  readonly operatorReviewedAtIso: string;
+};
+
 export type ExecutionReviewEvidenceV2 = {
+  /** When the operator confirmed Job Review. With `carriedOver`, when KerfDesk
+   * compared this run's review with the carried one: nobody clicked then. */
   readonly reviewedAtIso: string;
+  /** The warnings of this run's own review, built from its own preparation. */
   readonly warningsShown: ReadonlyArray<string>;
   readonly acknowledgement: ExecutionReviewAcknowledgementV2;
   readonly laserModeStartEvidence?: LaserModeStartEvidence;
   readonly cncSetupAttestation?: CncSetupAttestation;
+  readonly carriedOver?: ReviewCarriedOverV2;
 };
 
 export type ExecutionProvenanceEvidenceV2 = {
@@ -108,6 +124,7 @@ export function ordinaryExecutionEvidence(args: {
   readonly completedReplaySourceRunId?: string;
   readonly laserModeStartEvidence?: LaserModeStartEvidence;
   readonly cncSetupAttestation?: CncSetupAttestation;
+  readonly carriedOver?: ReviewCarriedOverV2;
 }): ExecutionProvenanceEvidenceV2 {
   return {
     workflow: {
@@ -234,6 +251,7 @@ function commonReview(args: {
   readonly acknowledgement: JobReviewAcknowledgement;
   readonly laserModeStartEvidence?: LaserModeStartEvidence;
   readonly cncSetupAttestation?: CncSetupAttestation;
+  readonly carriedOver?: ReviewCarriedOverV2;
 }): ExecutionReviewEvidenceV2 {
   return {
     reviewedAtIso: args.reviewedAtIso,
@@ -245,6 +263,7 @@ function commonReview(args: {
     ...(args.cncSetupAttestation === undefined
       ? {}
       : { cncSetupAttestation: args.cncSetupAttestation }),
+    ...(args.carriedOver === undefined ? {} : { carriedOver: { ...args.carriedOver } }),
   };
 }
 

@@ -216,6 +216,9 @@ export type RasterGroup = {
   // degrees counter-clockwise about the machine origin (raster-scan-frame.ts).
   // Absent means along machine X, exactly as before.
   readonly scanAngleDeg?: number;
+  // ADR-699: present only on the raster a ramped Fill burns as, so Job Review
+  // names it a Fill. Absent on every image group, so their output is unchanged.
+  readonly fillRamp?: true;
 };
 
 export type RasterRowProviderOrder = 'ascending-y' | 'descending-y';
@@ -461,6 +464,12 @@ export type JobDiagnostic =
   // emitted G-code precision. Keep this advisory so microscopic fill loss is
   // visible without turning it into a Start, Frame, or export refusal.
   | { readonly kind: 'fill-collapsed-at-precision'; readonly layerName: string }
+  // ADR-699: a ramped Fill's grid would need more than its cell limit, so it
+  // burns flat, as it would without a ramp.
+  | { readonly kind: 'fill-ramp-too-large'; readonly layerName: string; readonly cells: number }
+  // ADR-699 Amd 1: a ramped Fill asks for a scan angle, cross-hatch or an angle
+  // change per pass, but on a rotary it scans every pass along X.
+  | { readonly kind: 'fill-ramp-scan-angle-rotary'; readonly layerName: string }
   | {
       readonly kind: 'raster-source-luma-mismatch';
       readonly layerName: string;

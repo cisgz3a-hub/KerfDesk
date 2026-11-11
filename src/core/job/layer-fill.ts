@@ -152,7 +152,7 @@ function memoizedLayerFillHatching(
   return hatches;
 }
 
-function collectFillContoursForLayer(
+export function collectFillContoursForLayer(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,

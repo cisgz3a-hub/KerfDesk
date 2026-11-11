@@ -13,20 +13,27 @@
 // rows as the emitter writes them and the controller steps them
 // (rotary-row-placement.ts), so a one-step interval that doubles rows warns,
 // and the advice names only intervals that land evenly as printed.
+// Amendment 3 (rolling audit v14 Z3): a 0° Fill's hatch rows run round the
+// part too and are checked the same way, read from the machine-space job; an
+// offered interval must land evenly at every phase; layers go by their names,
+// and a Fill (ramped or not) is advised on its Interval.
 
 import { rotaryYScale } from '../../../core/devices';
 import type { RotaryAxis } from '../../../core/devices/rotary';
 import { rotaryAxisOf } from '../../../core/devices/rotary-axis';
-import type { Job, RasterGroup } from '../../../core/job';
-import { rotaryAppliesTo } from '../../../core/job';
+import type { FillGroup, Job, RasterGroup } from '../../../core/job';
+import { machineSpaceJob, rotaryAppliesTo } from '../../../core/job';
 import type { ControllerSettingsSnapshot } from '../../../core/preflight';
 import type { Project } from '../../../core/scene';
 import {
   fittingRowIntervals,
   rotaryRowPlacement,
   rowsLandEvenly,
+  steppedRowPlacement,
   type FittingInterval,
   type RowIntervalAdvice,
+  type RowKind,
+  type RowPlacement,
 } from './rotary-row-placement';
 
 /** The controller's steps for each rotary axis, as $$ reports them. */
@@ -53,7 +60,9 @@ export function rotaryRowStepsUnknownWarning(axis: RotaryAxis): string {
 
 /** Exact prepared-job disclosure only; it never changes output or blocks Start. */
 export function detectRotaryRowStepWarnings(
-  project: Pick<Project, 'device' | 'machine'>,
+  project: Pick<Project, 'device' | 'machine'> & {
+    readonly scene?: Pick<Project['scene'], 'layers'>;
+  },
   job: Job,
   /** The live controller's settings; null when it reported none, undefined
    *  when the caller has no live controller (nothing is checked). */
@@ -62,22 +71,57 @@ export function detectRotaryRowStepWarnings(
   const rotary = project.device.rotary;
   if (!rotaryAppliesTo(project.device, project.machine) || rotary === undefined) return [];
   const rasters = job.groups.filter((group): group is RasterGroup => group.kind === 'raster');
-  if (rasters.length === 0 || settings === undefined) return [];
+  const fills = job.groups.filter(isScanlineFill);
+  if ((rasters.length === 0 && fills.length === 0) || settings === undefined) return [];
   const axis = rotaryAxisOf(rotary);
   const stepsPerUnit = settings === null ? undefined : axisSteps(settings, axis);
   if (stepsPerUnit === undefined || !(stepsPerUnit > 0)) {
     return [rotaryRowStepsUnknownWarning(axis)];
   }
   // k is in the axis's own units per surface mm (degrees on A), as its steps are.
-  const scale = rotaryYScale(rotary);
-  const stepsText = `${axis} step (${AXIS_STEPS[axis].setting} = ${stepsPerUnit} ${AXIS_STEPS[axis].unit})`;
-  const warnings: string[] = [];
+  const steps: AxisSteps = {
+    scale: rotaryYScale(rotary),
+    stepsPerUnit,
+    stepsText: `${axis} step (${AXIS_STEPS[axis].setting} = ${stepsPerUnit} ${AXIS_STEPS[axis].unit})`,
+  };
+  const name = (layerId: string) =>
+    project.scene?.layers.find((layer) => layer.id === layerId)?.name ?? layerId;
   const seen = new Set<string>();
+  const images = imageWarnings(rasters, steps, name, seen);
+  if (fills.length === 0) return images;
+  const machineFills = machineSpaceJob(job, project.device, project.machine).groups;
+  return [...images, ...fillWarnings(machineFills.filter(isScanlineFill), steps, name, seen)];
+}
+
+function imageWarnings(
+  rasters: ReadonlyArray<RasterGroup>,
+  steps: AxisSteps,
+  name: (layerId: string) => string,
+  seen: Set<string>,
+): string[] {
+  const warnings: string[] = [];
   for (const group of rasters) {
     if (rowPitchMm(group) === null || seen.has(group.layerId)) continue;
     seen.add(group.layerId);
-    const warning = rowStepWarning(group, { scale, stepsPerUnit, stepsText });
+    const warning = imageRowWarning(group, steps, name(group.layerId));
     if (warning !== null) warnings.push(warning);
+  }
+  return warnings;
+}
+
+function fillWarnings(
+  fills: ReadonlyArray<FillGroup>,
+  steps: AxisSteps,
+  name: (layerId: string) => string,
+  seen: Set<string>,
+): string[] {
+  const warnings: string[] = [];
+  for (const group of fills) {
+    if (seen.has(group.layerId)) continue;
+    const warning = fillRowWarning(group, steps, name(group.layerId));
+    if (warning === null) continue;
+    seen.add(group.layerId);
+    warnings.push(warning);
   }
   return warnings;
 }
@@ -85,6 +129,10 @@ export function detectRotaryRowStepWarnings(
 function axisSteps(settings: RotaryAxisStepSettings, axis: RotaryAxis): number | undefined {
   if (axis === 'A') return settings.stepsPerUnitA;
   return axis === 'Z' ? settings.stepsPerMmZ : settings.stepsPerMmY;
+}
+
+function isScanlineFill(group: Job['groups'][number]): group is FillGroup {
+  return group.kind === 'fill' && (group.fillStyle ?? 'scanline') !== 'offset';
 }
 
 /** Surface mm between the image's rows, or null for a one-row image. */
@@ -100,42 +148,84 @@ type AxisSteps = {
   readonly stepsText: string;
 };
 
-function rowStepWarning(group: RasterGroup, axis: AxisSteps): string | null {
+function imageRowWarning(group: RasterGroup, axis: AxisSteps, name: string): string | null {
   const heightMm = group.bounds.maxY - group.bounds.minY;
   const pitchMm = heightMm / group.pixelHeight;
-  const rows = group.pixelHeight;
-  const placement = rotaryRowPlacement(rows, pitchMm, axis.scale, axis.stepsPerUnit);
+  const placement = rotaryRowPlacement(group.pixelHeight, pitchMm, axis.scale, axis.stepsPerUnit);
   if (rowsLandEvenly(placement)) return null;
+  // A ramped Fill compiles to rows like an image, but its field is the Fill's Interval.
+  const kind: RowKind = group.fillRamp === true ? 'fill' : 'image';
+  return rowWarning({ name, kind, heightMm, pitchMm, placement }, axis);
+}
+
+/** A 0° Fill's hatch rows, read where the machine-space job puts them. */
+function fillRowWarning(group: FillGroup, axis: AxisSteps, name: string): string | null {
+  const rows = hatchRowPositions(group);
+  if (rows.length < 2) return null;
+  const placement = steppedRowPlacement(rows, axis.stepsPerUnit);
+  if (rowsLandEvenly(placement)) return null;
+  const first = rows[0] ?? 0;
+  const last = rows[rows.length - 1] ?? 0;
+  const heightMm = (last - first) / axis.scale;
+  const pitchMm = heightMm / (rows.length - 1);
+  return rowWarning({ name, kind: 'fill', heightMm, pitchMm, placement }, axis);
+}
+
+/** The distinct rotary-axis positions of a Fill's hatch lines that run along
+ *  X (a cross-hatch's other pass and any angled hatch are not rows). */
+function hatchRowPositions(group: FillGroup): number[] {
+  const rows = new Set<number>();
+  for (const segment of group.segments) {
+    const from = segment.polyline[0];
+    const to = segment.polyline[segment.polyline.length - 1];
+    if (from === undefined || to === undefined || Math.abs(to.y - from.y) > 1e-9) continue;
+    if (Math.abs(to.x - from.x) > 1e-9) rows.add(Number(from.y.toFixed(9)));
+  }
+  return [...rows].sort((a, b) => a - b);
+}
+
+type RowFacts = {
+  readonly name: string;
+  readonly kind: RowKind;
+  readonly heightMm: number;
+  readonly pitchMm: number;
+  readonly placement: RowPlacement;
+};
+
+function rowWarning(rows: RowFacts, axis: AxisSteps): string {
   const stepsPerSurfaceMm = axis.scale * axis.stepsPerUnit;
   const stepMm = 1 / stepsPerSurfaceMm;
-  const steps = pitchMm * stepsPerSurfaceMm;
+  const steps = rows.pitchMm * stepsPerSurfaceMm;
+  const { placement } = rows;
   const gaps = placement.gapSteps.slice(0, 2).map((gap) => mm(gap * stepMm));
   const effect =
     placement.doubled > 0
-      ? `so ${placement.doubled} of its ${rows} rows land on the row before and burn twice`
+      ? `so ${placement.doubled} of its ${placement.rows} rows land on the row before and burn twice`
       : `so its rows land ${gaps.join(' or ')} mm apart and band`;
+  const field = rows.kind === 'fill' ? 'Interval' : 'line interval';
   const advice = intervalAdvice(
-    fittingRowIntervals(heightMm, steps, axis.scale, axis.stepsPerUnit),
+    fittingRowIntervals(rows.heightMm, steps, axis.scale, axis.stepsPerUnit, rows.kind),
+    field,
   );
+  const label = rows.kind === 'fill' ? 'Fill layer' : 'Image layer';
   return (
-    `Image layer ${group.layerId} on this rotary: one ${axis.stepsText} turns ` +
-    `the part ${mm(stepMm)} mm, and the ${mm(pitchMm)} mm line interval is ` +
+    `${label} ${rows.name} on this rotary: one ${axis.stepsText} turns ` +
+    `the part ${mm(stepMm)} mm, and the ${mm(rows.pitchMm)} mm ${field} is ` +
     `${steps.toFixed(2)} steps, ${effect}. ${advice}`
   );
 }
 
-function intervalAdvice(advice: RowIntervalAdvice): string {
+function intervalAdvice(advice: RowIntervalAdvice, field: string): string {
   const best = advice.options[0];
-  if (best === undefined)
-    return 'No line interval this layer accepts lands every row on its own step.';
+  if (best === undefined) return `No ${field} this layer accepts lands every row on its own step.`;
   if (!advice.even) {
     return (
-      `No line interval this layer accepts lands every row on its own step; ` +
+      `No ${field} this layer accepts lands every row on its own step; ` +
       `${described(best)} comes closest, with ${best.placement.doubled} of ` +
       `${best.placement.rows} rows doubled.`
     );
   }
-  return `For even rows, set the line interval to ${advice.options.map(described).join(' or ')}.`;
+  return `For even rows, set the ${field} to ${advice.options.map(described).join(' or ')}.`;
 }
 
 function described(option: FittingInterval): string {

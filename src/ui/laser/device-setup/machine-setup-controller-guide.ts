@@ -17,6 +17,8 @@ export type MachineSetupControllerGuide = {
   readonly configurationSurface: string;
   readonly writePolicy: MachineSetupWritePolicy;
   readonly writeExplanation: string;
+  /** The Find Machine title for a controller with its own link (ADR-705). */
+  readonly fileOnlyTitle?: string;
   readonly homeCommand: string | null;
   readonly statusCommand: string | null;
   readonly streamingExplanation: string;
@@ -99,6 +101,19 @@ export function machineSetupControllerGuide(
           'Set laser_module_maximum_s_value 1.0 (Full-power S stays 1): Smoothieware stores every S word in 12-bit 1.11 fixed point, so any S of 2 or more wraps and fires far below the requested power. Set laser_module_enable true and laser_module_minimum_power 0 for dark S0 feed moves. Edit the config through the Smoothieware USB/SD workflow, then reset and reconnect.',
       };
     case 'ruida':
+    case 'moshi':
+      return linkGuide(kind, common);
+  }
+}
+
+// Controllers outside the line-based store: Ruida files (ADR-097, ADR-697) and
+// the Moshiboard USB link (ADR-705).
+function linkGuide(
+  kind: 'ruida' | 'moshi',
+  common: ReturnType<typeof commonControllerGuide>,
+): MachineSetupControllerGuide {
+  switch (kind) {
+    case 'ruida':
       return {
         ...common,
         identityCommands: [],
@@ -108,6 +123,17 @@ export function machineSetupControllerGuide(
         writeExplanation:
           'This build exports files for Ruida. Connection, jogging, reads, and firmware writes are unavailable.',
       };
+    case 'moshi':
+      return {
+        ...common,
+        identityCommands: [],
+        settingsCommands: [],
+        configurationSurface: 'Moshiboard: no settings a host can read or write',
+        fileOnlyTitle: 'Moshiboard connects over its own USB link',
+        writePolicy: 'read-only',
+        writeExplanation:
+          'Experimental: a Moshiboard runs over its own USB link (Machine details), with Frame, Start, Abort and Home only. Laser power is set on the machine. Simulator-tested only, not qualified on hardware.',
+      };
   }
 }
 
@@ -115,7 +141,12 @@ function commonControllerGuide(kind: ControllerKind, driver: ControllerDriver) {
   return {
     kind,
     label: driver.label,
-    transportLabel: driver.capabilities.transport === 'serial' ? 'USB serial' : 'File export',
+    transportLabel:
+      driver.capabilities.transport === 'serial'
+        ? 'USB serial'
+        : driver.usbLink !== undefined
+          ? 'USB link'
+          : 'File export',
     defaultBaudRate: driver.defaultBaudRate,
     homeCommand: driver.commands.home,
     statusCommand: driver.realtime.statusQuery ?? driver.commands.queuedStatusQuery,
@@ -128,7 +159,7 @@ function commonControllerGuide(kind: ControllerKind, driver: ControllerDriver) {
 }
 
 export function machineSetupControllerGuides(): ReadonlyArray<MachineSetupControllerGuide> {
-  return (['grbl-v1.1', 'grblhal', 'fluidnc', 'marlin', 'smoothieware', 'ruida'] as const).map(
-    (kind) => machineSetupControllerGuide(kind),
-  );
+  return (
+    ['grbl-v1.1', 'grblhal', 'fluidnc', 'marlin', 'smoothieware', 'ruida', 'moshi'] as const
+  ).map((kind) => machineSetupControllerGuide(kind));
 }

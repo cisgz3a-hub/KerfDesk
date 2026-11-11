@@ -4,6 +4,8 @@
 // and the head's distance from it instead of offering to set the origin at the
 // head. Declining writes nothing; accepting puts the saved origin back.
 // The controller is the in-page journey GRBL (fixtures/journey-grbl-serial.js).
+// On this laser without homing the restore runs by itself after the Abort
+// (user annoyance audit A3-D-1, ADR-341 Amendment 14).
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -180,20 +182,22 @@ test('$10=0: a failed restore after Abort is told, and Frame offers the saved or
   // From here no report carries WCO:, so after the reset the restore has no
   // machine position to aim from within its wait.
   await setWcoReports(page, false);
+  const restoreFrom = await wireLength(page);
   await page.getByRole('button', { name: 'ABORT JOB', exact: true }).click();
   const card = page.getByRole('alert').filter({ hasText: 'You stopped the job' }).first();
   await expect(card).toContainText('It was at X 60, Y 40 mm from machine zero.', {
     timeout: 20_000,
   });
 
-  // The card closes with the alarm, and the failure is a toast.
-  const restoreFrom = await wireLength(page);
-  await card.getByRole('button', { name: 'Restore saved origin', exact: true }).click();
+  // This laser has no homing, so Restore saved origin runs by itself once the
+  // alarm has settled (ADR-341 Amendment 14). It cannot aim here: the failure
+  // is a toast that still says the job was stopped, and the card closes with
+  // the alarm its Unlock cleared.
   const notifications = page.getByRole('region', { name: 'Notifications', exact: true });
   await expect(notifications).toContainText(
-    'Restore saved origin: The saved origin was not written. The controller reports only the ' +
-      'work position ($10=0)',
-    { timeout: 20_000 },
+    'Stopped. The laser is off, but your origin was not restored automatically: The saved ' +
+      'origin was not written. The controller reports only the work position ($10=0)',
+    { timeout: 30_000 },
   );
   await expect(card).toHaveCount(0);
   expect(await g92Since(page, restoreFrom)).toEqual([]);

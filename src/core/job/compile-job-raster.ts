@@ -25,6 +25,12 @@ import {
 } from '../scene/effective-operation';
 import type { JobDiagnostic, RasterGroup } from './job';
 import { streamedRasterRowProvider } from './compile-job-raster-stream';
+import {
+  imageSlicing,
+  rasterRunGroups,
+  slicedRasterValues,
+  type SlicePass,
+} from './compile-job-raster-sliced';
 import { effectiveObjectMinPowerPercent, effectiveObjectPowerPercent } from './object-power-scale';
 import { imageScanOverscanMm } from './automatic-overscan';
 import { rasterScanBounds, type RasterMachineBounds } from './raster-bounds';
@@ -59,6 +65,8 @@ type CompileRasterGroupOptions = {
   readonly objects: ReadonlyArray<SceneObject>;
   readonly sourceLumaOverride: Uint8Array | undefined;
   readonly scanFrame: RasterScanFrame;
+  /** ADR-699: the 3D Sliced pass this group burns. */
+  readonly slicePass?: SlicePass;
 };
 
 type RasterCompilation = {
@@ -114,14 +122,19 @@ function appendObjectRasterGroups(
     });
   }
   const byAngle = new Map<number, RasterGroup>();
+  const slicing = imageSlicing(
+    layer,
+    scans.runs.reduce((total, run) => total + run.passes, 0),
+  );
+  const compile = (angleDeg: number, slicePass?: SlicePass): RasterGroup | null =>
+    compileRasterGroup(obj, layer, device, {
+      ...options,
+      scanFrame: rasterScanFrame(angleDeg),
+      ...(slicePass === undefined ? {} : { slicePass }),
+    });
   for (const run of scans.runs) {
-    const group =
-      byAngle.get(run.angleDeg) ??
-      compileRasterGroup(obj, layer, device, {
-        ...options,
-        scanFrame: rasterScanFrame(run.angleDeg),
-      });
-    if (group === null) {
+    const groups = rasterRunGroups(run, slicing, byAngle, compile);
+    if (groups === null) {
       out.diagnostics.push({
         kind: 'raster-source-luma-mismatch',
         layerName: layer.name,
@@ -131,8 +144,7 @@ function appendObjectRasterGroups(
       });
       return;
     }
-    byAngle.set(run.angleDeg, group);
-    out.groups.push(group.passes === run.passes ? group : { ...group, passes: run.passes });
+    for (const group of groups) out.groups.push(group);
   }
 }
 
@@ -191,7 +203,11 @@ function compileRasterGroup(
     scanFrame: options.scanFrame,
     laserPowerScaleVersion: options.laserPowerScaleVersion ?? CURRENT_LASER_POWER_SCALE_VERSION,
   };
-  const rasterValues = rasterValuesFor(rasterInput, options.streamedPixelThreshold);
+  const rasterValues = rasterValuesFor(
+    rasterInput,
+    options.streamedPixelThreshold,
+    options.slicePass,
+  );
   return {
     kind: 'raster',
     layerId: layer.id,
@@ -222,6 +238,7 @@ function compileRasterGroup(
 function rasterValuesFor(
   input: MaterializedRasterInput,
   streamedPixelThreshold: number,
+  slicePass?: SlicePass,
 ): Pick<RasterGroup, 'sValues' | 'rowProvider'> {
   const compilationMaxS = rasterCompilationPowerScale(input.device, input.laserPowerScaleVersion);
   const toDeviceUnits = (values: RasterPowerValues): RasterPowerValues =>
@@ -233,12 +250,53 @@ function rasterValuesFor(
           input.device.maxPowerS,
           input.laserPowerScaleVersion ?? CURRENT_LASER_POWER_SCALE_VERSION,
         );
+  if (slicePass !== undefined) {
+    return slicedRasterValues(
+      slicedValuesInput(input, streamedPixelThreshold, slicePass, toDeviceUnits),
+    );
+  }
   // Streaming works for every dither algorithm and mask (ADR-243); only size
   // chooses between one-shot materialization and an O(width) row provider.
   if (input.pixelWidth * input.pixelHeight <= streamedPixelThreshold) {
     return { sValues: toDeviceUnits(materializedRasterValues(input)) };
   }
-  const rowProvider = streamedRasterRowProvider({
+  const rowProvider = streamedRasterRowProvider(streamedInput(input));
+  return {
+    sValues: new Float64Array(0),
+    rowProvider: (y) => toDeviceUnits(rowProvider(y)),
+  };
+}
+
+// ADR-699: the depth grid is the Grayscale mapping at S 0..255, which is the
+// darkness of each burn cell after every image adjustment.
+function slicedValuesInput(
+  input: MaterializedRasterInput,
+  streamedPixelThreshold: number,
+  slicePass: SlicePass,
+  toDeviceUnits: (values: RasterPowerValues) => RasterPowerValues,
+): Parameters<typeof slicedRasterValues>[0] {
+  const depthInput: MaterializedRasterInput = {
+    ...input,
+    layer: { ...input.layer, ditherAlgorithm: 'grayscale' },
+    sMax: WHITE_LUMA_BYTE,
+    sMin: 0,
+  };
+  return {
+    slicePass,
+    scanAngleDeg: input.scanFrame.angleDeg,
+    pixelCount: input.pixelWidth * input.pixelHeight,
+    streamedPixelThreshold,
+    sOn: input.sMax,
+    materializeDepth: () => materializedRasterValues(depthInput),
+    streamDepthRows: () => streamedRasterRowProvider(streamedInput(depthInput)),
+    toDeviceUnits,
+  };
+}
+
+function streamedInput(
+  input: MaterializedRasterInput,
+): Parameters<typeof streamedRasterRowProvider>[0] {
+  return {
     sourceLuma: input.preparedLuma,
     sourceWidth: input.obj.pixelWidth,
     sourceHeight: input.obj.pixelHeight,
@@ -253,10 +311,6 @@ function rasterValuesFor(
     passThrough: input.layer.passThrough,
     sMax: input.sMax,
     sMin: input.sMin,
-  });
-  return {
-    sValues: new Float64Array(0),
-    rowProvider: (y) => toDeviceUnits(rowProvider(y)),
   };
 }
 
