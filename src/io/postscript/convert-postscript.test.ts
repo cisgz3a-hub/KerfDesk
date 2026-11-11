@@ -49,6 +49,50 @@ describe('EPS written by KerfDesk itself (round trip)', () => {
   });
 });
 
+describe('artwork with no height or width (audit C2 D1-P2-4)', () => {
+  const PS = (body: string, box = ''): string =>
+    `%!PS-Adobe-3.0\n${box === '' ? '' : `%%BoundingBox: ${box}\n`}${body}\nshowpage\n`;
+
+  function imported(text: string) {
+    const result = ok(text);
+    const parsed = parseSvg({ svgText: result.svg, id: 'ps', source: 'rule.ps' });
+    if (parsed.object === null || parsed.object.kind !== 'imported-svg')
+      throw new Error('nothing imported from ' + result.svg);
+    return { svg: result.svg, object: parsed.object };
+  }
+
+  it('imports a horizontal rule, its viewBox as tall as the minimum 1 pt', () => {
+    const { svg, object } = imported(PS('1 setlinewidth 10 50 moveto 90 50 lineto stroke'));
+    expect(svg).toContain('viewBox="0 0 80 1"');
+    expect(object.bounds.maxX - object.bounds.minX).toBeCloseTo(80 * (25.4 / 72), 3);
+  });
+
+  it('imports a vertical rlineto rule', () => {
+    const { svg } = imported(PS('20 10 moveto 0 60 rlineto stroke'));
+    expect(svg).toContain('viewBox="0 0 1 60"');
+  });
+
+  it('imports two collinear horizontal rules as two paths', () => {
+    const { object } = imported(PS('0 0 moveto 30 0 lineto stroke 50 0 moveto 80 0 lineto stroke'));
+    expect(object.paths.length).toBe(2);
+  });
+
+  it('makes a thick rule’s canvas as tall as its stroke', () => {
+    const { svg } = imported(PS('10 setlinewidth 0 20 moveto 72 20 lineto stroke'));
+    expect(svg).toContain('viewBox="0 0 72 10"');
+    expect(svg).toContain('height="3.527778mm"');
+  });
+
+  it('imports a rule whose declared BoundingBox is itself zero-height', () => {
+    const { svg } = imported(PS('0 30 moveto 72 30 lineto stroke', '0 30 72 30'));
+    expect(svg).toContain('viewBox="0 0 72 1"');
+  });
+
+  it('leaves artwork with both dimensions unchanged', () => {
+    expect(ok(PS('0 0 moveto 72 36 lineto stroke')).svg).toContain('viewBox="0 0 72 36"');
+  });
+});
+
 describe('PostScript language subset', () => {
   it('runs procedures, loops and transforms', () => {
     const result = ok(
