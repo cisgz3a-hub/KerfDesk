@@ -34,9 +34,10 @@ row walker, and the audit found it wrong in two ways:
    A Moshi row therefore burns where a G-code row burns: the same ink islands, split runways,
    Dot width correction (each burned line comes in by the correction at both ends) and two-way
    order.
-2. **Scan offset as on G-code.** A reversed row is shifted by
-   `-(layer bidirectionalScanOffsetMm ?? offsetForSpeed(device.scanningOffsets, layer speed))`,
-   as `grbl-strategy.ts` resolves it.
+2. **Scan offset as on G-code.** The offset is the layer's `bidirectionalScanOffsetMm`, else
+   `offsetForSpeed(device.scanningOffsets, layer speed)`, as `grbl-strategy.ts` resolves it. Every
+   row of a two-way scan moves half of it along its own travel (`rasterRowShiftX`, ADR-052
+   Amendment 2), forward rows one way and reversed rows the other, exactly as the G-code raster.
 3. **Every raster move stays on one axis.** A row starts with a vertical move from the previous
    row, then horizontal moves only, as MeerK40t's raster mode requires (`driver.py`
    `_goto_absolute` L817-845).
@@ -60,7 +61,7 @@ row walker, and the audit found it wrong in two ways:
 - `moshi-raster-plan.test.ts` decodes the program bytes. With 2 mm overscan, rows burn exactly
   the dark pixels both ways, while the head still enters 2 mm before the art. A 0.2 mm Dot width
   correction gives 1.6 mm burns inside the art. A 0.3 mm scan offset, from the layer or from the
-  machine table, shifts only the reversed row.
+  machine table, moves each row 0.15 mm along its travel.
 - The ADR-705 raster golden (overscan 0) decodes to the same moves as before.
 - `moshi-usb-store.test.ts`: a status read that throws on Connect closes the link once.
   `web-usb-link.test.ts`: a failed `selectConfiguration` closes the device and claims nothing.

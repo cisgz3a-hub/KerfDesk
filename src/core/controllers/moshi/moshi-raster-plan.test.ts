@@ -88,12 +88,18 @@ describe('Moshi raster rows', () => {
     }
   });
 
-  it('shifts reversed rows by the layer scan offset, else the machine table', () => {
+  // Every row moves half the offset along its own travel, as the G-code raster
+  // does (ADR-052 Amendment 2, rasterRowShiftX).
+  it('moves each row half the layer scan offset, else the machine table', () => {
     const fromLayer = burns(raster({ bidirectionalScanOffsetMm: 0.3 }));
-    expect(fromLayer[0]).toEqual({ from: ART_START, to: ART_END, y: mmToMils(10.5) });
+    expect(fromLayer[0]).toEqual({
+      from: mmToMils(11.15),
+      to: mmToMils(13.15),
+      y: mmToMils(10.5),
+    });
     expect(fromLayer[1]).toEqual({
-      from: mmToMils(12.7),
-      to: mmToMils(10.7),
+      from: mmToMils(12.85),
+      to: mmToMils(10.85),
       y: mmToMils(11.5),
     });
     const tableDevice: DeviceProfile = {

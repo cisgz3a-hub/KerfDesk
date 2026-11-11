@@ -9,15 +9,16 @@
 // (planRasterRowSweeps, as emit-raster.ts and emit-raster-sweep.ts walk it),
 // so a Moshi row burns exactly where a G-code row does: the same ink islands,
 // laser-off runways up to the overscan that end at the first dark pixel's
-// edge (rolling audit C2 D1-P1-1), the Dot width correction, and a reversed
-// row shifted by the bidirectional scan offset (D1-P1-2). Each row is a
+// edge (rolling audit C2 D1-P1-1), the Dot width correction, and every row
+// moved half the bidirectional scan offset along its travel (D1-P1-2; ADR-052
+// Amendment 2). Each row is a
 // vertical move to the row, a horizontal move to its runway start, then
 // horizontal moves and cuts. A Moshi has no power control: every pixel above
 // 0 burns at the machine's dial power.
 
 import type { DeviceProfile } from '../../devices';
 import type { RasterGroup } from '../../job';
-import { offsetForSpeed } from '../../job/scan-offset';
+import { offsetForSpeed, rasterRowShiftX } from '../../job/scan-offset';
 import type { RasterPowerValues } from '../../raster/raster-power-values';
 import { planRasterRowSweeps, type RasterRowSweepPlan } from '../../raster/raster-sweep-plan';
 import { mmToMils, type MoshiPoint, type MoshiStep } from './moshi-units';
@@ -101,7 +102,9 @@ function planSweep(
   levels: Set<number>,
 ): MoshiPoint {
   const { group, pixelWidthMm } = context;
-  const shift = reverse ? -context.scanOffsetMm : 0;
+  // Every row moves half the offset along its own travel (ADR-052 Amd 2), as
+  // emit-raster-sweep.ts does: forward rows one way, reversed rows the other.
+  const shift = rasterRowShiftX(context.scanOffsetMm, reverse, context.group.bidirectional ?? true);
   const x = (worldMm: number): number => mmToMils(Math.max(0, worldMm + shift));
   const push = (atX: number, cut: boolean): void => {
     const last = steps[steps.length - 1];
