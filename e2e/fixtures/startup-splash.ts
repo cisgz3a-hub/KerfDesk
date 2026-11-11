@@ -1,9 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
 // Covers a cold dev-server module graph plus the four visible seconds and
-// fade of the startup hold (ADR-049 Amendment 2). A fresh browser context is
-// the first launch of this version, so its first navigation holds in full;
-// later navigations in the same context reveal on paint (Amendment 3).
+// fade of the startup hold (ADR-049 Amendment 2).
 const STARTUP_SPLASH_TIMEOUT_MS = 45_000;
 
 /**
