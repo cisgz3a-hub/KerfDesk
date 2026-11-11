@@ -6,8 +6,7 @@
 import type { PlatformAdapter } from '../../platform/types';
 import { useStore } from '../state';
 import type { AutosaveDurableSnapshot } from '../state/autosave-durable';
-import { useLaserStore } from '../state/laser-store';
-import { isActiveJob } from '../state/laser-store-helpers';
+import { anyMachineJobActive } from '../state/link-machine-work';
 import type { ToastVariant } from '../state/toast-store';
 import { confirmDiscardAsync } from './confirm-discard';
 import { claimProjectOpenRequest } from './project-open-request-owner';
@@ -39,5 +38,5 @@ export async function restoreUnsavedWork(
 }
 
 function jobActive(): boolean {
-  return isActiveJob(useLaserStore.getState().streamer);
+  return anyMachineJobActive();
 }

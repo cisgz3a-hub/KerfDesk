@@ -120,12 +120,9 @@ test('$10=0: a failed restore after Abort is told, and Frame offers the saved or
   kerfdesk,
 }) => {
   test.setTimeout(600_000);
-  const dialogs: string[] = [];
-  let acceptDialogs = false;
-  page.on('dialog', async (dialog) => {
-    dialogs.push(dialog.message());
-    await (acceptDialogs ? dialog.accept() : dialog.dismiss());
-  });
+  // Frame's origin offer is an in-app dialog (ADR-707). No native box is part
+  // of this journey; one that appeared would be dismissed here.
+  page.on('dialog', (dialog) => void dialog.dismiss());
   await page.addInitScript({
     content: 'window.__JOURNEY_GRBL_CONFIG__ = { blocksPerSecond: 200, statusMask: "0" };',
   });
@@ -209,25 +206,32 @@ test('$10=0: a failed restore after Abort is told, and Frame offers the saved or
   await page.waitForTimeout(12_000);
   const frame = page.getByRole('button', { name: /^Frame (job|again)$/ });
   const frameFrom = await wireLength(page);
-  const asked = dialogs.length;
+  const offerDialog = page.getByRole('dialog', { name: 'Restore the saved origin?', exact: true });
   await frame.click();
-  await expect.poll(() => dialogs.length, { timeout: 60_000 }).toBeGreaterThan(asked);
-  const offer = dialogs[asked] ?? '';
+  await expect(offerDialog).toBeVisible({ timeout: 60_000 });
+  const offer = await offerDialog.innerText();
   expect(offer).toContain(
     'The job you stopped ran from X 60, Y 40 mm from machine zero, and that origin was not restored.',
   );
   expect(offer).toMatch(/The head is [\d.]+ mm from it \(X [+−]?[\d.]+, Y [+−]?[\d.]+ mm\)\./);
-  expect(offer).toContain('OK: put the saved origin back with one G92 (the head does not move)');
+  expect(offer).toContain(
+    '"Restore origin" puts the saved origin back with one G92 (the head does not move)',
+  );
   expect(offer).not.toContain('set the work origin at the current head position');
+  // The buttons name what they do; nothing explains "OK".
+  await expect(offerDialog.getByRole('button')).toHaveText(['Restore origin', 'Cancel']);
+  await offerDialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(offerDialog).toHaveCount(0);
   await page.waitForTimeout(2_000);
   expect(await g92Since(page, frameFrom)).toEqual([]);
   expect((await workOffset(page)).ox).toBeCloseTo(0, 3);
 
-  // OK puts the job's own origin back, and the Frame runs from it.
-  acceptDialogs = true;
+  // Restore origin puts the job's own origin back, and the Frame runs from it.
   const acceptFrom = await wireLength(page);
   await expect(frame).toBeEnabled({ timeout: 60_000 });
   await frame.click();
+  await expect(offerDialog).toBeVisible({ timeout: 60_000 });
+  await offerDialog.getByRole('button', { name: 'Restore origin', exact: true }).click();
   await expect.poll(() => g92Since(page, acceptFrom), { timeout: 60_000 }).toHaveLength(1);
   await expect.poll(() => workOffset(page).then((offset) => offset.ox)).toBeCloseTo(60, 3);
   expect((await workOffset(page)).oy).toBeCloseTo(40, 3);

@@ -13,7 +13,7 @@ export type SvgPage = { readonly svg: string; readonly outsideBox: boolean };
 
 export function paintedSvg(painted: readonly PaintedPath[], declared: PsBox | null): SvgPage {
   const extent = paintedExtent(painted);
-  const box = declared === null ? extent : unionBox(declared, extent);
+  const box = withMinimumSize(declared === null ? extent : unionBox(declared, extent), painted);
   const outsideBox = declared !== null && !contains(declared, extent);
   const width = box.maxX - box.minX;
   const height = box.maxY - box.minY;
@@ -86,6 +86,27 @@ function paintedExtent(painted: readonly PaintedPath[]): PsBox {
       maxY = Math.max(maxY, b.maxY);
     }
   return { minX, minY, maxX, maxY };
+}
+
+/**
+ * A rule drawn straight across has no height (or a vertical one no width), and
+ * the SVG import reads a zero viewBox axis as nothing drawn. Such an axis grows
+ * around its centre to the thickest stroke, at least 1 pt (audit C2 D1-P2-4).
+ * Points keep their 1:1 scale; only the canvas around them grows.
+ */
+function withMinimumSize(box: PsBox, painted: readonly PaintedPath[]): PsBox {
+  let size = 1;
+  for (const path of painted)
+    if (path.stroke !== null && path.strokeWidth > size) size = path.strokeWidth;
+  const [minX, maxX] = grownAxis(box.minX, box.maxX, size);
+  const [minY, maxY] = grownAxis(box.minY, box.maxY, size);
+  return { minX, minY, maxX, maxY };
+}
+
+function grownAxis(min: number, max: number, size: number): readonly [number, number] {
+  if (max - min > 1e-6) return [min, max];
+  const middle = (min + max) / 2;
+  return [middle - size / 2, middle + size / 2];
 }
 
 function contains(outer: PsBox, inner: PsBox): boolean {

@@ -204,7 +204,8 @@ describe('buildToolpath raster preview rows', () => {
     });
   });
 
-  it('applies profile scan-offset calibration to reverse preview rows', () => {
+  // ADR-052 Amendment 2: each row moves half the 0.25 mm offset along its travel.
+  it('applies profile scan-offset calibration to both preview row directions', () => {
     const tp = buildToolpath(
       rasterJob(
         rasterGroup({
@@ -223,15 +224,15 @@ describe('buildToolpath raster preview rows', () => {
     expect(cuts[0]).toMatchObject({
       kind: 'cut',
       polyline: [
-        { x: 0, y: 0.5 },
-        { x: 2, y: 0.5 },
+        { x: 0.125, y: 0.5 },
+        { x: 2.125, y: 0.5 },
       ],
     });
     expect(cuts[1]).toMatchObject({
       kind: 'cut',
       polyline: [
-        { x: 1.75, y: 1.5 },
-        { x: -0.25, y: 1.5 },
+        { x: 1.875, y: 1.5 },
+        { x: -0.125, y: 1.5 },
       ],
     });
   });

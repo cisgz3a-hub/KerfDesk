@@ -10,7 +10,7 @@ Method and areas: [AREAS.md](AREAS.md).
 | 6 | 3D CNC | [L6](L6-cnc-3d.md) | 2 | 0 | 1 | 1 | 2 | both |
 | 4 | Time estimate | [L4](L4-time-estimate.md) | 0 | 0 | 0 | 0 | 0 | — |
 | 5 | CNC 2D output | [L5](L5-cnc-2d.md) | 0 | 0 | 0 | 0 | 0 | — |
-| 7 | Bidirectional scan offset | [L7](L7-scan-offset.md) | 1 | 0 | 1 | 0 | 0 | no (reverses ADR-052; maintainer decision) |
+| 7 | Bidirectional scan offset | [L7](L7-scan-offset.md) | 1 | 0 | 1 | 0 | 0 | yes, after the maintainer chose LightBurn's rule (#1623) |
 | 8 | Marlin, Smoothieware, FluidNC, grblHAL | [L8](L8-other-controllers.md) | 0 | 0 | 0 | 0 | 0 | — |
 | 9 | Material Test grid | [L9](L9-material-test.md) | 0 | 0 | 0 | 0 | 0 | — |
 | 10 | Rotary scaling | [L10](L10-rotary.md) | 0 | 0 | 0 | 0 | 0 | — |
@@ -22,10 +22,10 @@ Method and areas: [AREAS.md](AREAS.md).
 |---|---|---|---|
 | L6-P2-1 | P2 | Depth-map reliefs finished 10–20× rougher than the same STL surface (42° median 0.154 mm against 0.008 mm); KNOWN rolling-v2 16-P2-1 / CNC v1 F6-P2-1, re-measured on main | ADR-580 Amendment 2: height maps carve their pixel-centre surface (42° median now 0.009–0.016 mm) |
 | L6-P3-1 | P3 | 3D rest finishing emitted one G1 per half cell; KNOWN CNC v1 F6-P3-2 | one G1 per kept stretch of a move, same path |
-| L7-P2-1 | P2 | Reverse-only scan compensation leaves a calibrated fill or image half its table value off the design and off vector cuts; LightBurn moves every row half the gap | open: prototyped (all seven twins), withdrawn because it reverses ADR-052's explicit choice and changes 42 pinned assertions; needs the maintainer's go-ahead |
+| L7-P2-1 | P2 | Reverse-only scan compensation left a calibrated fill or image half its table value off the design and off vector cuts; LightBurn moves every row half the gap | ADR-052 Amendment 2 (#1623): every row of a two-way scan moves half the stored value along its own travel |
 | L3-P3-1 | P3 | A Scan Line fill whose edge lies on its grid burns its first line on that edge and stops one interval short of the opposite edge | open: changes every Scan Line fill; no primary source on LightBurn's grid phase |
 
-Emitter revision: `heightmap-pixel-surface-20261108-v42`.
+Emitter revision: `scan-offset-half-each-row-20261111-v45` (#1623, landed after v44; v43 was held for it and never shipped).
 
 ## Next loop
 

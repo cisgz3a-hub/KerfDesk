@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StatusReport } from '../../core/controllers/grbl';
 import { createProject } from '../../core/scene';
 import { useStore } from '../state';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
+import { appConfirm } from '../state/app-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
@@ -18,8 +18,8 @@ import {
   UNLOCKED_NEXT_STEP_MESSAGE,
 } from './start-blocked-alarm-offers';
 
-vi.mock('../state/job-aware-dialogs', () => ({
-  jobAwareConfirm: vi.fn(() => true),
+vi.mock('../state/app-dialogs', () => ({
+  appConfirm: vi.fn(async () => true),
 }));
 
 const original = {
@@ -49,7 +49,7 @@ function softLimitAlarm() {
 }
 
 beforeEach(() => {
-  vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
+  vi.mocked(appConfirm).mockReset().mockResolvedValue(true);
   useLaserStore.setState({
     unlockAlarm: vi.fn(async () => undefined),
     home: vi.fn(async () => undefined),
@@ -96,7 +96,9 @@ describe('alarm recovery offer', () => {
       unlockAlarm: vi.fn(async () => useLaserStore.setState({ alarmCode: null })),
     });
     await expect(offerAlarmFixForBlockedStart([STATUS_ALARM_START_MESSAGE])).resolves.toBe('retry');
-    expect(jobAwareConfirm).toHaveBeenCalledWith(PROBE_UNLOCK_OFFER_PROMPT);
+    expect(appConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: PROBE_UNLOCK_OFFER_PROMPT }),
+    );
     expect(useToastStore.getState().toasts.at(-1)?.message).toBe('Alarm cleared.');
   });
 
@@ -109,7 +111,9 @@ describe('alarm recovery offer', () => {
     await expect(offerAlarmFixForBlockedStart([STATUS_ALARM_START_MESSAGE])).resolves.toBe(
       'handled',
     );
-    expect(jobAwareConfirm).toHaveBeenCalledWith(UNLOCK_OFFER_PROMPT);
+    expect(appConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: UNLOCK_OFFER_PROMPT }),
+    );
     expect(useToastStore.getState().toasts.at(-1)?.message).toBe(UNLOCKED_NEXT_STEP_MESSAGE);
   });
 
@@ -123,7 +127,9 @@ describe('alarm recovery offer', () => {
       unlockAlarm: vi.fn(async () => useLaserStore.setState({ alarmCode: null })),
     });
     await expect(offerAlarmFixForBlockedStart([STATUS_ALARM_START_MESSAGE])).resolves.toBe('retry');
-    expect(jobAwareConfirm).toHaveBeenCalledWith(POSITION_KEPT_UNLOCK_OFFER_PROMPT);
+    expect(appConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: POSITION_KEPT_UNLOCK_OFFER_PROMPT }),
+    );
     expect(POSITION_KEPT_UNLOCK_OFFER_PROMPT).not.toMatch(/probe|touch plate/i);
     expect(useToastStore.getState().toasts.at(-1)?.message).toBe('Alarm cleared.');
   });
@@ -160,7 +166,9 @@ describe('alarm recovery offer', () => {
     await expect(offerAlarmFixForBlockedStart([STATUS_ALARM_START_MESSAGE])).resolves.toBe(
       'handled',
     );
-    expect(jobAwareConfirm).toHaveBeenCalledWith(UNLOCK_OFFER_PROMPT);
+    expect(appConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: UNLOCK_OFFER_PROMPT }),
+    );
     expect(useToastStore.getState().toasts.at(-1)?.message).toBe(UNLOCKED_NEXT_STEP_MESSAGE);
   });
 
@@ -218,13 +226,13 @@ describe('alarm recovery offer', () => {
     await expect(offerAlarmFixForBlockedStart([STATUS_ALARM_START_MESSAGE])).resolves.toBe(
       'unrepaired',
     );
-    expect(jobAwareConfirm).not.toHaveBeenCalled();
+    expect(appConfirm).not.toHaveBeenCalled();
     useLaserStore.setState({ resetRequired: false });
   });
 
   it('keeps the block when the operator declines the unlock', async () => {
     useLaserStore.setState({ capabilities: { ...original.capabilities, unlock: true } });
-    vi.mocked(jobAwareConfirm).mockReturnValue(false);
+    vi.mocked(appConfirm).mockResolvedValue(false);
     await expect(offerAlarmFixForBlockedStart([STATUS_ALARM_START_MESSAGE])).resolves.toBe(
       'unrepaired',
     );
@@ -238,6 +246,6 @@ describe('alarm recovery offer', () => {
         'A job is already active. Request ABORT or finish it before starting another.',
       ]),
     ).resolves.toBe('unrepaired');
-    expect(jobAwareConfirm).not.toHaveBeenCalled();
+    expect(appConfirm).not.toHaveBeenCalled();
   });
 });

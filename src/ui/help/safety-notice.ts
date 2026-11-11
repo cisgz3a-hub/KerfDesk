@@ -1,12 +1,19 @@
 // Plain-text safety & liability notice, shown from the Help menu. Lasers and
 // CNC routers can cause fire, permanent eye injury, toxic fumes, and serious
-// cuts, so this is deliberately blunt. The medium is a text alert
-// (jobAwareAlert) — NO Markdown. The long-form version lives in docs/safety.md
+// cuts, so this is deliberately blunt. It is shown as preformatted text in a
+// dialog (HelpNoticeDialogs.tsx, ADR-707), with the guide as a real link, so
+// NO Markdown. The long-form version lives in docs/safety.md
 // and the published kerfdesk.com/safety/ page (website/pages/safety-data.mjs);
 // the license + safety terms shown at install time live in public/eula.txt.
 // Keep them in sync when the wording changes.
 
-export const SAFETY_NOTICE_TEXT = [
+export const SAFETY_NOTICE_TITLE = 'Safety & liability';
+
+/** The published long-form guide, linked under the notice. */
+export const SAFETY_GUIDE_URL = 'https://kerfdesk.com/safety/';
+
+/** The notice itself; the dialog adds the guide link and the licence button. */
+export const SAFETY_NOTICE_BODY = [
   'SAFETY & LIABILITY — please read',
   '',
   'KerfDesk sends commands to lasers and CNC routers — machines that can cause',
@@ -46,7 +53,4 @@ export const SAFETY_NOTICE_TEXT = [
   '',
   'You are responsible for safe operation and for following your machine',
   "manufacturer's instructions and your local safety regulations.",
-  '',
-  'Full guide: https://kerfdesk.com/safety/ — Licence: see Help > License &',
-  'Safety Notice.',
 ].join('\n');

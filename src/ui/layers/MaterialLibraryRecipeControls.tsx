@@ -1,5 +1,5 @@
 import { Button } from '../kit';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
+import { appConfirm } from '../state/app-dialogs';
 import type { MaterialLibraryPresetOption } from './material-library-preset-options';
 import {
   buttonRowStyle,
@@ -64,12 +64,16 @@ export function MaterialLibraryRecipeControls(props: {
               disabled={deleteDisabled}
               onClick={() => {
                 if (props.activePresetOption === null) return;
-                const label = presetDeleteLabel(props.activePresetOption);
-                if (!jobAwareConfirm(`Delete preset "${label}"?`)) {
-                  props.onStatus('Delete cancelled.');
-                  return;
-                }
-                props.onStatus(props.onDelete() ? 'Preset deleted.' : 'Preset was not deleted.');
+                // Asked in the app, so it can be answered during a job
+                // (ADR-707; annoyance audit A1-P2-4). The delete is the one
+                // this render named, whatever is selected by the answer.
+                void confirmPresetDelete(props.activePresetOption).then((confirmed) => {
+                  if (!confirmed) {
+                    props.onStatus('Delete cancelled.');
+                    return;
+                  }
+                  props.onStatus(props.onDelete() ? 'Preset deleted.' : 'Preset was not deleted.');
+                });
               }}
             >
               Delete
@@ -79,6 +83,15 @@ export function MaterialLibraryRecipeControls(props: {
       </details>
     </>
   );
+}
+
+function confirmPresetDelete(option: MaterialLibraryPresetOption): Promise<boolean> {
+  return appConfirm({
+    title: 'Delete preset?',
+    message: `Delete preset "${presetDeleteLabel(option)}" from this material library?`,
+    confirmLabel: 'Delete',
+    tone: 'danger',
+  });
 }
 
 function presetDeleteLabel(option: MaterialLibraryPresetOption): string {

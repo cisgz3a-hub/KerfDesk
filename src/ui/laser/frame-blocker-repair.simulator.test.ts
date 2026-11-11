@@ -14,7 +14,7 @@ import {
 } from '../../core/scene';
 import type { JobPlacementSettings } from '../../core/job';
 import { connectOptionsForDevice } from '../commands/connect-options';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
+import { appConfirm } from '../state/app-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { RecoveryRepository } from '../state/recovery';
@@ -45,6 +45,9 @@ vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
   jobAwareConfirm: vi.fn(() => true),
 }));
+vi.mock('../state/app-dialogs', () => ({
+  appConfirm: vi.fn(async () => true),
+}));
 vi.mock('./output-preparation-worker-client', async (importOriginal) => ({
   ...(await importOriginal<typeof OutputPreparationWorker>()),
   prepareStartOutputOffThread: async (
@@ -64,7 +67,7 @@ beforeEach(() => {
   useLaserStore.setState(initialLaserState());
   // A permit expired by an earlier case leaves its reason for Start to show.
   clearFrameExpiryNote();
-  vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
+  vi.mocked(appConfirm).mockReset().mockResolvedValue(true);
   disposeReview = installAutoJobReview('confirm');
 });
 afterEach(async () => {
@@ -147,7 +150,9 @@ describe('ordinary Frame offers the in-place fixes', () => {
     await vi.advanceTimersByTimeAsync(12_000);
 
     expect(await framing).toBe(true);
-    expect(jobAwareConfirm).toHaveBeenCalledWith(HOME_OFFER_PROMPT);
+    expect(appConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: HOME_OFFER_PROMPT }),
+    );
     expect(sim.outbound().join('')).toContain('$H\n');
     expect(useLaserStore.getState().framedRun).not.toBeNull();
     expect(useStartBlockerStore.getState().messages).toEqual([]);
@@ -172,8 +177,10 @@ describe('ordinary Frame offers the in-place fixes', () => {
 
     // The cycle parked the head at the switches. Framing on from there traced the
     // job at the homing corner and enabled Start for it (audit FRM-1).
-    expect(jobAwareConfirm).toHaveBeenCalledTimes(1);
-    expect(jobAwareConfirm).toHaveBeenCalledWith(HOME_OFFER_CURRENT_POSITION_PROMPT);
+    expect(appConfirm).toHaveBeenCalledTimes(1);
+    expect(appConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: HOME_OFFER_CURRENT_POSITION_PROMPT }),
+    );
     const sent = sim.outbound().join('');
     expect(sent).toContain('$H\n');
     expect(sent.slice(sent.indexOf('$H\n'))).not.toContain('$J=');
@@ -202,8 +209,10 @@ describe('ordinary Frame offers the in-place fixes', () => {
 
     // Unlock does not restore the machine position, so the Frame stops with
     // the one next step instead of refusing for a position no report can give.
-    expect(jobAwareConfirm).toHaveBeenCalledTimes(1);
-    expect(jobAwareConfirm).toHaveBeenCalledWith(UNLOCK_OFFER_PROMPT);
+    expect(appConfirm).toHaveBeenCalledTimes(1);
+    expect(appConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: UNLOCK_OFFER_PROMPT }),
+    );
     expect(sim.outbound().join('')).toContain('$X\n');
     expect(useLaserStore.getState().alarmCode).toBeNull();
     expect(useToastStore.getState().toasts.at(-1)?.message).toBe(UNLOCKED_NEXT_STEP_MESSAGE);
@@ -235,7 +244,9 @@ describe('ordinary Frame offers the in-place fixes', () => {
     await vi.advanceTimersByTimeAsync(12_000);
     await framing;
 
-    expect(jobAwareConfirm).toHaveBeenCalledWith(SET_ORIGIN_OFFER_PROMPT);
+    expect(appConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: SET_ORIGIN_OFFER_PROMPT }),
+    );
     expect(sim.state().g92).toEqual({ x: 120, y: 80, z: 0 });
     expect(useLaserStore.getState().framedRun).not.toBeNull();
     expect(useStartBlockerStore.getState().messages).toEqual([]);
@@ -255,7 +266,7 @@ describe('ordinary Frame offers the in-place fixes', () => {
     await starting;
 
     // Start is greyed out until a clean Frame; the fixes live on Frame job.
-    expect(jobAwareConfirm).not.toHaveBeenCalled();
+    expect(appConfirm).not.toHaveBeenCalled();
     expect(sim.outbound().join('').slice(sentBefore.length)).not.toMatch(/\$H|\$X/);
     expect(useToastStore.getState().toasts.at(-1)?.message).toBe(FRAME_JOB_FIRST_MESSAGE);
     expect(useLaserStore.getState().framedRun).toBeNull();
@@ -268,7 +279,7 @@ describe('ordinary Frame offers the in-place fixes', () => {
     ]);
     sim.triggerAlarm(3);
     await vi.advanceTimersByTimeAsync(1_500);
-    vi.mocked(jobAwareConfirm).mockReturnValue(false);
+    vi.mocked(appConfirm).mockResolvedValue(false);
 
     const framing = runFrameNow();
     await vi.advanceTimersByTimeAsync(12_000);

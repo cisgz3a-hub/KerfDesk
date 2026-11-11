@@ -4,7 +4,7 @@
 // thin layout shell.
 
 import { useMemo } from 'react';
-import { ConfirmSaveDialog, SaveFilenamePanel, StatusBar, Toasts } from '../common';
+import { AppDialogHost, ConfirmSaveDialog, SaveFilenamePanel, StatusBar, Toasts } from '../common';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { ArtworkCreationHost } from '../layers/ArtworkCreationHost';
 import { ProjectSheetsBar } from '../commands/ProjectSheetsBar';
@@ -13,6 +13,7 @@ import { CanvasGcodeView, CanvasViewSwitch } from '../gcode-inspector';
 import { useCanvasViewStore } from '../state/canvas-view-store';
 import { UpdatePrompt } from '../licensing/UpdatePrompt';
 import { LiveMotionBar, useAbortShortcut, useStartShortcut } from '../laser';
+import { LinkMachineWorkBar } from '../laser/LinkMachineWorkBar';
 import { useAbortAutoRestore } from '../laser/abort-auto-restore';
 import { MachineSetupDialogHost } from '../laser/device-setup';
 import { BoardCapturePanel } from '../laser/board-capture';
@@ -127,6 +128,7 @@ function AppWorkspace(): JSX.Element {
           swallows the mousedown that starts a drag. */}
       <Toasts />
       <LiveMotionBar />
+      <LinkMachineWorkBar />
       <PwaUpdateWatcherGate />
       <ArtworkCreationHost />
       <AddTextDialog />
@@ -143,6 +145,9 @@ function AppWorkspace(): JSX.Element {
       <TutorialHost />
       <FirstJobGuideHost />
       <RemotePairingHost />
+      {/* Last of the dialogs: a question asked from inside another dialog must
+          paint above it and be the topmost modal (ADR-707). */}
+      <AppDialogHost />
       <WorkspaceLifecycle />
     </div>
   );

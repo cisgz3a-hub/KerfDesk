@@ -10,7 +10,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { totalWco } from '../../__fixtures__/controllers/grbl-sim-state';
 import { useStore } from '../state';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
+import { appConfirm } from '../state/app-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { operatorAbortAlarm } from './abort-alarm-recovery';
 import {
@@ -29,6 +29,9 @@ import { runFrameNow } from './use-frame-action';
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
   jobAwareConfirm: vi.fn(() => true),
+}));
+vi.mock('../state/app-dialogs', () => ({
+  appConfirm: vi.fn(async () => true),
 }));
 
 installRecoveryStressHooks();
@@ -93,11 +96,11 @@ async function frameAndReadOffer(
   h: StressHarness,
   accept: boolean,
 ): Promise<{ readonly prompt: string; readonly g92: ReadonlyArray<string> }> {
-  vi.mocked(jobAwareConfirm).mockClear().mockReturnValue(accept);
+  vi.mocked(appConfirm).mockClear().mockResolvedValue(accept);
   const from = h.simulator.outbound().length;
   await drive(runFrameNow(), 60_000);
   return {
-    prompt: String(vi.mocked(jobAwareConfirm).mock.calls[0]?.[0] ?? ''),
+    prompt: vi.mocked(appConfirm).mock.calls[0]?.[0]?.message ?? '',
     g92: programLines(h.simulator, from).filter((line) => line.includes('G92')),
   };
 }
@@ -115,11 +118,13 @@ describe('X1-P1-1: the saved Abort origin after the controller restarted', () =>
           'restarted since then, and without homing its machine zero may have moved, so that ' +
           'origin cannot be put back.',
       );
-      expect(declined.prompt).toContain('OK: set the work origin where the head is now.');
-      expect(declined.prompt).not.toContain('put the saved origin back');
+      expect(declined.prompt).toContain(
+        '"Set origin here" sets the work origin where the head is now.',
+      );
+      expect(declined.prompt).not.toContain('puts the saved origin back');
       expect(declined.g92).toEqual([]);
 
-      // OK sets the origin at the head, as it says; it never writes the old one.
+      // Set origin here sets the origin at the head, as it says; it never writes the old one.
       const accepted = await frameAndReadOffer(h, true);
       expect(accepted.g92).toHaveLength(1);
       expect(accepted.g92[0]).not.toMatch(/X-35/);
@@ -156,7 +161,7 @@ describe('X1-P1-1: the saved Abort origin after the controller restarted', () =>
         'The controller has restarted since then, so its machine zero may have moved: Home ' +
           'measures it again before the origin goes back.',
       );
-      expect(offer.prompt).toContain('OK: home the machine');
+      expect(offer.prompt).toContain('"Home and restore origin" homes the machine');
       expect(offer.prompt).not.toContain('The head is');
       const lines = programLines(h.simulator, from);
       const homed = lines.findIndex((line) => line.startsWith('$H'));
