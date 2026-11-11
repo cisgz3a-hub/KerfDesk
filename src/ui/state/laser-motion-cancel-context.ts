@@ -107,9 +107,12 @@ function endCancelAttempt(context: CancelContext): boolean {
   return true;
 }
 
+// A Cancel that failed did not settle the jog cleanly, so a Frame held through
+// that jog is not returned (ADR-565 Amendment 1).
 function withoutCancelAttempt(operation: LaserMotionOperation): LaserMotionOperation {
-  const { cancelAttemptId: endedAttempt, ...rest } = operation;
+  const { cancelAttemptId: endedAttempt, heldFrame: droppedFrame, ...rest } = operation;
   void endedAttempt;
+  void droppedFrame;
   return rest;
 }
 

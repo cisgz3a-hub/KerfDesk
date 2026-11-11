@@ -2489,9 +2489,24 @@ inches hides the position until `$G` or the next Frame (ADR-375 Amendment 11).
    split Frame (ADR-353) the permit arrives when the exact program does; the trace's own motion
    never cancels that program. Each execution permit remains exact and one-use. Power/speed
    edits preserve spatial evidence; changed geometry, output geometry, placement or registration,
-   Jog, Home, origin/probe/reset/disconnect, or coordinate drift expires it and greys Start out
+   Home, origin/probe/reset/disconnect, or coordinate drift expires it and greys Start out
    again, with the reason in the status line. A settled app-owned run retains the unchanged Frame.
    Camera-only UI state does not.
+   - **A jog (ADR-565 Amendment 1).** When the job is placed in **Absolute Coords**, **User
+     Origin** or **Verified Origin**, a plain X/Y jog keeps the Frame: the job lands by the work
+     origin, not by where the head stands. This covers jog-pad steps and hold-to-jog, keyboard
+     jogs, a phone-remote step, **Move to position**, **Go to work zero** and a click-to-position
+     move. While the head moves, Start is disabled and the status line reads **Jogging — the
+     Frame is kept. Start unlocks when the head stops**. When the jog settles at Idle the status
+     line returns to **Ready to start — framed placement unchanged**, and Start's approach leaves
+     from wherever the head now stands.
+   - A jog still expires the Frame when the job is placed at **Current Position**; when the move
+     includes Z or a rotary axis (a focus jog, a CNC Z jog, or a point move that lifts to safe Z);
+     when the job is a rotary job or the move is a rotary test turn; when the jog ends in an
+     alarm, a rejected line (for example `error:15` past the soft limits), a failed or timed-out
+     Cancel, a pendant takeover, a reset or a reconnect; when a phone-remote hold is released;
+     and when the work origin, the controller session or the artwork changed while the head
+     moved, even if the change was undone. Console motion (`$J=`, `G0`) expires it as before.
 5. The user clicks **Start**. The app opens the single **Job Review** dialog (ADR-224,
    ADR-237 and ADR-565) against the latest exact prepared program plus current controller state.
    Settings changed since Frame are prepared before review; no job streams before confirmation.
@@ -3958,8 +3973,9 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 2. A turn the controller rejects (for example `error:15` beyond soft limits), an alarm or a
    disconnect ends the test with a message and no return turn.
 3. **Apply** and **Generate test pattern** are disabled while a test turns.
-4. A test turn is a jog: it expires a completed Frame, and Start stays greyed out until the job
-   is framed again (ADR-372).
+4. A test turn always expires a completed Frame, whichever axis it turns and however the job is
+   placed, and Start stays greyed out until the job is framed again (ADR-372, ADR-565
+   Amendment 1): it may drive a roller, so it is never a plain head move.
 
 #### Success — where a rotary job burns (ADR-127 Amendment 1)
 1. In Current Position, User Origin and Verified Origin the job keeps its placement anchor: the

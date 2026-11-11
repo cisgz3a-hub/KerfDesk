@@ -165,7 +165,9 @@ async function runTurn(
   }
   const watch = watchOwnJog(store);
   try {
-    await store.getState().jog(params);
+    // A test turn may drive a roller through the Y motor: never a plain head
+    // move, so it expires a completed Frame whatever axis it uses (ADR-565 Amd 1).
+    await store.getState().jog(params, undefined, { voidsFrame: true });
   } catch (error) {
     watch.dispose();
     // A cancel from any surface (Stop here, Esc, the Live Motion bar) poisons
