@@ -169,6 +169,21 @@ describe('AdjustImageDialog', () => {
     }
   });
 
+  // O6-P2-1 (ADR-671 Amendment 1): KerfDesk's gamma lightens as it rises, as
+  // Photoshop and GIMP Levels do; LightBurn's Gamma darkens. The field says so.
+  it('states which way gamma moves the midtones and that LightBurn differs', async () => {
+    const { host, root } = await renderDialog({});
+    try {
+      const gamma = host.querySelector<HTMLInputElement>('input[name="gamma"]');
+      expect(gamma?.title).toContain('Higher gamma lightens midtones');
+      expect(gamma?.title).toContain('LightBurn');
+      expect(host.textContent).toContain("LightBurn's Gamma runs the other way");
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('maps DPI and line interval edits into the submitted lines-per-mm setting', async () => {
     const onApply = vi.fn();
     const { host, root } = await renderDialog({ onApply });
