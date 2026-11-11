@@ -273,6 +273,7 @@ This is cited, not re-raised.
   - with `maxRadialErrMm` ≤ 0.0221 and `maxAngularStepErrDeg` ≤ 0.00778.
 - **Test truth:** `copy-along-path.test.ts` (25/25) checks rotation on polygon guides only (`:148-171`). No curved guide is checked.
 - **Severity:** P3. The lean is visible on the canvas and does not change any copy's size or place.
+- **Fixed (2026-11-11).** Each flattened guide edge is now mapped back to its canonical segment (`copy-along-path-tangent.ts`). A copy on a cubic or arc turns with the curve's tangent at its nearest curve point, and a copy on a straight segment keeps the edge direction, so real corners stay edge-aligned. Measured on 12 and 997 copies at r 5, 10, 50 and 200: an SVG arc circle leans 0.0000°. The Circle tool's circle leans 0.054–0.072° at every radius, which is its four-quarter-cubic form's own tangent wobble that the copies now follow. Tests: `copy-along-path-tangent.test.ts`.
 - **Fix direction:** take the tangent from the canonical curve (`ColoredPath.curves`) at the copy's parameter, or from the two walk points straddling the copy. Add a circle-guide tangent test.
 - **Refuter: CONFIRMED, P3 kept.**
   - **Own repro.** `zz-l4r-core.test.ts`: a `createEllipse` guide, then `splitCopyAlongPathSelection`, then `copyAlongPathLayout`; 12 copies with Rotate on. The results match the auditor's exactly:
