@@ -77,3 +77,38 @@ describe('portraitAutoTones (ADR-685)', () => {
     expect(portraitAutoTones(histogramOf([[128, 50]]))).toBeNull();
   });
 });
+
+// O6-P3-2 (ADR-685 Amendment 2): brightness and contrast round to a tenth.
+// Rounded to nearest, the 0.5% level could land a fraction of a level above 0,
+// and the midtone gamma lifted that by up to 50 levels.
+describe('the darkest 0.5% stays solid after the controls round', () => {
+  function firstLevelAtShare(histogram: Uint32Array, share: number): number {
+    let total = 0;
+    for (let level = 0; level < 255; level += 1) total += histogram[level] ?? 0;
+    let seen = 0;
+    for (let level = 0; level < 255; level += 1) {
+      seen += histogram[level] ?? 0;
+      if (seen >= share * total && seen > 0) return level;
+    }
+    return 254;
+  }
+
+  it('maps the 0.5% level to 0 on two-tone portraits', () => {
+    for (let dark = 20; dark <= 150; dark += 1) {
+      for (const light of [dark + 40, dark + 80, Math.min(254, dark + 120)]) {
+        const levels: Array<readonly [number, number]> = [];
+        for (let level = dark; level <= dark + 12; level += 1) levels.push([level, 30]);
+        for (let level = dark + 13; level <= light; level += 1) levels.push([level, 60]);
+        const histogram = histogramOf(levels);
+        const lo = firstLevelAtShare(histogram, 0.005);
+        expect(curve(histogram)[lo]).toBe(0);
+      }
+    }
+  });
+
+  it('burns a uniform dark backdrop solid instead of grey', () => {
+    const levels: Array<readonly [number, number]> = [[113, 6000]];
+    for (let level = 114; level <= 212; level += 1) levels.push([level, 40]);
+    expect(curve(histogramOf(levels))[113]).toBe(0);
+  });
+});

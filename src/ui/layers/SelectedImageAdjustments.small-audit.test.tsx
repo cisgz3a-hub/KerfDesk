@@ -132,4 +132,14 @@ describe('small numeric audit: image adjustment ownership', () => {
     expect(savedImage('current').brightness).toBe(-12.5);
     expect(useStore.getState().undoStack.length).toBe(undoBefore + 1);
   });
+
+  // O6-P2-1 (ADR-671 Amendment 1): the gamma field says which way it moves
+  // the midtones, since LightBurn's Gamma runs the other way.
+  it('titles the gamma field with its direction and the LightBurn difference', async () => {
+    useStore.getState().importRasterImage(image('current'));
+    const host = await mount();
+    const gamma = field(host, 'Gamma for current.png');
+    expect(gamma.title).toContain('Higher gamma lightens midtones');
+    expect(gamma.title).toContain("LightBurn's Gamma runs the other way");
+  });
 });

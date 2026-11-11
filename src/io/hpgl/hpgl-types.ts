@@ -3,6 +3,24 @@ import type { ColoredPath, ImportedSvg, Polyline, Vec2 } from '../../core/scene'
 // An individual generated point array uses JavaScript's actual array representation.
 const MAX_ARRAY_LENGTH = 2 ** 32 - 1;
 
+// Commands that only set device or pen attributes (speed, force, pen width,
+// colour, line ends, merge, transparency) and draw nothing. A laser cuts the
+// centre line, so they are skipped with one note instead of refusing the file
+// (ADR-357 Amendment 5, audit O2-P2-2). RO, IR, IW, PS and CT change geometry
+// or clipping and stay unsupported.
+export const HPGL_IGNORED_ATTRIBUTE_COMMANDS = [
+  'VS',
+  'FS',
+  'NP',
+  'PW',
+  'WU',
+  'PC',
+  'CR',
+  'MC',
+  'TR',
+  'LA',
+] as const;
+
 export const HPGL_SUPPORTED_COMMANDS = [
   'IN',
   'DF',
@@ -26,6 +44,8 @@ export const HPGL_SUPPORTED_COMMANDS = [
   'FP',
   'LT',
   'FT',
+  ...HPGL_IGNORED_ATTRIBUTE_COMMANDS,
+  'PG',
 ] as const;
 
 export type HpglDiagnostic = {
@@ -95,6 +115,8 @@ export type HpglState = {
   workPoints: number;
   outputPoints: number;
   diagnostics: Map<string, HpglDiagnostic>;
+  /** The first PG (advance page) and how many paths came before it. */
+  pageAdvance: { readonly command: HpglCommand; readonly paths: number } | null;
 };
 
 export const PLOTTER_MAPPING: HpglMapping = { sx: 1, sy: 1, tx: 0, ty: 0 };
