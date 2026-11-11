@@ -61,9 +61,11 @@ function rotaryAxesForKind(kind: ControllerKind): ReadonlyArray<RotaryAxis> {
       return ROTARY_AXES;
     case 'grbl-v1.1':
       return ['Y', 'Z'];
+    // ADR-704: the galvo encoder refuses a rotary job; Y keeps the editor's choice list.
     case 'marlin':
     case 'smoothieware':
     case 'ruida':
+    case 'jcz-lmc':
       return ['Y'];
   }
 }

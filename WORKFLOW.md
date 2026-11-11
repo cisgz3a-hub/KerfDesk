@@ -8796,6 +8796,42 @@ Simulator-tested only; no real Ruida has run this path.
 6. A crashed window, a window that stops reading for 15 s, quitting, or
    Windows ending the session: the main process sends Stop Process.
 
+### F-H6. Mark on a JCZ galvo over USB (EXPERIMENTAL — ADR-704)
+
+Simulator-tested only; no real JCZ board has run this path.
+
+#### Success
+1. The user picks a JCZ fiber galvo profile (110, 150 or 200 mm lens) or sets
+   Machine Setup → **Galvo lens and source** (source, flips and swap, timing).
+   The bed is the lens field, with its origin at the centre.
+2. Machine details shows **JCZ galvo USB connection (experimental)** where the
+   platform has a USB link, with the not-qualified warning. The user may choose
+   the lens's EZCad `.cor` file, then clicks **Connect galvo** and picks the
+   board (USB 9588:9899) in the chooser. KerfDesk initialises it as MeerK40t
+   does; nothing moves or fires.
+3. **Frame (red light)** traces the job's outline with the red pointer for
+   about 5 s; the laser source is never fired. It counts as complete once the
+   board reports not busy twice after running it.
+4. **Start** sends the job's LMC lists and lists its warnings. **Pause**,
+   **Resume** and **Abort** send Stop List, Restart List and Stop Execute. The
+   job ends when the board reports idle; the oscillator is closed and the
+   outputs lowered.
+5. Cut Settings → **Galvo** sets an operation's own frequency and, for a MOPA
+   source, pulse width; blank uses the machine's default.
+
+#### Refusals and failures
+1. Start without a completed Frame of the same footprint on this connection:
+   "Frame this job with the red pointer first…"; nothing is sent.
+2. Placement other than Absolute Coordinates, an Image layer, a rotary, a point
+   outside the lens field, or a speed the board cannot take: refused with the
+   reason; nothing is sent.
+3. Save G-code: "A JCZ galvo has no job file to save…".
+4. A board that reports busy, or does not answer, is sent nothing.
+5. A missed reply or a failed transfer mid-send: KerfDesk sends the abort
+   sequence and says whether Stop Execute was acknowledged; if not, use the
+   machine's emergency stop.
+6. The board unplugged: the panel says a held program may keep running.
+
 ## Phase K flows (box generator — ADR-106)
 
 ### F-K1. Generate a finger-joint box

@@ -407,6 +407,7 @@ function statusQueryFor(
 ): StatusQueryCapability {
   if (laser.connection.kind === 'connected') return laser.statusQuery;
   if (project.device.controllerKind === 'marlin') return 'queued-poll';
-  if (project.device.controllerKind === 'ruida') return 'none';
+  const kind = project.device.controllerKind;
+  if (kind === 'ruida' || kind === 'jcz-lmc') return 'none';
   return 'realtime-report';
 }

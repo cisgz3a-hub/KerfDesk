@@ -26,8 +26,10 @@ export function selectOutputStrategy(device: DeviceProfile): AnyOutputStrategy {
       return grblStrategy;
     // Ruida output is NOT G-code — Save routes to the binary .rd encoder
     // (io/rd) before any strategy runs. The GRBL emitter here only feeds
-    // the on-screen preview/estimate pipeline fallback.
+    // the on-screen preview/estimate pipeline fallback. A JCZ galvo runs LMC
+    // list packets (ADR-704); the GRBL emitter again only feeds the preview.
     case 'ruida':
+    case 'jcz-lmc':
       return grblStrategy;
     default:
       return assertNeverControllerKind(kind);

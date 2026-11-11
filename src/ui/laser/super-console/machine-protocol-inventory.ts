@@ -58,7 +58,9 @@ export function machineProtocolInventory(device: DeviceProfile, laser: LaserStat
       value:
         driver.kind === 'ruida'
           ? 'Experimental vector .rd export; run from the machine panel'
-          : 'Save executable output and use a separately qualified controller/file workflow',
+          : driver.kind === 'jcz-lmc'
+            ? 'No job file: run over USB from the Galvo USB panel (experimental)'
+            : 'Save executable output and use a separately qualified controller/file workflow',
     },
     {
       name: 'Firmware flashing',

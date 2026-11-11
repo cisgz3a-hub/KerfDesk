@@ -281,6 +281,14 @@ Verified end-to-end against scripted firmware simulators
   `.rd` job, frames it with a travel-only job, and sends Pause, Resume, Abort and status reads;
   jog, home, console and settings stay off. Simulator-tested only; NOT qualified on a real
   controller. Browsers have no UDP, so the web app stays export-only.
+- **I.5b — JCZ LMC galvo** (ADR-704): EXPERIMENTAL fiber, MOPA, UV and CO2 galvo markers on a
+  JCZ LMC (EZCad2-class) board over the ADR-702 USB link, reimplemented from MeerK40t's MIT
+  `balormk`. The bed is the square lens field (origin at its centre; 110/150/200 mm profiles);
+  operations may set their own galvo frequency and MOPA pulse width (schema 24). The line store
+  sees the board as `transport: 'file-only'` and Save has no job file; a separate store sends
+  LMC list packets with a red-pointer Frame (laser never fired), Start gated on it, Pause, Resume,
+  Abort and status. Image rasters, rotary and EZCad3 boards are not built. Simulator-tested only;
+  NOT qualified on a real board.
 - **I.6 — Controller/profile compatibility** (ADR-157): detected firmware,
   streaming mode, receive window, output dialect and active driver are reconciled.
   The buffered receive window is bounded by the capacity the controller reports
@@ -425,7 +433,8 @@ Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, no
   A1 Pro and Neotronics 4040, firmware builds unconfirmed; community Marlin/Smoothie/FluidNC verification), Ruida
   real-controller validation of the export and of the Electron UDP transport (built first at the
   maintainer's request, ADR-697), wizard
-  controller-family step polish. Trocen/TopWisdom/galvo stay out of scope.
+  controller-family step polish. Trocen/TopWisdom stay out of scope; JCZ LMC (EZCad2) galvo
+  boards are built over USB (ADR-704), simulator-tested only, and EZCad3 (DLC) boards stay out.
 - Phase J: Linux desktop build. Packaging, the `.lf2` file type, remembered serial ports and CI install checks shipped under ADR-607; publishing Linux and commercial Mac downloads is designed in ADR-613 and waits for the maintainer's switch; macOS Preview moved into the current ADR-247/248 Desktop Preview track. (Renumbered from Phase I — the multi-controller track took that slot at integration; ADR-104.)
 
 **Public source availability does not collapse the phase plan.** ADR-005, ADR-006, ADR-007 are discipline choices, not technical-impossibility choices. See ADR-017 for the dependency policy, ADR-247/248 for the preview-distribution posture and ADR-543 for the source licence.

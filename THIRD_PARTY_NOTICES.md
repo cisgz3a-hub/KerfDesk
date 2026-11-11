@@ -31,6 +31,14 @@ are in `docs/licensing/photocraft-color-to-alpha.txt` and are included in the
 generated release notices. No upstream editor, artwork or fonts are bundled for
 this feature.
 
+The JCZ LMC galvo support (ADR-704) is a clean-room TypeScript
+reimplementation of the protocol MeerK40t's MIT-licensed `balormk` module
+documents, at commit `d511944e08788e88077727f682957759884ff5ca`: opcode values,
+USB ids and endpoints, initialisation order and defaults, unit conversions and
+the `.cor` layout. No MeerK40t source is included. Attribution, scope and the
+full MIT notice are in `docs/licensing/meerk40t-balormk.txt` and are included
+in the generated release notices.
+
 The Blue Noise dither (ADR-649) transcribes the integer error-filter weights
 from Appendix I of Victor Ostromoukhov, "A Simple and Efficient
 Error-Diffusion Algorithm" (SIGGRAPH 2001). The paper states the author's

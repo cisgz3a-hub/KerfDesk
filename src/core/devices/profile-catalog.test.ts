@@ -30,6 +30,9 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
       'generic-marlin-laser',
       'generic-smoothieware',
       'generic-ruida-rd-export',
+      'generic-jcz-fiber-galvo-110',
+      'generic-jcz-fiber-galvo-150',
+      'generic-jcz-fiber-galvo-200',
     ]);
     for (const entry of GRBL_MACHINE_PROFILE_CATALOG) {
       expect(validateMachineProfile(entry.profile)).toEqual([]);

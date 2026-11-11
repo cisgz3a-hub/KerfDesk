@@ -57,6 +57,9 @@ export {
   type PrebuiltGcodeSave,
 } from './transactional-gcode-save';
 export { handleSaveProject, type SaveProjectCtx } from './project-save-action';
+
+export const GALVO_HAS_NO_FILE =
+  'A JCZ galvo has no job file to save. Run the job from Machine details → JCZ galvo USB connection: Frame with the red light, then Start.';
 export {
   SAVE_COMPLETED_WITH_NEWER_EDITS_MESSAGE,
   type SaveProjectOutcome,
@@ -229,14 +232,25 @@ export async function handleSaveGcode(
   // Ruida .rd today). Route on the driver capability, not `controllerKind ===
   // 'ruida'` — ADR-094 bans kind checks in ui/, and LaserWindow's sibling gate
   // already keys on transport. selectControllerDriver normalizes an unknown kind.
-  if (
-    selectControllerDriver(ctx.project.device.controllerKind).capabilities.transport === 'file-only'
-  ) {
-    const { handleSaveRd } = await import('./save-rd-action');
-    await handleSaveRd(ctx, placement);
-    return;
-  }
+  if (await savedFileOnlyOutput(ctx, placement)) return;
   await saveOrdinaryGcode(ctx, placement, options.prebuilt);
+}
+
+/** True when the machine takes no G-code file, and this handled the save. */
+async function savedFileOnlyOutput(
+  ctx: SaveGcodeCtx,
+  placement: Extract<ReturnType<typeof resolveExportJobPlacement>, { readonly ok: true }>,
+): Promise<boolean> {
+  const driver = selectControllerDriver(ctx.project.device.controllerKind);
+  // A JCZ galvo has no job file (ADR-704): it runs over its USB link.
+  if (driver.galvoUsb !== undefined) {
+    ctx.pushToast(GALVO_HAS_NO_FILE, 'error');
+    return true;
+  }
+  if (driver.capabilities.transport !== 'file-only') return false;
+  const { handleSaveRd } = await import('./save-rd-action');
+  await handleSaveRd(ctx, placement);
+  return true;
 }
 
 async function saveOrdinaryGcode(

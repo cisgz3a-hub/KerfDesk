@@ -26,6 +26,7 @@ fidelity**. Be specific about what that means:
 | FluidNC · Marlin · Smoothieware | Simulator-verified only |
 | Ruida `.rd` export | Encode→decode round-trip proven; **never accepted by a real controller** |
 | Ruida network control (desktop) | Simulator only; **never run against a real controller** |
+| JCZ LMC galvo over USB | Simulator only; **never run against a real board** |
 | Laser raster/image engrave | **Not qualified.** Code + tests, plus informal use such as a photo engraving on a Neotronics 4040. |
 | **The entire CNC / router surface** | **Not qualified.** Code + tests, plus informal cuts on a Neotronics 4040. |
 | Box generator physical fit | Never cut and assembled |
@@ -176,6 +177,7 @@ capability-gated per firmware.
 | Marlin | WebSerial | Simulator only |
 | Smoothieware | WebSerial | Simulator only |
 | Ruida | `.rd` file export; experimental UDP network link on the desktop (ADR-697) | `.rd` round-trip proven, never accepted by hardware; network link simulator only |
+| JCZ LMC galvo (fiber, MOPA, UV, CO2) | USB link (ADR-702), experimental (ADR-704); no job file | Simulator only |
 
 No controller family or machine is qualified. An earlier claim that the Falcon was
 hardware-verified, and that this proved the driver refactor on real hardware, was withdrawn after
@@ -183,14 +185,15 @@ the 2026-09-19 audit found no reproducible evidence for it; see ADR-322 in
 [`DECISIONS.md`](DECISIONS.md).
 
 Output dialects: `grbl-compatible`, `grbl-dynamic`, `grbl-raster`, `neotronics-4040-safe`, plus
-`marlin-inline` (LASER_FEATURE) and `marlin-fan` (fan-mosfet). Eighteen device profiles and nine
+`marlin-inline` (LASER_FEATURE) and `marlin-fan` (fan-mosfet). Twenty-one device profiles and nine
 CNC machine presets ship in the catalog.
 
 Streaming is exercised end-to-end against scripted firmware simulators
 ([`src/__fixtures__/controllers/`](src/__fixtures__/controllers/) — GRBL, Marlin, Smoothieware and
 a Ruida decoder, over a fake serial port) driving the real application store rather than a mock.
 The desktop Ruida network link is exercised against a scripted Ruida UDP simulator built on that
-decoder, driving the real Ruida network store.
+decoder, driving the real Ruida network store. The JCZ galvo link runs against a scripted LMC
+board behind the USB transfer calls, driving the real galvo store.
 grblHAL and FluidNC ride the GRBL driver with capability deltas rather than having simulators of
 their own.
 

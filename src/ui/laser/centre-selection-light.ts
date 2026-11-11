@@ -261,6 +261,8 @@ function assertCentreLightAvailable(framed = false): void {
     throw new Error(
       'Ruida is file export only. Position the head and switch its light at the machine.',
     );
+  if (project.device.controllerKind === 'jcz-lmc')
+    throw new Error('A galvo’s red pointer is its Frame: use Frame in the Galvo USB panel.');
   if (machineKindOf(project.machine) !== 'laser')
     throw new Error('Centre & LED is available in Laser mode.');
   if (!framed && jobPlacement.startFrom !== 'absolute')

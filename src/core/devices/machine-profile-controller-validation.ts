@@ -5,9 +5,11 @@ import {
   isBidirectionalScanPolicy,
   isControllerCommandSet,
   isKnownControllerKind,
+  KNOWN_CONTROLLER_KINDS,
   type DeviceProfile,
 } from './device-profile';
 import { isGcodeDialectSelection } from './gcode-dialects';
+import { galvoProfileIssues } from './galvo-profiles';
 
 export function machineProfileControllerIssues(profile: DeviceProfile): ReadonlyArray<string> {
   return [
@@ -20,6 +22,7 @@ export function machineProfileControllerIssues(profile: DeviceProfile): Readonly
     ...scanPolicyIssues(profile),
     ...streamingIssues(profile),
     ...receiveWindowIssues(profile),
+    ...galvoProfileIssues(profile),
   ];
 }
 
@@ -27,9 +30,7 @@ function controllerKindIssues(profile: DeviceProfile): ReadonlyArray<string> {
   if (profile.controllerKind === undefined || isKnownControllerKind(profile.controllerKind)) {
     return [];
   }
-  return [
-    'controllerKind must be one of: grbl-v1.1, grblhal, fluidnc, marlin, smoothieware, ruida',
-  ];
+  return [`controllerKind must be one of: ${KNOWN_CONTROLLER_KINDS.join(', ')}`];
 }
 
 function dialectIssues(profile: DeviceProfile): ReadonlyArray<string> {

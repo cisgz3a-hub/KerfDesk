@@ -7,6 +7,7 @@ import type { ControllerDriver } from './controller-driver';
 import { fluidncDriver } from './fluidnc/driver';
 import { grblDriver } from './grbl/driver';
 import { grblHalDriver } from './grblhal/driver';
+import { jczLmcDriver } from './jcz/driver';
 import { marlinDriver } from './marlin/driver';
 import { ruidaDriver } from './ruida/driver';
 import { smoothiewareDriver } from './smoothieware/driver';
@@ -23,19 +24,15 @@ export function selectControllerDriver(
     if (kind === 'grblhal') return falconGrblHalDriver;
     if (kind === undefined || kind === 'grbl-v1.1') return falconGrblDriver;
   }
-  switch (kind) {
-    case 'grbl-v1.1':
-    case undefined:
-      return grblDriver;
-    case 'grblhal':
-      return grblHalDriver;
-    case 'fluidnc':
-      return fluidncDriver;
-    case 'marlin':
-      return marlinDriver;
-    case 'smoothieware':
-      return smoothiewareDriver;
-    case 'ruida':
-      return ruidaDriver;
-  }
+  return kind === undefined ? grblDriver : DRIVERS[kind];
 }
+
+const DRIVERS: Readonly<Record<ControllerKind, ControllerDriver>> = {
+  'grbl-v1.1': grblDriver,
+  grblhal: grblHalDriver,
+  fluidnc: fluidncDriver,
+  marlin: marlinDriver,
+  smoothieware: smoothiewareDriver,
+  ruida: ruidaDriver,
+  'jcz-lmc': jczLmcDriver,
+};

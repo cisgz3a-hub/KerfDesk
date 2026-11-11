@@ -1,6 +1,7 @@
 import { normalizeSceneObject } from './normalize-scene-object';
 import { settleLegacyTraceSources } from './legacy-trace-source';
 import type { LoadedProject } from './project-load-metadata';
+import { normalizeGalvoSetup } from '../../core/devices/galvo-setup';
 import { normalizePositioningLight } from '../../core/devices/positioning-light';
 import type { ReliefAuthoringResolutions } from './project-relief-authoring-validator';
 // deserializeProject - parses a .lf2 string and returns a typed Project, or a
@@ -362,6 +363,9 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
       normalizeGcodeDialectSelection(dev['gcodeDialect']).dialectId,
     ),
     noGoZones: Array.isArray(dev['noGoZones']) ? dev['noGoZones'] : [],
+    // ADR-704: a malformed galvo setup is dropped; the galvo link then refuses
+    // to mark until the machine is set up again, rather than guess its source.
+    ...(dev['galvo'] === undefined ? {} : { galvo: normalizeGalvoSetup(dev['galvo']) }),
     ...(dev['cameraProfile'] !== undefined
       ? { cameraProfile: normalizeCameraProfile(dev['cameraProfile'] as CameraProfile) }
       : {}),

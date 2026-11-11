@@ -10,6 +10,7 @@ import {
 import { validateCameraProfileShape } from '../camera';
 import { GRBLHAL_DEFAULT_RX_BUFFER_BYTES } from '../grbl-streaming';
 import { FALCON_A1_PRO_GRBLHAL_PROFILE, FALCON_COMPATIBLE_PROFILE } from './falcon-profiles';
+import { GENERIC_JCZ_GALVO_PROFILES } from './galvo-profiles';
 import { validateScanOffsetProfile } from './scan-offset-profile';
 import { cncSubProfileIssues } from './cnc-sub-profile-validation';
 import { machineProfileControllerIssues } from './machine-profile-controller-validation';
@@ -221,6 +222,11 @@ export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEn
   entry(GENERIC_RUIDA_PROFILE, [
     'Ruida: file-export only (.rd); encoder is EXPERIMENTAL and not accepted by real hardware yet.',
   ]),
+  ...GENERIC_JCZ_GALVO_PROFILES.map((profile) =>
+    entry(profile, [
+      'JCZ galvo over USB (ADR-704): red-light Frame, Start, Pause, Resume, Abort. EXPERIMENTAL; simulator-tested only. Set the lens, source and axis flips to match the machine.',
+    ]),
+  ),
 ];
 
 export function profileCatalogEntryById(profileId: string): MachineProfileCatalogEntry | undefined {

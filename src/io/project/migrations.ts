@@ -70,6 +70,9 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   21: (raw) => ({ ...raw, schemaVersion: 22 }),
   // Schema 23 adds an optional Fill ramp (ADR-699); no earlier file has one.
   22: (raw) => ({ ...raw, schemaVersion: 23 }),
+  // Schema 24 adds the JCZ galvo machine and operation fields (ADR-704); no
+  // earlier file has one.
+  23: (raw) => ({ ...raw, schemaVersion: 24 }),
 };
 
 function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {

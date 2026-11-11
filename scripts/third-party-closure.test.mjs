@@ -193,6 +193,14 @@ test('renders deterministic notices for every production package and artwork ass
     first.includes(ostromoukhovNotice),
     'the transcribed Ostromoukhov weight table must ship its attribution',
   );
+  const meerk40tNotice = fs
+    .readFileSync(path.join(REPO_ROOT, 'docs/licensing/meerk40t-balormk.txt'), 'utf8')
+    .trim()
+    .replace(/\r\n?/g, '\n');
+  assert.ok(
+    first.includes(meerk40tNotice),
+    'the JCZ galvo protocol carried over from MeerK40t must ship its MIT notice',
+  );
   assert.match(first, /Electron package license is reproduced below/);
   assert.match(first, /artifact-level license files are explicitly bundled and required/);
   assert.match(first, /explicitly bundles the Electron and Chromium runtime license files/);

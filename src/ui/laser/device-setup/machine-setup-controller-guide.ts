@@ -99,17 +99,30 @@ export function machineSetupControllerGuide(
           'Set laser_module_maximum_s_value 1.0 (Full-power S stays 1): Smoothieware stores every S word in 12-bit 1.11 fixed point, so any S of 2 or more wraps and fires far below the requested power. Set laser_module_enable true and laser_module_minimum_power 0 for dark S0 feed moves. Edit the config through the Smoothieware USB/SD workflow, then reset and reconnect.',
       };
     case 'ruida':
-      return {
-        ...common,
-        identityCommands: [],
-        settingsCommands: [],
-        configurationSurface: 'Ruida controller panel and vendor software',
-        writePolicy: 'file-only',
-        writeExplanation:
-          'This build exports files for Ruida. Connection, jogging, reads, and firmware writes are unavailable.',
-      };
+      return { ...common, ...RUIDA_GUIDE };
+    case 'jcz-lmc':
+      return { ...common, ...GALVO_GUIDE };
   }
 }
+
+const RUIDA_GUIDE = {
+  identityCommands: [],
+  settingsCommands: [],
+  configurationSurface: 'Ruida controller panel and vendor software',
+  writePolicy: 'file-only',
+  writeExplanation:
+    'This build exports files for Ruida. Connection, jogging, reads, and firmware writes are unavailable.',
+} as const;
+
+// ADR-704: a JCZ galvo has no serial console or settings to read or write.
+const GALVO_GUIDE = {
+  identityCommands: [],
+  settingsCommands: [],
+  configurationSurface: 'Machine Setup (galvo lens and source) and EZCad correction files',
+  writePolicy: 'file-only',
+  writeExplanation:
+    'A JCZ galvo runs from the JCZ galvo USB connection in Machine details: red-light Frame, Start, Pause, Resume and Abort. Jogging, console and firmware writes are unavailable. Experimental: simulator-tested only, not qualified on hardware.',
+} as const;
 
 function commonControllerGuide(kind: ControllerKind, driver: ControllerDriver) {
   return {
@@ -128,7 +141,7 @@ function commonControllerGuide(kind: ControllerKind, driver: ControllerDriver) {
 }
 
 export function machineSetupControllerGuides(): ReadonlyArray<MachineSetupControllerGuide> {
-  return (['grbl-v1.1', 'grblhal', 'fluidnc', 'marlin', 'smoothieware', 'ruida'] as const).map(
-    (kind) => machineSetupControllerGuide(kind),
-  );
+  return (
+    ['grbl-v1.1', 'grblhal', 'fluidnc', 'marlin', 'smoothieware', 'ruida', 'jcz-lmc'] as const
+  ).map((kind) => machineSetupControllerGuide(kind));
 }

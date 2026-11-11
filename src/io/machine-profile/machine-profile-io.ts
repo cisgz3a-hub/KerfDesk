@@ -351,6 +351,7 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     ...(profile.positioningLight === undefined
       ? {}
       : { positioningLight: { ...profile.positioningLight } }),
+    ...canonicalGalvo(profile),
     origin: profile.origin,
     homing: { ...profile.homing },
     autofocusCommand: profile.autofocusCommand,
@@ -366,6 +367,11 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     ...canonicalZMetadata(profile),
     ...canonicalHeadPositions(profile),
   };
+}
+
+// ADR-704: a JCZ galvo's lens mapping, source and timing travel with the profile.
+function canonicalGalvo(profile: DeviceProfile): Partial<DeviceProfile> {
+  return profile.galvo === undefined ? {} : { galvo: { ...profile.galvo } };
 }
 
 function canonicalCameraModel(profile: DeviceProfile): Partial<DeviceProfile> {

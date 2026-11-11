@@ -24,6 +24,7 @@ import {
 } from '../../core/devices/device-profile';
 import { laserArcMovesEntry } from '../../core/devices/laser-arc-moves';
 import { cncSubProfileIssues } from '../../core/devices/cnc-sub-profile-validation';
+import { galvoSetupIssue } from '../../core/devices/galvo-setup';
 import { positioningLightIssue } from '../../core/devices/positioning-light';
 import {
   invalidSavedHeadPositionIndex,
@@ -82,6 +83,7 @@ function validateLaserOutputFields(value: Record<string, unknown>): string | nul
   return (
     validateLaserFireControl(value['fireControl']) ??
     positioningLightIssue(value['positioningLight']) ??
+    (value['galvo'] === undefined ? null : galvoSetupIssue(value['galvo'])) ??
     validateHeadPositions(value)
   );
 }
