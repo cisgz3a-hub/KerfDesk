@@ -35,6 +35,7 @@
 
 import type { DeviceProfile } from '../../devices/device-profile';
 import { settingsMapToRows, type GrblSettingRow } from './grbl-settings';
+import { homingCycleAxesField } from './grblhal-homing-cycles';
 import {
   isLaserModeEnabled,
   parseGrblMachineMode,
@@ -92,6 +93,9 @@ export type ControllerSettingsSnapshot = Partial<
   // only from a dump that prints the whole `$22` bitfield (ADR-375
   // Amendment 4); undefined for stock GRBL and FluidNC, which print 0 or 1.
   readonly homingForceSetOrigin?: boolean;
+  // grblHAL `$44`-`$49`: the axes its homing passes cover, when the dump lists
+  // them (grblhal-homing-cycles.ts). An axis in none is never homed.
+  readonly homingCycleAxesMask?: number;
   // `$100` / `$101` / `$102`: one step's length bounds how far the machine position a
   // status report shows can sit from the firmware's own (ADR-375).
   readonly stepsPerMmX?: number;
@@ -224,6 +228,7 @@ export function settingsMapToControllerSettings(
     ...g92PersistenceField(map),
     ...grblHalSignalSettingsField(map),
     ...forceSetOriginField(map),
+    ...homingCycleAxesField(map),
     ...stepsPerMmFields(map),
     ...zeroMaxPowerField(map),
   };

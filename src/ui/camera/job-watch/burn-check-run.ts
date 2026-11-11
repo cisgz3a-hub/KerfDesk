@@ -59,10 +59,12 @@ export type BeforePicture =
 export const UNKNOWN_BED_POSITION_BURN_CHECK =
   'The bed position is unverified for this job, so KerfDesk does not know where on the bed it burns and the camera cannot check it.';
 
-/** Why this job cannot be checked, or null when it can. */
+/** Why this job cannot be checked, or null when it can. `bedUnknownWhy` is
+ * the reason this firmware and session have no bed mapping, when known. */
 export function burnCheckBlocker(
   plan: CanvasMotionPlan,
   camera: WatchCamera | null,
+  bedUnknownWhy: string | null = null,
 ): string | null {
   if (plan.machineKind !== 'laser') return 'The burn check is for laser jobs.';
   if (camera === null) return 'The camera was not running when the job started.';
@@ -75,7 +77,9 @@ export function burnCheckBlocker(
   if (planPlacesOnBed(plan)) return null;
   return planBedPositionKnown(plan)
     ? 'KerfDesk could not place this job on the bed.'
-    : UNKNOWN_BED_POSITION_BURN_CHECK;
+    : bedUnknownWhy === null
+      ? UNKNOWN_BED_POSITION_BURN_CHECK
+      : `${UNKNOWN_BED_POSITION_BURN_CHECK} ${bedUnknownWhy}`;
 }
 
 /** The first picture, taken as the job starts. */

@@ -147,7 +147,46 @@ describe('dispatchPositionLaser', () => {
     useLaserStore.setState({ controllerBuildInfoObservation: null });
     dispatchPositionLaser({ x: 50, y: 30 }, device);
     expect(jogToMachinePosition).toHaveBeenCalledTimes(1);
-    expect(useToastStore.getState().toasts[0]?.message).toContain('mapping is unverified');
+    // The refusal names what is missing in this session (annoyance audit A2
+    // B3-P2-2), not a "supported coordinate mapping" nobody could look up.
+    expect(useToastStore.getState().toasts[0]?.message).toBe(
+      "Move laser here needs to know where the bed is. KerfDesk has not read this controller's settings in this connection, and it needs them to place the bed. Reconnect, or read the settings in Machine Setup, then Home.",
+    );
+  });
+
+  it.each([
+    ['marlin', /^Move laser here needs to know where the bed is\. Marlin's home position and travel are fixed in the firmware build.* Jog the head to the point instead\.$/],
+    ['smoothieware', /Smoothieware's homing position is in the board's config file.* Jog the head to the point instead\.$/],
+    ['fluidnc', /FluidNC does not report where its homed coordinates sit on the bed.* Jog the head to the point instead\.$/],
+  ] as const)('tells a homed %s why no Home can help, and to jog', (kind, expected) => {
+    const device = {
+      ...deviceWith('front-left'),
+      controllerKind: kind,
+      homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: true },
+    };
+    const jogToMachinePosition = vi.fn(async () => undefined);
+    useToastStore.setState({ toasts: [] });
+    useLaserStore.setState({
+      ...stockNativeEvidence(device),
+      activeControllerKind: kind,
+      detectedControllerKind: kind,
+      connection: { kind: 'connected' },
+      streamer: null,
+      motionOperation: null,
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: null,
+        wPos: null,
+        feed: null,
+        spindle: null,
+        wco: null,
+      },
+      jogToMachinePosition,
+    });
+    dispatchPositionLaser({ x: 50, y: 30 }, device);
+    expect(jogToMachinePosition).not.toHaveBeenCalled();
+    expect(useToastStore.getState().toasts[0]?.message).toMatch(expected);
   });
 
   // GRBL homing trips the switch on the envelope's homing edge and rests $27

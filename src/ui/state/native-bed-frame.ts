@@ -1,6 +1,7 @@
 import type { CameraBedFrame } from '../../core/camera/model/camera-bed-frame';
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
+import { jogTravelLimits } from '../../core/controllers/grbl/jog-travel-limits';
 import { deriveMachineEnvelope } from '../../core/controllers/grbl/machine-envelope';
 import type { ControllerKind, DeviceProfile } from '../../core/devices';
 import type { ControllerCommandSet } from '../../core/devices/device-profile';
@@ -101,21 +102,108 @@ export function resolveNativeBedFrame(
   device: DeviceProfile,
   evidence: NativeBedEvidence,
 ): NativeBedFrame | null {
-  if (!device.homing.enabled || evidence.homingState !== 'confirmed') return null;
-  if (hasVendorPositiveContract(device, evidence)) {
-    return nativeBedFrame(device, {
-      minX: 0,
-      minY: 0,
-      maxX: device.bedWidth,
-      maxY: device.bedHeight,
-    });
+  return nativeBedFrameStatus(device, evidence).frame;
+}
+
+/** Why a session has no bed mapping, for the surfaces that tell the operator
+ * (annoyance audit A2 B3-P2-2). The firmware comes first: on a family
+ * KerfDesk cannot map, "Home first" would be advice that never works. */
+export type NativeBedUnknownReason =
+  | { readonly kind: 'firmware'; readonly firmware: ControllerKind | 'vendor-mismatch' }
+  | { readonly kind: 'homing-off' }
+  | { readonly kind: 'not-homed' }
+  | { readonly kind: 'settings-unread' }
+  | { readonly kind: 'report-incomplete' }
+  | { readonly kind: 'bed-differs'; readonly homedArea: HomedArea };
+
+export type HomedArea = { readonly widthMm: number; readonly heightMm: number };
+
+export type NativeBedFrameStatus =
+  | { readonly frame: NativeBedFrame; readonly reason: null }
+  | { readonly frame: null; readonly reason: NativeBedUnknownReason };
+
+/**
+ * The bed mapping, or why there is none. Three kinds of session can earn one,
+ * each after a Home confirmed in this connection:
+ * - the Falcon A1 Pro command contract (ADR-322 Amendment 3);
+ * - stock GRBL 1.1, from this session's `$$` and `$I`;
+ * - grblHAL, from this session's `$$` (ADR-322 Amendment 4).
+ * FluidNC, Marlin and Smoothieware report nothing that places their homed
+ * coordinates on the bed (native-bed-unknown-reason.ts has the sources).
+ */
+export function nativeBedFrameStatus(
+  device: DeviceProfile,
+  evidence: NativeBedEvidence,
+): NativeBedFrameStatus {
+  const family = mappingFamily(device, evidence);
+  if (family.kind === 'unsupported')
+    return unknown({ kind: 'firmware', firmware: family.firmware });
+  if (!device.homing.enabled) return unknown({ kind: 'homing-off' });
+  if (evidence.homingState !== 'confirmed') return unknown({ kind: 'not-homed' });
+  if (family.kind === 'vendor') {
+    return framed(device, { minX: 0, minY: 0, maxX: device.bedWidth, maxY: device.bedHeight });
   }
-  if (!hasCurrentStockEvidence(evidence)) return null;
+  // Both `$$` readings need the banner that names the firmware they are for.
+  if (evidence.detectedControllerKind == null) return unknown({ kind: 'settings-unread' });
   const settings = evidence.controllerSettings;
+  const epoch = evidence.controllerSessionEpoch;
+  if (
+    settings == null ||
+    epoch === undefined ||
+    evidence.controllerSettingsObservation?.sessionEpoch !== epoch
+  ) {
+    return unknown({ kind: 'settings-unread' });
+  }
+  if (family.kind === 'grblhal') {
+    const bounds = grblHalNativeBounds(settings);
+    return bounds === null ? unknown({ kind: 'report-incomplete' }) : framed(device, bounds);
+  }
   const build = evidence.controllerBuildInfo;
-  if (settings == null || build == null) return null;
+  if (build == null || evidence.controllerBuildInfoObservation?.sessionEpoch !== epoch) {
+    return unknown({ kind: 'settings-unread' });
+  }
   const bounds = stockNativeBounds(settings, build);
-  return bounds === null ? null : nativeBedFrame(device, bounds);
+  return bounds === null ? unknown({ kind: 'report-incomplete' }) : framed(device, bounds);
+}
+
+function unknown(reason: NativeBedUnknownReason): NativeBedFrameStatus {
+  return { frame: null, reason };
+}
+
+function framed(device: DeviceProfile, bounds: NativeXyBounds): NativeBedFrameStatus {
+  const frame = nativeBedFrame(device, bounds);
+  if (frame !== null) return { frame, reason: null };
+  const widthMm = bounds.maxX - bounds.minX;
+  const heightMm = bounds.maxY - bounds.minY;
+  return Number.isFinite(widthMm) && Number.isFinite(heightMm) && widthMm > 0 && heightMm > 0
+    ? unknown({ kind: 'bed-differs', homedArea: { widthMm, heightMm } })
+    : unknown({ kind: 'report-incomplete' });
+}
+
+type MappingFamily =
+  | { readonly kind: 'vendor' | 'stock' | 'grblhal' }
+  | { readonly kind: 'unsupported'; readonly firmware: ControllerKind | 'vendor-mismatch' };
+
+function mappingFamily(device: DeviceProfile, evidence: NativeBedEvidence): MappingFamily {
+  if (hasVendorPositiveContract(device, evidence)) return { kind: 'vendor' };
+  const active = evidence.activeControllerKind ?? device.controllerKind ?? 'grbl-v1.1';
+  const detected = evidence.detectedControllerKind ?? null;
+  // A command set whose contract did not hold, or a banner naming another
+  // family than the driver in use: neither path's reading of `$$` applies.
+  if (evidence.activeControllerCommandSet != null) {
+    return { kind: 'unsupported', firmware: 'vendor-mismatch' };
+  }
+  if (active === 'grbl-v1.1') {
+    return detected === null || detected === 'grbl-v1.1'
+      ? { kind: 'stock' }
+      : { kind: 'unsupported', firmware: detected };
+  }
+  if (active === 'grblhal') {
+    return detected === null || detected === 'grblhal'
+      ? { kind: 'grblhal' }
+      : { kind: 'unsupported', firmware: detected === 'grbl-v1.1' ? 'vendor-mismatch' : detected };
+  }
+  return { kind: 'unsupported', firmware: active };
 }
 
 function hasVendorPositiveContract(device: DeviceProfile, evidence: NativeBedEvidence): boolean {
@@ -136,16 +224,45 @@ function hasVendorPositiveContract(device: DeviceProfile, evidence: NativeBedEvi
   );
 }
 
-function hasCurrentStockEvidence(evidence: NativeBedEvidence): boolean {
-  const epoch = evidence.controllerSessionEpoch;
-  return (
-    evidence.activeControllerKind === 'grbl-v1.1' &&
-    evidence.detectedControllerKind === 'grbl-v1.1' &&
-    evidence.activeControllerCommandSet == null &&
-    epoch !== undefined &&
-    evidence.controllerSettingsObservation?.sessionEpoch === epoch &&
-    evidence.controllerBuildInfoObservation?.sessionEpoch === epoch
-  );
+// grblHAL's homed envelope (ADR-322 Amendment 4), from the same model as its
+// jog clamp and reported work area (jog-travel-limits.ts, ADR-637 Amendment 4),
+// here with nothing assumed: every setting the envelope depends on must have
+// been read, and both X and Y must be in a homing pass, because grblHAL keeps
+// no envelope for an axis its Home did not cover (grblhal-homing-cycles.ts).
+// A build that prints `$22` as 0 or 1 (COMPATIBILITY_LEVEL above 1) reports
+// neither force origin nor the passes, and gets no mapping.
+// https://github.com/grblHAL/core/blob/f8f10aecdf05943e3a02b1ac3c691b666a811495/machine_limits.c#L114-L139
+function grblHalNativeBounds(settings: ControllerSettingsSnapshot): NativeXyBounds | null {
+  const { bedWidth, bedHeight, homingDirectionMask, hardLimitsEnabled, homingPullOffMm } = settings;
+  const forceOrigin = settings.homingForceSetOrigin;
+  const homedAxes = settings.homingCycleAxesMask;
+  if (
+    settings.homingEnabled !== true ||
+    !isDefinedFinitePositive(bedWidth) ||
+    !isDefinedFinitePositive(bedHeight) ||
+    homingDirectionMask === undefined ||
+    hardLimitsEnabled === undefined ||
+    homingPullOffMm === undefined ||
+    forceOrigin === undefined ||
+    homedAxes === undefined ||
+    (homedAxes & 3) !== 3
+  ) {
+    return null;
+  }
+  const limits = jogTravelLimits({
+    firmware: 'grblhal',
+    travelMm: { x: bedWidth, y: bedHeight },
+    homingDirectionMask,
+    forceOrigin,
+    hardLimits: hardLimitsEnabled,
+    pullOffMm: homingPullOffMm,
+    // The envelope itself, without the jog rounding margin.
+    softLimitsEnforced: false,
+    stepsPerMm: { x: undefined, y: undefined },
+  });
+  return limits === null
+    ? null
+    : { minX: limits.x.minMm, maxX: limits.x.maxMm, minY: limits.y.minMm, maxY: limits.y.maxMm };
 }
 
 function stockNativeBounds(

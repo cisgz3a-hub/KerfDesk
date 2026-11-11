@@ -16,6 +16,11 @@ import {
   isRunId,
   isSafeNonNegativeInteger,
 } from './execution-provenance-validation-helpers';
+import {
+  hasValidOptionalOperatorStatement,
+  isOperatorStatedAcknowledgement,
+  operatorStatementMatchesReview,
+} from './execution-operator-stated-validation';
 import { hasValidCarriedOver } from './execution-review-carried-over-validation';
 import type { ExecutionWorkflowV2 } from './execution-workflow-evidence';
 import { isLaserSecondPassChain } from './laser-second-pass-lineage';
@@ -141,6 +146,7 @@ function hasValidPassAcknowledgement(value: Record<string, unknown>): boolean {
 function hasValidJobReviewAcknowledgement(value: unknown): boolean {
   if (!isRecord(value)) return false;
   if (value['kind'] === 'laser-verified') return true;
+  if (isOperatorStatedAcknowledgement(value)) return true;
   return (
     (value['kind'] === 'laser-unverified' || value['kind'] === 'cnc') &&
     isBoundedString(value['prompt'], 1)
@@ -210,7 +216,8 @@ function hasValidLaserRequirements(value: Record<string, unknown>): boolean {
   return (
     isFiniteNonNegative(value['expectedMaxPowerS']) &&
     typeof value['m7Required'] === 'boolean' &&
-    typeof value['unverifiedAcknowledged'] === 'boolean'
+    typeof value['unverifiedAcknowledged'] === 'boolean' &&
+    hasValidOptionalOperatorStatement(value)
   );
 }
 
@@ -366,6 +373,7 @@ function ordinaryWorkflowMatchesReview(
   review: Record<string, unknown>,
 ): boolean {
   if (!hasValidJobReviewAcknowledgement(acknowledgement)) return false;
+  if (!operatorStatementMatchesReview(acknowledgement, review)) return false;
   return acknowledgement['kind'] === 'cnc'
     ? review['cncSetupAttestation'] !== undefined && review['laserModeStartEvidence'] === undefined
     : review['laserModeStartEvidence'] !== undefined && review['cncSetupAttestation'] === undefined;

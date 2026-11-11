@@ -3,6 +3,10 @@ import { createPortal } from 'react-dom';
 import { formatDuration } from '../../core/job';
 import { CANVAS_MOTION_SLOT_ID } from '../common/status-bar-slots';
 import { useCameraStore } from '../state/camera-store';
+import { useLaserStore } from '../state/laser-store';
+import { selectNativeBedEvidence } from '../state/native-bed-frame';
+import { relativeViewHelp } from '../state/native-bed-unknown-reason';
+import { useStore } from '../state/store';
 import { cncPassPosition, type CncPassPosition } from '../state/canvas-pass-progress';
 import { isTerminalCanvasLifecycle } from '../state/live-canvas-run-timing';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
@@ -16,6 +20,9 @@ export function CanvasMotionBadge(props: {
   const nowMs = useElapsedTick(overlay);
   const slot = useStatusBarSlot();
   const cameraOverlay = useCameraStore((state) => state.overlayVisible);
+  const device = useStore((state) => state.project.device);
+  const bedEvidence = useLaserStore(selectNativeBedEvidence);
+  const connected = useLaserStore((state) => state.connection.kind === 'connected');
   if (overlay === null) return null;
   const passes = overlayPassPosition(overlay);
   const message = badgeMessage(overlay, passes, nowMs, cameraOverlay);
@@ -33,7 +40,11 @@ export function CanvasMotionBadge(props: {
               data-testid="canvas-motion-status"
               aria-busy={overlay.planIsCurrent === false}
               style={overlay.run === null ? cautionMessageStyle : messageStyle}
-              title={overlay.run === null ? idleViewHelp(message) : undefined}
+              title={
+                overlay.run === null && message.includes(RELATIVE_VIEW_REASON)
+                  ? relativeViewHelp(device, bedEvidence, connected)
+                  : undefined
+              }
             >
               {message}
             </span>,
@@ -214,11 +225,9 @@ function markerDescription(overlay: CanvasMotionOverlay): string {
 const RELATIVE_VIEW_REASON = 'Relative view — physical bed position unverified';
 
 // The red line alone reads as an error the beginner caused (UX audit U1-P3-2),
-// so its hover says what it means and that it is expected before setup.
-function idleViewHelp(message: string): string | undefined {
-  if (!message.includes(RELATIVE_VIEW_REASON)) return undefined;
-  return "KerfDesk can't yet tell where on the bed this job will burn, so the start markers are shown relative to your origin. This is normal until your machine is connected and homed.";
-}
+// so its hover says what it means. relativeViewHelp gives the reason for this
+// firmware and session: "normal until connected and homed" was untrue on a
+// machine no Home can map (annoyance audit A2 B3-P2-2).
 
 // Why an idle plan's markers may not show where the job burns.
 function idleViewReason(overlay: CanvasMotionOverlay, cameraOverlay: boolean): string | null {

@@ -8,6 +8,7 @@ import type { LaserFireControl } from './fire-control';
 import type { PositioningLight } from './positioning-light';
 import type { ScanOffsetCalibrationStatus, ScanOffsetPoint } from './scan-offset-profile';
 import type { GcodeDialectSelection } from './gcode-dialects';
+import type { OperatorPowerScaleStatement } from './power-scale-statement';
 import { DEFAULT_GRBL_RX_BUFFER_BYTES, type GrblStreamingMode } from '../grbl-streaming';
 import type { CameraProfile } from '../camera';
 
@@ -266,6 +267,9 @@ export type DeviceProfile = {
   readonly bedHeight: number; // mm
   readonly maxFeed: number; // mm/min
   readonly maxPowerS: number; // GRBL $30 value (e.g. 1000)
+  // The operator's word that Full-power S matches a firmware that reports no
+  // power scale (ADR-095 Amendment 1). Never a KerfDesk verification.
+  readonly operatorPowerScaleStatement?: OperatorPowerScaleStatement | undefined;
   readonly minPowerS: number; // GRBL $31 value; normally 0 for diode lasers
   readonly laserModeEnabled: boolean; // GRBL $32; true means laser mode is enabled
   // GRBL coolant command wired to software-controlled air assist. LightBurn

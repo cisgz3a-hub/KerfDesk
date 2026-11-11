@@ -25,6 +25,8 @@ export function JobReviewAcknowledgement(props: {
           purpose={props.purpose ?? 'start'}
         />
       );
+    case 'laser-operator-stated':
+      return <OperatorStatedFact statement={ack.statement} />;
     case 'cnc':
       return (
         <AcknowledgementBanner
@@ -36,6 +38,17 @@ export function JobReviewAcknowledgement(props: {
     default:
       return assertNever(ack, 'job review acknowledgement');
   }
+}
+
+// The operator's own recorded statement (ADR-095 Amendment 1): a plain fact
+// line, not a warning banner, and nothing to confirm. Its text says it is
+// operator-stated and that KerfDesk has not checked it.
+function OperatorStatedFact(props: { readonly statement: string }): JSX.Element {
+  return (
+    <p role="note" aria-label="Operator-stated power scale" style={ackFootnoteStyle}>
+      {props.statement}
+    </p>
+  );
 }
 
 function AcknowledgementBanner(props: {

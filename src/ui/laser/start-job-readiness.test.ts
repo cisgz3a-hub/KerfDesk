@@ -219,8 +219,10 @@ describe('prepareStartJob', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.gcode).toContain('M4 S0'); // ADR-257: dynamic-power cut default
+      // The bed note names why this session has no mapping (annoyance audit
+      // A2 B3-P2-2): the default profile has homing off.
       expect(result.warnings).toEqual([
-        UNKNOWN_NATIVE_BED_MESSAGE,
+        `${UNKNOWN_NATIVE_BED_MESSAGE} Why: This machine profile has homing off, so there is no fixed point to measure the bed from. If the machine has homing switches, turn homing on in Machine Setup, then Home.`,
         'Output power uses saved profile S1000; no current controller power range was verified. 100% means S1000 under that profile assumption, not measured optical power.',
       ]);
     }

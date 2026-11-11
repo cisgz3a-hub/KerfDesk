@@ -32,19 +32,27 @@ export function beforeYouStartText(machineKind: MachineKind): string {
   return `${BEFORE_YOU_START_HEADING}: ${beforeYouStartLines(machineKind).join(' ')}`;
 }
 
+export type RemoteReviewAcknowledgementKind = 'laser-verified' | 'laser-unverified' | 'cnc';
+
 /** The remote review's acknowledgement: the safety points first, then any
  * prompt the operator confirms, whose question stays last. Every deployed
- * phone and MCP client already shows `prompt`, so no Worker change is needed. */
+ * phone and MCP client already shows `prompt`, so no Worker change is needed.
+ * An operator-stated power scale (ADR-095 Amendment 1) goes out as
+ * `laser-unverified` with its fact line: the deployed clients know three
+ * kinds, and KerfDesk has not verified it. */
 export function remoteReviewAcknowledgement(
   acknowledgement: JobReviewAcknowledgement,
   machineKind: MachineKind,
-): { readonly kind: JobReviewAcknowledgement['kind']; readonly prompt: string } {
+): { readonly kind: RemoteReviewAcknowledgementKind; readonly prompt: string } {
   const safety = beforeYouStartText(machineKind);
-  return {
-    kind: acknowledgement.kind,
-    prompt:
-      acknowledgement.kind === 'laser-verified' ? safety : `${safety}\n\n${acknowledgement.prompt}`,
-  };
+  switch (acknowledgement.kind) {
+    case 'laser-verified':
+      return { kind: 'laser-verified', prompt: safety };
+    case 'laser-operator-stated':
+      return { kind: 'laser-unverified', prompt: `${safety}\n\n${acknowledgement.statement}` };
+    default:
+      return { kind: acknowledgement.kind, prompt: `${safety}\n\n${acknowledgement.prompt}` };
+  }
 }
 
 // Folding is remembered per machine (profile id, else name) on this computer. A machine never

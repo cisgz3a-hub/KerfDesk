@@ -447,7 +447,13 @@ function coordinatePreflightContext(options: FinalizeStartPreparationOptions) {
   if (options.motionOffset === undefined)
     return {
       emitOptions: { preflightCoordinateMode: 'relative-origin' as const },
-      warnings: [unknownNativeBedWarning(options.placement.jobOrigin, options.machine)],
+      warnings: [
+        unknownNativeBedWarning(
+          options.placement.jobOrigin,
+          options.machine,
+          options.project.device,
+        ),
+      ],
     };
   return {
     emitOptions: {

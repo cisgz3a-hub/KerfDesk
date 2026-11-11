@@ -1,6 +1,11 @@
 import type { ControllerSettingsSnapshot as GrblControllerSettingsSnapshot } from '../controllers/grbl';
 import { laserPowerRangeIsEmpty, reportedMaxPowerS } from '../controllers/grbl/parse-settings';
 import type { ControllerKind } from '../devices';
+import {
+  standingPowerScaleStatement,
+  unreportedPowerScaleFirmware,
+  unreportedPowerScaleWarning,
+} from '../devices/power-scale-statement';
 import type { Project } from '../scene';
 import {
   CNC_LASER_MODE_ENABLED_MESSAGE,
@@ -89,13 +94,11 @@ export function runControllerReadiness(
   // ADR-095). Firmwares with a READ-ONLY dump (FluidNC) fall through to the
   // verification below: what they report is checked (audit F6).
   if (settingsCapability === 'none') {
-    warnings.push({
-      code: 'power-scale-unverified',
-      message:
-        cncMachine === null
-          ? `This controller does not report GRBL $-settings, so the S power scale (max S ${project.device.maxPowerS}) comes from the device profile and is NOT verified against the firmware. Confirm it before burning at high power.`
-          : `This controller does not report GRBL $-settings, so the spindle S scale (max RPM ${cncMachine.params.spindleMaxRpm}) comes from the machine profile and is NOT verified against the firmware. Confirm it before cutting.`,
-    });
+    const message =
+      cncMachine === null
+        ? unreportedLaserScaleMessage(project)
+        : `This controller does not report its spindle speed scale, so the spindle S scale (max RPM ${cncMachine.params.spindleMaxRpm}) comes from the machine profile and is NOT verified against the firmware. Confirm it before cutting.`;
+    if (message !== null) warnings.push({ code: 'power-scale-unverified', message });
     return { ok: true, errors, warnings };
   }
 
@@ -143,6 +146,19 @@ export function runControllerReadiness(
   // since #482 the Save/export path states them as advisories rather than
   // refusing, so nothing returned here gates an action on its own.
   return laserReadiness(project, controller, 'warn', source, firmwareKind);
+}
+
+// Marlin and Smoothieware are named, told what to check, and stop being told
+// once the operator has recorded that check: Job Review then shows the
+// statement as one fact line instead (ADR-095 Amendment 1). Other families
+// without a settings report keep the general note.
+function unreportedLaserScaleMessage(project: Project): string | null {
+  if (unreportedPowerScaleFirmware(project.device.controllerKind) === null) {
+    return `This controller does not report its laser power scale, so the S power scale (max S ${project.device.maxPowerS}) comes from the device profile and is NOT verified against the firmware. Confirm it before burning at high power.`;
+  }
+  return standingPowerScaleStatement(project.device) === null
+    ? unreportedPowerScaleWarning(project.device)
+    : null;
 }
 
 type ReadinessErrors = Array<ControllerReadinessMessage<ControllerReadinessErrorCode>>;

@@ -2660,8 +2660,9 @@ inches hides the position until `$G` or the next Frame (ADR-375 Amendment 11).
    - the machine is a laser. A CNC job always shows Job Review, because its setup confirmation
      belongs to each run;
    - the prepared program is the one the completed run sent, byte for byte;
-   - the review needs no answer: laser mode is verified, there is no machine-type question and
-     nothing blocks Start;
+   - the review needs no answer: laser mode is verified, or the firmware reports no power
+     scale and the operator has recorded that they checked it (ADR-237 Amendment 4, ADR-095
+     Amendment 1); there is no machine-type question and nothing blocks Start;
    - its warnings are exactly the ones accepted for the run being repeated;
    - that run was reviewed in this KerfDesk session, on this controller session. After a
      reload, or once the controller session has changed (a reconnect, for example), the
@@ -8822,7 +8823,26 @@ as the pane's design record.
    safety copy say so). **Resume** continues the stream. **ABORT** requests the
    controller-specific reset/de-energize path; it is not a physical E-stop. The
    host stops sending and requests `M5 I` + `M107` cleanup.
-4. Start shows the power-scale-unverified warning (no $30/$32 proof exists).
+4. Marlin reports no laser power scale, so KerfDesk cannot check Full-power S (ADR-095
+   Amendment 1; the same holds for Smoothieware).
+   - Until the operator has recorded a check, every Job Review asks **Confirm laser settings**
+     in Marlin's terms: full power is sent as the profile's S, and the firmware's laser power
+     unit (`CUTTER_POWER_UNIT`: PWM255 is S0 to S255, PERCENT is S0 to S100, RPM runs up to
+     `SPEED_POWER_MAX`) must top out at that value. On fan wiring it asks that the laser is on
+     the fan output (`M106` S0 to S255). On Smoothieware it asks that
+     `laser_module_maximum_s_value` equals Full-power S. The warnings list carries the same
+     note. Neither names a GRBL setting.
+   - **Machine Setup > Full-power S > Power scale check** has a tick box, "I have checked this:
+     full power is S*n* on this machine". It is the operator's own statement; KerfDesk tests
+     nothing. It is stored with the machine profile and is cleared when Full-power S, the
+     controller or the output dialect changes. KerfDesk cannot see a firmware change on these
+     controllers, so the operator checks again after one.
+   - With the box ticked, Job Review shows one plain line instead of the banner and the
+     warning: "Power scale: operator-stated. You recorded on *date* that full power is S*n* on
+     this machine. KerfDesk has not checked it, …". Nothing is clicked for it, the "Laser mode
+     verified" chip is not shown, and the run's record says operator-stated. Run again can then
+     carry the review. A program run from the G-code Inspector still asks, because its S values
+     come from the file.
    Its final status check sends an owned `M400`, then an owned `M114`, because Marlin has no
    realtime status query; the fresh Idle-shaped report must match the Frame (ADR-362
    Amendment 1).
@@ -9780,6 +9800,17 @@ Simulator-tested only; no real Ruida has run this path.
   firmware accepts, keeping the homing-side edge the homing pull-off (`$27`,
   1 mm if unread) clear of the switch (ADR-375). It then sends one absolute
   beam-off jog through the normal jog safety gates.
+- **Error / bed position unknown.** The move needs a bed mapping: where the controller's
+  coordinates sit on the bed. It is known after a Home in this connection on a Falcon A1 Pro
+  preset, on stock GRBL 1.1, and on grblHAL whose settings report gives its homed area (homing
+  on, X and Y both in a homing pass, travel, pull-off and origin settings) with the profile bed
+  that size (ADR-322 Amendment 4). Without it nothing is sent, and the message says why for
+  this machine: not homed yet, homing off in the profile, settings not read, a bed that is not
+  the controller's homed area, or a firmware KerfDesk cannot map. FluidNC, Marlin and
+  Smoothieware report nothing that places their homed coordinates on the bed, so there the
+  message says so and to jog instead. The same reason is on the status line's hover over
+  "Relative view", in Job Review's bed note after "Why:", and in the camera burn check's
+  "unavailable" line. None of this gates Frame or Start.
 - **Error / machine not ready.** If the machine is disconnected, busy, alarmed,
   or otherwise blocked for jogging, no command is sent and the operator sees
   the same block reason as the Jog Pad.
@@ -9963,8 +9994,9 @@ Simulator-tested only; no real Ruida has run this path.
   timelapse, and "The camera was not running when the job started."
 - **Error / cannot check.** A CNC job, a camera that is not fixed and calibrated, or a job that
   was stopped says why it was not checked. So does a job whose bed position is unverified (no
-  homing, not homed, Verified Origin): KerfDesk does not know where it burns (ADR-490
-  Amendment 1). The camera stopping mid-job ends the timelapse with the
+  homing, not homed, Verified Origin, or a firmware KerfDesk cannot map): KerfDesk does not
+  know where it burns (ADR-490 Amendment 1), and the line adds the reason for this machine
+  (ADR-322 Amendment 4). The camera stopping mid-job ends the timelapse with the
   frames it has.
 
 ---
