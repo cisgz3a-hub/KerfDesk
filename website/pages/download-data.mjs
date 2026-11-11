@@ -76,7 +76,7 @@ export function updateItems(site) {
     {
       icon: 'globe',
       title: 'Web app',
-      body: 'The newest version that passes KerfDesk’s automated checks is published at kerfdesk.com automatically. The app never reloads itself. When an update is ready, an Update button appears in the status bar. The new version loads when you click it, or the next time you open KerfDesk after closing all its tabs and windows. The button stays available during a job, so update while your machine is idle.',
+      body: 'The newest version that passes KerfDesk’s automated checks is published at kerfdesk.com automatically. The app never reloads itself. When an update is ready, an Update button appears in the status bar. The new version loads when you click it, or the next time you open KerfDesk after closing all its tabs and windows. During a job the button reads Update after job and waits, because updating reloads the page; use it once the machine is idle.',
     },
     {
       icon: 'monitor-down',
