@@ -1,4 +1,5 @@
 import { toolbarCommand } from './fixtures/workspace-ui';
+import { expectGcodeSaveRefused } from './fixtures/gcode-save';
 import { expect, test, type KerfDeskFixture, type Page } from './fixtures/kerfdesk-test';
 import { DEFAULT_DEVICE_PROFILE, toMachineCoords } from '../src/core/devices';
 import { unrepresentableStrokeProject } from '../src/__fixtures__/vcarve-stroke-geometry';
@@ -189,9 +190,9 @@ test('reports unrepresentable stroke geometry without saving partial G-code', as
     page.getByRole('note').filter({ hasText: 'could not represent the stroke geometry' }),
   ).toBeVisible();
   await command(page, 'File', 'Save G-code...');
-  const dialog = page.getByRole('dialog', { name: 'Save G-code' });
-  await expect(dialog).toContainText('No final file was selected or modified');
-  await expect(dialog.getByRole('button', { name: 'Save as…' })).toBeDisabled();
+  // Refused once: listed in the Save G-code dialog when it is already open, else
+  // one error toast (ADR-656 Amendment 4).
+  await expectGcodeSaveRefused(page, /stroke geometry/);
   expect(await kerfdesk.savedFiles()).toEqual({});
   expect((await kerfdesk.events()).filter((event) => event.kind.startsWith('serial'))).toEqual([]);
   expect(errors).toEqual([]);

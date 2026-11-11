@@ -260,7 +260,7 @@ function assertCentreLightAvailable(framed = false): void {
     throw new Error(issue ?? 'Set up the separate positioning light in Machine Setup first.');
   if (isFileOnlyController(project.device.controllerKind))
     throw new Error(
-      'Ruida is file export only and a Moshiboard runs over its own USB link. Position the head and switch its light at the machine.',
+      'This controller runs from files or its own USB link. Position the head and switch its light at the machine.',
     );
   if (machineKindOf(project.machine) !== 'laser')
     throw new Error('Centre & LED is available in Laser mode.');

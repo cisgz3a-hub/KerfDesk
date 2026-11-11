@@ -9,7 +9,7 @@ import { planRasterRowSweeps, type RasterRowSweepPlan } from '../raster/raster-s
 import { rasterScanFrame, scanToMachine, type RasterScanFrame } from '../raster/raster-scan-frame';
 import type { RasterGroup } from './job';
 import { rasterRowsInProviderOrder } from './raster-rows';
-import { offsetForEmittedFeed, type ScanOffsetPoint } from './scan-offset';
+import { offsetForEmittedFeed, rasterRowShiftX, type ScanOffsetPoint } from './scan-offset';
 import { appendTravelStep, dist } from './toolpath-math';
 import type { ToolpathStep } from './toolpath-types';
 
@@ -94,7 +94,7 @@ function appendRasterSpanSweepSteps(
   const pixelWidthMm = (group.bounds.maxX - group.bounds.minX) / group.pixelWidth;
   const activeStartX = group.bounds.minX + span.firstX * pixelWidthMm;
   const activeEndX = group.bounds.minX + (span.lastX + 1) * pixelWidthMm;
-  const rowShiftX = reverse ? -scanOffsetMm : 0;
+  const rowShiftX = rasterRowShiftX(scanOffsetMm, reverse, group.bidirectional ?? true);
   // Planned along the row in the scan frame; each point is placed on the bed
   // through the scan angle (ADR-492), the identity along X.
   const at = (x: number): Vec2 => scanToMachine(row.frame, { x, y: row.worldY });

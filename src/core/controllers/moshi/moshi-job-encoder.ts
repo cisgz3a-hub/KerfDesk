@@ -27,7 +27,9 @@ import {
   type MoshiBounds,
   type MoshiStep,
 } from './moshi-units';
-import { planCutGroupSteps, planFillGroupSteps } from './moshi-vector-plan';
+import { planFillGroupSteps } from './moshi-fill-plan';
+import { moshiPowerNotes } from './moshi-power-notes';
+import { planCutGroupSteps } from './moshi-vector-plan';
 
 /** Raster speed is one byte of cm/s (builder.py L408-411). */
 const MOSHI_RASTER_SPEED_MAX_MM_S = 2560;
@@ -78,7 +80,7 @@ export function encodeMoshiJob(job: Job, device: DeviceProfile): MoshiEncodeResu
       return { ok: false, error: { kind: 'cnc-unsupported', layerId: group.layerId } };
     if (group.kind === 'raster' && group.scanAngleDeg !== undefined)
       return { ok: false, error: { kind: 'angled-raster-unsupported', layerId: group.layerId } };
-    const planned = planGroup(group, notes);
+    const planned = planGroup(group, device, notes);
     const bounds = stepBounds(planned);
     if (bounds === null) continue;
     const outside = planned.find((step) => !isMoshiPosition(step.x) || !isMoshiPosition(step.y));
@@ -89,16 +91,19 @@ export function encodeMoshiJob(job: Job, device: DeviceProfile): MoshiEncodeResu
   const footprint = unionMoshiBounds(motion.map((part) => part.bounds));
   if (footprint === null || !motion.some((part) => part.steps.some((step) => step.cut)))
     return { ok: false, error: { kind: 'empty-job' } };
+  // What the board cannot express, named for this job (ADR-705 Amd 4).
+  for (const note of moshiPowerNotes(job)) notes.add(note);
   return { ok: true, programs, motion, footprint, notes: [...notes] };
 }
 
 function planGroup(
   group: Exclude<Group, { readonly kind: 'cnc' }>,
+  device: DeviceProfile,
   notes: Set<string>,
 ): MoshiStep[] {
   if (group.kind === 'cut') return planCutGroupSteps(group);
-  if (group.kind === 'fill') return planFillGroupSteps(group);
-  const raster = planRasterGroupSteps(group);
+  if (group.kind === 'fill') return planFillGroupSteps(group, device);
+  const raster = planRasterGroupSteps(group, device);
   if (raster.greyLevels)
     notes.add(
       `Layer ${group.layerId}: a Moshiboard has no power control, so every grey pixel burns at the machine's dial power. Dither the image for shading.`,

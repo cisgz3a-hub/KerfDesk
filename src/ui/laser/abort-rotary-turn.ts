@@ -108,9 +108,11 @@ export async function turnRotaryBackToJobStart(turn: RotaryStartTurn): Promise<v
   const feed = clampJogFeed(TURN_BACK_FEED, useStore.getState().project.device.maxFeed);
   const back = -delta;
   await useLaserStore.getState().jog(turn.axis === 'A' ? { da: back, feed } : { dz: back, feed });
-  // The turn takes |back| / feed minutes (rolling audit v14 Z2-P2-1: a fixed
-  // 3 s gave up on a correct turn of more than about 75 degrees).
-  const turnMs = (Math.abs(back) / feed) * 60_000;
+  // The turn takes |back| / speed minutes (rolling audit v14 Z2-P2-1: a fixed
+  // 3 s gave up on a correct turn of more than about 75 degrees). The planner
+  // turns the axis no faster than its own max rate, $113 on A or $112 on Z, so
+  // a slow axis sets the speed (Z4-P3-1, ADR-695 Amendment 3).
+  const turnMs = (Math.abs(back) / turnSpeed(turn.axis, feed)) * 60_000;
   const settled = await waitForControllerStatus(
     (state) =>
       state.statusReport?.state === 'Idle' &&
@@ -128,4 +130,12 @@ export function abortRotaryZero(): RotaryStartTurn | undefined {
   const turn = currentJobStopRequest(state)?.rotaryStartTurn;
   // After a restart Start from line is refused rather than re-enter a stale turn.
   return turn === undefined || rotaryStartTurnStale(state, turn) ? undefined : turn;
+}
+
+// The speed the turn-back really runs at: the jog feed, held to the axis's own
+// max rate when the controller reported one ($113 on A, $112 on Z).
+function turnSpeed(axis: 'A' | 'Z', feed: number): number {
+  const settings = useLaserStore.getState().controllerSettings;
+  const rate = axis === 'A' ? settings?.maxRateA : settings?.maxRateZ;
+  return rate !== undefined && rate > 0 ? Math.min(feed, rate) : feed;
 }

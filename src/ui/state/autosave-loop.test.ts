@@ -68,12 +68,128 @@ describe('startAutosaveLoop', () => {
     stop();
   });
 
-  it('skips writes during streaming (do not perturb the render loop)', () => {
+  it('skips writes during a job unless the caller vouches for its writer', () => {
     const project = createProject();
     const stop = startAutosaveLoop(() => ({ project, dirty: true, isStreaming: true }), TICK_MS);
     vi.advanceTimersByTime(TICK_MS * IDLE_TICKS);
     expect(readAutosave()).toBeNull();
     stop();
+  });
+
+  // ADR-305 Amendment 1 (annoyance audit A4-P2-1): a job no longer switches
+  // autosave off. The caller's gate decides, project by project.
+  describe('while a job streams', () => {
+    it('writes on the interval when the gate lets the project through', async () => {
+      const project = editedProject('drawn while the job ran');
+      const writer = vi.fn(async () => ({ kind: 'ok', savedAt: 1, storageKey: 'slot' }) as const);
+      const waiting: boolean[] = [];
+      const stop = startAutosaveLoop(
+        () => ({ project, dirty: true, isStreaming: true }),
+        TICK_MS,
+        undefined,
+        writer,
+        { writeDuringJob: () => true, onWaitingForJob: (held) => waiting.push(held) },
+      );
+
+      await vi.advanceTimersByTimeAsync(TICK_MS);
+
+      expect(writer).toHaveBeenCalledTimes(1);
+      expect(writer).toHaveBeenCalledWith(project);
+      expect(waiting).toEqual([false]);
+      stop();
+    });
+
+    it('holds a project the gate refuses, says so, and writes it when the job ends', async () => {
+      const project = editedProject('too large for a job');
+      const writer = vi.fn(async () => ({ kind: 'ok', savedAt: 1, storageKey: 'slot' }) as const);
+      const waiting: boolean[] = [];
+      const asked: Project[] = [];
+      let isStreaming = true;
+      const stop = startAutosaveLoop(
+        () => ({ project, dirty: true, isStreaming }),
+        TICK_MS,
+        undefined,
+        writer,
+        {
+          writeDuringJob: (candidate) => {
+            asked.push(candidate);
+            return false;
+          },
+          onWaitingForJob: (held) => waiting.push(held),
+        },
+      );
+
+      await vi.advanceTimersByTimeAsync(TICK_MS * 2);
+      expect(writer).not.toHaveBeenCalled();
+      expect(asked).toEqual([project, project]);
+      expect(waiting).toEqual([true, true]);
+
+      isStreaming = false;
+      await vi.advanceTimersByTimeAsync(TICK_MS);
+      expect(writer).toHaveBeenCalledTimes(1);
+      expect(waiting).toEqual([true, true, false]);
+      stop();
+    });
+
+    it('asks the gate again after every edit', async () => {
+      let project = editedProject('small');
+      const writer = vi.fn(async () => ({ kind: 'ok', savedAt: 1, storageKey: 'slot' }) as const);
+      const allowed = new Set<Project>([project]);
+      const stop = startAutosaveLoop(
+        () => ({ project, dirty: true, isStreaming: true }),
+        TICK_MS,
+        undefined,
+        writer,
+        { writeDuringJob: (candidate) => allowed.has(candidate) },
+      );
+
+      await vi.advanceTimersByTimeAsync(TICK_MS);
+      expect(writer).toHaveBeenCalledTimes(1);
+
+      project = editedProject('grew past the limit');
+      await vi.advanceTimersByTimeAsync(TICK_MS);
+      expect(writer).toHaveBeenCalledTimes(1);
+
+      allowed.add(project);
+      await vi.advanceTimersByTimeAsync(TICK_MS);
+      expect(writer).toHaveBeenCalledTimes(2);
+      stop();
+    });
+
+    it('says nothing is waiting when the slot already holds the project, or nothing is unsaved', async () => {
+      const project = editedProject('saved before the job');
+      const writer = vi.fn(async () => ({ kind: 'ok', savedAt: 1, storageKey: 'slot' }) as const);
+      const waiting: boolean[] = [];
+      const gate = vi.fn(() => false);
+      let snapshot = { project, dirty: true, isStreaming: false };
+      const stop = startAutosaveLoop(() => snapshot, TICK_MS, undefined, writer, {
+        writeDuringJob: gate,
+        onWaitingForJob: (held) => waiting.push(held),
+      });
+
+      // Written before the job starts: the job then holds nothing back.
+      await vi.advanceTimersByTimeAsync(TICK_MS);
+      snapshot = { project, dirty: true, isStreaming: true };
+      await vi.advanceTimersByTimeAsync(TICK_MS);
+      // A manual save during the job leaves nothing to write.
+      snapshot = { project: editedProject('saved to a file'), dirty: false, isStreaming: true };
+      await vi.advanceTimersByTimeAsync(TICK_MS);
+
+      expect(writer).toHaveBeenCalledTimes(1);
+      expect(gate).not.toHaveBeenCalled();
+      expect(waiting).toEqual([false, false, false]);
+      stop();
+    });
+
+    it('never starts the synchronous default writer during a job', () => {
+      const setItem = spyOnSetItem();
+      const project = editedProject('default writer');
+      // No writer and no gate: the localStorage writer serialises on this thread.
+      const stop = startAutosaveLoop(() => ({ project, dirty: true, isStreaming: true }), TICK_MS);
+      vi.advanceTimersByTime(TICK_MS * IDLE_TICKS);
+      expect(setItem).not.toHaveBeenCalled();
+      stop();
+    });
   });
 
   it('stop function cancels future writes', () => {

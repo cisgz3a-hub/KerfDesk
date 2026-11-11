@@ -67,10 +67,11 @@ describe('scan-offset tables leave placed jobs on their anchor (ADR-052 Amendmen
         maxX: target.x + SIZE_MM,
         maxY: target.y + SIZE_MM,
       });
-      // The commanded reverse rows still reach 0.5 mm past the anchor; that
-      // is real motion, so the burn and motion envelopes keep it.
+      // The commanded reverse rows still reach half the 0.5 mm table past the
+      // anchor (ADR-052 Amendment 2); that is real motion, so the burn and
+      // motion envelopes keep it.
       expect(computeJobBounds(prepared.job, prepared.project.device)?.minX).toBeCloseTo(
-        target.x - 0.5,
+        target.x - 0.25,
         6,
       );
     },
@@ -86,7 +87,7 @@ describe('scan-offset tables leave placed jobs on their anchor (ADR-052 Amendmen
       expect(prepared.jobOriginOffset).toEqual(untabled.jobOriginOffset);
       expect(lineBounds(prepared.job)).toMatchObject({ minY: target.y, maxX: target.x });
       expect(computeJobBounds(prepared.job, prepared.project.device)?.maxX).toBeCloseTo(
-        target.x + 0.5,
+        target.x + 0.25,
         6,
       );
     },
@@ -104,8 +105,9 @@ describe('scan-offset tables leave placed jobs on their anchor (ADR-052 Amendmen
     const emitted = emitGcode(project, { jobOrigin: userOrigin('front-left') });
 
     expect(emitted.preflight.ok).toBe(true);
-    // Compact rows read `G1X-0.5Y2…`: the reverse rows end 0.5 mm below X0.
-    expect(emitted.gcode).toMatch(/X-0\.5(?![0-9])/);
+    // Compact rows read `G1X-0.25Y2…`: the reverse rows end half the table
+    // value below X0 (ADR-052 Amendment 2).
+    expect(emitted.gcode).toMatch(/X-0\.25(?![0-9])/);
   });
 
   it.each([

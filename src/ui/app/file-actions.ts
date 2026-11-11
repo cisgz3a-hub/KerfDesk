@@ -34,6 +34,7 @@ import { parseOpenedProjectFile, type OpenProjectFile } from './project-open-par
 import { importSvgFiles } from './svg-import-action';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 import { saveGcodePlacement, type PrebuiltGcodeSave } from './transactional-gcode-save';
+import { GCODE_SAVE_REFUSED, pushExportRefusal } from './export-refusal';
 import { pushSavedGcodeNotices } from './save-gcode-notices';
 import { errorMessage, suggestedGcodeName } from './file-action-formatters';
 import {
@@ -230,10 +231,10 @@ export async function handleSaveGcode(
 }
 
 // File-only transports export a binary job instead of G-code text (ADR-097:
-// Ruida .rd today). Route on the driver capability, not `controllerKind ===
-// 'ruida'` — ADR-094 bans kind checks in ui/, and LaserWindow's sibling gate
-// already keys on transport. selectControllerDriver normalizes an unknown kind.
-// True when the save was handled here.
+// Ruida .rd; ADR-703: Lihuiyu .egv). Route on the driver capability, not
+// `controllerKind` — ADR-094 bans kind checks in ui/, and LaserWindow's sibling
+// gate already keys on transport. selectControllerDriver normalizes an unknown
+// kind. True when the save was handled here.
 async function savedWithoutGcode(
   ctx: SaveGcodeCtx,
   placement: Extract<ReturnType<typeof resolveExportJobPlacement>, { readonly ok: true }>,
@@ -250,6 +251,11 @@ async function savedWithoutGcode(
     return true;
   }
   if (driver.capabilities.transport !== 'file-only') return false;
+  if (driver.fileFormat === 'egv') {
+    const { handleSaveEgv } = await import('./save-egv-action');
+    await handleSaveEgv(ctx, placement);
+    return true;
+  }
   const { handleSaveRd } = await import('./save-rd-action');
   await handleSaveRd(ctx, placement);
   return true;
@@ -275,12 +281,15 @@ async function saveOrdinaryGcode(
   ]) {
     ctx.pushToast(advisory, 'warning');
   }
-  // Production calls this from the Save as button with a prebuilt
-  // artifact, so the picker is invoked synchronously inside that fresh user
-  // gesture. Direct/test callers without an artifact prepare first: factual
-  // failure must never create, open, truncate, or modify a final target.
+  // Production calls this with a prebuilt artifact while a click or key press
+  // is still active (gcode-save-flow.ts), so the picker opens at once.
+  // Direct/test callers without an artifact prepare first: factual failure
+  // must never create, open, truncate, or modify a final target.
   const prepared = prebuilt?.prepared ?? (await prepareGcodeSave(ctx, placement));
-  if (prepared.kind === 'failed') return;
+  if (prepared.kind === 'failed') {
+    pushExportRefusal(ctx.pushToast, GCODE_SAVE_REFUSED, prepared.reasons);
+    return;
+  }
   let target: SaveTarget | null;
   try {
     // Preparation is complete, so use the normal Save As dialog. A directory

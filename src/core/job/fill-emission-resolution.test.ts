@@ -78,11 +78,12 @@ describe('isEmittableFillSegment', () => {
   it('filters after scan-offset translation when a reverse sweep collapses', () => {
     const candidate = group(
       reverseSegment({ x: 10.0012, y: 4 }, { x: 10.0004, y: 4 }),
-      2 * CALIBRATED_OFFSET_MM,
+      // Each row moves half the offset (ADR-052 Amendment 2).
+      4 * CALIBRATED_OFFSET_MM,
     );
     const gcode = grblStrategy.emit({ groups: [candidate] }, DEFAULT_DEVICE_PROFILE);
 
-    expect(planFillSweeps(candidate, 2 * CALIBRATED_OFFSET_MM)).toEqual([]);
+    expect(planFillSweeps(candidate, 4 * CALIBRATED_OFFSET_MM)).toEqual([]);
     expect(computeJobMotionBounds({ groups: [candidate] }, DEFAULT_DEVICE_PROFILE)).toBeNull();
     expect(gcode).not.toContain('kerfdesk:laser-off-motion');
     expect(gcode).not.toMatch(/S300\b/);

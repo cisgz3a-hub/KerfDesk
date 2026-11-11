@@ -8,12 +8,20 @@ describe.each(['web', 'electron'] as const)('%s transactional Save G-code', (pla
   it('does not select, create, or modify a final target when preparation fails', async () => {
     const target = targetMock();
     const pickFileForSave = vi.fn(async () => target.target);
-    vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+    const alert = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+    const ctx = context(platformId, createProject(), pickFileForSave);
 
-    await handleSaveGcode(context(platformId, createProject(), pickFileForSave));
+    await handleSaveGcode(ctx);
 
     expect(pickFileForSave).not.toHaveBeenCalled();
     expect(target.write).not.toHaveBeenCalled();
+    // Said once, as an error toast (ADR-656 Amendment 4).
+    expect(alert).not.toHaveBeenCalled();
+    expect(ctx.pushToast).toHaveBeenCalledExactlyOnceWith(
+      'Cannot save G-code: No output layers. Enable Output on at least one layer.',
+      'error',
+      { key: 'export-refused', details: [] },
+    );
   });
 
   it('writes only an exact prebuilt artifact from the destination-selection gesture', async () => {

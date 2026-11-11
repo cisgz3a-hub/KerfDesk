@@ -1,7 +1,7 @@
 // The Moshi USB store (ADR-705) driving the scripted Moshiboard: Frame-first
 // Start, a laser-off Frame, Start sending exactly the encoded programs, Abort
 // mid-run with the estop, and the factual refusals. Simulator only.
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   MoshiSimulator,
   type MoshiSimulatorScript,
@@ -80,6 +80,23 @@ describe('Moshi USB store', () => {
     const { store } = await connected();
     expect(store.getState().phase).toBe('idle');
     expect(store.getState().status).toBe(205);
+  });
+
+  it('releases the device when the first status read fails (C2 D1-P3-1)', async () => {
+    let closes = 0;
+    const link = {
+      ...connection(new MoshiSimulator()),
+      readStatus: async (): Promise<Uint8Array> => {
+        throw new Error('transfer stalled');
+      },
+      close: async () => {
+        closes += 1;
+      },
+    };
+    await useMoshiUsbStore.getState().connect(async () => link, { wait: async () => undefined });
+    expect(useMoshiUsbStore.getState().phase).toBe('disconnected');
+    expect(useMoshiUsbStore.getState().message).toBe('transfer stalled');
+    expect(closes).toBe(1);
   });
 
   it('refuses Start until a Frame of the same footprint completes', async () => {
@@ -178,6 +195,16 @@ describe('Moshi USB store', () => {
     await ctx.store.getState().frame(compiled());
     expect(ctx.store.getState().phase).toBe('disconnected');
     expect(ctx.store.getState().message).toContain('may still be running');
+  });
+
+  it('runs the job completion (variable advance) once the job finishes, not after a Frame', async () => {
+    const { store } = await connected();
+    const completed = vi.fn();
+    const job = { ...compiled(), completed };
+    await store.getState().frame(job);
+    expect(completed).not.toHaveBeenCalled();
+    await store.getState().start(job);
+    expect(completed).toHaveBeenCalledTimes(1);
   });
 
   it('Home runs MeerK40t’s move to 0,0', async () => {

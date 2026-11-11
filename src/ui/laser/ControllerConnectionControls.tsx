@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { selectControllerDriver } from '../../core/controllers';
 import type { MachineKind } from '../../core/scene';
 import { usePlatform } from '../app/platform-context';
 import { machineNoun } from '../machine/machine-labels';
@@ -32,6 +33,7 @@ import { controllerActionFailureHandler } from './report-controller-action-failu
 import { MachineNetworkConnect } from './MachineNetworkConnect';
 import { MoshiUsbPanel } from './MoshiUsbPanel';
 import { RuidaNetworkPanel } from './RuidaNetworkPanel';
+import { LihuiyuUsbPanel } from './LihuiyuUsbPanel';
 import { RECONNECT_DURING_JOB_TITLE, reconnectWithSavedProfile } from './reconnect-job-guard';
 import {
   useControllerStoppedResponding,
@@ -151,6 +153,7 @@ function MachineDetailsContent(): JSX.Element {
       <LaserModuleRow />
       <MachineNetworkConnect />
       <RuidaNetworkPanel />
+      <LihuiyuUsbPanel />
       <MoshiUsbPanel />
     </>
   );
@@ -181,6 +184,16 @@ function ConnectionHints(props: {
 }): JSX.Element | null {
   // The desktop app reaches a Ruida over the network (ADR-697); browsers cannot.
   const networkLink = usePlatform().ruidaNetwork !== undefined;
+  const kind = useStore((state) => state.project.device.controllerKind);
+  if (props.isFileOnlyProfile && selectControllerDriver(kind).fileFormat === 'egv') {
+    return (
+      <p className="lf-connection-hint" style={hintStyle}>
+        This K40 board speaks its own protocol: use Save G-code… to write an experimental .egv job,
+        or, in Chrome, Edge or the desktop app, use the experimental, simulator-tested USB
+        connection under Machine details.
+      </p>
+    );
+  }
   if (props.isFileOnlyProfile) {
     return (
       <p className="lf-connection-hint" style={hintStyle}>
