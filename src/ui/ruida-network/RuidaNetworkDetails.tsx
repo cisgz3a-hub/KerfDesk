@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import type { RuidaNetworkAdapter } from '../../platform/ruida-network-types';
-import { useStore } from '../state';
+import { currentLinkJobRequest } from '../state/link-job-request';
 import {
   RUIDA_NOT_QUALIFIED,
   ruidaStatusText,
@@ -104,8 +104,9 @@ function RuidaJobControls({ ruida }: { readonly ruida: RuidaNetworkState }): JSX
   const active = ruida.phase === 'framing' || ruida.phase === 'running' || ruida.phase === 'paused';
   const sending = ruida.sending !== null;
   const withJob = async (action: 'frame' | 'start'): Promise<void> => {
-    const { project, jobPlacement } = useStore.getState();
-    const prepared = await prepareRuidaNetworkJob(project, jobPlacement);
+    // Placement, the output scope and the variable advance, as Save .rd and
+    // G-code Start take them (C2 D2-P1-1, D2-P2-3).
+    const prepared = await prepareRuidaNetworkJob(currentLinkJobRequest());
     if (!prepared.ok) {
       setCompileError(prepared.messages.join(' '));
       return;

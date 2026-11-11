@@ -145,6 +145,17 @@ describe('frame first', () => {
     expect(store().positionMm).toEqual({ x: 12.5, y: -2 });
   });
 
+  it('runs the job completion (variable advance) once the job finishes', async () => {
+    const { sim } = await connected();
+    const completed = vi.fn();
+    const reviewed = { ...job(project()), completed };
+    await framed(sim, reviewed);
+    expect(completed).not.toHaveBeenCalled();
+    await store().start(reviewed);
+    await runWhile('running');
+    expect(completed).toHaveBeenCalledTimes(1);
+  });
+
   it('needs a new Frame once the job moves', async () => {
     const { sim } = await connected();
     await framed(sim, job(project(1)));

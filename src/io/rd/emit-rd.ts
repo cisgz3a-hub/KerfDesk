@@ -34,6 +34,9 @@ export type EmitRdResult =
       readonly advisories: ReadonlyArray<PreflightIssue>;
       /** Where the job runs, for the Ruida network Frame and Start (ADR-697). */
       readonly footprint: RdFootprint;
+      /** The shared job warnings G-code shows, added by the UI's
+       *  emitPreparedRdWithJobWarnings (ADR-705 Amendment 4). */
+      readonly jobWarnings?: ReadonlyArray<string>;
     }
   | { readonly ok: false; readonly messages: ReadonlyArray<string> };
 

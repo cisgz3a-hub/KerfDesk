@@ -18,6 +18,7 @@ import {
 } from '../../../core/scene';
 import { useStore } from '..';
 import { prepareMoshiUsbJob } from './moshi-usb-job';
+import { linkJobRequest } from '../link-job-request';
 
 const CHUCK: RotarySetup = {
   enabled: true,
@@ -72,7 +73,7 @@ const ABSOLUTE = {
 
 /** Rows of burn per distinct machine-Y mil, from the decoded programs. */
 async function burnRows(p: Project): Promise<{ rows: number; mils: number; advisories: string[] }> {
-  const result = await prepareMoshiUsbJob(p, ABSOLUTE);
+  const result = await prepareMoshiUsbJob(linkJobRequest(p, ABSOLUTE));
   if (!result.ok) throw new Error(result.messages.join(' '));
   const ys: number[] = [];
   for (const bytes of result.job.programs) {
