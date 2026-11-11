@@ -20,6 +20,8 @@ import type { Vec2 } from '../../scene';
 import type { RdReferencePoint } from './rd-file-commands';
 import { writeRdJob } from './rd-job-writer';
 import { planRdMotion, type RdMotionPart } from './rd-motion-plan';
+import { splitRdPartsBySurfaceSpeed } from './rd-rotary-feed';
+import { rotaryFeedMatchFor } from '../../output/rotary-surface-feed';
 import {
   isCoord35Encodable,
   mmPerMinToUmPerSec,
@@ -35,6 +37,8 @@ export type RdEncodeError =
   /** A router layer: .rd is a laser job format (controller audit 2026-09-25 CN-3). */
   | { readonly kind: 'cnc-unsupported'; readonly layerId: string }
   | { readonly kind: 'too-many-layers'; readonly count: number }
+  /** A Y rotary needs more surface-speed parts than a .rd file holds (ADR-127 Amd 5). */
+  | { readonly kind: 'rotary-too-many-speeds'; readonly maxParts: number }
   | {
       readonly kind: 'coordinate-out-of-range';
       readonly path: string;
@@ -56,6 +60,8 @@ export type RdEncodeResult =
       readonly bytes: Uint8Array;
       /** The moves the bytes command, per part, for the export's checks. */
       readonly motion: ReadonlyArray<RdMotionPart>;
+      /** On a scaled Y rotary: the dose range left by the speed classes (ADR-127 Amd 5). */
+      readonly rotaryDose?: { readonly minDose: number; readonly maxDose: number };
     }
   | { readonly ok: false; readonly error: RdEncodeError };
 
@@ -68,7 +74,7 @@ const MAX_RD_LAYERS = 100;
 
 export function encodeRdJob(
   job: Job,
-  _device: DeviceProfile,
+  device: DeviceProfile,
   options: RdEncodeOptions = {},
 ): RdEncodeResult {
   const cutGroups: CutGroup[] = [];
@@ -89,11 +95,42 @@ export function encodeRdJob(
   }
   const representationError = validateRepresentation(cutGroups);
   if (representationError !== null) return { ok: false, error: representationError };
-  const motion = planRdMotion(cutGroups);
+  const planned = planRdMotion(cutGroups);
   // Every segment collapsed to a single µm point: there is nothing to burn.
-  if (motion.length === 0) return { ok: false, error: { kind: 'empty-job' } };
-  const payload = writeRdJob(motion, rdReferencePointFor(options.jobOrigin));
-  return { ok: true, bytes: swizzleBytes(payload), motion };
+  if (planned.length === 0) return { ok: false, error: { kind: 'empty-job' } };
+  const rotary = rotaryMotion(job, device, planned);
+  if ('error' in rotary) return { ok: false, error: rotary.error };
+  const payload = writeRdJob(rotary.motion, rdReferencePointFor(options.jobOrigin));
+  return {
+    ok: true,
+    bytes: swizzleBytes(payload),
+    motion: rotary.motion,
+    ...(rotary.dose === undefined ? {} : { rotaryDose: rotary.dose }),
+  };
+}
+
+type RotaryMotion =
+  | {
+      readonly motion: ReadonlyArray<RdMotionPart>;
+      readonly dose?: { readonly minDose: number; readonly maxDose: number };
+    }
+  | { readonly error: RdEncodeError };
+
+// ADR-127 Amd 5: on a scaled Y rotary each layer splits into parts by the
+// speed that moves the part's surface at the layer speed; elsewhere the plan
+// is unchanged, byte for byte.
+function rotaryMotion(
+  job: Job,
+  device: DeviceProfile,
+  planned: ReadonlyArray<RdMotionPart>,
+): RotaryMotion {
+  const match = rotaryFeedMatchFor(job, device.maxFeed);
+  if (match === undefined) return { motion: planned };
+  const split = splitRdPartsBySurfaceSpeed(planned, match, MAX_RD_LAYERS);
+  if (split === null) return { error: { kind: 'rotary-too-many-speeds', maxParts: MAX_RD_LAYERS } };
+  const speedError = speedRepresentationError(split.parts.map((part) => part.group));
+  if (speedError !== null) return { error: speedError };
+  return { motion: split.parts, dose: { minDose: split.minDose, maxDose: split.maxDose } };
 }
 
 /** Audit RU-2 (lead's product decision): the reference-point mode follows the
@@ -113,7 +150,8 @@ export function rdReferencePointFor(jobOrigin: JobOriginPlacement | undefined): 
   }
 }
 
-function validateRepresentation(groups: ReadonlyArray<CutGroup>): RdEncodeError | null {
+/** A group speed a .rd file cannot carry, or null. */
+function speedRepresentationError(groups: ReadonlyArray<CutGroup>): RdEncodeError | null {
   for (const group of groups) {
     const speed = mmPerMinToUmPerSec(group.speed);
     if (!isCoord35Encodable(speed) || speed < 0) {
@@ -125,6 +163,14 @@ function validateRepresentation(groups: ReadonlyArray<CutGroup>): RdEncodeError 
         maxUmPerSec: RUIDA_COORD35_MAX,
       };
     }
+  }
+  return null;
+}
+
+function validateRepresentation(groups: ReadonlyArray<CutGroup>): RdEncodeError | null {
+  const speedError = speedRepresentationError(groups);
+  if (speedError !== null) return speedError;
+  for (const group of groups) {
     for (let segmentIndex = 0; segmentIndex < group.segments.length; segmentIndex += 1) {
       const segment = group.segments[segmentIndex];
       if (segment === undefined) continue;

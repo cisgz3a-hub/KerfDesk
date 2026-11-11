@@ -24,4 +24,6 @@ export type MoshiUsbJob = {
   readonly advisories: ReadonlyArray<string>;
   /** The profile's framing feed (mm/min), for the Frame program. */
   readonly framingFeedMmPerMin: number;
+  /** Runs once the board reports the job finished (variable advance). */
+  readonly completed?: () => void;
 };

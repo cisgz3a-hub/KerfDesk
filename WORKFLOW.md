@@ -3912,7 +3912,7 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 4. **Discard** deletes only the capsule. It does not stop, reset, reconnect, move,
    or modify the current job.
 5. Recovery storage/quota/schema failure shows a nonblocking warning. Current Start
-   and the status-bar PWA Update button (ADR-227) remain available.
+   and the status-bar PWA Update button (ADR-227) remain available (the Update button waits while machine work runs, ADR-227 Amendment 2).
 
 #### Error — project changed since the run
 1. Exact capsules do not depend on the current project and therefore cannot fail
@@ -10158,7 +10158,7 @@ Selecting **Download update** immediately shows that the request is starting. Th
 
 #### Edge case - browser build
 
-The web app keeps its status bar **Update** button (ADR-227, ADR-228); applying it reloads the page.
+The web app keeps its status bar **Update** button (ADR-227, ADR-228); applying it reloads the page. While machine work runs it reads **Update after job** and does nothing, as the toolbar button does, because a reload would stop a job streaming from the tab (ADR-227 Amendment 2).
 
 1. On each packaged unsigned Preview launch, KerfDesk makes at most one anonymous
    metadata request to `https://dl.kerfdesk.com/desktop/previews/latest.json`.

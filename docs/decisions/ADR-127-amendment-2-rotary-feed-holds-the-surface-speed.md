@@ -65,8 +65,9 @@ material, as it is on a flat bed.
 
 Out of scope, unchanged:
 
-- **Ruida `.rd`.** It has a per-layer speed, not a per-move one, and it uses the controller's own
-  rotary settings. Not verified, as in D3.
+- **Ruida `.rd`.** It has a per-layer speed, not a per-move one. _Corrected by Amendment 5:_ the
+  export applies KerfDesk's own Y scale (`machineSpaceJob`), not the controller's rotary settings,
+  so this was not out of scope. Amendment 5 matches its speeds.
 - **Scan offset** (ADR-052). It is still chosen from the layer speed.
 - **A dedicated A/Z rotary axis** (X8-P2-1, built separately). It writes the turn under another
   letter and needs its own feed rule for its units.
