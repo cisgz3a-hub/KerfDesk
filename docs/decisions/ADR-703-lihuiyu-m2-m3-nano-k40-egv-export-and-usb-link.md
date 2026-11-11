@@ -95,6 +95,13 @@ MeerK40t at `d511944e08788e88077727f682957759884ff5ca`, read for this decision (
    The panel body loads lazily; the encoder, link and `.egv` writer stay out of the boot bundle
    (`vite.config.ts`).
 
+6. **Opening the board.** Machine details shows the K40 panel where the platform has ADR-702's
+   `usbLink` (Chromium browsers and the desktop app) and the profile's driver carries
+   `LIHUIYU_USB_CAPABILITIES`. Connect shows the chooser limited to `CH341_USB_FILTER`, then opens
+   the bridge with `openCh341Epp(session, { status: 'bulk' })` (MeerK40t reads Lihuiyu status by
+   bulk). A Windows driver failure (`UsbLinkOpenError` `'driver'`) points to Help → Can't connect?,
+   which has the WinUSB steps.
+
 ### Evidence
 
 - `lhy-protocol.test.ts`: speed codes against MeerK40t's vendor table rows (M2, B2, M1, A, M) and
@@ -104,10 +111,13 @@ MeerK40t at `d511944e08788e88077727f682957759884ff5ca`, read for this decision (
   travel dark and the head back at its start; diagonals within one step of the true line; image
   rows; AT1 powers; refusals; determinism; the Frame decodes with the beam never on.
 - `emit-egv.test.ts`: a project through `prepareOutput` to an `.egv` file, read back to the square.
-- `lihuiyu-usb-store.test.ts`: the real store against `lihuiyu-simulator.ts` (a simulated M2 Nano
-  behind a USB session: EPP framing, CRC check, a small buffer, FINISH after the program ends):
+- `lihuiyu-usb-store.test.ts`: the real store, opener and `openCh341Epp` against
+  `lihuiyu-simulator.ts` (a simulated M2 Nano behind ADR-702's fake USB device: EPP framing, CRC
+  check, a small buffer, FINISH after the program ends): EPP init and version read; 0xA6 framing;
   Home and Frame-first refusals; Frame with the beam off, then Start to the board's finish; Start →
-  Pause → Resume → Abort; jog; checksum resend; a pulled cable.
+  Pause → Resume → Abort; jog; checksum resend; a pulled cable; the WinUSB hint.
+- `LihuiyuUsbPanel.test.tsx`: the panel mounts only with a USB link and the Lihuiyu link
+  capability, and its buttons run Connect, Home, Frame and Start against the simulator.
 
 None of this is evidence that a real Lihuiyu board accepts these packets or burns these jobs.
 

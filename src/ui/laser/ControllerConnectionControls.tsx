@@ -31,6 +31,7 @@ import { DeviceSetupControls } from './device-setup';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { MachineNetworkConnect } from './MachineNetworkConnect';
 import { RuidaNetworkPanel } from './RuidaNetworkPanel';
+import { LihuiyuUsbPanel } from './LihuiyuUsbPanel';
 import { RECONNECT_DURING_JOB_TITLE, reconnectWithSavedProfile } from './reconnect-job-guard';
 import {
   useControllerStoppedResponding,
@@ -149,6 +150,7 @@ function MachineDetailsContent(): JSX.Element {
       <LaserModuleRow />
       <MachineNetworkConnect />
       <RuidaNetworkPanel />
+      <LihuiyuUsbPanel />
     </>
   );
 }
@@ -183,7 +185,8 @@ function ConnectionHints(props: {
     return (
       <p className="lf-connection-hint" style={hintStyle}>
         This K40 board speaks its own protocol: use Save G-code… to write an experimental .egv job,
-        or use the experimental, simulator-tested USB connection under Machine details.
+        or, in Chrome, Edge or the desktop app, use the experimental, simulator-tested USB
+        connection under Machine details.
       </p>
     );
   }

@@ -10,35 +10,15 @@
 // it is full. Every status read runs one queued packet through the decoder,
 // unless the board is paused, so time moves only as the host polls. When the
 // board enters its finished state ("FNSE" ends program mode; Home too) with
-// the FIFO empty, the next read answers FINISH once. Realtime packets act at once: "PN" toggles
-// pause (driver.py pause/resume) and a lone "I" resets — the FIFO is dropped.
+// the FIFO empty, the next read answers FINISH once. Realtime packets act at
+// once: "PN" toggles pause (driver.py pause/resume) and a lone "I" resets —
+// the FIFO is dropped. `fakeDevice()` puts the board behind ADR-702's scripted
+// fake USB device, so tests run the real CH341 EPP driver against it.
 
 import { lhyCrc, LHY_STATUS } from '../../core/controllers/lihuiyu/lhy-packet';
+import type { UsbLinkSession } from '../../core/controllers/usb/usb-link-session';
+import { createFakeUsbDevice, type FakeUsbDevice } from '../usb/fake-usb-device';
 import { LhyDecoder } from './lihuiyu-decoder';
-
-export type SimUsbSetup = {
-  readonly requestType: 'vendor' | 'standard' | 'class';
-  readonly recipient: 'device' | 'interface' | 'endpoint' | 'other';
-  readonly request: number;
-  readonly value: number;
-  readonly index: number;
-};
-
-/** The USB session shape of ADR-702's UsbLinkSession. */
-export type SimUsbSession = {
-  readonly info: {
-    readonly vendorId: number;
-    readonly productId: number;
-    readonly productName?: string;
-  };
-  readonly controlTransferOut: (setup: SimUsbSetup, data?: Uint8Array) => Promise<void>;
-  readonly controlTransferIn: (setup: SimUsbSetup, length: number) => Promise<Uint8Array>;
-  readonly transferOut: (endpointNumber: number, bytes: Uint8Array) => Promise<void>;
-  readonly transferIn: (endpointNumber: number, length: number) => Promise<Uint8Array>;
-  readonly onDisconnect: (handler: () => void) => () => void;
-  readonly close: () => Promise<void>;
-  readonly forget: () => Promise<void>;
-};
 
 const EPP_DATA = 0xa6;
 const EPP_ADDRESS = 0xa7;
@@ -71,7 +51,19 @@ export class LihuiyuSimulator {
     this.capacity = options.fifoCapacity ?? 4;
   }
 
-  readonly session: SimUsbSession = {
+  /** The board behind ADR-702's fake USB device, which records every call. */
+  fakeDevice(): FakeUsbDevice {
+    const { session } = this;
+    return createFakeUsbDevice({
+      info: session.info,
+      controlOut: (setup, data) => session.controlTransferOut(setup, data),
+      controlIn: (setup, length) => session.controlTransferIn(setup, length),
+      transferOut: (endpoint, data) => session.transferOut(endpoint, data),
+      transferIn: (endpoint, length) => session.transferIn(endpoint, length),
+    });
+  }
+
+  readonly session: UsbLinkSession = {
     info: { vendorId: 0x1a86, productId: 0x5512, productName: 'USB2.0-Print (simulated)' },
     controlTransferOut: async (setup) => {
       this.live();

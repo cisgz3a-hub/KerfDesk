@@ -1,15 +1,18 @@
 // The Lihuiyu USB store against the simulated board behind its USB session
-// (ADR-703): Home, Frame, Start, Pause, Resume and Abort, and the failures a
+// (ADR-703), through the real opener and CH341 EPP driver over ADR-702's fake
+// USB device: Home, Frame, Start, Pause, Resume and Abort, and the failures a
 // link can meet. Simulator-tested only; nothing here touches hardware.
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { joinCollinear } from '../../../__fixtures__/controllers/lihuiyu-decoder';
-import { lihuiyuSimulatorConnection } from '../../../__fixtures__/controllers/lihuiyu-sim-connection';
 import { LihuiyuSimulator } from '../../../__fixtures__/controllers/lihuiyu-simulator';
 import { encodeLhyJob, lhyBoardSetting } from '../../../core/controllers/lihuiyu/lhy-encoder';
 import { lhyFootprint } from '../../../core/controllers/lihuiyu/lhy-frame';
 import type { CutGroup } from '../../../core/job';
+import type { FakeUsbDevice } from '../../../__fixtures__/usb/fake-usb-device';
+import { UsbLinkOpenError, type UsbLinkAdapter } from '../../../platform/usb-link-types';
 import { LIHUIYU_FRAME_FIRST, LIHUIYU_HOME_FIRST } from './lihuiyu-usb-messages';
+import { LIHUIYU_DRIVER_HELP, lihuiyuUsbOpener } from './lihuiyu-usb-opener';
 import { resetLihuiyuUsbStoreForTests, useLihuiyuUsbStore } from './lihuiyu-usb-store';
 import type { LihuiyuUsbJob } from './lihuiyu-usb-types';
 
@@ -65,8 +68,19 @@ function zigzagJob(rows = 12): LihuiyuUsbJob {
   };
 }
 
+let device: FakeUsbDevice | null = null;
+
+/** Connects the store to the simulated board through the chooser, the opener and the EPP driver. */
+async function connectTo(simulator: LihuiyuSimulator): Promise<FakeUsbDevice> {
+  const fake = simulator.fakeDevice();
+  device = fake;
+  const adapter: UsbLinkAdapter = { request: async () => fake.session, reopen: async () => null };
+  await store().connect(lihuiyuUsbOpener(adapter), tick);
+  return fake;
+}
+
 async function connectedHomed(simulator = new LihuiyuSimulator()): Promise<LihuiyuSimulator> {
-  await store().connect(async () => lihuiyuSimulatorConnection(simulator), tick);
+  await connectTo(simulator);
   expect(store().phase).toBe('idle');
   await store().home();
   expect(store().head).toEqual({ x: 0, y: 0 });
@@ -78,7 +92,7 @@ afterEach(() => resetLihuiyuUsbStoreForTests());
 describe('Lihuiyu USB store', () => {
   it('connects, reads status, and refuses Absolute work before Home and Start before Frame', async () => {
     const simulator = new LihuiyuSimulator();
-    await store().connect(async () => lihuiyuSimulatorConnection(simulator), tick);
+    await connectTo(simulator);
     expect(store().phase).toBe('idle');
     expect(store().statusCode).toBe(206);
     const job = zigzagJob();
@@ -167,14 +181,40 @@ describe('Lihuiyu USB store', () => {
   });
 
   it('reports a pulled cable as a closed link', async () => {
-    const simulator = await connectedHomed();
+    await connectedHomed();
     const job = zigzagJob(16);
     await store().frame(job);
     const started = store().start(job);
     await until(() => (store().sending?.sent ?? 0) >= 2, 'two packets');
-    simulator.unplug();
+    device?.unplug();
     await started;
     expect(store().phase).toBe('disconnected');
     expect(store().message).toMatch(/unplugged/);
+  });
+
+  it('opens the CH341 in EPP mode, reads its version, and frames every packet with 0xA6', async () => {
+    const simulator = new LihuiyuSimulator();
+    const fake = await connectTo(simulator);
+    const [init, version] = fake.calls;
+    expect(init).toMatchObject({ kind: 'control-out', setup: { request: 0xb1, value: 0x0102 } });
+    expect(version).toMatchObject({ kind: 'control-in', setup: { request: 0x5f } });
+    await store().home();
+    const packetWrites = fake.writes().filter((bytes) => bytes.length > 1);
+    expect(packetWrites).toHaveLength(1);
+    expect(packetWrites[0]?.[0]).toBe(0xa6);
+    expect(packetWrites[0]?.[32]).toBe(0xa6);
+    expect(packetWrites[0]).toHaveLength(34);
+  });
+
+  it('points a Windows driver failure at the WinUSB help', async () => {
+    const adapter: UsbLinkAdapter = {
+      request: async () => {
+        throw new UsbLinkOpenError('driver', 'The board could not be claimed.');
+      },
+      reopen: async () => null,
+    };
+    await store().connect(lihuiyuUsbOpener(adapter), tick);
+    expect(store().phase).toBe('disconnected');
+    expect(store().message).toContain(LIHUIYU_DRIVER_HELP);
   });
 });
