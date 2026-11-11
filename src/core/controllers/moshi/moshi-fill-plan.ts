@@ -32,7 +32,8 @@ export function planFillGroupSteps(group: FillGroup, device: DeviceProfile): Mos
   if ((group.fillStyle ?? 'scanline') === 'offset') {
     let head: MoshiPoint | null = null;
     for (let pass = 0; pass < passes; pass += 1) {
-      for (const segment of group.segments) head = planPolyline(steps, segment.polyline, head, fires);
+      for (const segment of group.segments)
+        head = planPolyline(steps, segment.polyline, head, fires);
     }
     return steps;
   }

@@ -9,6 +9,7 @@
 // them. Notes only: the bytes do not change and nothing is refused.
 
 import type { Group, Job } from '../../job';
+import { roundToTenth } from '../../util/rounding';
 
 type LaserGroup = Exclude<Group, { readonly kind: 'cnc' }>;
 
@@ -23,7 +24,7 @@ function tabNotes(groups: ReadonlyArray<LaserGroup>): string[] {
     if (group.kind !== 'cut' || group.tabSpanPowerPercent === undefined || !(group.power > 0))
       continue;
     notes.push(
-      `Layer ${group.layerId}: its burned tabs are set to ${round(group.tabSpanPowerPercent)} % of the cut, but a Moshiboard has no power control, so they burn at the machine's dial power and cut through. Set the tab power to 0 % to leave the tabs uncut.`,
+      `Layer ${group.layerId}: its burned tabs are set to ${roundToTenth(group.tabSpanPowerPercent)} % of the cut, but a Moshiboard has no power control, so they burn at the machine's dial power and cut through. Set the tab power to 0 % to leave the tabs uncut.`,
     );
   }
   return notes;
@@ -33,7 +34,7 @@ function mixedPowerNotes(groups: ReadonlyArray<LaserGroup>): string[] {
   const powers = new Set<number>();
   for (const group of groups) {
     if (group.kind === 'cut' && group.tabSpanPowerPercent !== undefined) continue;
-    if (group.power > 0) powers.add(round(group.power));
+    if (group.power > 0) powers.add(roundToTenth(group.power));
   }
   if (powers.size < 2) return [];
   const listed = [...powers].sort((a, b) => a - b).map((power) => `${power} %`);
@@ -48,8 +49,4 @@ function airNotes(groups: ReadonlyArray<LaserGroup>): string[] {
   return [
     `Air assist is on for layer ${layers.join(', ')}, but a Moshiboard has no air output KerfDesk can switch. Run the air from the machine.`,
   ];
-}
-
-function round(value: number): number {
-  return Math.round(value * 10) / 10;
 }

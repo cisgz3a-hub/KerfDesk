@@ -23,8 +23,22 @@ function fill(overrides: Partial<FillGroup> = {}): FillGroup {
     airAssist: false,
     overscanMm: 0,
     segments: [
-      { polyline: [{ x: 50, y: 10 }, { x: 70, y: 10 }], closed: false, reverse: false },
-      { polyline: [{ x: 70, y: 11 }, { x: 50, y: 11 }], closed: false, reverse: true },
+      {
+        polyline: [
+          { x: 50, y: 10 },
+          { x: 70, y: 10 },
+        ],
+        closed: false,
+        reverse: false,
+      },
+      {
+        polyline: [
+          { x: 70, y: 11 },
+          { x: 50, y: 11 },
+        ],
+        closed: false,
+        reverse: true,
+      },
     ],
     ...overrides,
   };
