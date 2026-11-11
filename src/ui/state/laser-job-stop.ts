@@ -20,7 +20,14 @@ import type { OwnedResetSettingsRefs } from './laser-owned-reset-settings';
 import { clearCncLiveCaps } from './detected-settings-action';
 import { isGrblFamilyDriver, runGrblDisconnectTransaction } from './laser-disconnect-transaction';
 import { reportedWorkOffsetMm } from './infer-machine-position';
-import { streamResetRecord, type JobStopReason, type JobStopRequest } from './job-stop-request';
+import {
+  streamResetRecord,
+  type JobStopReason,
+  type JobStopRequest,
+  type RotaryStartTurn,
+} from './job-stop-request';
+import { rotaryOutputAxis } from '../../core/job/rotary-job';
+import { useStore } from './store';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { recordControllerRecoveryReset } from './laser-controller-operation';
 import {
@@ -348,6 +355,10 @@ async function stopWithOwnedReset(
             reason,
             streamerEpoch: state.streamerEpoch,
             ...g92OriginAtStop(state),
+            // Read here too: the stop outcome clears the job's own kind.
+            ...(state.activeJobMachineKind === null
+              ? {}
+              : { jobMachineKind: state.activeJobMachineKind }),
           },
         }),
     ...(state.streamer === null
@@ -367,13 +378,22 @@ async function stopWithOwnedReset(
   return { airOffSent: true, quickStop: 'none' };
 }
 
-function g92OriginAtStop(state: LaserState): Pick<JobStopRequest, 'originAtStopMm'> {
-  if (!state.workOriginActive || state.workOriginSource !== 'g92') return {};
+function g92OriginAtStop(
+  state: LaserState,
+): Pick<JobStopRequest, 'originAtStopMm' | 'originMachineZeroEpoch' | 'rotaryStartTurn'> {
+  const turn = rotaryStartTurnAtStop(state);
+  const rotary = turn === null ? {} : { rotaryStartTurn: turn };
+  if (!state.workOriginActive || state.workOriginSource !== 'g92') return rotary;
   const offset = reportedWorkOffsetMm(
     state.wcoCache,
     state.controllerSettings?.reportInches === true,
   );
-  return offset === null ? {} : { originAtStopMm: { x: offset.x, y: offset.y } };
+  if (offset === null) return rotary;
+  return {
+    ...rotary,
+    originAtStopMm: { x: offset.x, y: offset.y },
+    originMachineZeroEpoch: state.machineZeroEpoch ?? 0,
+  };
 }
 
 // A quickstop that may have reached the controller leaves homing and position
@@ -455,4 +475,18 @@ async function writeStopLinesAtOnce(
     airOffSent: lines.some((line, index) => sent(index) && isAirOffLine(line)),
     allSent: lines.every((_line, index) => sent(index)),
   };
+}
+
+// ADR-695 Amendment 1: the turn a dedicated-axis rotary job started from is
+// its axis's work offset, because the job opened with G92 A0 (or Z0).
+function rotaryStartTurnAtStop(state: LaserState): RotaryStartTurn | null {
+  const { device, machine } = useStore.getState().project;
+  const axis = rotaryOutputAxis(device, machine);
+  const wco = state.wcoCache;
+  if (axis === null || wco === null) return null;
+  const value =
+    axis === 'A' ? wco.a : wco.z * (state.controllerSettings?.reportInches === true ? 25.4 : 1);
+  return value === undefined || !Number.isFinite(value)
+    ? null
+    : { axis, machine: value, machineZeroEpoch: state.machineZeroEpoch ?? 0 };
 }

@@ -51,7 +51,9 @@ function opened(name: string): { readonly project: Project; readonly toasts: str
   const toasts: string[] = [];
   const result = deserializeProject(fileText(name));
   if (result.kind !== 'ok') throw new Error(`${name} did not open: ${JSON.stringify(result)}`);
-  expect(result.migratedFrom, name).toBeUndefined();
+  // 1.0.29 wrote schema 21. Schema 22 (ADR-694) only adds an optional rotary
+  // taper, so step 21 changes nothing in these files.
+  expect(result.migratedFrom, name).toBe(21);
   expect(result.oldProjectBurn, name).toBeUndefined();
   const done = completeNativeProjectOpen(
     {

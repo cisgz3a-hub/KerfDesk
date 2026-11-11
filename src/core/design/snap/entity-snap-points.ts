@@ -10,6 +10,7 @@ import type { Vec2 } from '../../scene';
 import { entityToPolylines } from '../entity-geometry';
 import type { SketchEntity } from '../sketch-entity';
 import type { SnapTarget } from './snap-kinds';
+import { midpoint } from '../../geometry/point-math';
 
 const DEG_TO_RAD = Math.PI / 180;
 const QUADRANT_ANGLES_DEG: ReadonlyArray<number> = [0, 90, 180, 270];
@@ -143,10 +144,6 @@ function pathPoints(
 
 function target(kind: SnapTarget['kind'], atMm: Vec2, entityId: string): SnapTarget {
   return { kind, atMm, entityId };
-}
-
-function midpoint(a: Vec2, b: Vec2): Vec2 {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
 
 function polar(centre: Vec2, radiusMm: number, deg: number): Vec2 {

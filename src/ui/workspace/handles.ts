@@ -286,8 +286,3 @@ function inverseVectorToLocalScaleFrame(vector: Vec2, t: Transform): Vec2 {
   const ym = t.mirrorY ? -yr : yr;
   return { x: xm, y: ym };
 }
-
-// Round-trip helper for tests: maps an object-local point through transform.
-export function applyForwardLocal(t: Transform, local: Vec2): Vec2 {
-  return applyTransform(local, t);
-}

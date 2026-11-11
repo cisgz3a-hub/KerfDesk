@@ -1,0 +1,45 @@
+{
+  "measuredOn": "1.0.29",
+  "burns": {
+    "logo.svg": {
+      "width": 30,
+      "height": 29.8,
+      "minX": 185,
+      "minY": 185.1,
+      "length": 8015.11,
+      "dose": 2404533
+    },
+    "plate.svg": {
+      "width": 60,
+      "height": 19.9,
+      "minX": 230,
+      "minY": 130,
+      "length": 13140,
+      "dose": 3942000
+    },
+    "styled.svg": {
+      "width": 30,
+      "height": 29.8,
+      "minX": 305,
+      "minY": 65.1,
+      "length": 8135.108,
+      "dose": 2440532.4
+    },
+    "workaround.svg": {
+      "width": 30,
+      "height": 29.8,
+      "minX": 365,
+      "minY": 5.1,
+      "length": 7055.108,
+      "dose": 2116532.4
+    },
+    "whole-job": {
+      "width": 210,
+      "height": 209.8,
+      "minX": 185,
+      "minY": 5.1,
+      "length": 36345.326,
+      "dose": 10903597.8
+    }
+  }
+}

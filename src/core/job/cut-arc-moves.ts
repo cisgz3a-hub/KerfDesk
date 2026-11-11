@@ -38,6 +38,7 @@ import {
   type Vec2,
 } from '../scene';
 import type { CutArcMoves, CutSegment, Job } from './job';
+import { polylineLength } from '../geometry/point-math';
 
 /** Preview sampling of an arc: chords within 0.01 mm, below what a screen
  * shows at working zoom and finer than the 0.025 mm chords it replaces. */
@@ -134,7 +135,7 @@ export function withCutArcMoves<T extends CutSegment>(
     moves,
     from,
     pointCount: segment.polyline.length,
-    lengthMm: polylineLengthMm(segment.polyline),
+    lengthMm: polylineLength(segment.polyline),
   };
   return { ...segment, arcMoves };
 }
@@ -151,7 +152,7 @@ export function validCutArcMoves(segment: CutSegment): ReadonlyArray<ArcMove> | 
   if (first.x !== stored.from.x || first.y !== stored.from.y) return null;
   if (polyline.length !== stored.pointCount) return null;
   const slack = FINGERPRINT_LENGTH_ABSOLUTE_MM + stored.lengthMm * FINGERPRINT_LENGTH_RELATIVE;
-  if (!(Math.abs(polylineLengthMm(polyline) - stored.lengthMm) <= slack)) return null;
+  if (!(Math.abs(polylineLength(polyline) - stored.lengthMm) <= slack)) return null;
   return arcMovesConnect(first, stored.moves, last) ? stored.moves : null;
 }
 
@@ -413,14 +414,4 @@ function uniqueVertexIndex(
     byY.set(point.y, byY.has(point.y) ? -1 : index);
   }
   return byX;
-}
-
-function polylineLengthMm(polyline: ReadonlyArray<Vec2>): number {
-  let length = 0;
-  for (let index = 1; index < polyline.length; index += 1) {
-    const a = polyline[index - 1] as Vec2;
-    const b = polyline[index] as Vec2;
-    length += Math.hypot(b.x - a.x, b.y - a.y);
-  }
-  return length;
 }

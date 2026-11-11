@@ -8,11 +8,13 @@
 import type { CameraAdapter, CameraBridgeAdapter } from '../../../platform/types';
 import {
   loadLastCameraSource,
-  loadPhoneCamera,
   loadPreferredCameraId,
-  loadRtspCameraUrl,
   type LastCameraSource,
 } from '../../state/camera-preference-storage';
+import {
+  rememberedPhoneCamera,
+  rememberedRtspCameraUrl,
+} from '../../state/remembered-camera-addresses';
 import { useCameraStore, type MachineCameraState } from '../../state/camera-store';
 import type { ActiveCameraSource } from '../frame-source';
 import { phoneSnapshotUrl } from '../phone-camera-address';
@@ -80,15 +82,16 @@ export async function startRememberedCamera(
   }
 }
 
-// A network camera from its remembered, login-free address (ADR-116, ADR-448).
+// A network camera from its remembered address (ADR-116, ADR-448): an RTSP
+// login only from the desktop's secure storage (ADR-692).
 async function startAddressCamera(kind: 'rtsp' | 'phone', deps: CameraStartDeps): Promise<void> {
   if (!deps.bridgeAvailable) return;
   if (kind === 'rtsp') {
-    const url = loadRtspCameraUrl();
+    const url = await rememberedRtspCameraUrl();
     if (url !== null) await useCameraStore.getState().startRtspSource(deps.bridge, url);
     return;
   }
-  const phone = loadPhoneCamera();
+  const phone = await rememberedPhoneCamera();
   const url = phone === null ? null : phoneSnapshotUrl(phone.app, phone.address);
   if (url !== null) await useCameraStore.getState().startSnapshotSource(deps.bridge, url);
 }

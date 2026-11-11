@@ -6,24 +6,6 @@ import {
   type RecoveryRepositorySnapshot,
 } from './recovery';
 
-/** React bridge for the sealed recovery repository. Reading this snapshot is
- * observational only; opening recovery UI never claims or activates a run. */
-export function useRecoveryRepositorySnapshot(
-  repository: RecoveryRepository = recoveryRepository,
-): RecoveryRepositorySnapshot {
-  const snapshot = useSyncExternalStore(
-    repository.subscribe,
-    repository.getSnapshot,
-    repository.getSnapshot,
-  );
-
-  useEffect(() => {
-    void repository.initialize();
-  }, [repository]);
-
-  return snapshot;
-}
-
 /** The same bridge, narrowed to the slots a component renders. A running job
  * publishes a new snapshot at every progress checkpoint; a consumer that does
  * not show active-run progress re-renders only when its slice changes

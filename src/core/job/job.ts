@@ -15,6 +15,7 @@ import type { CncCompilationSidecar } from './cnc-compilation-sidecar-types';
 export type { CncCompilationSidecar } from './cnc-compilation-sidecar-types';
 import type { CutArcMoves, LeadContour } from './cut-segment-geometry';
 export type { CutArcMoves } from './cut-segment-geometry';
+import type { RotaryTaperProfile } from './rotary-taper-profile';
 
 import { representedCncCoordinateMm } from '../cnc/coordinate-representation';
 import { sampleCircularArcPoints } from '../geometry/arc-representation';
@@ -215,6 +216,9 @@ export type RasterGroup = {
   // degrees counter-clockwise about the machine origin (raster-scan-frame.ts).
   // Absent means along machine X, exactly as before.
   readonly scanAngleDeg?: number;
+  // ADR-699: present only on the raster a ramped Fill burns as, so Job Review
+  // names it a Fill. Absent on every image group, so their output is unchanged.
+  readonly fillRamp?: true;
 };
 
 export type RasterRowProviderOrder = 'ascending-y' | 'descending-y';
@@ -289,6 +293,9 @@ export type CncPath3dPass = {
   readonly stayDownLink?: true;
   // ADR-489: see CncContourPass.airFloorZMm.
   readonly airFloorZMm?: number;
+  // ADR-421 Amendment 2: a level the finishing bit cuts where relief roughing
+  // did not reach, ahead of its finishing rows. Provenance only.
+  readonly reliefStepDown?: true;
 };
 
 export type CncArcPass = {
@@ -457,6 +464,12 @@ export type JobDiagnostic =
   // emitted G-code precision. Keep this advisory so microscopic fill loss is
   // visible without turning it into a Start, Frame, or export refusal.
   | { readonly kind: 'fill-collapsed-at-precision'; readonly layerName: string }
+  // ADR-699: a ramped Fill's grid would need more than its cell limit, so it
+  // burns flat, as it would without a ramp.
+  | { readonly kind: 'fill-ramp-too-large'; readonly layerName: string; readonly cells: number }
+  // ADR-699 Amd 1: a ramped Fill asks for a scan angle, cross-hatch or an angle
+  // change per pass, but on a rotary it scans every pass along X.
+  | { readonly kind: 'fill-ramp-scan-angle-rotary'; readonly layerName: string }
   | {
       readonly kind: 'raster-source-luma-mismatch';
       readonly layerName: string;
@@ -545,31 +558,9 @@ export type CncStepoverCompilationEvidence = {
   readonly stepoverPercent: number;
 };
 
-/** Materialized planning grid and finishing geometry for one relief source. */
-export type CncReliefPlanningEvidence = {
-  readonly layerId: string;
-  /** Projection target identity in the actual ordered job, independent of display filenames. */
-  readonly targetObjectId?: string;
-  readonly source: string;
-  readonly stage: 'roughing' | 'finishing' | 'rest-finishing' | 'projection';
-  readonly predecessorToolId?: string;
-  readonly targetRevision?: number;
-  readonly residualThresholdMm?: number;
-  readonly maximumResidualMm?: number;
-  readonly selectedCells?: number;
-  readonly restFallbackReason?: string;
-  readonly verticalDepthMm?: number;
-  readonly requestedSampleSpacingMm?: number;
-  readonly widthCells: number;
-  readonly heightCells: number;
-  readonly cellSizeMm: number;
-  readonly toolDiameterMm: number;
-  readonly toolKind: CncToolKind;
-  // Tapered ball nose only: the tip ball whose radius bounds the scallop.
-  readonly toolTipDiameterMm?: number;
-  readonly rowSpacingMm?: number;
-  readonly scallopMm?: number;
-};
+// The relief planning evidence lives beside the job (job.ts holds the raw
+// line backstop); re-exported so every reader keeps importing it from here.
+export type { CncReliefPlanningEvidence } from './cnc-relief-planning-evidence';
 
 export type Job = {
   readonly groups: ReadonlyArray<Group>;
@@ -582,11 +573,19 @@ export type Job = {
     readonly maxY: number;
   } | null;
   readonly diagnostics?: ReadonlyArray<JobDiagnostic>;
+  /** The cone a machine-space rotary job was warped onto (ADR-694); absent on
+   * every other job. A later stage reads the local Y factor from it. */
+  readonly rotaryTaper?: RotaryTaperProfile;
   readonly cncCompilation?: CncCompilationSidecar;
   /** Laser finish placed by preparation (ADR-493). Absent keeps the default. */
   readonly laserFinish?: JobLaserFinish;
   /** Placed job's anchor Y, kept by an active rotary (ADR-127 Amd 1); absent: Y 0. */
   readonly rotaryAnchorY?: number;
+  /** Machine Y mm per surface mm of a machine-space rotary job whose Y is
+   * scaled (ADR-127 Amendment 2). The laser emitters scale each move's feed by
+   * it so the part's surface moves at the layer speed. Absent on every other
+   * job, whose output is unchanged. */
+  readonly rotarySurfaceYScale?: number;
 };
 
 /** Where a laser job leaves the head (ADR-493): `point` is in this job's program

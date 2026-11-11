@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { saveComputerPreference } from './preference-persistence';
+import { isRecord } from '../../core/util/is-record';
 
 export type ExperimentalLaserFeature = 'lowPowerFire' | 'printAndCut';
 
@@ -71,8 +72,4 @@ function browserStorage(): Storage | null {
   } catch {
     return null;
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

@@ -6,6 +6,7 @@ import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { browserLocalStorage } from '../state/browser-local-storage';
 import { useLaserStore } from '../state/laser-store';
+import { isActiveJob } from '../state/laser-store-helpers';
 import { controllerAttention } from '../state/controller-attention';
 import { motionOwnerAwaitsMissingReply } from '../state/laser-motion-release';
 import { portOpenWithoutAnswer } from '../state/port-open-no-answer';
@@ -13,13 +14,13 @@ import { loadAutoConnectPreference, saveAutoConnectPreference } from '../state/s
 import { pauseAutoConnect, useAutoConnectSession } from '../state/auto-connect-session';
 import { ConnectionBar, type ConnectionBarProps } from './ConnectionBar';
 import { connectMachine } from './connect-machine';
+import { connectionControlBlockReason } from './control-block-reason';
 import {
   isFileOnlyController,
   useControllerQualificationRetry,
   useControllerReconnect,
 } from './controller-reconnect';
 import { ConnectedMachineProfile } from './ConnectedMachineProfile';
-import { connectOptionsForDevice } from '../commands/connect-options';
 import {
   liveDriverMismatch,
   toolbarDriverMismatchText,
@@ -29,6 +30,9 @@ import { LaserModuleRow } from './LaserModuleRow';
 import { DeviceSetupControls } from './device-setup';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { MachineNetworkConnect } from './MachineNetworkConnect';
+import { MoshiUsbPanel } from './MoshiUsbPanel';
+import { RuidaNetworkPanel } from './RuidaNetworkPanel';
+import { RECONNECT_DURING_JOB_TITLE, reconnectWithSavedProfile } from './reconnect-job-guard';
 import {
   useControllerStoppedResponding,
   useControllerWentSilent,
@@ -57,9 +61,9 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   const neverAnswered = useLaserStore(portOpenWithoutAnswer);
   const stoppedResponding = useControllerStoppedResponding(connection.kind === 'connected');
   const disconnectController = useLaserStore((state) => state.disconnect);
-  const connectController = useLaserStore((state) => state.connect);
   const device = useStore((state) => state.project.device);
   const driverMismatch = useLiveDriverMismatch(device);
+  const jobActive = useLaserStore((state) => isActiveJob(state.streamer));
   const machineName = toolbarMachineName(device.name || 'Unnamed machine', driverMismatch);
   const supportsSerial = platform.serial.isSupported();
   const isFileOnlyProfile = isFileOnlyController(device.controllerKind);
@@ -79,12 +83,6 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   const choosePort = async (): Promise<void> => {
     if (useLaserStore.getState().connection.kind === 'connected') await disconnect();
     await connectMachine(platform, { portSelection: 'choose' });
-  };
-  // The saved profile's driver replaces the live one: the same reconnect as
-  // Machine Setup's, offered when its Save could not switch it (U2-P2-1).
-  const reconnectWithProfile = async (): Promise<void> => {
-    await disconnectController();
-    await connectController(platform, connectOptionsForDevice(useStore.getState().project.device));
   };
   const autoConnect = useAutoConnectPreference();
   return (
@@ -120,11 +118,17 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
             ? undefined
             : {
                 text: toolbarDriverMismatchText(driverMismatch),
+                // The saved profile's driver replaces the live one, offered when
+                // Save could not switch it (U2-P2-1); never mid-job (V3-P2-1).
+                blockedReason: jobActive ? RECONNECT_DURING_JOB_TITLE : null,
                 onReconnect: () =>
-                  void reconnectWithProfile().catch(controllerActionFailureHandler('Reconnect')),
+                  void reconnectWithSavedProfile(platform).catch(
+                    controllerActionFailureHandler('Reconnect'),
+                  ),
               }
         }
         disabled={!supportsSerial || controlsBusy || isFileOnlyProfile}
+        disabledReason={controlsBusy ? connectionControlBlockReason(props.motionOperation) : null}
       />
     </>
   );
@@ -146,6 +150,8 @@ function MachineDetailsContent(): JSX.Element {
     <>
       <LaserModuleRow />
       <MachineNetworkConnect />
+      <RuidaNetworkPanel />
+      <MoshiUsbPanel />
     </>
   );
 }
@@ -173,11 +179,16 @@ function ConnectionHints(props: {
   readonly supportsSerial: boolean;
   readonly isFileOnlyProfile: boolean;
 }): JSX.Element | null {
+  // The desktop app reaches a Ruida over the network (ADR-697); browsers cannot.
+  const networkLink = usePlatform().ruidaNetwork !== undefined;
   if (props.isFileOnlyProfile) {
     return (
       <p className="lf-connection-hint" style={hintStyle}>
         This profile is file-export only: use Save G-code… to write an experimental .rd job and run
-        it from the machine panel. Live Ruida streaming is not available in this build.
+        it from the machine panel.{' '}
+        {networkLink
+          ? 'An experimental, simulator-tested network connection is under Machine details.'
+          : 'Live Ruida control needs the desktop app.'}
       </p>
     );
   }

@@ -1,6 +1,5 @@
 import {
   applyTransform,
-  curveSubpathBounds,
   type Bounds,
   type ColoredPath,
   type CurveSubpath,
@@ -11,6 +10,7 @@ import {
 } from '../scene';
 import type { PathTextAcrossAlign } from '../scene/scene-object';
 import type { TextRenderResult } from './text-to-polylines';
+import { coloredPathsBounds } from './colored-paths-bounds';
 
 export type PathTextResult =
   | { readonly kind: 'ok'; readonly rendered: TextRenderResult; readonly origin: Vec2 }
@@ -63,7 +63,7 @@ export function placeTextOnPath(
     };
   };
   const worldPaths = rendered.paths.map((path) => mapColoredPath(path, map));
-  const bounds = boundsForPaths(worldPaths);
+  const bounds = coloredPathsBounds(worldPaths);
   return {
     kind: 'ok',
     rendered: normalizePaths(worldPaths, bounds),
@@ -139,9 +139,7 @@ function samplePath(
   distance: number,
 ): { readonly point: Vec2; readonly normal: Vec2 } {
   const target = Math.max(0, Math.min(metric.length, distance));
-  let index = 1;
-  while (index < metric.cumulative.length - 1 && (metric.cumulative[index] ?? 0) < target)
-    index += 1;
+  const index = firstSegmentReaching(metric.cumulative, target);
   const from = metric.points[index - 1] as Vec2;
   const to = metric.points[index] as Vec2;
   const start = metric.cumulative[index - 1] ?? 0;
@@ -152,6 +150,21 @@ function samplePath(
     point: { x: from.x + (to.x - from.x) * ratio, y: from.y + (to.y - from.y) * ratio },
     normal: { x: tangent.y, y: -tangent.x },
   };
+}
+
+// The first index from 1 whose cumulative length reaches `target`, or the last
+// index. A binary search finds the index the old forward scan found, since the
+// lengths never decrease; the scan cost one step per guide point for every text
+// point, 145 s for 2,000 characters on a 40,000-point guide (audit S7-P2-3).
+function firstSegmentReaching(cumulative: ReadonlyArray<number>, target: number): number {
+  let low = 1;
+  let high = Math.max(1, cumulative.length - 1);
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if ((cumulative[middle] ?? 0) < target) low = middle + 1;
+    else high = middle;
+  }
+  return low;
 }
 
 function mapColoredPath(path: ColoredPath, map: (point: Vec2) => Vec2): ColoredPath {
@@ -183,25 +196,6 @@ function mapSegment(segment: PathSegment, map: (point: Vec2) => Vec2): PathSegme
     };
   }
   return { kind: 'line', to: map(segment.to) };
-}
-
-function boundsForPaths(paths: ReadonlyArray<ColoredPath>): Bounds {
-  const curves = paths.flatMap((path) => path.curves?.map(curveSubpathBounds) ?? []);
-  const points = paths.flatMap((path) => path.polylines.flatMap((line) => line.points));
-  const xs = [
-    ...curves.flatMap((bounds) => [bounds.minX, bounds.maxX]),
-    ...points.map((point) => point.x),
-  ];
-  const ys = [
-    ...curves.flatMap((bounds) => [bounds.minY, bounds.maxY]),
-    ...points.map((point) => point.y),
-  ];
-  return {
-    minX: Math.min(...xs),
-    minY: Math.min(...ys),
-    maxX: Math.max(...xs),
-    maxY: Math.max(...ys),
-  };
 }
 
 function normalizePaths(paths: ReadonlyArray<ColoredPath>, bounds: Bounds): TextRenderResult {

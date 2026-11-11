@@ -41,6 +41,11 @@ import {
   type Project,
 } from '../../core/scene';
 import { cncNoteContours } from '../layers/cnc-note-contours';
+import { projectionStockWarning } from './cnc-projection-stock-warnings';
+import {
+  compiledProjectionFactsByLayer,
+  type CompiledProjectionFacts,
+} from './job-review/job-review-projection-detail';
 import { formatMm } from './job-review/job-review-format';
 
 export function detectCncThroughCutTabWarnings(
@@ -61,9 +66,29 @@ export function detectCncThroughCutTabWarnings(
     return tabbed.has(layer.id);
   };
 
+  // W6-P2-1: a projection is judged on what it compiled, not on Cut depth.
+  let projections: ReadonlyMap<string, CompiledProjectionFacts> | undefined;
+  const projectionFacts = (layer: Layer): CompiledProjectionFacts | undefined => {
+    projections ??= compiledProjectionFactsByLayer(
+      compiledJob ?? compileCncJob(project.scene, project.device, machine),
+    );
+    return projections.get(layer.id);
+  };
+
   const warnings: string[] = [];
   for (const layer of project.scene.layers) {
     if (!layer.output) continue;
+    const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+    if (settings.reliefProjection !== undefined) {
+      const warning = projectionStockWarning(
+        layer,
+        settings,
+        projectionFacts(layer),
+        stockThicknessMm,
+      );
+      if (warning !== null) warnings.push(warning);
+      continue;
+    }
     // Relief depth belongs to each relief object. A stale layer depth is not
     // physical evidence when every object on the operation is a relief; the
     // prepared-job warning below uses the exact rough/finish pass depth.
@@ -155,8 +180,13 @@ function overcutTabNote(
       keptMm < settings.tabHeightMm
         ? `are ${formatMm(keptMm)} mm thick above the stock bottom, thinned from the ` +
           `${formatMm(settings.tabHeightMm)} mm set to half the ${formatMm(stockThicknessMm)} mm stock`
-        : `stay ${formatMm(settings.tabHeightMm)} mm thick above the stock bottom`;
-    return `Its holding tabs ${thickness}, which relies on Stock thickness being right. `;
+        : `reach ${formatMm(settings.tabHeightMm)} mm above the stock bottom`;
+    // Rolling audit v12 X6-P1-1: a tab keeps only the stock that is there, so a
+    // relief or pocket cut deeper under it first leaves it thinner.
+    return (
+      `Its holding tabs ${thickness}, which relies on Stock thickness being right; a relief or ` +
+      'pocket cut deeper under them first leaves them thinner. '
+    );
   }
   const inStockMm = stockThicknessMm + tabTopZMm(tabs.depthMm, tabs.tabHeightMm);
   return inStockMm > 0

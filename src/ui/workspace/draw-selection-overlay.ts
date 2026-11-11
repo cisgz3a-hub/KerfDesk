@@ -8,6 +8,7 @@ import { aabbHandlePoints } from './selection-handles';
 import { drawSelectionMoveHandle } from './draw-selection-move-handle';
 import { selectionMoveHandlePosition } from './selection-move-handle';
 import type { ViewTransform } from './view-transform';
+import { boxCorners } from '../../core/geometry/box-math';
 
 export function drawObjectSelectionOverlay(
   ctx: CanvasRenderingContext2D,
@@ -51,7 +52,7 @@ export function drawSelectionSetOverlay(
   ctx.strokeStyle = canvasTheme.selection;
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 3]);
-  strokeSelectionFrame(ctx, selectionFrameForAabb(bbox), view);
+  strokeSelectionFrame(ctx, boxCorners(bbox), view);
   ctx.setLineDash([]);
   drawRotateHandleAt(ctx, rotateHandlePositionForAabb(bbox, view), bbox.minY, view);
   // Scale handles on the combined box so the whole selection can be resized by
@@ -77,17 +78,18 @@ function drawSelectionBox(
   drawHandles(ctx, obj, view);
 }
 
+// The last thing drawn for its object, inside drawObjects' save and restore
+// for that object, so it sets the stroke without a save of its own: with
+// thousands selected, each frame drew a save and restore per box (S2-P3-3).
 function drawSecondarySelectionBox(
   ctx: CanvasRenderingContext2D,
   obj: SceneObject,
   view: ViewTransform,
 ): void {
-  ctx.save();
   ctx.strokeStyle = canvasTheme.selection;
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 3]);
   strokeSelectionFrame(ctx, selectionFrameFor(obj), view);
-  ctx.restore();
 }
 
 function strokeSelectionFrame(
@@ -172,17 +174,6 @@ function drawRotateHandleAt(
   ctx.strokeStyle = canvasTheme.rotateHandleStroke;
   ctx.stroke();
   ctx.restore();
-}
-
-function selectionFrameForAabb(
-  bbox: AABB,
-): ReadonlyArray<{ readonly x: number; readonly y: number }> {
-  return [
-    { x: bbox.minX, y: bbox.minY },
-    { x: bbox.maxX, y: bbox.minY },
-    { x: bbox.maxX, y: bbox.maxY },
-    { x: bbox.minX, y: bbox.maxY },
-  ];
 }
 
 function rotateHandlePositionForAabb(

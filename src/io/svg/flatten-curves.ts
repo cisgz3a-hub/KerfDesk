@@ -8,7 +8,9 @@
 // polylines; job compilation re-flattens native curves at the much finer
 // DEFAULT_MACHINE_CURVE_TOLERANCE_MM (compilation-polylines.ts).
 
+import { NEAR_STRAIGHT_SAGITTA_PER_CHORD } from '../../core/geometry/near-straight-arc';
 import type { Vec2 } from '../../core/scene';
+import { midpoint } from '../../core/geometry/point-math';
 
 export const DEFAULT_FLATNESS_MM = 0.25;
 
@@ -26,12 +28,12 @@ export function flattenCubic(
     out.push(p3);
     return;
   }
-  const p01 = mid(p0, p1);
-  const p12 = mid(p1, p2);
-  const p23 = mid(p2, p3);
-  const p012 = mid(p01, p12);
-  const p123 = mid(p12, p23);
-  const p0123 = mid(p012, p123);
+  const p01 = midpoint(p0, p1);
+  const p12 = midpoint(p1, p2);
+  const p23 = midpoint(p2, p3);
+  const p012 = midpoint(p01, p12);
+  const p123 = midpoint(p12, p23);
+  const p0123 = midpoint(p012, p123);
   flattenCubic(p0, p01, p012, p0123, tolerance, out);
   flattenCubic(p0123, p123, p23, p3, tolerance, out);
 }
@@ -127,6 +129,9 @@ export function arcToCubics(
   let rx = rxIn;
   let ry = ryIn;
   const lambda = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry);
+  if (isNearStraightSmallArc(lambda, rx, ry, arc.largeArc, Math.hypot(dx, dy) * 2)) {
+    return [straightCubic(start, end)];
+  }
   if (lambda > 1) {
     const s = Math.sqrt(lambda);
     rx *= s;
@@ -181,6 +186,39 @@ export function arcToCubics(
   return cubics;
 }
 
+// Past float32 range Chromium refuses the path data and draws nothing (rolling
+// audit v11 W5-P3-1, refuted); those radii keep their existing handling.
+const FLOAT32_MAX = 3.4028234663852886e38;
+
+// A small arc whose radius dwarfs its chord is its chord: Chromium draws
+// A1e17 1e17 0 0 1 10 10 as a 10 x 10 line. Through its centre, ~1e16 chords
+// away, rounding bowed the cubic metres off the line (ADR-159 Amendment 3,
+// audit W5-P1-1). In the unit-circle frame the half-chord is sqrt(lambda); the
+// ellipse is at most max(rx, ry) times that frame, which bounds the sagitta.
+function isNearStraightSmallArc(
+  lambda: number,
+  rx: number,
+  ry: number,
+  largeArc: boolean,
+  chord: number,
+): boolean {
+  if (largeArc || !(lambda < 1) || chord === 0) return false;
+  if (!(Math.max(rx, ry) <= FLOAT32_MAX)) return false;
+  const unitSagitta = lambda / (1 + Math.sqrt(1 - lambda));
+  return Math.max(rx, ry) * unitSagitta <= NEAR_STRAIGHT_SAGITTA_PER_CHORD * chord;
+}
+
+function straightCubic(start: Vec2, end: Vec2): Cubic {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  return {
+    p0: start,
+    p1: { x: start.x + dx / 3, y: start.y + dy / 3 },
+    p2: { x: start.x + (2 * dx) / 3, y: start.y + (2 * dy) / 3 },
+    p3: end,
+  };
+}
+
 function arcSegmentToCubic(
   cx: number,
   cy: number,
@@ -226,10 +264,6 @@ function angleBetween(ux: number, uy: number, vx: number, vy: number): number {
 }
 
 // --- shared math ---
-
-function mid(a: Vec2, b: Vec2): Vec2 {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-}
 
 function perpDistance(a: Vec2, b: Vec2, p: Vec2): number {
   const len = Math.hypot(b.x - a.x, b.y - a.y);

@@ -14,6 +14,7 @@
 import { projectPointToPolyline } from '../cnc/cnc-tab-anchors';
 import type { Polyline, Vec2 } from '../scene';
 import { polylineBounds, type SegmentBounds } from './segment-bounds';
+import { growBox, boxesOverlap } from '../geometry/box-math';
 
 // The kerf offset mitres its corners with Clipper's miter limit of 2, so no
 // point of an offset ring lies further than twice the kerf from its source.
@@ -33,7 +34,7 @@ export function startKerfRingsAtSources(
   const starts = sources.flatMap((source): SourceStart[] => {
     const start = source.points[0];
     const bounds = polylineBounds(source.points);
-    return start === undefined || bounds === null ? [] : [{ start, reach: grown(bounds, grow) }];
+    return start === undefined || bounds === null ? [] : [{ start, reach: growBox(bounds, grow) }];
   });
   return rings.map((ring) => startRingNearSource(ring, starts));
 }
@@ -49,7 +50,7 @@ export function kerfRingOwners(
   const grow = MITRE_REACH * Math.abs(kerfOffsetMm) + REACH_SLACK_MM;
   const reaches = sources.map((source) => {
     const bounds = polylineBounds(source.points);
-    return bounds === null ? null : grown(bounds, grow);
+    return bounds === null ? null : growBox(bounds, grow);
   });
   return rings.map((ring) => {
     const bounds = polylineBounds(ring.points);
@@ -57,7 +58,7 @@ export function kerfRingOwners(
     let best = Number.POSITIVE_INFINITY;
     sources.forEach((source, index) => {
       const reach = reaches[index];
-      if (bounds === null || reach === null || reach === undefined || !overlaps(reach, bounds))
+      if (bounds === null || reach === null || reach === undefined || !boxesOverlap(reach, bounds))
         return;
       const distanceSq = sampledDistanceSq(ring, source);
       if (distanceSq < best) {
@@ -85,7 +86,7 @@ function sampledDistanceSq(ring: Polyline, source: Polyline): number {
 function startRingNearSource(ring: Polyline, starts: ReadonlyArray<SourceStart>): Polyline {
   const bounds = polylineBounds(ring.points);
   if (bounds === null) return ring;
-  const nearby = starts.filter((source) => overlaps(source.reach, bounds));
+  const nearby = starts.filter((source) => boxesOverlap(source.reach, bounds));
   const repeatsStart = closesOnItself(ring.points);
   const cycle = repeatsStart ? ring.points.slice(0, -1) : ring.points;
   const index = nearestVertexIndex(cycle, nearby);
@@ -117,17 +118,4 @@ function closesOnItself(points: ReadonlyArray<Vec2>): boolean {
   const first = points[0];
   const last = points.at(-1);
   return points.length > 1 && first?.x === last?.x && first?.y === last?.y;
-}
-
-function grown(bounds: SegmentBounds, by: number): SegmentBounds {
-  return {
-    minX: bounds.minX - by,
-    minY: bounds.minY - by,
-    maxX: bounds.maxX + by,
-    maxY: bounds.maxY + by,
-  };
-}
-
-function overlaps(a: SegmentBounds, b: SegmentBounds): boolean {
-  return a.minX <= b.maxX && b.minX <= a.maxX && a.minY <= b.maxY && b.minY <= a.maxY;
 }

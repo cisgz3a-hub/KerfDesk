@@ -8,6 +8,7 @@ import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { hasCustomOrigin, hasCustomXyOrigin, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { actionGridStyle, gridFullRowStyle, sectionCaptionStyle } from './JobControls.styles';
+import { setupControlBlockReason, titleWhenDisabled } from './control-block-reason';
 import { clampJogFeed } from './jog-control-policy';
 import { useJogControlPreferences } from './jog-control-preferences';
 import { RELEASE_MOTORS_CONFIRM } from './hand-position-copy';
@@ -18,8 +19,9 @@ import {
   HOST_RECORDED_RESET_UNKNOWN_MESSAGE,
   hostRecordedMachinePosition,
 } from '../state/host-recorded-origin';
-import { placementAfterSetOrigin } from './set-origin-placement';
+import { placementAfterSetOrigin, setOriginToast } from './set-origin-placement';
 import { useFocusThroughDisable } from '../common/use-focus-through-disable';
+import { useFreshKeyActivation } from '../common/use-fresh-key-activation';
 
 // ADR-053 P4 — releasing motors ($SLP) is hard to undo cleanly (waking needs a
 // soft-reset, which clears G92 on stock GRBL and FluidNC), so confirm and spell out the correct order:
@@ -67,6 +69,10 @@ function SetOriginButton(props: {
 }): JSX.Element | null {
   // Set origin here turns itself off while it runs; focus waits beside it (U7-P3-1).
   const ref = useFocusThroughDisable<HTMLButtonElement>(props.busy);
+  // Focus comes back to it: a held Enter must not set the origin again.
+  const keys = useFreshKeyActivation('Set origin here');
+  // While it is off, the tooltip says why (A3-P3-4).
+  const blockReason = useLaserStore(setupControlBlockReason);
   if (props.show === false) return null;
   return (
     <button
@@ -74,13 +80,16 @@ function SetOriginButton(props: {
       type="button"
       className={`${props.needsAttention ? 'lf-btn lf-btn--attention' : 'lf-btn'}${props.jog ? ' lf-jog-origin' : ''}`}
       onClick={props.onSet}
+      {...keys}
       data-search-target="set-origin"
       disabled={props.busy}
-      title={
+      title={titleWhenDisabled(
+        props.busy,
+        blockReason,
         props.needsAttention
           ? SET_ORIGIN_ATTENTION_TITLE
-          : 'Declare the current head position as work X0 Y0 without moving. Re-establish it after reset or loss of position.'
-      }
+          : 'Declare the current head position as work X0 Y0 without moving. Re-establish it after reset or loss of position.',
+      )}
     >
       Set origin here
     </button>
@@ -302,8 +311,7 @@ function makeOriginHandlers(deps: OriginHandlerDeps): {
       void deps
         .setOrigin()
         .then(() => {
-          placementAfterSetOrigin(documentEpoch);
-          deps.pushToast('Origin set to current head position (G92).', 'success');
+          deps.pushToast(setOriginToast(placementAfterSetOrigin(documentEpoch)), 'success');
         })
         .catch(reportOriginActionFailure);
     },
@@ -391,8 +399,13 @@ function AdvancedOriginControls(props: {
     if (!jobAwareConfirm(SET_PERSISTENT_ORIGIN_CONFIRM)) return;
     void setPersistentOrigin()
       .then(() => {
-        placementAfterSetOrigin(documentEpoch);
-        pushToast('Persistent G54 XY origin set; temporary offsets cleared.', 'success');
+        pushToast(
+          setOriginToast(
+            placementAfterSetOrigin(documentEpoch),
+            'Persistent G54 XY origin set; temporary offsets cleared.',
+          ),
+          'success',
+        );
       })
       .catch(reportOriginActionFailure);
   };

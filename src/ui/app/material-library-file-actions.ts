@@ -15,6 +15,7 @@ import {
 } from '../import/document-import-worker-client';
 import { resolveImportBlob } from '../import/import-file-blob';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
+import { errorMessage } from '../../core/util/error-message';
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
 
@@ -36,7 +37,7 @@ export async function handleOpenMaterialLibrary(ctx: OpenMaterialLibraryCtx): Pr
   try {
     files = await ctx.platform.pickFilesForOpen({ accept: ['.lfml.json'], multiple: false });
   } catch (err) {
-    ctx.pushToast(`Could not open material library: ${errMsg(err)}`, 'error');
+    ctx.pushToast(`Could not open material library: ${errorMessage(err)}`, 'error');
     return;
   }
 
@@ -54,7 +55,7 @@ export async function handleOpenMaterialLibrary(ctx: OpenMaterialLibraryCtx): Pr
     ctx.pushToast(
       isImportCancellation(err)
         ? `${file.name}: open cancelled.`
-        : `Could not open ${file.name}: ${errMsg(err)}`,
+        : `Could not open ${file.name}: ${errorMessage(err)}`,
       isImportCancellation(err) ? 'warning' : 'error',
     );
     return;
@@ -82,7 +83,7 @@ export async function handleImportClbMaterialLibrary(ctx: OpenMaterialLibraryCtx
   try {
     files = await ctx.platform.pickFilesForOpen({ accept: ['.clb'], multiple: false });
   } catch (err) {
-    ctx.pushToast(`Could not import CLB: ${errMsg(err)}`, 'error');
+    ctx.pushToast(`Could not import CLB: ${errorMessage(err)}`, 'error');
     return;
   }
   const file = files[0];
@@ -98,7 +99,7 @@ export async function handleImportClbMaterialLibrary(ctx: OpenMaterialLibraryCtx
     ctx.pushToast(
       isImportCancellation(err)
         ? `${file.name}: import cancelled.`
-        : `Could not read ${file.name}: ${errMsg(err)}`,
+        : `Could not read ${file.name}: ${errorMessage(err)}`,
       isImportCancellation(err) ? 'warning' : 'error',
     );
     return;
@@ -128,7 +129,7 @@ export async function handleSaveMaterialLibrary(ctx: SaveMaterialLibraryCtx): Pr
       extensions: ['.lfml.json'],
     });
   } catch (err) {
-    ctx.pushToast(`Could not save material library: ${errMsg(err)}`, 'error');
+    ctx.pushToast(`Could not save material library: ${errorMessage(err)}`, 'error');
     return;
   }
   if (target === null) return;
@@ -138,7 +139,7 @@ export async function handleSaveMaterialLibrary(ctx: SaveMaterialLibraryCtx): Pr
     ctx.markMaterialLibrarySaved();
     ctx.pushToast(`Saved material library to ${target.displayName}`, 'success');
   } catch (err) {
-    ctx.pushToast(`Could not save material library: ${errMsg(err)}`, 'error');
+    ctx.pushToast(`Could not save material library: ${errorMessage(err)}`, 'error');
   }
 }
 
@@ -149,10 +150,6 @@ function describeOpenResult(
   if (result.kind === 'schema-too-new') return `unsupported version ${result.sawVersion}`;
   if (result.kind === 'schema-too-old') return `legacy version ${result.sawVersion}`;
   return 'unknown error';
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 async function parseMaterialLibraryFile(

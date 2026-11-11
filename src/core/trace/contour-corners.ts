@@ -43,6 +43,7 @@ import type { Vec2 } from '../scene';
 import { latticeCandidates } from './contour-corner-lattice';
 import { fitLeg, growLeg, LEG_SLOPE_TOLERANCE, type Leg } from './contour-corner-leg-runs';
 import { apexContradictsInk, apexStandsInPaper } from './contour-corner-ink';
+import { apexWithinChainReach } from './contour-corner-reach';
 import { legCandidates, legIntersection } from './contour-corner-legs';
 import {
   LATTICE_STEP_COST_PX,
@@ -146,7 +147,9 @@ function boundedApexes(
 // (contour-corner-ink.ts) is dropped, so the loop rounds that turn instead of
 // drawing a spike into the paper or a notch into the ink. A re-seated apex is
 // judged on the legs it was re-seated on; falling back to the apex decided
-// before re-seating let the same spikes through.
+// before re-seating let the same spikes through. An apex that stands far past
+// the chain from a short leg is then held to the chain's reach along its
+// longer leg (contour-corner-reach.ts).
 function inkBoundedApexes(
   cracks: ReadonlyArray<Vec2>,
   seated: ReadonlyArray<SeatedCorner>,
@@ -159,19 +162,20 @@ function inkBoundedApexes(
       back: fitLeg(cracks, corner.from, corner.legBack, -1),
       ahead: fitLeg(cracks, (corner.from + corner.skip + 1) % n, corner.legAhead, 1),
     };
-  return seated.filter(
-    (corner) =>
-      isLatticeApex(corner.apex) ||
-      !apexContradictsInk(
-        cracks,
-        corner.from,
-        corner.skip,
-        corner.apex,
-        legsOf(corner),
-        scale,
-        inkAt,
-      ),
-  );
+  const kept: SeatedCorner[] = [];
+  for (const corner of seated) {
+    if (isLatticeApex(corner.apex)) {
+      kept.push(corner);
+      continue;
+    }
+    const legs = legsOf(corner);
+    if (apexContradictsInk(cracks, corner.from, corner.skip, corner.apex, legs, scale, inkAt)) {
+      continue;
+    }
+    const apex = apexWithinChainReach(cracks, corner, legs, scale);
+    kept.push(apex === corner.apex ? corner : { ...corner, apex });
+  }
+  return kept;
 }
 
 // Lattice turns and pixel features sit on lattice vertices: exact already.

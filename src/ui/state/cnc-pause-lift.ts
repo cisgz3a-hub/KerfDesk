@@ -50,6 +50,7 @@ import {
 import { controllerPlannerSizeBlocks } from './laser-rx-capacity-evidence';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
+import { errorMessage } from '../../core/util/error-message';
 
 const RESET_TIMEOUT_MS = 8_000;
 
@@ -97,9 +98,9 @@ export async function liftPausedCncJob(
     context.set((state) => ({
       ...(state.cncPauseLift?.token === lift.token ? { cncPauseLift: null } : {}),
       ...(state.streamer?.status === 'paused'
-        ? cncPauseLiftJobPatch(state, { skipReason: messageOf(error) })
+        ? cncPauseLiftJobPatch(state, { skipReason: errorMessage(error) })
         : {}),
-      log: pushLog(state, `[lf2] Pause and lift skipped: ${messageOf(error)}`),
+      log: pushLog(state, `[lf2] Pause and lift skipped: ${errorMessage(error)}`),
     }));
   }
 }
@@ -336,8 +337,4 @@ function recordNoLift(context: CncPauseLiftContext, reason: string, retry: boole
       ? {}
       : { log: pushLog(state, `[lf2] Paused without lifting the bit: ${reason}`) }),
   }));
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

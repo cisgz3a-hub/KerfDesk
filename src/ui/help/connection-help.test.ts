@@ -32,6 +32,14 @@ describe('CONNECTION_HELP_TEXT', () => {
     expect(CONNECTION_HELP_TEXT).toContain('Active hours');
   });
 
+  it('explains the WinUSB driver swap and its undo for USB K40 and galvo boards (ADR-702)', () => {
+    expect(CONNECTION_HELP_TEXT).toContain('WinUSB');
+    expect(CONNECTION_HELP_TEXT).toContain('Zadig');
+    expect(CONNECTION_HELP_TEXT).toMatch(/go back\s+to LaserDRW or EZCad/);
+    expect(CONNECTION_HELP_TEXT).toContain('udev');
+    expect(CONNECTION_HELP_TEXT).toMatch(/simulators only/);
+  });
+
   it('points to the full guide', () => {
     // The app ships without docs/, so the guide is the published page (S12-F1).
     expect(CONNECTION_HELP_TEXT).toContain('https://kerfdesk.com/docs/#troubleshooting');

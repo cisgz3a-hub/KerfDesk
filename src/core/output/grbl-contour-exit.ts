@@ -16,6 +16,7 @@ import type { CutGroup, CutSegment, FillGroup } from '../job';
 import { contourExitPoint, type ContourEntryBounds } from '../job/contour-entry';
 import { formatGcodeCoordinateMm } from '../gcode';
 import { laserOffRunwayLine } from './grbl-laser-lines';
+import { surfaceMatchedFeed, type RotaryFeedContext } from './rotary-surface-feed';
 import { emittedHead, laserOffMoveLines, type LaserOutputCursor } from './grbl-output-cursor';
 
 /** The runway fields a contour group's segment emission reads. */
@@ -31,7 +32,7 @@ export function contourRunways(group: CutGroup | FillGroup): {
  * behind a lit M3 burn (OR-1) now drain with the beam dark. */
 export function contourExitLines(
   seg: CutSegment,
-  context: {
+  context: RotaryFeedContext & {
     readonly exitRunwayMm?: number | undefined;
     readonly entryBounds: ContourEntryBounds;
     readonly cursor: LaserOutputCursor;
@@ -40,11 +41,14 @@ export function contourExitLines(
 ): string[] {
   if (context.exitRunwayMm === undefined) return [];
   const exit = contourExitPoint(seg.polyline, context.exitRunwayMm, context.entryBounds);
-  if (exit === null) return [];
+  const last = seg.polyline[seg.polyline.length - 1];
+  if (exit === null || last === undefined) return [];
+  // ADR-127 Amd 2: the exit continues the last burn edge, so it keeps its feed.
+  const feed = surfaceMatchedFeed(context.feed, last, exit, context.rotaryFeed);
   return laserOffMoveLines(
     context.cursor,
     emittedHead(exit.x, exit.y),
-    laserOffRunwayLine(exit.x, exit.y, context.feed),
+    laserOffRunwayLine(exit.x, exit.y, feed),
   );
 }
 

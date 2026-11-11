@@ -14,9 +14,11 @@ import type { SvgIdResolver } from './svg-id-resolver';
 import { parseCssColor } from './svg-css-color';
 import {
   resolveSvgColorProperty,
+  simplePaintAlpha,
   simplePaintColor,
   type SvgColorValue,
   type SvgPaint,
+  type SvgSimplePaint,
 } from './svg-paint';
 import { svgPresentationStyles } from './svg-presentation';
 import type { SvgStyleCascade } from './svg-stylesheet';
@@ -25,6 +27,8 @@ export type ResolvedSvgPaint = {
   /** #rrggbb, or '' when the paint paints nothing. */
   readonly color: string;
   readonly server: 'gradient' | 'pattern' | null;
+  /** Below 1 for a see-through colour (rgba, #rrggbbaa); absent when opaque. */
+  readonly alpha?: number;
 };
 
 export type SvgPaintResolver = (paint: SvgPaint, color: SvgColorValue) => ResolvedSvgPaint;
@@ -39,7 +43,7 @@ export function createSvgPaintResolver(
 ): SvgPaintResolver {
   const gradientColors = new Map<Element, string>();
   return (paint, color) => {
-    if (paint.kind !== 'server') return { color: simplePaintColor(paint, color), server: null };
+    if (paint.kind !== 'server') return simpleResolvedPaint(paint, color);
     const target = paint.id === null ? null : resolveId(paint.id);
     if (target !== null && isGradient(target)) {
       let gradientColor = gradientColors.get(target);
@@ -50,8 +54,18 @@ export function createSvgPaintResolver(
       return { color: gradientColor, server: 'gradient' };
     }
     if (target?.tagName.toLowerCase() === 'pattern') return { color: '', server: 'pattern' };
-    const fallback = paint.fallback === null ? '' : simplePaintColor(paint.fallback, color);
-    return { color: fallback, server: null };
+    return paint.fallback === null
+      ? { color: '', server: null }
+      : simpleResolvedPaint(paint.fallback, color);
+  };
+}
+
+function simpleResolvedPaint(paint: SvgSimplePaint, color: SvgColorValue): ResolvedSvgPaint {
+  const alpha = simplePaintAlpha(paint, color);
+  return {
+    color: simplePaintColor(paint, color),
+    server: null,
+    ...(alpha < 1 ? { alpha } : {}),
   };
 }
 

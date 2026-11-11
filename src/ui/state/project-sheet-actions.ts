@@ -66,6 +66,7 @@ export function projectSheetActions(set: Set, get: () => AppState): ProjectSheet
       pushProjectLoadNotices(parsed, useToastStore.getState().pushToast, {
         migration: false,
         keepEarlierReview: true,
+        project: parsed.project,
       });
       return true;
     },

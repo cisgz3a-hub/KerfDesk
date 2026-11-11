@@ -2,6 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStreamer, step } from '../../core/controllers/grbl';
 import type { LaserState } from '../state/laser-store';
 import { useLaserStore } from '../state/laser-store';
+import { useToastStore } from '../state/toast-store';
+import {
+  KEEP_AWAKE_HIDDEN_MESSAGE,
+  KEEP_AWAKE_HIDDEN_TOAST,
+  KEEP_VISIBLE_TITLE_MARK,
+} from './hidden-job-keep-awake-notice';
 import { installActiveJobWakeLock } from './use-active-job-wake-lock';
 
 class FakeWakeLockSentinel extends EventTarget {
@@ -121,6 +127,135 @@ describe('installActiveJobWakeLock', () => {
     await flush();
 
     expect(keepAwakeWarnings()).toBe(1);
+    uninstall();
+  });
+});
+
+// Rolling audit v11 W9-P2-1 (ADR-117 Amendment 1). The fake models the W3C
+// Screen Wake Lock spec: hiding the page releases the lock, and request()
+// rejects with NotAllowedError while the page is hidden.
+class FakePage extends EventTarget {
+  visibilityState: DocumentVisibilityState = 'visible';
+  title = 'KerfDesk — job.lf2';
+  readonly live: FakeWakeLockSentinel[] = [];
+
+  setVisibility(state: DocumentVisibilityState): void {
+    this.visibilityState = state;
+    if (state === 'hidden') for (const lock of this.live.splice(0)) void lock.release();
+    this.dispatchEvent(new Event('visibilitychange'));
+  }
+
+  readonly request = vi.fn(async (_type: 'screen'): Promise<FakeWakeLockSentinel> => {
+    if (this.visibilityState === 'hidden') throw new DOMException('hidden', 'NotAllowedError');
+    const lock = new FakeWakeLockSentinel();
+    this.live.push(lock);
+    return lock;
+  });
+}
+
+function installOn(page: FakePage): () => void {
+  return installActiveJobWakeLock({
+    document: page as unknown as Document,
+    navigator: fakeNavigator(page.request),
+  });
+}
+
+function hiddenNotices(): number {
+  return useLaserStore.getState().log.filter((line) => line.includes(KEEP_AWAKE_HIDDEN_MESSAGE))
+    .length;
+}
+
+function hiddenToasts(): number {
+  return useToastStore.getState().toasts.filter((t) => t.message === KEEP_AWAKE_HIDDEN_TOAST)
+    .length;
+}
+
+describe('a page hidden during a job (W9-P2-1)', () => {
+  afterEach(() => useToastStore.setState({ toasts: [] }));
+
+  it('logs once, marks the title while hidden, and re-acquires the lock when visible', async () => {
+    const page = new FakePage();
+    patchStore({ streamer: streamingState() });
+    const uninstall = installOn(page);
+    await flush();
+    expect(page.live).toHaveLength(1);
+
+    page.setVisibility('hidden');
+    await flush();
+    expect(page.live).toHaveLength(0);
+    expect(hiddenNotices()).toBe(1);
+    expect(keepAwakeWarnings()).toBe(0);
+    expect(page.title).toBe(`${KEEP_VISIBLE_TITLE_MARK}KerfDesk — job.lf2`);
+
+    page.setVisibility('visible');
+    await flush();
+    expect(page.live).toHaveLength(1);
+    expect(page.title).toBe('KerfDesk — job.lf2');
+    expect(hiddenToasts()).toBe(1);
+
+    // A second trip to the background in the same job: the title and the
+    // toast come back, the log line does not repeat.
+    page.setVisibility('hidden');
+    await flush();
+    expect(hiddenNotices()).toBe(1);
+    expect(page.title.startsWith(KEEP_VISIBLE_TITLE_MARK)).toBe(true);
+    page.setVisibility('visible');
+    await flush();
+    expect(page.live).toHaveLength(1);
+    uninstall();
+  });
+
+  it('tells a job started while the page is already hidden, without asking for a lock', async () => {
+    const page = new FakePage();
+    page.visibilityState = 'hidden';
+    const uninstall = installOn(page);
+
+    patchStore({ streamer: streamingState() });
+    await flush();
+
+    expect(page.request).not.toHaveBeenCalled();
+    expect(hiddenNotices()).toBe(1);
+    expect(page.title.startsWith(KEEP_VISIBLE_TITLE_MARK)).toBe(true);
+    uninstall();
+    expect(page.title).toBe('KerfDesk — job.lf2');
+  });
+
+  it('unmarks the title when the job ends while hidden, and says nothing with no job', async () => {
+    const page = new FakePage();
+    patchStore({ streamer: streamingState() });
+    const uninstall = installOn(page);
+    await flush();
+    page.setVisibility('hidden');
+    await flush();
+
+    patchStore({ streamer: null });
+    await flush();
+    expect(page.title).toBe('KerfDesk — job.lf2');
+
+    page.setVisibility('visible');
+    page.setVisibility('hidden');
+    await flush();
+    expect(hiddenNotices()).toBe(1);
+    expect(hiddenToasts()).toBe(0);
+    expect(page.title).toBe('KerfDesk — job.lf2');
+    uninstall();
+  });
+
+  it('logs again for the next job', async () => {
+    const page = new FakePage();
+    patchStore({ streamer: streamingState() });
+    const uninstall = installOn(page);
+    await flush();
+    page.setVisibility('hidden');
+    patchStore({ streamer: null });
+    page.setVisibility('visible');
+    await flush();
+
+    patchStore({ streamer: streamingState() });
+    await flush();
+    page.setVisibility('hidden');
+    await flush();
+    expect(hiddenNotices()).toBe(2);
     uninstall();
   });
 });

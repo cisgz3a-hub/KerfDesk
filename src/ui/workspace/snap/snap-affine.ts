@@ -8,6 +8,7 @@
 // per point.
 
 import type { Transform, Vec2 } from '../../../core/scene';
+import { maxOf, minOf } from '../../../core/util';
 
 // world = (a*x + c*y + e, b*x + d*y + f)
 export type Affine = {
@@ -60,10 +61,10 @@ export function mapBox(m: Affine, box: Box): Box {
     applyAffine(m, box.minX, box.maxY),
   ];
   return {
-    minX: Math.min(...corners.map((p) => p.x)),
-    minY: Math.min(...corners.map((p) => p.y)),
-    maxX: Math.max(...corners.map((p) => p.x)),
-    maxY: Math.max(...corners.map((p) => p.y)),
+    minX: minOf(corners.map((p) => p.x)),
+    minY: minOf(corners.map((p) => p.y)),
+    maxX: maxOf(corners.map((p) => p.x)),
+    maxY: maxOf(corners.map((p) => p.y)),
   };
 }
 
@@ -76,6 +77,4 @@ export function boxAround(point: Vec2, radius: number): Box {
   };
 }
 
-export function boxesOverlap(a: Box, b: Box): boolean {
-  return a.minX <= b.maxX && b.minX <= a.maxX && a.minY <= b.maxY && b.minY <= a.maxY;
-}
+export { boxesOverlap } from '../../../core/geometry/box-math';

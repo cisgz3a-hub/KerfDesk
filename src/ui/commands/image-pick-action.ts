@@ -10,6 +10,7 @@ import type { ToastVariant } from '../state/toast-store';
 import { importImageFile } from './import-image-action';
 import { pickPlatformImageFile } from './platform-image-files';
 import { requestPagedArtwork } from '../import/request-paged-artwork';
+import { errorMessage } from '../../core/util/error-message';
 
 export type ImagePickActionContext = {
   /** Nested studios cannot host the separate document-page import dialog. */
@@ -60,8 +61,4 @@ export async function runImagePickAction(ctx: ImagePickActionContext): Promise<S
     ownedActions.pushToast,
   );
   return owner.isCurrent() ? imported : null;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

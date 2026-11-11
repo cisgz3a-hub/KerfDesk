@@ -18,7 +18,7 @@ import type { RegistrationJigIdentity } from './registration-jig-identity';
 import type { ColoredPath } from './colored-path';
 import type { TextBoxSettings } from './text-box';
 import type { BooleanCompound } from './boolean-compound';
-export type { ColoredPath, SubpathNesting } from './colored-path';
+export type { ColoredPath, SubpathNesting, WhiteInk } from './colored-path';
 
 import type { VariableTemplate } from './variable-template';
 import type { ReliefHeightfield } from './relief/relief-heightfield';
@@ -348,6 +348,9 @@ export const DITHER_ALGORITHMS = [
   'blue-noise',
   'ordered',
   'grayscale',
+  // ADR-699: a depth map burned as one threshold pass per slice. Older builds
+  // refuse it like any value they do not list.
+  '3d-sliced',
 ] as const;
 
 export type DitherAlgorithm = (typeof DITHER_ALGORITHMS)[number];

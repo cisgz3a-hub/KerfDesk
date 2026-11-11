@@ -12,6 +12,7 @@
 
 import { useState } from 'react';
 import { useStore } from '../state';
+import type { OperationSettingsOwner } from '../state/layer-param-actions';
 import { useToastStore } from '../state/toast-store';
 
 /** Upper bound of Machine Setup's Output max feed field. */
@@ -74,10 +75,12 @@ export function useFeedCeiling(storedFeed: number | null, resetKey: unknown): Fe
 
 export function FeedCeilingNotice(props: {
   readonly ceiling: FeedCeiling;
-  /** Re-applies the request once the ceiling allows it. */
-  readonly onRaise: (feed: number) => void;
+  /** Where the field's speed is stored. Raise writes the request there in the
+   * same undo step as the new ceiling (ADR-361 Amendment 1), so one Undo never
+   * leaves the ceiling raised without the speed, or the reverse. */
+  readonly owner: OperationSettingsOwner;
 }): JSX.Element | null {
-  const updateDeviceProfile = useStore((state) => state.updateDeviceProfile);
+  const raiseOutputMaxFeedForSpeed = useStore((state) => state.raiseOutputMaxFeedForSpeed);
   const { request, maxFeed } = props.ceiling;
   if (request === null) return null;
   const target = Math.min(Math.round(request), OUTPUT_MAX_FEED_LIMIT_MM_PER_MIN);
@@ -90,10 +93,7 @@ export function FeedCeilingNotice(props: {
           type="button"
           className="lf-feed-ceiling-note__raise"
           title={`Set this machine's Output max feed to ${formatFeed(target)} mm/min so this speed runs as entered. Only raise it as far as the machine can really move.`}
-          onClick={() => {
-            updateDeviceProfile({ maxFeed: target });
-            props.onRaise(target);
-          }}
+          onClick={() => raiseOutputMaxFeedForSpeed(target, props.owner)}
         >
           {`Raise Output max feed to ${formatFeed(target)} mm/min`}
         </button>

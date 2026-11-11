@@ -37,6 +37,7 @@ import {
   positionLaserReach,
 } from '../../workspace/position-laser-click';
 import { bedPictureTakenNow } from '../bed-picture-frame';
+import { frameRescaleIssue, frameRescaleVerdict } from '../frame-rescale-check';
 import { cameraBedFrameNow } from '../camera-bed-frame-now';
 import { cameraSourceIdentity, captureSourceFrame, type ActiveCameraSource } from '../frame-source';
 import { runHeadCapture, type HeadCaptureIo, type HeadSettle } from './head-capture-run';
@@ -106,6 +107,13 @@ export async function captureWithHeadCamera(target: HeadCaptureTarget): Promise<
   const taken = bedPictureTakenNow();
   store.setState({ state: { kind: 'running', taken: 0, total: stops.length, stopping: false } });
   const outcome = await runHeadCapture(stops, machineIo(target, source, stops.length));
+  // A picture of another size than the calibration's is placed only once it
+  // is shown to be a resize, not a cut-out of the sensor (ADR-440 Amendment 9).
+  const rescale = unprovedRescaleIssue(record, outcome.pictures);
+  if (rescale !== null) {
+    store.setState({ state: { kind: 'failed', message: rescale } });
+    return;
+  }
   const shown = showPictures(record, outcome.pictures, { region, taken });
   store.setState({ state: finalState(outcome, stops.length, shown, coversArea) });
 }
@@ -257,6 +265,19 @@ function settleReading(target: Vec2, stopRequested: () => boolean): HeadSettle |
   const head = headPositionNow();
   if (laser.motionOperation !== null || state !== 'Idle' || head === null) return null;
   return stopRequested() || near(head, target) ? { kind: 'settled', headMm: head } : null;
+}
+
+function unprovedRescaleIssue(
+  record: CameraModelRecord,
+  pictures: ReadonlyArray<HeadCameraPicture>,
+): string | null {
+  for (const { frame } of pictures) {
+    const { width, height } = frame;
+    if (width === record.lens.imageWidth && height === record.lens.imageHeight) continue;
+    const verdict = frameRescaleVerdict(record, width, height);
+    if (verdict !== 'resize') return frameRescaleIssue(record, width, height, verdict);
+  }
+  return null;
 }
 
 function showPictures(

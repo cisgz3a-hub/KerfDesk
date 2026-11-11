@@ -6,8 +6,10 @@ import { inferCurrentMachinePosition } from '../../state/infer-machine-position'
 import { useLaserStore } from '../../state/laser-store';
 import { BoardFineJogControls } from './BoardFineJogControls';
 import { MIN_BOARD_DIMENSION_MM } from './constants';
+import { errorMessageOr } from '../../../core/util/error-message';
 
 const CIRCLE_FIT_WARNING_MM = 2;
+const CREATE_FAILED = 'Could not create the circle at the current head position.';
 
 type CircleCenterConfirmationProps = {
   readonly fit: BestFitCircle;
@@ -78,7 +80,7 @@ function useCircleCenterController(props: CircleCenterConfirmationProps): Circle
       .catch((cause: unknown) => {
         if (activeMoveRequest.current !== requestId) return;
         setMove(null);
-        setError(errorMessage(cause, 'Could not move to the calculated circle center.'));
+        setError(errorMessageOr(cause, 'Could not move to the calculated circle center.'));
       });
   };
 
@@ -92,7 +94,7 @@ function useCircleCenterController(props: CircleCenterConfirmationProps): Circle
         setMove(null);
       })
       .catch((cause: unknown) => {
-        setError(errorMessage(cause, 'Could not confirm that the center move stopped.'));
+        setError(errorMessageOr(cause, 'Could not confirm that the center move stopped.'));
       })
       .finally(() => setCancelling(false));
   };
@@ -108,9 +110,7 @@ function useCircleCenterController(props: CircleCenterConfirmationProps): Circle
     setError(null);
     void props
       .onFinish(currentPosition, props.fit.diameterMm)
-      .catch((cause: unknown) =>
-        setError(errorMessage(cause, 'Could not create the circle at the current head position.')),
-      )
+      .catch((cause: unknown) => setError(errorMessageOr(cause, CREATE_FAILED)))
       .finally(() => setSaving(false));
   };
 
@@ -232,10 +232,6 @@ function CircleCenterMovingAction(props: {
       )}
     </>
   );
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message.trim() !== '' ? error.message : fallback;
 }
 
 const confirmationStyle: React.CSSProperties = {

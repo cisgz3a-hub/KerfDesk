@@ -11,6 +11,7 @@ import type { SurfaceHeightArea } from '../../../core/camera/model/height-areas'
 import type { RgbaImage } from '../../../core/camera/rgba-image';
 import type { ViewTransform } from '../../workspace/view-transform';
 import { cameraModelForFrame } from '../camera-model-frame';
+import { useFrameRescaleVerdicts } from '../frame-rescale-check';
 import type { LiveCaptureElement } from '../frame-capture';
 import { cameraCaptureBindingForFrame, type ActiveCameraSource } from '../frame-source';
 import type { CameraCaptureBinding } from '../../../core/camera/camera-capture-binding';
@@ -22,10 +23,23 @@ export type OverlayFrame =
       readonly kind: 'still';
       readonly image: RgbaImage;
       readonly capture: CameraCaptureBinding | null;
+      // The still shrunk in the camera picture worker, drawn in its place
+      // (ADR-440 Amendment 11); the image's own size still places it.
+      readonly display?: ImageBitmap | null;
     }
   | {
       readonly kind: 'live';
       readonly element: LiveCaptureElement;
+      readonly source: ActiveCameraSource;
+    }
+  | {
+      // A bridge camera's newest picture, decoded off the UI thread at the
+      // canvas's size (ADR-440 Amendment 10); width and height are the
+      // picture's own, which the camera model is fitted to.
+      readonly kind: 'bitmap';
+      readonly bitmap: ImageBitmap;
+      readonly width: number;
+      readonly height: number;
       readonly source: ActiveCameraSource;
     };
 
@@ -85,11 +99,13 @@ export function useBedOverlayDrawing(
     };
   }, [canvas]);
 
-  // A new view, opacity or frame: draw it now.
+  // A new view, opacity or frame, or a frame size just proved a resize
+  // (ADR-440 Amendment 9): draw it now.
+  const rescaleVerdicts = useFrameRescaleVerdicts();
   useEffect(() => {
     inputRef.current = { frame, scene };
     if (renderer !== null && !renderer.lost) setIssue(drawOverlay(renderer, frame, scene));
-  }, [renderer, frame, scene]);
+  }, [renderer, frame, scene, rescaleVerdicts]);
 
   const live = frame?.kind === 'live' ? frame.element : null;
   const streaming = frame?.kind === 'live' && frame.source.kind === 'machine-rtsp';
@@ -169,6 +185,7 @@ function drawOverlay(
     frame.kind === 'still'
       ? frame.capture
       : cameraCaptureBindingForFrame(frame.source, size.width, size.height);
+  // Only a new picture is drawn: a bitmap is its own new frame.
   const fitted = cameraModelForFrame(scene.model, capture, size.width, size.height);
   if (fitted.kind === 'issue') {
     renderer.clear();
@@ -195,6 +212,7 @@ function drawOverlay(
 function frameSize(
   frame: OverlayFrame,
 ): { readonly width: number; readonly height: number } | null {
+  if (frame.kind === 'bitmap') return { width: frame.width, height: frame.height };
   const size =
     frame.kind === 'still'
       ? { width: frame.image.width, height: frame.image.height }
@@ -222,6 +240,8 @@ const stillTextures = new WeakMap<RgbaImage, ImageData>();
 
 function textureSource(frame: OverlayFrame): TexImageSource {
   if (frame.kind === 'live') return frame.element;
+  if (frame.kind === 'bitmap') return frame.bitmap;
+  if (frame.display !== undefined && frame.display !== null) return frame.display;
   const cached = stillTextures.get(frame.image);
   if (cached !== undefined) return cached;
   const image = new ImageData(

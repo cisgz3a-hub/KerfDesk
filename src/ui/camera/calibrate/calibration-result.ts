@@ -13,11 +13,17 @@ import type {
   BedCalibrationFailure,
 } from '../../../core/camera/target/bed-calibration';
 import { DEFAULT_RING_DIAMETER_MM } from '../../../core/camera/target/bed-target';
+import {
+  extrapolationEstimate,
+  GOOD_EXTRAPOLATED_MM,
+  type ExtrapolationEstimate,
+} from '../../../core/camera/model/extrapolation-estimate';
 import type { MissingOuterBand } from '../../../core/camera/target/missing-outer-band';
 import {
   shareOutsideTarget,
   targetLayoutMismatch,
 } from '../../../core/camera/target/target-coverage';
+import { roundToTenth } from '../../../core/util/rounding';
 
 export function cameraModelFromCalibration(args: {
   readonly calibration: BedCalibration;
@@ -113,7 +119,7 @@ export function calibrationGrade(record: CameraModelRecord): CalibrationGrade {
   if (record.accuracy.onlyAtTargetHeight === true && rmsErrorMm <= FAIR_RMS_MM) {
     return {
       tone: 'fair',
-      headline: `Lined up at the height of the ${mm(record.accuracy.targetHeightMm)} mm target sheet only.`,
+      headline: `Lined up at the height of the ${roundToTenth(record.accuracy.targetHeightMm)} mm target sheet only.`,
       advice: joined(
         'The camera looks almost straight down, so one photo cannot tell how high it is. On the target sheet the picture is exact, but on thicker or thinner material it may be off by several millimetres. Measure the height of the camera lens above the bed, enter it under Change settings (Camera height), and take the photo again.',
         lowCoverage,
@@ -121,13 +127,7 @@ export function calibrationGrade(record: CameraModelRecord): CalibrationGrade {
       ),
     };
   }
-  if (rmsErrorMm <= GOOD_RMS_MM) {
-    return {
-      tone: 'good',
-      headline: 'Accurate enough for placing artwork by eye.',
-      advice: joined(lowCoverage, extrapolated),
-    };
-  }
+  if (rmsErrorMm <= GOOD_RMS_MM) return goodOnTheRings(record, joined(lowCoverage, extrapolated));
   if (rmsErrorMm <= FAIR_RMS_MM) {
     return {
       tone: 'fair',
@@ -147,20 +147,64 @@ export function calibrationGrade(record: CameraModelRecord): CalibrationGrade {
   };
 }
 
-// The figures are measured on the rings only (ADR-441 Amendment 4): say so
-// when much of what the camera sees lies beyond them. No figure is given for
-// the rest, because nothing there was measured.
-function extrapolationAdvice(record: CameraModelRecord): string | null {
-  const share = shareOutsideTarget(record);
-  if (share === null || share < EXTRAPOLATED_SHARE) return null;
-  const percent = Math.round(share * 100);
-  return record.mount?.kind === 'head'
-    ? `About ${percent} % of the picture lies outside the target. The accuracy is measured on its rings; elsewhere the picture is estimated. A larger target size measures more of it.`
-    : `About ${percent} % of the bed the camera sees lies outside the target. The accuracy is measured on its rings; outside the target the picture is estimated. A smaller margin measures more of the bed.`;
+// Rolling audit v13 Y1-P2-1: the rings read 0.06 mm while the far bed was
+// millimetres off, and the grade said "Accurate enough" for all of it. Good
+// now means the whole bed the camera sees (ADR-441 Amendment 9).
+function goodOnTheRings(record: CameraModelRecord, advice: string | null): CalibrationGrade {
+  const offTarget = offTargetEstimate(record);
+  if (offTarget !== null && offTarget.worstMm > GOOD_EXTRAPOLATED_MM) {
+    return {
+      tone: 'fair',
+      headline: `Accurate on the target; elsewhere on the bed up to about ${roundToTenth(offTarget.worstMm)} mm off.`,
+      advice,
+    };
+  }
+  return { tone: 'good', headline: 'Accurate enough for placing artwork by eye.', advice };
 }
 
-function mm(value: number): number {
-  return Math.round(value * 10) / 10;
+// The figures are measured on the rings only (ADR-441 Amendment 4): say so
+// when much of what the camera sees lies beyond them, with the estimate of
+// how far off it may be there (Amendment 9). The lever is the sheet: a
+// larger one measures more of the bed (a smaller margin adds only a few
+// millimetres, rolling audit v13 Y1-P3-6).
+function extrapolationAdvice(record: CameraModelRecord): string | null {
+  const share = shareOutsideTarget(record);
+  const offTarget = offTargetEstimate(record);
+  const large = offTarget !== null && offTarget.worstMm > GOOD_EXTRAPOLATED_MM;
+  if ((share === null || share < EXTRAPOLATED_SHARE) && !large) return null;
+  if (record.mount?.kind === 'head') {
+    return `About ${Math.round((share ?? 0) * 100)} % of the picture lies outside the target. The accuracy is measured on its rings; elsewhere the picture is estimated. A larger target size measures more of it.`;
+  }
+  const outside = outsideSentence(share);
+  const estimate =
+    offTarget === null
+      ? 'outside the target the picture is estimated.'
+      : `outside the target the picture is estimated, and may be up to about ${roundToTenth(offTarget.worstMm)} mm off ${bedRegion(offTarget)}.`;
+  const fix = large
+    ? ' Engrave the target on a larger sheet, one that covers more of the bed the camera sees, to measure more of it.'
+    : '';
+  return `${outside} The accuracy is measured on its rings; ${estimate}${fix}`;
+}
+
+function outsideSentence(share: number | null): string {
+  return share === null || share < EXTRAPOLATED_SHARE
+    ? 'Part of the bed the camera sees lies outside the target.'
+    : `About ${Math.round(share * 100)} % of the bed the camera sees lies outside the target.`;
+}
+
+// The off-target estimate for a fixed camera, or null when it cannot be made.
+function offTargetEstimate(record: CameraModelRecord): ExtrapolationEstimate | null {
+  return record.mount?.kind === 'head' ? null : extrapolationEstimate(record);
+}
+
+/** Where on the bed the estimate is worst, as the canvas shows it (y grows down). */
+export function bedRegion(estimate: Pick<ExtrapolationEstimate, 'worstAt' | 'bed'>): string {
+  const { worstAt: at, bed } = estimate;
+  const across = at.x < bed.width / 3 ? 'left' : at.x > (2 * bed.width) / 3 ? 'right' : null;
+  const down = at.y < bed.height / 3 ? 'top' : at.y > (2 * bed.height) / 3 ? 'bottom' : null;
+  if (across !== null && down !== null) return `near the ${down}-${across} corner of the bed`;
+  if (across !== null || down !== null) return `near the ${down ?? across} edge of the bed`;
+  return 'in the middle of the bed';
 }
 
 function joined(...parts: ReadonlyArray<string | null>): string | null {
@@ -213,7 +257,7 @@ export function calibrationFailureMessage(
     case 'too-few-marks':
       return 'Too few rings were found to fit the camera. Light the bed evenly and move anything covering the target.';
     case 'lens-folds':
-      return 'The rings cover too little of the picture to model the lens out to its edges. Engrave a larger target (a smaller margin, or a larger target size for a camera on the head), then take the photo again.';
+      return 'The rings cover too little of the picture to model the lens out to its edges. Engrave a larger target (on a larger sheet, or a larger target size for a camera on the head), then take the photo again.';
     case 'too-few-points':
     case 'no-initial-pose':
     case 'diverged':

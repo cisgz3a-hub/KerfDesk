@@ -68,6 +68,7 @@ function BrushControls(props: SecondPassToolsProps): JSX.Element {
       <div className="second-pass-tool-buttons" role="group" aria-label="Drawing tools">
         {TOOLS.map(({ tool, label, title }) => (
           <button
+            type="button"
             className="lf-btn lf-btn--sm"
             key={tool}
             title={title}
@@ -113,6 +114,7 @@ function HistoryControls(props: SecondPassToolsProps): JSX.Element {
   return (
     <div className="second-pass-tool-buttons">
       <button
+        type="button"
         className="lf-btn lf-btn--sm"
         disabled={props.disabled || !props.canUndo}
         onClick={props.onUndo}
@@ -121,6 +123,7 @@ function HistoryControls(props: SecondPassToolsProps): JSX.Element {
         Undo
       </button>
       <button
+        type="button"
         className="lf-btn lf-btn--sm"
         disabled={props.disabled || !props.canRedo}
         onClick={props.onRedo}
@@ -129,6 +132,7 @@ function HistoryControls(props: SecondPassToolsProps): JSX.Element {
         Redo
       </button>
       <button
+        type="button"
         className="lf-btn lf-btn--sm"
         disabled={props.disabled || props.strokes.length === 0}
         onClick={props.onClear}
@@ -146,6 +150,7 @@ function StrokeList(props: SecondPassToolsProps): JSX.Element {
       {props.strokes.map((stroke, index) => (
         <li key={stroke.id}>
           <button
+            type="button"
             className="lf-btn lf-btn--sm"
             disabled={props.disabled || stroke.mode === 'erase'}
             aria-pressed={props.selected === stroke.id}
@@ -160,6 +165,7 @@ function StrokeList(props: SecondPassToolsProps): JSX.Element {
             {stroke.mode === 'paint' ? ` · ${Math.round(stroke.powerScale * 100)}%` : ''}
           </button>
           <button
+            type="button"
             className="lf-btn lf-btn--sm"
             aria-label={`Remove stroke ${index + 1}`}
             title="Remove this stroke; earlier overlapping paint or eraser strokes then apply."

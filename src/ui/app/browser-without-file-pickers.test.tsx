@@ -1,6 +1,7 @@
 // U1-P2-1 (ADR-688): in Firefox or Safari the file pickers are missing. The
 // app says so as it opens, and the Save-changes question offers no Save that
-// can only fail.
+// can only fail. Rolling audit v11 W9-P2-2 (ADR-688 Amendment 2): Save
+// downloads there, and nothing calls the browser's autosave safe.
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -11,7 +12,7 @@ import { ConfirmSaveDialog } from '../common/ConfirmSaveDialog';
 import { useStore } from '../state';
 import { useConfirmSaveStore } from '../state/confirm-save-store';
 import { useUiStore } from '../state/ui-store';
-import { BrowserFilesNotice } from './BrowserFilesNotice';
+import { BrowserFilesNotice, UNSAVED_WORK_WARNING } from './BrowserFilesNotice';
 import { confirmDiscardAsync } from './confirm-discard';
 import { PlatformProvider } from './platform-context';
 
@@ -34,7 +35,19 @@ beforeEach(() => {
   root = createRoot(host);
 });
 
+const originalCreateObjectUrl = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
+
+function allowDownloads(allowed = true): void {
+  Object.defineProperty(URL, 'createObjectURL', {
+    configurable: true,
+    writable: true,
+    value: allowed ? () => 'blob:kerfdesk/1' : undefined,
+  });
+}
+
 afterEach(async () => {
+  if (originalCreateObjectUrl === undefined) Reflect.deleteProperty(URL, 'createObjectURL');
+  else Object.defineProperty(URL, 'createObjectURL', originalCreateObjectUrl);
   await act(async () => root.unmount());
   host.remove();
   delete pickerWindow.showOpenFilePicker;
@@ -50,10 +63,11 @@ async function render(node: React.ReactNode): Promise<void> {
   await act(async () => root.render(node));
 }
 
-function mockPlatform(filePickersAvailable: boolean): PlatformAdapter {
+function mockPlatform(filePickersAvailable: boolean, savesByDownload = false): PlatformAdapter {
   return {
     id: 'web',
     filePickersAvailable: () => filePickersAvailable,
+    savesByDownload: () => savesByDownload,
     pickFilesForOpen: async () => [],
     pickFileForSave: async () => {
       throw new Error('picker should not open');
@@ -63,21 +77,38 @@ function mockPlatform(filePickersAvailable: boolean): PlatformAdapter {
 }
 
 describe('browser file notice', () => {
-  it('appears on load when showOpenFilePicker is undefined', async () => {
+  it('appears on load in Firefox or Safari, says Save downloads, and does not call autosave safe', async () => {
     expect(pickerWindow.showOpenFilePicker).toBeUndefined();
+    allowDownloads();
     await render(
       <PlatformProvider adapter={webAdapter}>
         <BrowserFilesNotice />
       </PlatformProvider>,
     );
 
-    const notice = host.querySelector('[aria-label="Browser file support"]');
-    expect(notice?.textContent).toContain("This browser can't open or save files.");
-    expect(notice?.textContent).toContain('Use Chrome or Edge, or the desktop app.');
-    expect(notice?.textContent).toContain('drag files onto the canvas');
-    expect(notice?.querySelector('a')?.getAttribute('href')).toBe(
+    const text = host.querySelector('[aria-label="Browser file support"]')?.textContent ?? '';
+    expect(text).toContain('This browser saves by downloading.');
+    expect(text).toContain('Save and Export download a copy to your Downloads folder');
+    expect(text).toContain('drag a file onto the canvas');
+    expect(text).toContain(UNSAVED_WORK_WARNING);
+    expect(text).toContain('Safari does after 7 days without a visit');
+    expect(text).not.toContain('your work is autosaved in this browser');
+    expect(host.querySelector('a')?.getAttribute('href')).toBe(
       'https://kerfdesk.com/download.html',
     );
+  });
+
+  it('says it cannot save at all where downloads are missing too', async () => {
+    allowDownloads(false);
+    await render(
+      <PlatformProvider adapter={webAdapter}>
+        <BrowserFilesNotice />
+      </PlatformProvider>,
+    );
+
+    const text = host.querySelector('[aria-label="Browser file support"]')?.textContent ?? '';
+    expect(text).toContain("This browser can't open or save files.");
+    expect(text).toContain(UNSAVED_WORK_WARNING);
   });
 
   it('stays away where the browser has file pickers', async () => {
@@ -114,7 +145,8 @@ describe('Save changes question without file pickers', () => {
     expect(labels).not.toContain('Save');
     expect(labels).toEqual(expect.arrayContaining(['Cancel', "Don't Save"]));
     expect(dialog?.textContent).toContain("this browser can't save files");
-    expect(dialog?.textContent).toContain('Chrome or Edge');
+    expect(dialog?.textContent).toContain('the browser can delete it');
+    expect(dialog?.textContent).not.toContain('open KerfDesk in Chrome or Edge');
 
     await act(async () => useConfirmSaveStore.getState().choose('cancel'));
     await expect(result).resolves.toBe(false);
@@ -132,6 +164,20 @@ describe('Save changes question without file pickers', () => {
 
     await expect(result).resolves.toBe(false);
     expect(pick).not.toHaveBeenCalled();
+  });
+
+  it('offers Save where the browser saves by downloading (ADR-688 Amendment 2)', async () => {
+    useStore.setState({ dirty: true });
+    await render(<ConfirmSaveDialog />);
+
+    const result = confirmDiscardAsync(mockPlatform(false, true), 'open a project');
+    await act(async () => undefined);
+
+    expect(useConfirmSaveStore.getState().request?.canSave).toBe(true);
+    const labels = [...host.querySelectorAll('[role="dialog"] button')].map((b) => b.textContent);
+    expect(labels).toEqual(['Save', "Don't Save", 'Cancel']);
+    await act(async () => useConfirmSaveStore.getState().choose('cancel'));
+    await expect(result).resolves.toBe(false);
   });
 
   it('keeps Save where the pickers exist', async () => {

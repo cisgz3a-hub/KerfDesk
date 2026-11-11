@@ -12,6 +12,7 @@
 import { RGBA_CHANNELS, type PixelRect, type RgbaBuffer } from '../image-edit';
 import type { SelectionMask } from '../image-select';
 import { clampRectToDoc, lumaByte, MAX_BYTE } from './lut';
+import { modulo } from '../math/wrap';
 
 const RGB_CHANNELS = 3;
 // Above half ink, circles can no longer add area without overlapping — the
@@ -154,18 +155,14 @@ function compareRanks(a: SpotRank | undefined, b: SpotRank | undefined): number 
 // to whole pixels, so 90° lands on the grid despite cos(90°) not being 0.
 function arrayThreshold(thresholds: Float64Array, x: number, y: number, screen: ScreenSpec) {
   const s = screen.spacing;
-  const i = wrap(Math.round(x * screen.cos + y * screen.sin), s);
-  const j = wrap(Math.round(-x * screen.sin + y * screen.cos), s);
+  const i = modulo(Math.round(x * screen.cos + y * screen.sin), s);
+  const j = modulo(Math.round(-x * screen.sin + y * screen.cos), s);
   return thresholds[j * s + i] ?? 1;
 }
 
 // Signed distance to the nearest cell centre along one screen axis.
 function fractionalCell(value: number, spacing: number): number {
   return value - Math.round(value / spacing) * spacing;
-}
-
-function wrap(value: number, spacing: number): number {
-  return ((value % spacing) + spacing) % spacing;
 }
 
 function fraction(value: number): number {

@@ -34,6 +34,9 @@ store, compile them to G-code, and compare with the sidecar.
 | `1.0.29-unaffected`                    | 1.0.29                                                    | Nothing a later release should change: the notices stay silent            |
 | `1.0.29-cnc-bowtie-pocket`             | 1.0.29                                                    | The 1.0.28 Pocket bowtie, cut at the canvas anchor                        |
 | `1.0.29-cnc-flat-drill`                | 1.0.29                                                    | The 1.0.28 flat Drill contour, cut at the canvas anchor                   |
+| `1.0.29-white-logos`                   | 1.0.29                                                    | U3's logo, a white-letter plate, a style and class logo, and the logo with its white on Output off |
+| `1.0.29-white-logo-copies`             | 1.0.29                                                    | U3's logo with two Array copies and a moved Duplicate, which lost `svgImport` |
+| `1.0.29-rotary`                        | 1.0.29                                                    | The Creality chuck preset (40 mm per turn, Ø80) on, a line square and a 90° fill |
 
 The 1.0.29 set was built through 1.0.29's store actions: Import, Draw, the laser tab tool, the
 toolbar and a handle drag, the operation settings, and the Photo engraving dialog's own preview,
@@ -42,10 +45,28 @@ recipe patch and Apply update. Its `1.0.29-fill-pool.burns.json` also holds the 
 1.0.29 burned each tab, read with `burned-tab-spans.ts` (`tabSpans`). `returning-user-1-0-29.test.ts`
 reads them.
 
+`1.0.29-white-logos` (rolling audit v10 V2-P2-1) was imported through 1.0.29's own `parseSvg` and
+store Import, so its white shapes burn over the black, and the last logo's white operation was set
+to Output off with `setLayerParam`. Its sidecar holds each import's burn (by `svgImport.source`)
+and the whole job. `returning-user-white-fills.test.ts` reads it.
+
+`1.0.29-rotary` (rolling audit v12 X8, ADR-695) was built through 1.0.29's store: Draw, the operation
+settings and Rotary Setup's Apply (`updateDeviceProfile`). It has no rotary axis, so it must open on Y.
+Its sidecar holds the rotary as saved and the whole job's burn from Absolute, Current Position
+(centre at X120 Y80) and User Origin (front-left). `returning-user-rotary-1-0-29.test.ts` reads it.
+
+`1.0.29-white-logo-copies` (rolling audit v12 X2-P1-1) is U3's logo imported the same way, then
+copied with 1.0.29's Array (`placeSelectionCopies`, two copies beside it) and Duplicate (moved below
+with `applyObjectTransform`). 1.0.29's copies drop `svgImport`, so only the original keeps it
+(`withSvgImport: 1` in the sidecar). Its sidecar holds each object's burn and the whole job.
+`returning-user-white-copies.test.ts` reads it.
+
 Browser storage and projects saved by 1.0.28's own hooks and store, the same way (rolling audit v9
 R6): a temporary test under the export's `src` drove the Studio's Apply with its persistence hook
 mounted, and connected its laser store to the published A1 Pro banner and `$$` with its profile
-persistence hook mounted.
+persistence hook mounted. The 1.0.29 last machine was made by 1.0.29's own `initDeviceSetup`,
+`planControllerAutoFill`, `deviceSetupReducer`, `machineSetupProfile` and `rememberLastMachine`
+(rolling audit v10's refuter bundle of `df2279e26`).
 
 | File                                      | Read by                                        | Holds                                                                    |
 | ----------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------ |
@@ -53,6 +74,7 @@ persistence hook mounted.
 | `1.0.28-studio-older.lf2`                 | `design-kept-drawings-copies.test.tsx`         | That project after its first Apply (1 line), as an older autosave         |
 | `1.0.28-studio-newer.lf2`                 | `design-kept-drawings-copies.test.tsx`         | That project after its second Apply (3 lines)                             |
 | `1.0.28-a1-pro-widened-last-machine.json` | `falcon-a1-pro-connect-home.simulator.test.ts` | The last-machine document after Use detected values: bed 363 × 273 mm     |
+| `1.0.29-laser-made-cnc-last-machine.json` | `converted-laser-question.test.ts`, `converted-laser-question.e2e.ts` | The laser starter after 1.0.29's first Connect to a stock-GRBL `$$` (`$30=1000`, `$32=0`): saved as a CNC (U8-P2-1, V2-P2-2) |
 
 Add one set per release at release time. To make one, export the release into a folder inside your
 worktree, build the scene in a temporary test under its `src`, save with its

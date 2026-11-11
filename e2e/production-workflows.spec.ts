@@ -878,6 +878,9 @@ test('offers a selected-area second pass after completion with the Machine panel
   await drainHeldSerialWrites(page, kerfdesk, baselineLines);
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   const complete = page.getByRole('dialog', { name: 'Job complete', exact: true });
+  // UX audit U4-P3-8: the facts lead, and the way to burn it again is named.
+  await expect(complete).toContainText('The job finished and the laser is off.');
+  await expect(complete).toContainText('Run same job again from start');
   await expect(complete).toContainText('Would you like to darken selected areas?');
   await expect(page.getByLabel('Laser controls collapsed')).toBeVisible();
   await dismissNotifications(page);
@@ -932,7 +935,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
     recovery.getByRole('button', { name: 'Review recovery', exact: true }),
   ).toBeVisible();
   await expect(
-    recovery.getByTitle('Permanently discard only this isolated recovery capsule.'),
+    recovery.getByTitle('Delete this saved job record for good. Nothing else changes.'),
   ).toBeVisible();
 
   // Make the live canvas differ from the archived run before opening its review.

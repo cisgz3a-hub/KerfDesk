@@ -1,9 +1,10 @@
 // webAdapter — PlatformAdapter backed by the File System Access API.
 //
 // PROJECT.md "Delivery targets" requires Chromium (Chrome, Edge, Brave, Arc),
-// all of which ship the File System Access API. No download-fallback path:
-// unsupported browsers fail clearly instead of creating a second persistence
-// path outside the project/file contract.
+// all of which ship the File System Access API. Firefox and Safari have no
+// pickers: Open still fails clearly (drag-and-drop opens and imports), and
+// Save, Save As and every export download the same bytes instead, so work
+// never lives only in this browser's evictable autosave (ADR-688 Amendment 2).
 
 import type {
   FileHandle,
@@ -18,8 +19,10 @@ import type {
 import { saveDirectoryUnsupportedError } from '../types';
 import { webCamera } from './web-camera';
 import { webSerial } from './web-serial';
+import { webUsbLink } from './web-usb-link';
 import { createHttpCameraBridge } from './camera-bridge';
 import { createLaunchQueueFileOpens } from './launch-queue-file-opens';
+import { downloadSaveTarget, downloadsAvailable } from './download-save-target';
 import { pickerTypeDescription } from './picker-file-types';
 import { fileHandleFromFile, webRecentFiles } from './recent-file-handles';
 
@@ -45,13 +48,18 @@ function acceptTypesFor(accept: ReadonlyArray<string>): FilePickerAcceptType[] {
 export const BROWSER_CANNOT_OPEN_FILES =
   "This browser can't open files. Use Chrome or Edge, or the KerfDesk desktop app. You can still drag files onto the canvas to import them.";
 export const BROWSER_CANNOT_SAVE_FILES =
-  "This browser can't save files. Use Chrome or Edge, or the KerfDesk desktop app. Your work stays in this browser's autosave.";
+  "This browser can't save or download files. Use Chrome or Edge, or the KerfDesk desktop app.";
 
 function filePickersAvailable(): boolean {
   return (
     typeof window.showOpenFilePicker === 'function' &&
     typeof window.showSaveFilePicker === 'function'
   );
+}
+
+/** Saves go to the browser's downloads: no save picker, but a Blob URL (ADR-688 Amd 2). */
+function savesByDownload(): boolean {
+  return typeof window.showSaveFilePicker !== 'function' && downloadsAvailable();
 }
 
 async function pickFilesForOpen(req: FileOpenRequest): Promise<ReadonlyArray<FileHandle>> {
@@ -81,7 +89,8 @@ async function pickFilesForOpen(req: FileOpenRequest): Promise<ReadonlyArray<Fil
 // all bytes before picking (ADR-656).
 async function pickFileForSave(req: FileSaveRequest): Promise<SaveTarget | null> {
   if (typeof window.showSaveFilePicker !== 'function') {
-    throw new Error(BROWSER_CANNOT_SAVE_FILES);
+    if (!downloadsAvailable()) throw new Error(BROWSER_CANNOT_SAVE_FILES);
+    return downloadSaveTarget(req.suggestedName);
   }
   let handle: FileSystemFileHandle;
   try {
@@ -106,6 +115,11 @@ async function reserveFileForSave(req: FileSaveRequest): Promise<SaveTarget | nu
 
 async function reserveSaveDirectory(): Promise<SaveDirectoryTarget | null> {
   if (typeof window.showDirectoryPicker !== 'function') {
+    // Firefox and Safari: each file of the set downloads on its own, and the
+    // browser keeps any same-named file by renaming the new one.
+    if (typeof window.showSaveFilePicker !== 'function' && downloadsAvailable()) {
+      return { file: (displayName) => downloadSaveTarget(displayName), exists: async () => false };
+    }
     throw saveDirectoryUnsupportedError(
       'File System Access directory picker is required to save files safely.',
     );
@@ -303,6 +317,7 @@ async function abortWritable(writable: FileSystemWritableFileStream): Promise<vo
 export const webAdapter: PlatformAdapter = {
   id: 'web',
   filePickersAvailable,
+  savesByDownload,
   pickFilesForOpen,
   pickFileForSave,
   reserveFileForSave,
@@ -313,4 +328,11 @@ export const webAdapter: PlatformAdapter = {
   recentFiles: webRecentFiles,
   externalFileOpens: createLaunchQueueFileOpens(),
   openedProjectSaveTarget,
+  // WebUSB lasers (ADR-702): Chromium browsers and the desktop window only.
+  ...usbLinkEntry(),
 };
+
+function usbLinkEntry(): Pick<PlatformAdapter, 'usbLink'> {
+  const usbLink = webUsbLink();
+  return usbLink === undefined ? {} : { usbLink };
+}

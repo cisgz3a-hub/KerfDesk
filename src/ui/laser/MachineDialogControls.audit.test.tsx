@@ -121,10 +121,12 @@ describe('Machine dialog control audit', () => {
     act(() => button('Chuck').click());
     expect(button('Chuck').getAttribute('aria-pressed')).toBe('true');
     expect(check('[aria-label="Rotary millimetres per rotation"]').disabled).toBe(false);
-    const toggles = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+    // By name: Tapered part (ADR-694) sits between Enable and Reverse.
+    const toggle = (title: string): HTMLInputElement =>
+      check(`input[type="checkbox"][title="${title}"]`);
     act(() => {
-      toggles[0]!.click();
-      toggles[1]!.click();
+      toggle('Enable rotary for this machine profile').click();
+      toggle('Reverse rotary direction').click();
     });
     act(() => button('Cancel').click());
     expect(onCancel).toHaveBeenCalledTimes(1);

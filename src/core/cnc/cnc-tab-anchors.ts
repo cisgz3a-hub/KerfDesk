@@ -11,6 +11,7 @@ import {
   type SceneObject,
   type Vec2,
 } from '../scene';
+import { lerpPoint } from '../geometry/point-math';
 
 const EPS = 1e-9;
 
@@ -312,7 +313,7 @@ function pointAtMeasuredFraction(measure: PolylineMeasure | null, fraction: numb
   for (const edge of measure.edges) {
     if (target > edge.startDistance + edge.length + EPS) continue;
     const edgeT = (target - edge.startDistance) / edge.length;
-    return interpolate(edge.start, edge.end, edgeT);
+    return lerpPoint(edge.start, edge.end, edgeT);
   }
   return measure.first;
 }
@@ -345,16 +346,12 @@ function projectPointToEdge(point: Vec2, start: Vec2, end: Vec2): EdgeProjection
     0,
     Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSq),
   );
-  const projected = interpolate(start, end, edgeT);
+  const projected = lerpPoint(start, end, edgeT);
   return {
     point: projected,
     edgeT,
     distanceSq: (point.x - projected.x) ** 2 + (point.y - projected.y) ** 2,
   };
-}
-
-function interpolate(start: Vec2, end: Vec2, t: number): Vec2 {
-  return { x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t };
 }
 
 // A curve flattened as resolvedPolylines flattens a path's curves.

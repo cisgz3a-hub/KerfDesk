@@ -1,4 +1,6 @@
 /** Provider-independent review payloads. No model result contains executable code or settings. */
+import { isRecord } from '../util/is-record';
+
 export type AiCandidate = {
   readonly id: string;
   readonly name: string;
@@ -35,7 +37,7 @@ export type AiAssistant = {
 };
 
 export function parseAiDraft(value: unknown, request: AiRequest): AiDraft {
-  if (!record(value) || !shortText(value['title'], 160) || !shortText(value['explanation'], 4000))
+  if (!isRecord(value) || !shortText(value['title'], 160) || !shortText(value['explanation'], 4000))
     throw new Error('The assistant returned an invalid description.');
   const paths = value['paths'];
   const matches = value['matches'];
@@ -64,7 +66,7 @@ function validateTask(paths: unknown[], matches: unknown[], task: AiRequest['tas
 function validatePaths(paths: unknown[], request: AiRequest): void {
   let count = 0;
   for (const path of paths) {
-    if (!record(path) || typeof path['closed'] !== 'boolean' || !Array.isArray(path['points']))
+    if (!isRecord(path) || typeof path['closed'] !== 'boolean' || !Array.isArray(path['points']))
       throw new Error('The assistant returned an invalid path.');
     const points: unknown[] = path['points'];
     count += points.length;
@@ -78,7 +80,7 @@ function validatePaths(paths: unknown[], request: AiRequest): void {
 }
 function validPoint(point: unknown, request: AiRequest): boolean {
   return (
-    record(point) && within(point['x'], request.widthMm) && within(point['y'], request.heightMm)
+    isRecord(point) && within(point['x'], request.widthMm) && within(point['y'], request.heightMm)
   );
 }
 function within(value: unknown, maximum: number): boolean {
@@ -88,7 +90,7 @@ function validateMatches(matches: unknown[], request: AiRequest): void {
   const allowed = new Set(request.candidates.map((candidate) => candidate.id));
   const seen = new Set<string>();
   for (const match of matches) {
-    if (!record(match) || !shortText(match['id'], 200) || !shortText(match['reason'], 2000))
+    if (!isRecord(match) || !shortText(match['id'], 200) || !shortText(match['reason'], 2000))
       throw new Error('The assistant returned an invalid material suggestion.');
     const id = match['id'];
     if (!allowed.has(id) || seen.has(id))
@@ -98,7 +100,4 @@ function validateMatches(matches: unknown[], request: AiRequest): void {
 }
 function shortText(value: unknown, maximum: number): value is string {
   return typeof value === 'string' && value.length <= maximum && value.trim().length > 0;
-}
-function record(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

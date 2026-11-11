@@ -9,6 +9,7 @@
 // ring seams are always kept, and kept vertices are the input's own points.
 
 import type { Polyline, Vec2 } from '../scene';
+import { isFinitePositive } from '../util/finite';
 
 export type ToolpathSimplifyOptions = {
   /** Physical size of one polyline unit along each local axis, mm. Rotation
@@ -67,15 +68,11 @@ function ringVertexCount(kept: ReadonlyArray<Vec2>, polyline: Polyline): number 
 
 function usableOptions(options: ToolpathSimplifyOptions): boolean {
   return (
-    isPositiveFinite(options.mmPerUnitX) &&
-    isPositiveFinite(options.mmPerUnitY) &&
-    isPositiveFinite(options.toleranceMm) &&
+    isFinitePositive(options.mmPerUnitX) &&
+    isFinitePositive(options.mmPerUnitY) &&
+    isFinitePositive(options.toleranceMm) &&
     Number.isFinite(options.cornerAngleDeg)
   );
-}
-
-function isPositiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }
 
 // Endpoints (an open chain's ends, or a ring's seam and its explicit return)

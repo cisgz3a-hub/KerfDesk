@@ -9,6 +9,8 @@ import {
   type PhotoToneCurve,
   type PhotoToneSample,
 } from '../../core/raster/photo-tone-curve';
+import { isPositiveFiniteNumber } from '../../core/util/finite';
+import { isRecord } from '../../core/util/is-record';
 
 /** The wedge's burn settings, for the "measured with" note and mismatch warning. */
 export type ToneCalibrationSettings = {
@@ -111,10 +113,10 @@ function isSettings(value: unknown): value is ToneCalibrationSettings {
   return (
     isRecord(value) &&
     DITHER_ALGORITHMS.some((algorithm) => algorithm === value['ditherAlgorithm']) &&
-    isPositive(value['linesPerMm']) &&
+    isPositiveFiniteNumber(value['linesPerMm']) &&
     typeof value['power'] === 'number' &&
     Number.isFinite(value['power']) &&
-    isPositive(value['speed']) &&
+    isPositiveFiniteNumber(value['speed']) &&
     typeof value['negativeImage'] === 'boolean'
   );
 }
@@ -127,12 +129,4 @@ function isSample(value: unknown): value is PhotoToneSample {
     typeof value['observedPercent'] === 'number' &&
     Number.isFinite(value['observedPercent'])
   );
-}
-
-function isPositive(value: unknown): boolean {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

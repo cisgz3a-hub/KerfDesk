@@ -157,6 +157,24 @@ the machine type from `$32`: a laser whose controller reports `$32=0` stays a la
 turn laser mode on with one guarded click, and becomes a CNC only when the operator says so. Job
 Review's laser-mode-off row gets **Send $32=1**.
 
+Amendment 8 (`ADR-637-amendment-8-a-laser-1-0-29-made-a-cnc-is-asked-before-start.md`) reaches
+the machines 1.0.29 had already made CNCs: such a CNC is asked whether it is a laser on the canvas,
+in Machine Setup and in Job Review, whose Start waits for the answer. It never changes the type
+itself.
+
+Amendment 9 (`ADR-637-amendment-9-reconnects-wait-for-the-job.md`) holds the toolbar's
+**Reconnect now** and step 1's **Reconnect using selected profile** while a job runs, as Save's
+driver switch already was: reconnecting resets the controller, which would end the job.
+
+Amendment 10 (`ADR-637-amendment-10-only-an-answer-ends-the-converted-laser-question.md`) widens
+Amendment 8: every CNC-only profile 1.0.29 could have made from a laser (the starter, a LightBurn
+import, a profile with no id) is asked whatever its spindle settings or `$30`, only the operator's
+answer ends the question, and both CNC recoveries ask it before they start.
+
+Amendment 11 (`ADR-637-amendment-11-the-inspector-run-asks-the-converted-laser-question.md`) has
+the G-code Inspector's Run ask it too: on a CNC-typed machine its review drops the laser checks, so
+its Start waits for the same answer.
+
 Verification: `device-setup-auto-fill.test.ts` (a listed laser and a CNC preset keep their type),
 `machine-picker-entries.test.ts` (the CNC reset), and `DeviceSetupMachinePicker.customised.test.tsx`
 (the draft's facts and type question, the replace notice for a CNC preset, **My machine isn't

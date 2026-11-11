@@ -27,6 +27,8 @@ import {
   withoutClosingPoint,
   type FollowedTabs,
 } from './edited-tab-anchors';
+import { maxOf, minOf } from '../util';
+import { lerpPoint } from './point-math';
 
 type Landing = { readonly point: Vec2; readonly moved: boolean };
 
@@ -92,7 +94,10 @@ function landOnRebuiltContour(place: Vec2, old: Polyline, next: Polyline): Landi
   const end = to[(edge.index + 1) % to.length] as Vec2;
   const stretched = nearestOnEdge(target, start, end);
   return {
-    point: stretched.distance <= stretch.keptPlaceMm ? stretched.point : at(start, end, edge.share),
+    point:
+      stretched.distance <= stretch.keptPlaceMm
+        ? stretched.point
+        : lerpPoint(start, end, edge.share),
     moved: false,
   };
 }
@@ -127,19 +132,15 @@ function nearestOnEdge(target: Vec2, start: Vec2, end: Vec2): EdgePoint {
           0,
           Math.min(1, ((target.x - start.x) * dx + (target.y - start.y) * dy) / lengthSq),
         );
-  const point = at(start, end, share);
+  const point = lerpPoint(start, end, share);
   return { point, share, distance: Math.hypot(target.x - point.x, target.y - point.y) };
-}
-
-function at(start: Vec2, end: Vec2, share: number): Vec2 {
-  return { x: start.x + (end.x - start.x) * share, y: start.y + (end.y - start.y) * share };
 }
 
 function pointBounds(points: ReadonlyArray<Vec2>): Bounds {
   return {
-    minX: Math.min(...points.map((point) => point.x)),
-    minY: Math.min(...points.map((point) => point.y)),
-    maxX: Math.max(...points.map((point) => point.x)),
-    maxY: Math.max(...points.map((point) => point.y)),
+    minX: minOf(points.map((point) => point.x)),
+    minY: minOf(points.map((point) => point.y)),
+    maxX: maxOf(points.map((point) => point.x)),
+    maxY: maxOf(points.map((point) => point.y)),
   };
 }

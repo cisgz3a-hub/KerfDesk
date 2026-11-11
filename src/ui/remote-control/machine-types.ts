@@ -44,7 +44,12 @@ export type MachineCommand =
       readonly command: 'capture_board_point' | 'finish_board';
       readonly args: MachineAdmission;
     }
-  | { readonly command: 'pause_job' | 'resume_job'; readonly args: { readonly requestId: string } }
+  | { readonly command: 'pause_job'; readonly args: { readonly requestId: string } }
+  | {
+      readonly command: 'resume_job';
+      /** `confirmAdvisory` echoes the status's `job.resumeAdvisory.confirmation` (ADR-585 Amendment 2). */
+      readonly args: { readonly requestId: string; readonly confirmAdvisory?: string };
+    }
   | {
       readonly command: 'jog_hold_start';
       readonly args: MachineAdmission & {

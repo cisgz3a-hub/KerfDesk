@@ -43,7 +43,7 @@ describe('InspectorTimeline', () => {
     const playback = playbackState();
     mount(<InspectorTimeline playback={playback} totalRouteMm={10} />);
     expect(host?.querySelector('input[type="range"]')).not.toBeNull();
-    expect(host?.textContent).toContain('Playback estimate');
+    expect(host?.querySelector('[aria-label="Playback estimate"]')).not.toBeNull();
 
     act(() =>
       root?.render(
@@ -68,10 +68,8 @@ describe('InspectorTimeline', () => {
   it('preserves preview transport actions and labels the clock as estimated', () => {
     const playback = playbackState();
     mount(<InspectorTimeline playback={playback} totalRouteMm={10} />);
-    expect(host?.textContent).toContain('0:03 / 0:10');
-    const play = Array.from(host?.querySelectorAll('button') ?? []).find(
-      (button) => button.textContent === 'Play',
-    );
+    expect(host?.textContent).toContain('0:03 / 0:10 est.');
+    const play = host?.querySelector<HTMLButtonElement>('button[aria-label="Play"]');
     act(() => play?.click());
     act(() =>
       host?.querySelector<HTMLButtonElement>('[aria-label="Step forward 0.25 seconds"]')?.click(),
@@ -147,10 +145,10 @@ describe('InspectorTimeline', () => {
     );
     const select = host?.querySelector<HTMLSelectElement>('select[aria-label="Playback trail"]');
     expect([...(select?.options ?? [])].map((option) => option.text)).toEqual([
-      'Whole path',
-      'Last 60 s',
-      'Last 20 s',
-      'Last 5 s',
+      'Full trail',
+      'Trail 60 s',
+      'Trail 20 s',
+      'Trail 5 s',
     ]);
     act(() => {
       if (select) select.value = '20';

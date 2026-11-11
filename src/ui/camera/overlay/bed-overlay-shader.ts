@@ -24,6 +24,7 @@ import { fisheyeAngleLimit, type FisheyeDistortion } from '../../../core/camera/
 import type { Mat3 } from '../../../core/camera/homography';
 import { rodriguesToMatrix } from '../../../core/camera/rodrigues';
 import type { ViewTransform } from '../../workspace/view-transform';
+import { finitePositiveOr } from '../../../core/util/finite';
 
 type Pair = readonly [number, number];
 type Triple = readonly [number, number, number];
@@ -217,7 +218,7 @@ export function bedOverlayUniforms(args: BedOverlayUniformArgs): BedOverlayUnifo
   const k = lens.intrinsics;
   return {
     uCanvasSize: [backingPx(args.canvasWidthPx), backingPx(args.canvasHeightPx)],
-    uPixelRatio: positiveOr(args.devicePixelRatio, 1),
+    uPixelRatio: finitePositiveOr(args.devicePixelRatio, 1),
     uViewScale: view.scale,
     uViewOffset: [view.offsetX, view.offsetY],
     uClip: [0, 0, args.bedWidthMm, args.bedHeightMm],
@@ -335,10 +336,6 @@ function columnMajor(r: Mat3): ColumnMajorMat3 {
 // stores are whole pixels, so round here where the renderer and mirror both see it.
 function backingPx(value: number): number {
   return Number.isFinite(value) ? Math.max(1, Math.round(value)) : 1;
-}
-
-function positiveOr(value: number, fallback: number): number {
-  return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
 // NaN hides the overlay rather than drawing it at an undefined strength.

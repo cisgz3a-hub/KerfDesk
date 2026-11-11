@@ -7,7 +7,7 @@
 // still read; the others sit in `otherCameraModels`. Pure core.
 
 import type { DeviceProfile } from '../../devices/device-profile';
-import type { CameraCaptureBinding } from '../camera-capture-binding';
+import { sameCameraSource, type CameraCaptureBinding } from '../camera-capture-binding';
 import { normalizeCameraModelRecord, type CameraModelRecord } from './camera-model-record';
 
 /** What names one camera: its kind, id and, for network cameras, its query. */
@@ -37,8 +37,7 @@ export function modelBelongsTo(model: CameraModelRecord, source: CameraSourceIde
   const saved = model.capture;
   return (
     saved !== undefined &&
-    saved.sourceKind === source.sourceKind &&
-    saved.sourceId === source.sourceId &&
+    sameCameraSource(saved, source) &&
     (source.sourceKind === 'usb' || saved.queryFingerprint === source.queryFingerprint)
   );
 }

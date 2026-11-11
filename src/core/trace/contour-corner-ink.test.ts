@@ -386,3 +386,37 @@ describe('a JPEG of two-level text traces as the clean text (ADR-530 Amendment 1
     },
   );
 });
+
+describe('Sharp traces a JPEG of two-level text as the clean text (ADR-530 Amendment 13)', () => {
+  // Sharp never enlarges, so Amendment 12's step field never reached it: it
+  // walked a JPEG natively on the field's own crossings, and on 72 glyph
+  // images drew 19 serif spikes at quality 75 and 46 at quality 60 (worst
+  // 2.87 px), against 5 on the clean art. Amendment 13 rewrites the JPEG as
+  // its clean art before any route, so Sharp's trace is the clean trace.
+  it.each([24, 32, 48])(
+    'draws a quality 75 JPEG of 1-bit serif text at %i px exactly as the clean text',
+    async (px) => {
+      for (const char of ['A', 'M', 'W', 'k']) {
+        const image = await serifGlyph(char, px);
+        const clean = await trace(oneBit(image), 'Sharp');
+        expect(await trace(oneBit(image, 75), 'Sharp'), `Sharp ${char}`).toEqual(clean);
+      }
+    },
+  );
+
+  // At quality 60 a crack the ringing leaves too uneven to be a step keeps its
+  // ramp, so a node may move a little (0.42 px at most on the 72 images).
+  it.each([24, 32])(
+    'draws a quality 60 JPEG of 1-bit serif text at %i px on the clean outline',
+    async (px) => {
+      for (const char of ['A', 'M', 'N', 'R', 'z']) {
+        const image = await serifGlyph(char, px);
+        const clean = outlinePoints(await trace(oneBit(image), 'Sharp'));
+        for (const node of nodes(await trace(oneBit(image, 60), 'Sharp'))) {
+          const off = Math.min(...clean.map((p) => Math.hypot(p.x - node.x, p.y - node.y)));
+          expect(off, `Sharp ${char} at (${node.x}, ${node.y})`).toBeLessThanOrEqual(1);
+        }
+      }
+    },
+  );
+});

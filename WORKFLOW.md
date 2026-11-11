@@ -60,11 +60,17 @@ The splash becomes visible only after its complete markup is parsed, even when t
 arrives in chunks. The workspace does not accept pointer or keyboard input behind it.
 Workspace overlays, including the controller pause panel, stay beneath the startup screen
 through its hold and fade. Live machine controls regain their normal priority after dismissal.
-Reduced motion uses a static indicator. Both web and desktop hold the screen for at least four
-visible seconds from its first frame after the workspace module starts, then fade it over
-750 ms once the workspace canvas has had a paint opportunity. Time before that frame or while
-the browser document or native desktop window is hidden does not consume the hold
-(ADR-049 Amendment 2). A
+Reduced motion uses a static indicator. On the first launch of each app version on a device (a
+fresh install or an update; a desktop release, or a new major.minor number of the web app), both web
+and desktop hold the screen for at least four visible seconds from its first frame after the
+workspace module starts, then fade it over 750 ms once the workspace canvas has had a paint
+opportunity. Time before that frame or while the browser document or native desktop window is
+hidden does not consume the hold (ADR-049 Amendment 2).
+Every other launch and every reload starts the same fade as soon as the workspace canvas, or
+the settled licence window, has had its paint opportunity, with no hold; input returns when
+the screen is gone, as before. The version that has had its hold is remembered on the device
+once the hold completes, so a launch cut short holds again; when the browser refuses storage,
+no launch holds (ADR-049 Amendment 3). A
 startup crash is shown at once. It introduces no startup interaction or modal.
 
 1. App opens to **empty workspace** state (see F-A2).
@@ -111,8 +117,9 @@ startup crash is shown at once. It introduces no startup interaction or modal.
    your changes before closing KerfDesk?" with **Save** (the default), **Don't Save** and
    **Cancel** (ADR-549). **Save** runs File > Save (the Save dialog for a new project) and closes
    only once the save finishes; a cancelled or failed save keeps the window open. **Don't Save**
-   permits the close and **Cancel** keeps the window and project unchanged. A page navigation in
-   Electron still asks **Leave** or **Stay**.
+   permits the close and **Cancel** keeps the window and project unchanged. After **Don't Save**
+   the work stays under **File > Recover unsaved work** and the next launch does not ask about it
+   (F-C3, ADR-688 Amendment 3). A page navigation in Electron still asks **Leave** or **Stay**.
 3. Active-job unload retains its independent stop-and-recovery behavior and does not show this dirty
    prompt. This flow does not create, change, or consume a Frame permit.
 
@@ -345,6 +352,18 @@ startup crash is shown at once. It introduces no startup interaction or modal.
    error. Images still need absolute positions and sizes; unusable percentage image geometry is
    skipped with the existing warning.
 
+#### Edge — SVG artwork placed with CSS transforms (ADR-574 Amendment 1)
+1. Artwork lands where a browser draws it. The CSS `transform` property (in a `style` attribute
+   or a `<style>` rule) and the `translate`, `rotate` and `scale` properties apply in CSS order,
+   about `transform-origin`, with units such as `px` (one user unit), `mm`, `in` and `turn`, and
+   percentages of the view box or, with `transform-box: fill-box`, of the element's own box.
+2. The `transform` attribute keeps SVG's own grammar: plain numbers, no units. An attribute a
+   browser cannot read (such as `rotate(0.25turn)` or `translate(20px)`) is ignored, as a browser
+   ignores it, and a warning toast counts the elements imported without it.
+3. CSS a browser can place but KerfDesk cannot evaluate (`em` or `vw` units, `calc()`, `var()`, a
+   stroke box) is approximated, and a warning toast says how many elements may sit elsewhere in a
+   browser.
+
 #### Edge — SVG `<text>` elements
 1. Phase A ignores `<text>` elements (text → paths conversion is Phase D).
 2. Toast (info): `<filename> · 4 text elements ignored. Convert text to paths in your design tool, or wait for Phase D.`
@@ -462,6 +481,12 @@ destination and cannot overwrite the template source.
 1. Edit menu `Lock Selection` locks selected artwork and clears selection.
 2. Normal click, marquee, Select All, and transform tools skip locked objects.
 3. Edit menu `Unlock All` unlocks every locked object in the project.
+4. One object can be unlocked on its own (ADR-706). A locked row in the Artwork tree has
+   **Unlock**: an artwork row unlocks that artwork and selects it, and a group row unlocks the
+   locked artwork inside it. A right-click on locked artwork on the canvas opens the context menu
+   with **Unlock** first, which unlocks that object and selects it. Each is one undo step and
+   leaves every other lock in place. The name button of a locked row stays disabled and reads
+   `{name} is locked. Unlock it to select or edit it.`
 
 ---
 
@@ -934,7 +959,8 @@ the linked artwork.
   Numeric typing retains the 300 ms debounce. Mixed values show a neutral, disabled slider until
   an exact value is entered. **More cut settings**
   opens the full draft editor grouped by purpose; **Apply settings** commits the draft and
-  **Cancel** leaves the operation unchanged.
+  **Cancel** leaves the operation unchanged. It opens whatever the machine is doing, and an open
+  draft stays open when a job, jog, Frame or autofocus begins (ADR-706).
 - **Saved defaults** in More cut settings offers **Make Default for #rrggbb**, which remembers
   the operation's applied settings for the colour it names: the colour of the artwork the operation
   was created for, or the operation's own colour when it has no artwork. Further operations in this
@@ -1097,7 +1123,8 @@ that owns those fields, without changing the existing Frame/Start policy.
 - > device.maxFeed: snaps to maxFeed. The Artwork Speed field shows an inline note under the
   essentials ("15,000 mm/min is above this machine's Output max feed, so it runs at 10,000
   mm/min.") with a one-click **Raise Output max feed to 15,000 mm/min** that raises the ceiling
-  and applies the request; a stored speed above the ceiling shows the same note. The Job Review
+  and applies the request as one undo step (ADR-361 Amendment 1); a stored speed above the
+  ceiling shows the same note. The Job Review
   Speed cell warns with a toast: `Capped to Output max feed 10,000 mm/min. Change it in Machine
   Setup > Output max feed.` Advisory only (ADR-361).
 
@@ -1158,7 +1185,9 @@ that owns those fields, without changing the existing Frame/Start policy.
 4. In CNC, Sort cuts last is unavailable: CNC already runs profiles last.
 5. When a Line operation's closed outline runs before weaker output inside it (Fill, Image or a
    lighter score), Job Review and Save G-code warn "Cut runs before the engraving inside it", and
-   Job Review's row has **Cut last**, which runs Sort cuts last (ADR-480 Amendment 2). New
+   Job Review's row has **Cut last**, which runs Sort cuts last (ADR-480 Amendment 2). Each part
+   is checked on its own, so two coasters or a grid on one operation are warned like one
+   (Amendment 3), and a cut with a lead-in or lead-out counts like any other (Amendment 4). New
    operations are not reordered on their own.
 
 ---
@@ -1238,6 +1267,26 @@ that owns those fields, without changing the existing Frame/Start policy.
 5. The runway is only as right as Machine Setup's acceleration: read $120 and $121 from the
    controller where the firmware reports them, and check the scan edges on scrap.
 
+### F-A7e2. Fill Ramp for rubber stamps (ADR-699)
+
+1. Draw or import the stamp so its letters are holes in a filled plate: a border shape with the
+   letters inside, mirrored for a stamp. Put it on a Fill operation (Scanline or Island Fill).
+2. **More cut settings → Fill detail → Ramp**: set **Ramp length** (how far in from each edge power
+   takes to reach full Power; 0 turns it off) and **Ramp min power** (the power at the very edge,
+   just above where the laser starts to mark). Leave **Ramp outer edge** off so the plate's border
+   is cut square, as LightBurn advises; turn it on to slope that edge too.
+3. The fill now burns as a scan of varying power at its line interval and angle: Min power at
+   every letter wall, rising to full Power at the ramp length, so each letter stands on a sloped
+   shoulder. Preview, the time estimate and G-code show the graded power; Job Review reads
+   "ramp N mm from min power M%" and whether the outer edge is square or ramped.
+4. Follow Shape fills keep a flat burn and hide the Ramp fields. A ramp whose grid would need more
+   than 8,000,000 cells burns flat with a Job Review warning; raise the line interval or split the
+   artwork. Ruida `.rd` export refuses a ramped fill, as it refuses images.
+5. Depth depends on the laser and stock. Test the length and floor on scrap first.
+6. On a rotary a ramped fill scans every pass along X in one direction, as an image does
+   (ADR-699 Amendment 1): its scan angle, Cross-hatch and angle per pass are set aside, and Job
+   Review says so when any of them was set.
+
 ### F-A7f. Material Test grids that vary any two settings (ADR-497)
 
 **Focus Test (ADR-602).** Tools → Focus Test generates 2–101 Line samples at distinct relative Z offsets, with per-sample operation names showing the exact 0.001 mm represented offset (names are not engraved). The 2D estimate excludes Z travel and dark returns; Inspect G-code (3D) shows complete emitted motion and its playback estimate. Set a known starting focus, sweep range, spacing, line length, cut power/feed and Z travel feed. Positive Z follows the controller axis direction. Generate replaces the scene through the normal one-step Undo action; save/reopen retains the offsets in schema 18. Preview and inspect the emitted program, complete Frame for the unchanged placement, then use ordinary Start and Job Review. Frame traces XY only. Review warns about missing Z qualification and configured travel exceedance, without adding a Start gate. GRBL-family output switches the laser off before Z motion, restores absolute XY positioning before burns, and returns to starting Z after each completed sample. An interrupted run may leave Z displaced; line-resume is unavailable because the original physical Z datum cannot be reconstructed. Restore starting focus and use ordinary Frame/Start for a whole test. Focus content cannot be emitted in CNC mode. Travel-feed edits preserve Frame identity; changing an offset requires another Frame. Compare the narrowest physical line and set focus manually; software tests do not establish material results or hardware clearance. Unsupported controller dialects and changing a focus operation away from Line mode cannot produce a valid focus program and report that output failure.
@@ -1261,6 +1310,12 @@ that owns those fields, without changing the existing Frame/Start policy.
    Engrave. Engraved cells fill; cut cells show only their outline. Hovering a cell names its
    settings. While a field is invalid the last valid card stays, dimmed, until it is fixed. The
    preview only shows the card; it never changes what Generate makes.
+7. Under the preview, one line says how to read the card (Engrave: the cell you like best; Cut:
+   the fastest cell that cut cleanly through, else more power or passes) and one says to test on
+   scrap over something non-flammable and stay with the laser. A **Cut** still on the default
+   engraving ranges offers **Use cut starting ranges**: 100 % power, 60–600 mm/min down the rows,
+   1–5 passes across the columns, as LightBurn advises for a cut test. Nothing changes until it is
+   pressed (UX audit U8-P3-2).
 
 ### F-A7g. Recipes that apply themselves (ADR-496)
 
@@ -1347,6 +1402,21 @@ that owns those fields, without changing the existing Frame/Start policy.
 1. Click toggle again (or `P`).
 2. Viewport returns to design view.
 3. Scrubber disappears.
+
+#### Editing while Preview is on (ADR-706)
+- Preview shows the job and not the selection, so the canvas only pans (`Space + drag`, the wheel
+  button or the right button) and zooms. Nothing on it can be selected, moved or drawn.
+- The first plain click on the canvas in each visit to Preview shows one line: `Preview shows the
+  job and cannot be edited. Press P or click Preview to go back to the design.` Later clicks in
+  that visit are quiet, a pan never shows it, and the line leaves with Preview.
+- The canvas tools in the left tool strip are disabled, each with the reason `Not available in
+  Preview. Press P or click Preview to edit.` Create artwork and the design library stay available.
+- A key that would change artwork changes nothing and shows the same line: Delete, Backspace, Cut,
+  Paste, Paste in Place, Duplicate, Group, Ungroup, Delete Duplicates, the nudge, flip and rotate
+  keys, the align, Move Together and draw-order keys, and the keys that arm a drawing tool. The key
+  is still consumed, so it never reaches the browser.
+- Undo, Redo, Copy, Select All, Escape, the view keys and `P` work as usual. Menu and toolbar
+  commands and the settings panels are unchanged; Preview rebuilds after each edit (Live updates).
 
 #### Live updates
 - Changes to any Layer's power/speed/passes/visible/output or object transform schedule a preview rebuild outside render. Stale scheduled or asynchronous builds are cancelled; the previous route stays painted until its replacement is ready.
@@ -1956,11 +2026,31 @@ are shown. Nothing here is a gate: Frame, Start and Save are unchanged.
 
 Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 
+#### Which control has the keyboard (ADR-706)
+- A text field keeps every key, so typing, Backspace and its own Undo work as in any field.
+- A control that holds no text keeps only the keys that work it. A slider keeps the arrow keys,
+  Home, End, PgUp and PgDn. A drop-down keeps those, Enter, Space and typed letters, which jump to
+  an option. A radio button keeps the arrows and Space, a tick box Space, and a colour or file
+  button Enter and Space.
+- Every other design shortcut still works while such a control has focus. Delete, Undo, Redo, Copy,
+  Paste and Escape act on the artwork straight after a tick box, slider or drop-down was used, with
+  no click on the canvas first.
+- Enter in a number field that commits on Enter also releases focus. It stays in the field when the
+  value is invalid, inside a dialog, in a table row that sorts on Enter, and on the numeric keypad's Enter (the keypad digits jog a
+  connected machine when no field has focus).
+- The machine keys are stricter: the jog keys and `Cmd/Ctrl+Return` do nothing while any form
+  control has focus.
+- In Preview the editing keys change nothing (F-A8).
+
 #### File
 - `Cmd/Ctrl+N` — New project
 - `Cmd/Ctrl+O` — Open project
 - `Cmd/Ctrl+S` — Save project
 - `Cmd/Ctrl+Shift+S` — Save Project As
+- While a dialog, Design Studio, Image Studio or on-canvas text has the keyboard, both Save keys
+  save nothing and one line says what to do first (apply the drawing or image and close the Studio,
+  finish the text, or close the window). The key never reaches the browser's own "Save page as"
+  (ADR-706)
 - `Cmd/Ctrl+I` — Import SVG, DXF, PDF/compatible AI, HPGL/PLT, PNG/JPG/BMP/GIF/TIFF/PSD or STL through the unified picker
 - `Cmd/Ctrl+Shift+E` — Save G-code (Export)
 
@@ -1986,7 +2076,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - Shift+Arrow — Nudge 10 mm
 - `Cmd/Ctrl+Arrow` — Nudge 0.1 mm (ADR-499; all three distances are set in Settings → Canvas)
 - Holding an arrow key slides the selection as one undo step. An arrow key on a focused tab strip,
-  slider, radio group, list or menu works that control and does not nudge (or align, with Alt);
+  slider, radio group, drop-down, list or menu works that control and does not nudge (or align, with Alt);
   from a plain button it still nudges (ADR-493, ADR-499 Amendment 1).
 - `Alt+Left` / `Alt+Right` / `Alt+Up` / `Alt+Down` — Align left / right / top / bottom (ADR-499)
 - `Alt+PgUp` / `Alt+PgDn` — Align centres on X / Y (ADR-499)
@@ -2135,7 +2225,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    - Marlin's cutter: lit until its laser safety timeout, 1 s in stock builds.
    - Marlin's fan output: lit until the window recovers, or until the E-stop.
 
-   The warning never refuses Start.
+   Its advice depends on why the window streams (ADR-676 Amendment 5): with the preference off,
+   turn it on and reconnect; with an identical USB adapter, leave only one plugged in and
+   reconnect; when the worker could not start, reconnecting is likely to fail the same way. Each
+   asks you not to edit the project while the job runs. The warning leads the list, ahead of
+   Frame and controller-identity notes, and never refuses Start.
 5. Pause releases background refill. Confirmed Resume and tool-change Continue restore it for
    the same live job. Abort, disconnect or a replacement job cannot inherit an old refill queue.
    Marlin's Abort and Disconnect send their stop lines right behind the refill's handback, so
@@ -2383,6 +2477,12 @@ inches hides the position until `$G` or the next Frame (ADR-375 Amendment 11).
    already sent, then writes `0x85` (ADR-375, ADR-640). After the old command handoff settles, the app queries state. If
    GRBL reports `Jog`, the first byte lost the Idle-to-Jog race, so `0x85` is sent again. No queued
    settlement marker is written until a fresh `Idle`; a second post-marker `Idle` releases ownership.
+   A line the controller had not read when `0x85` arrived is never answered, so Cancel reports the
+   missing reply after 8 s. Once the controller reports Idle, a GRBL, grblHAL or FluidNC board is
+   sent one `$G`: these answer lines in order, so its `[GC:` proves the unanswered line was
+   discarded unread, and ownership is released on the same session, with no reset and the work
+   origin kept. Until then, or where that proof is not available, Disconnect and Connect stay
+   available (ADR-640, ADR-696).
 2. An owned G54 selection remains active after cancellation; the stored G55-G59 offsets remain
    intact.
 
@@ -2413,8 +2513,11 @@ inches hides the position until `$G` or the next Frame (ADR-375 Amendment 11).
 5. Otherwise the jog asks for full travel and relies on the release.
 6. A release just after the jog went out waits for its reply before `0x85`, as Cancel does
    (F-B4). If a motion line's reply never comes, Cancel says so after 8 s and the jog stays owned,
-   since the reply may still arrive; once the controller reports Idle, Disconnect and Connect stay
-   available to clear it (ADR-640).
+   since the reply may still arrive. Once the controller reports Idle, a GRBL-family board is asked
+   for `$G` (after 1 s of Idle, or 15 s when the firmware did not identify itself); its `[GC:`
+   proves the jog line was discarded unread, and the jog is released without a reconnect, so a G92
+   origin and a homed machine survive. Disconnect and Connect stay available meanwhile, and remain
+   the way out if `$G` is not answered (ADR-640, ADR-696).
 
 ### F-B6. Start job
 
@@ -2438,9 +2541,24 @@ inches hides the position until `$G` or the next Frame (ADR-375 Amendment 11).
    split Frame (ADR-353) the permit arrives when the exact program does; the trace's own motion
    never cancels that program. Each execution permit remains exact and one-use. Power/speed
    edits preserve spatial evidence; changed geometry, output geometry, placement or registration,
-   Jog, Home, origin/probe/reset/disconnect, or coordinate drift expires it and greys Start out
+   Home, origin/probe/reset/disconnect, or coordinate drift expires it and greys Start out
    again, with the reason in the status line. A settled app-owned run retains the unchanged Frame.
    Camera-only UI state does not.
+   - **A jog (ADR-565 Amendment 1).** When the job is placed in **Absolute Coords**, **User
+     Origin** or **Verified Origin**, a plain X/Y jog keeps the Frame: the job lands by the work
+     origin, not by where the head stands. This covers jog-pad steps and hold-to-jog, keyboard
+     jogs, a phone-remote step, **Move to position**, **Go to work zero** and a click-to-position
+     move. While the head moves, Start is disabled and the status line reads **Jogging — the
+     Frame is kept. Start unlocks when the head stops**. When the jog settles at Idle the status
+     line returns to **Ready to start — framed placement unchanged**, and Start's approach leaves
+     from wherever the head now stands.
+   - A jog still expires the Frame when the job is placed at **Current Position**; when the move
+     includes Z or a rotary axis (a focus jog, a CNC Z jog, or a point move that lifts to safe Z);
+     when the job is a rotary job or the move is a rotary test turn; when the jog ends in an
+     alarm, a rejected line (for example `error:15` past the soft limits), a failed or timed-out
+     Cancel, a pendant takeover, a reset or a reconnect; when a phone-remote hold is released;
+     and when the work origin, the controller session or the artwork changed while the head
+     moved, even if the change was undone. Console motion (`$J=`, `G0`) expires it as before.
 5. The user clicks **Start**. The app opens the single **Job Review** dialog (ADR-224,
    ADR-237 and ADR-565) against the latest exact prepared program plus current controller state.
    Settings changed since Frame are prepared before review; no job streams before confirmation.
@@ -2528,14 +2646,36 @@ inches hides the position until `$G` or the next Frame (ADR-375 Amendment 11).
     readable (ADR-221). Runs without a recorded start show no timer.
 
 #### Repeat — Run again
-1. **Run again** follows Start exactly (ADR-372 Amendment 1, amended by ADR-565). An unchanged
+1. **Run again** follows Start (ADR-372 Amendment 1, amended by ADR-565). An unchanged
    footprint and placement may reuse the clean completed Frame. The button needs another Frame
    when that spatial evidence expires; it never runs a Frame itself and makes no offer. Each
-   replay prepares and reviews the current exact program, claims its own execution permit and
-   starts from line 1 with a new run ID. The run records which completed run it repeats.
+   replay prepares the current exact program, claims its own execution permit and starts from
+   line 1 with a new run ID. The run records which completed run it repeats.
 2. A Current Position job at a different head position requires another Frame. After that Frame,
    Run again uses its newly framed placement, not the first run's frozen origin. The current
    execution inputs must still match the completed job, including after review edits.
+3. **Job Review is not shown again for an unchanged laser job that was already reviewed**
+   (ADR-237 Amendment 3). Run again prepares the program and builds its review as always. It
+   starts without the dialog only when all of these hold:
+   - the machine is a laser. A CNC job always shows Job Review, because its setup confirmation
+     belongs to each run;
+   - the prepared program is the one the completed run sent, byte for byte;
+   - the review needs no answer: laser mode is verified, there is no machine-type question and
+     nothing blocks Start;
+   - its warnings are exactly the ones accepted for the run being repeated;
+   - that run was reviewed in this KerfDesk session, on this controller session. After a
+     reload, or once the controller session has changed (a reconnect, for example), the
+     dialog shows.
+
+   In every other case Job Review opens as it does for Start. When the dialog is skipped, a
+   notice says **Running the same reviewed job again.** once the controller has the job; with
+   warnings it counts them and lists them when opened. The run's record states that its review
+   was carried over and names the run whose review the operator confirmed. All checks after the
+   review still run: the permit claim, the controller and origin checks and the final handoff.
+4. Ordinary **Start** always shows Job Review. So does a job started from the phone remote, and
+   a run that was approved there is not carried into Run again. Editing anything that changes
+   the program hides Run again; Start then reviews the changed job.
+5. A held Enter never presses Run again: only a fresh key press or a click does.
 
 #### Error — exact artifact cannot be produced
 1. The persistent blocker surface and error toast show the compile/transport reason. No Frame or job
@@ -2737,6 +2877,23 @@ minimum target size.
    This software action does not prove that the command arrived or that physical energy stopped.
 4. A reset sent into motion leaves a GRBL controller in `Alarm` (ALARM:3); the user clears it with
    `$X` (F-B9). A reset after a completed hold or a cancelled jog raises no alarm.
+5. After the operator's own ABORT JOB, that ALARM:3 shows "You stopped the job" instead of the
+   ordinary alarm card. When the Abort saved a Set origin here origin it offers **Restore saved
+   origin** (**Home, then restore origin** on a profile with homing), **Set origin here** and
+   **$X — Unlock** (ADR-341 Amendment 11).
+6. On a laser without homing, Restore saved origin runs by itself, once: Unlock, then one `G92`,
+   with no motion. It waits until the controller has reported Alarm twice with nothing in flight,
+   and a toast says "Stopped. The laser is off and your origin is restored. Frame to check before
+   starting again." Start still needs a new Frame (ADR-341 Amendment 14).
+   - It applies only to stock GRBL and FluidNC, a laser job, a saved origin, no rotary, a machine
+     zero that has not moved, and no reset required, safety notice, door or E-stop input.
+   - A CNC job, a profile with homing, grblHAL, any other alarm and any stop that was not the
+     operator's Abort keep the card and its buttons.
+   - A press on a card button first keeps the recovery with the operator. A restore that fails is
+     told in a toast, and the card keeps its buttons while the alarm stands.
+7. The Pause button's tooltip on a laser job with a realtime hold adds that Pause, a wait for the
+   head to stop, then ABORT JOB stops without the controller losing its position (ADR-215
+   Amendment 1).
 
 ### F-B9. Alarm
 
@@ -2745,6 +2902,21 @@ minimum target size.
 
 #### Success — unlock
 1. User clicks **$X — Unlock**. App writes `$X\n`. Alarm cleared from UI.
+2. Unlock hides the head position and the work origin only when the alarm it clears can have lost
+   them (ADR-367 Amendment 3). After a soft limit (`ALARM:2`), a failed probe (`ALARM:4` or `5`)
+   or FluidNC's G-code error (`ALARM:17`) the controller stopped the machine under control, so
+   the position and the work offset it reports stay shown, from the rail, the Frame offer and a
+   Console `$X` alike. A soft limit first needs **Reset (Ctrl-X)**; stock GRBL clears an origin
+   set with Set origin here at that reset, grblHAL keeps it. Home, work-Z and Frame evidence are
+   cleared either way.
+3. After any other alarm, an alarm with no code on record (the power-on lock of a machine that
+   must home, or a lock KerfDesk connected into), a soft limit raised during a hold, or one
+   followed by a new connection or a restart KerfDesk did not send, the position stays hidden
+   until Home, Set origin here, a probe or a reconnect. The Console log says which case applied.
+4. While it is hidden, nothing asks the operator to wait for a report. Frame, Move to position
+   (**Go** and **Use current**), the status panel's `Origin:` row and the disabled **Fire**
+   button's tooltip all say: Home the machine (only on a profile with homing), or move the head
+   to where the job should start and use Set origin here.
 
 #### Edge — reset required
 1. After a critical event (hard or soft limit, E-stop, motor fault) the controller accepts only a
@@ -3748,8 +3920,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 2. **Run same job again from start** appears only while canvas, machine profile,
    output scope, placement, and execution signature still match. Like Start, it
    is greyed out until a clean Frame of this exact job issues a permit (ADR-372
-   Amendment 1). Clicking streams that permit through Job Review, from line 1 with
-   a new run ID and zero recovery progress.
+   Amendment 1). Clicking streams that permit from line 1 with a new run ID and
+   zero recovery progress. Job Review opens first, except for an unchanged laser
+   job already reviewed in this session (ADR-237 Amendment 3; see "Repeat — Run
+   again").
 3. Any relevant edit hides the offer. The receipt remains diagnostic history
    until another accepted run replaces it; **Forget Controller** clears it.
    Ordinary **Start current job** remains available.
@@ -3771,7 +3945,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    Alarm (ADR-367), except a grblHAL E-stop alarm, which must be released first; after Unlock
    the operator sets the origin again, since Unlock does not restore the machine position.
    After a failed probe (ALARM:4 or 5) nothing was lost, so the Frame unlocks and continues
-   once the controller reports Idle (ADR-375).
+   once the controller reports Idle (ADR-375). The same holds after another alarm that keeps
+   the machine position, a soft limit (ALARM:2) above all: the offer says the controller still
+   knows where the head is, and a missing origin is then the Frame's next question (ADR-367
+   Amendment 3).
    A job placed at the head's current position does not frame on after Home, because the cycle
    parks the head at the switches: the Frame stops and asks the operator to jog the head back
    into place and Frame again (ADR-367 Amendment 1).
@@ -3828,16 +4005,17 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    freezes further host refill and preserves the existing dwell/busy detection
    and warning threshold. These are software controls, not physical-stop proof.
 
-### F-B17. Rotary setup, test rotation and the Rotary switch (ADR-127, ADR-315, ADR-373)
+### F-B17. Rotary setup, test rotation and the Rotary switch (ADR-127, ADR-315, ADR-373, ADR-694)
 
 #### Success — set up the attachment
 1. **Tools → Rotary Setup**, or **Setup…** beside the Rotary switch. The dialog edits a draft;
    nothing reaches the profile until **Apply**.
 2. **Object diameter** and **Circumference** are one linked measurement: editing either updates
    the other, and a typed circumference is stored as its exact diameter. **Measure with a strip**
-   takes the flat length of a strip wrapped once round the part where the artwork goes and the
-   strip's thickness (default 0.1 mm), shows Ø = wrap / π − thickness, and **Use this diameter**
-   fills the field.
+   takes the flat length of a strip wrapped once round the part and the strip's thickness
+   (default 0.1 mm), shows Ø = wrap / π − thickness, and **Use this diameter** fills the field.
+   One reading is one diameter; with **Tapered part** on, the buttons are **Use for the top** and
+   **Use for the bottom**.
 3. A **chuck** scales Y by Motion per turn / (π × object diameter). A **roller** either scales it
    by Motion per turn / (π × **Roller diameter**), independent of the part's size, or leaves Y
    unscaled (**Scale Y from the roller diameter** off: the controller's Y steps/mm already move
@@ -3852,6 +4030,28 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    its settings (today the Creality Rotary Kit Pro as a chuck, 40 mm per rotation, for Falcon
    machines). Picking it fills in the type and Motion per turn, keeps the object's diameter and
    the toggles, and shows where the figures come from. Test rotation still checks them.
+6. **Tapered part (Taper Warp)** (ADR-694), off by default, takes LightBurn's Taper Warp inputs:
+   Top diameter, Bottom diameter, Length (top edge to bottom edge along the side), which side of
+   the bed the part's top points to (Left or Right), and **Artwork from top**, the distance along
+   the side from the part's top edge to the nearest edge of the artwork (measure it on the part
+   after Frame). A side-view diagram shows the part with its engraved side level. While it is on,
+   Object diameter follows the wider end and is disabled here and in Machine Setup. Off, the hint
+   says the size round a narrowing part is right only where its diameter was measured.
+   - Hold the part so the side being engraved is level with the bed (raise the narrow end), as
+     LightBurn asks. Focus still changes along the taper and nothing corrects it (nor does
+     LightBurn's Taper Warp); the hint says to focus at the middle of the artwork, or keep the design
+     short along the part. KerfDesk does not promise a perfect burn on a tapered part.
+   - The warp is applied to the output, never to the artwork: G-code (cut, fill and image), `.rd`,
+     Frame and its canvas outline, the estimate and the bounds check all see it. A design D mm tall
+     burns D mm round the part at every height, and one turn stays one turn. Rows round the part
+     stay level; a stroke along the side leans slightly away from the job's anchor row (2.3° at
+     30 mm from it on an Ø80→Ø70 cup), so anchor a Current Position job at its centre.
+   - The preview gives one turn round the top and round the bottom, and checks the artwork against
+     one turn where the part is narrowest under it. Job Review's Rotary fact names the taper, for
+     example "Chuck, taper Ø80 → Ø70 mm over 100 mm". A taper whose ends differ in radius by more
+     than its length disables Apply with a reason.
+   - A project with a taper saves as schema 22; a 1.0.30 or older reader refuses it rather than
+     burning the part unwarped. Older rotary projects open unchanged and emit identical G-code.
 
 #### Success — test rotation
 1. With the controller connected, Idle, unalarmed, no job or other motion, auto-focus idle and
@@ -3884,8 +4084,9 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 2. A turn the controller rejects (for example `error:15` beyond soft limits), an alarm or a
    disconnect ends the test with a message and no return turn.
 3. **Apply** and **Generate test pattern** are disabled while a test turns.
-4. A test turn is a jog: it expires a completed Frame, and Start stays greyed out until the job
-   is framed again (ADR-372).
+4. A test turn always expires a completed Frame, whichever axis it turns and however the job is
+   placed, and Start stays greyed out until the job is framed again (ADR-372, ADR-565
+   Amendment 1): it may drive a roller, so it is never a plain head move.
 
 #### Success — where a rotary job burns (ADR-127 Amendment 1)
 1. In Current Position, User Origin and Verified Origin the job keeps its placement anchor: the
@@ -3897,7 +4098,48 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    where the cylinder is.
 4. Bounds checks keep X on the bed but check Y only by how far it spans: one turn of the object is
    the limit, and a job taller than that warns. Where the job sits in Y never warns, with or without
-   a known work offset.
+   a known work offset. The warning names the artwork's own size round the part and the turns it
+   needs, for example "The artwork wraps 270.0 mm round the part (1.07 turns), more than one turn
+   of the Ø80 mm object (251.3 mm)" (ADR-127 Amendment 2).
+
+#### Success — speed on the part (ADR-127 Amendment 2)
+1. The layer Speed is the speed across the part's surface in every direction, as on a flat bed.
+   Each burn move's F is the machine feed that gives it: a stroke round an Ø80 glass in the
+   Creality chuck (Y ×0.16) is written at 0.16 × the layer speed, a stroke along it at the layer
+   speed, and a diagonal in between.
+2. Image rows run along X and keep the layer speed and their bytes.
+3. When a stroke round the part would need more than the Max feed (a roller whose Y scale is
+   above 1, or the narrow end of a taper on any rotary), the feed stops at the Max feed and Job
+   Review warns from the job's own moves: "They burn up to 122 % of the energy you set. For an even
+   burn, set this layer to 4909 mm/min or less" (ADR-127 Amendment 3). Strokes along X never warn.
+5. A rotary project saved by 1.0.30 or earlier, with a scaled rotary and line, cut or fill output,
+   says on open (and in Job Review) that its strokes round the part now burn with another energy,
+   for example "up to 6.28× the energy they did" on the Creality chuck (ADR-127 Amendment 3).
+4. The ETA and the G-code Inspector read the same program, so they time and shade these strokes
+   as burned.
+
+#### Success — turning the part by hand (ADR-127 Amendment 2)
+1. With a rotary on, the jog pad shows **Turn the part**: −/+ buttons and a step of 1°, 5°, 15°,
+   30°, 45°, 90° or 180°, with the surface millimetres one step moves. Each click is one Y jog of
+   that share of a turn; "+" turns the part the way a job's increasing Y does, Reverse included.
+2. After an Abort on a rotary, Frame's offer to put the saved origin back describes the part's
+   turn in degrees ("the part has turned +111° since"), and on rollers says the part may have
+   slipped.
+
+#### Success — image and Fill rows fit the rotary's steps (ADR-315 Amendments 1 to 3)
+1. The controller places each image row on a whole Y step, and on a rotary one step turns the part
+   `1 / (Y scale × $101)` mm. Job Review checks the rows as the program writes them (row centres,
+   3 decimals) and the controller steps them. When they band or double, it warns, for example "one
+   Y step ($101 = 80 steps/mm) turns the part 0.0785 mm, and the 0.1000 mm line interval is 1.27
+   steps, so its rows land 0.0785 or 0.1571 mm apart and band", and names only intervals that land
+   evenly once typed as printed (here 0.1571 mm, 6.37 lines/mm, 2 steps).
+2. When rows double, the warning counts them ("136 of its 382 rows land on the row before and burn
+   twice"). When no interval the layer accepts lands every row, it says so and names the closest.
+3. A 0° Fill's hatch rows are checked the same way and advised on the Fill's Interval; an offered
+   interval lands evenly wherever the artwork sits against the step grid. Layers go by their names.
+4. A rotary on A or Z is checked against `$103` or `$102` the same way. When the controller
+   reported no steps for the rotary's axis, one warning says the rows could not be checked.
+5. The warning changes nothing on its own; the operator sets the line interval or Interval.
 
 #### Success — the Rotary switch
 1. Once the profile has a rotary setup, a laser project's Job actions dock shows a **Rotary**
@@ -3909,7 +4151,7 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    whose measurements cannot map Y opens Rotary Setup instead of switching on.
 3. Switching changes the job's Y mapping, so a completed Frame expires. Job Review's Rotary fact
    names the mapping, for example "Enabled · Roller, Ø60 mm (rollers Ø25 mm) · Y ×0.51, one
-   revolution = 96 machine mm". Rotary stays a warning-only Job Review fact; Frame remains the
+   revolution = 96 machine mm · each move's feed holds the layer speed on the part". Rotary stays a warning-only Job Review fact; Frame remains the
    only ordinary Start gate.
 
 ---
@@ -3949,6 +4191,20 @@ discarded.
    with picture, object count and save time. **Restore** first asks Save / Don't Save / Cancel for
    the open project, then restores as above.
 3. The list leaves out this window's own work and work open in another live window.
+4. Each session is one row with its newest copy, though a tab closed with unsaved work leaves an
+   interval copy and a newer close copy. Restore never removes a copy newer than the one restored
+   (ADR-688 Amendment 1).
+
+#### Alternate — Don't Save when closing the desktop app
+1. Closing the desktop app with unsaved changes asks Save, Don't Save or Cancel (F-A1, ADR-549).
+   After **Don't Save** the window still writes its close copy to the slot.
+2. The next launch shows no card for that copy: the question was answered at the close. The copy
+   is kept and **File > Recover unsaved work…** lists it (ADR-688 Amendment 3).
+3. Only that copy is quiet. Work autosaved later is asked about as usual, and so is the last
+   interval copy when the close copy could not be written.
+4. A crash, a forced kill, the system ending the session, a reload and the browser's own **Leave
+   site?** are not that answer: the next launch shows the card. Don't Save before New or Open
+   still discards the session's copy (F-A13).
 
 #### Edge — browser without file pickers (Firefox, Safari)
 1. A banner above the workspace reads **This browser can't open or save files. Use Chrome or Edge,
@@ -4724,6 +4980,12 @@ correct M4-mode raster G-code from Compile.
      and threshold change with the tone, for portraits. While Use original pixels (Pass-through in Adjust Image) is
      on and a binary swatch is chosen, a note under the swatches says the image
      burns as Grayscale until that box is off.
+     **3D Sliced** (ADR-699, after LightBurn) treats the image as a depth map: darker burns
+     deeper. **Passes** sets the slice count; each pass burns, at full Power, every pixel at least
+     that many slices deep, darkest first, so a pixel is burned on as many passes as its darkness
+     earns and white never. Its swatch shows a few steps of depth; Job Review names the pass
+     count ("3D Sliced: N passes, one slice each"), and the time estimate counts every pass.
+     Negative inverts the depth. Use original pixels burns it as Grayscale instead.
    - **Lines/mm**: number input, 5..25, default 10.
 6. Workspace shows the image where it will burn; no separate "preview
    the dither" overlay in v1 — the image itself is the preview.
@@ -4858,7 +5120,9 @@ Y on machine X0 Y0 or work zero until they are typed.
 name (blank gives Position N; the same name replaces the old entry) in the machine profile, so it
 travels with the profile and the project and is one undo step. Each saved row has **Go** and
 **Delete**. Go needs a connected, Idle machine, like the jog arrows; a missing work offset for a
-From origin move is a notice and nothing moves.
+From origin move is a notice and nothing moves. While KerfDesk hides the position after Unlock
+or Release motors, Go and Use current say to Home the machine (on a profile with homing) or to
+move the head to the start and use Set origin here, and nothing moves (ADR-367 Amendment 3).
 
 **After a job** (Machine Setup's laser step, ADR-493; LightBurn's Finish Position) sets where a laser
 job leaves the head: **Go to the work origin** (the default, which stores nothing; a Current
@@ -4971,7 +5235,9 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
    clears `wcoCache`; the status row reads "Origin: not reported yet" until
    the next WCO-bearing report shows what remains ("machine 0,0" unless a
    G54 offset is stored or grblHAL kept the G92, which then reads "reported
-   by controller"). A failed probe
+   by controller"). After an Unlock that hides the position the row reads
+   "unknown (Home, or jog to the start and Set origin here)", without Home
+   on a machine that has none (ADR-367 Amendment 3). A failed probe
    (ALARM:4 or 5) keeps the origin (ADR-375). User re-jogs and re-sets if
    they want the offset back.
 5. **Off-bed risk.** Operator sets origin near the bed edge, then
@@ -7069,7 +7335,9 @@ and lifts the command's CNC-only gate.)*
    retry asks for a new one, and so do a streamed job and a new controller
    session. Touches during a tool-change hold count. The cycle's own
    contacts never count. The surface grid (Measure grid) needs the same
-   test touch and uses it up too (ADR-103 Amendment 3).
+   test touch and uses it up too (ADR-103 Amendment 3). Its dialog shows
+   the same live **Probe circuit** line, which ends "tested. Measure grid
+   once the region is clear." (ADR-103 Amendment 4).
 3. Z cycle: fast G38.2 seek down, 2 mm back-off, slow re-touch, then
    `G10 L20 P0 Z<thickness>` — work Z0 lands on the STOCK TOP (plate
    underside) — and a retract. Every line owns the controller response
@@ -8641,6 +8909,37 @@ as the pane's design record.
 1. The export refuses with "Layer … uses Fill/Image raster output, which the
    experimental .rd encoder does not support yet."
 
+### F-H5. Run a Ruida job over the network (desktop, EXPERIMENTAL — ADR-697)
+
+Simulator-tested only; no real Ruida has run this path.
+
+#### Success
+1. Machine details shows **Ruida network connection (experimental)** on the
+   desktop app for a Ruida profile, with the not-qualified warning. The user
+   enters the controller's IPv4 address from its panel and clicks **Connect
+   Ruida**. KerfDesk reads the status bits; only an answer counts as connected.
+2. **Frame (laser off)** sends a travel-only .rd job around the job's bounds,
+   with the job's placement. It counts as complete once the controller has
+   reported busy and then idle twice.
+3. **Start** sends the exact bytes Save .rd would write, datagram by datagram,
+   and lists the job's warnings. **Pause**, **Resume** and **Abort** send
+   Pause, Restore and Stop Process. The job ends when the controller reports
+   idle.
+
+#### Refusals and failures
+1. Start without a completed Frame of the same footprint on this connection:
+   "Frame this job first…"; nothing is sent.
+2. Current Position placement is refused (the link does not read the head
+   position back); Save .rd still exports it.
+3. A controller that reports itself busy, or does not answer, is sent nothing.
+4. A datagram refused four times or left without a verdict for 1 s ends the
+   send without a resend; KerfDesk sends Stop Process and says whether the
+   controller acknowledged it. An unacknowledged stop says to press Stop on
+   the panel.
+5. Port 40200 already in use (LightBurn, RDWorks): Connect fails and names them.
+6. A crashed window, a window that stops reading for 15 s, quitting, or
+   Windows ending the session: the main process sends Stop Process.
+
 ## Phase K flows (box generator — ADR-106)
 
 ### F-K1. Generate a finger-joint box
@@ -8830,8 +9129,12 @@ as the pane's design record.
    loose lid with a half-round thumb notch on its leading edge.
 2. The side-wall channels run from the front edge to one thickness
    inside the wall body; the assembled lid slides over the shortened
-   front and stops against the in-wall post (the captive top strip stays
-   fingered into the back wall).
+   front and its shoulders stop against the in-wall posts (the captive
+   top strip stays fingered into the back wall). A tongue one inner width
+   wide runs on between the posts to the back wall, so the lid band has
+   no slit at the back and the lid cannot wander sideways (ADR-116
+   Amd 1). In CNC mode the tongue shoulders get dogbones; the thumb notch
+   never does.
 3. The lid and its slots are sized with the mandatory play so the lid
    physically slides; laser default clearance rises to 0.2 mm for this
    style (CNC keeps 0.15 mm).
@@ -8903,6 +9206,65 @@ as the pane's design record.
 
 1. Without a 2D context (headless/jsdom) the preview renders an empty
    canvas without crashing, matching BoxPreview's guard.
+
+### F-K10. Lift-off lid (ADR-693)
+
+#### Success
+
+1. Style **Lift-off lid** produces seven parts: an open-top body
+   (bottom, front, back, left, right), a **Lid** the size of the outer
+   footprint, and a **Lid lip** the size of the opening less the
+   clearance.
+2. The operator glues the lip centred under the lid. Setting the lip
+   into the box opening and the lid flush with the walls while the glue
+   cures aligns them. The lid rests on the wall rim and the lip locates
+   it, with the clearance shared between both sides of the lip.
+3. The entered inner height is the usable cavity under the lip; outer
+   height = inner + 3T. Dividers stop under the lip. The laser default
+   clearance rises to 0.2 mm when this style is chosen (CNC keeps
+   0.15 mm).
+
+#### Error — zero clearance
+
+1. Clearance 0 with this style reports "A lift-off lid needs clearance
+   to drop into the box — use 0.2 mm or more."; **Generate** stays
+   disabled.
+
+#### Empty
+
+1. (Not applicable — the style always yields its seven parts.)
+
+#### Edge — outer dimensions
+
+1. In Outer mode the entered height includes the lid; the walls stand
+   one thickness under it.
+
+### F-K11. Open front (ADR-693)
+
+#### Success
+
+1. Style **Open front** produces five panels: bottom, top, back, left
+   and right — a cubby or shelf unit. The bottom and top run straight
+   across the opening and the side walls finish flush with them.
+2. The depth adds only the back wall (outer depth = inner + T), so the
+   entered inner depth reaches from the opening to the back wall.
+3. **Dividers across width** stand on the bottom, end flush with the
+   opening and tab only into the back wall.
+
+#### Error — dividers across depth
+
+1. Any **Dividers across depth** count reports "An open-front box takes
+   dividers across its width only — dividers across its depth would
+   close off the opening."; **Generate** stays disabled.
+
+#### Empty
+
+1. (Not applicable — the style always yields its five panels.)
+
+#### Edge — CNC
+
+1. The open edges have no seats, so they get no dogbones; every joint
+   and divider slot does, as in F-K3.
 
 ## Phase L flows (Image Studio — ADR-242)
 
@@ -9125,9 +9487,13 @@ as the pane's design record.
   step and says what to do next. The operator Frames and Starts it like any job, then presses
   **Expand** on the minimised wizard for the photo. Disabled with a reason while the canvas is in
   CNC mode (ADR-441 Amendment 5). The bed frame is recorded at the Start that burns the rings: an
-  Absolute Start whose job holds every ring where the target put it (ADR-440 Amendment 5). If no
-  such Start was seen and Machine Setup has changed since the target was added, the photo step
-  says so and asks for the target to be added again, instead of fitting it in the old frame.
+  Absolute Start whose job holds every ring where the target put it (ADR-440 Amendment 5). Only
+  rings seen to burn at Absolute are calibrated on (ADR-441 Amendment 10): **Set origin** keeps
+  Absolute while the unmoved rings are on the canvas, and its toast says so; Job Review warns when a
+  Start would stream them from Current Position, User Origin or Verified Origin; and the photo step
+  refuses rings burned from another mode (naming it) or never seen to burn, asking for a Start at
+  Absolute or Engrave target. If Machine Setup has changed since the target was added and no burn
+  was seen, the photo step says that instead, and asks for the target to be added again.
 - **Warning / not homed.** While connected, the target step says to home first on a homing machine
   that is not homed, and on a machine without homing that the camera lines up only while the
   controller keeps its zero. Advice only: **Engrave target** stays available. A calibration whose
@@ -9153,7 +9519,13 @@ as the pane's design record.
 - **Edge / target smaller than the picture.** The fit keeps only the lens terms the rings pin
   down. When a quarter or more of what the camera sees lies outside the target, the result says
   that the accuracy is measured on the rings and the rest of the picture is estimated
-  (Amendment 4).
+  (Amendment 4), and how far off it may be there and where (ADR-441 Amendment 9: the rings are
+  refitted with the other lens models that fit them as well, and with each half of them alone,
+  and their spread past the target is the estimate). When that is over 1.5 mm the result is
+  **Accurate on the target; elsewhere on the bed up to about N mm off**, also in Camera settings,
+  and suggests a larger sheet. The camera overlay tints where the picture may be more than 1.5 mm
+  off, and Job Review says so for a job placed there at Absolute Coordinates with camera placement
+  on.
 - **Edge / target engraved with other settings.** When the rings found form a complete grid
   smaller than the layout looked for, and the camera sees where the missing rings would be, the
   result is rough and names the setting to correct. A check then suggests keeping the saved
@@ -9187,6 +9559,17 @@ as the pane's design record.
   Absolute Coordinates between the runs. It is never told to choose Absolute Coordinates (ADR-654
   Amendment 4). When the outline's own Start from is known and the artwork run differs, the jig's
   outline warning (F-B15a) is shown instead.
+- **Warning / camera placement on a rotary (ADR-228 Amendments 2 and 3).** With the Rotary switch on,
+  the advice depends on the axis that turns the part. On **A or Z**, Absolute Coordinates burns
+  where the artwork sits on the camera picture and starts on the face under the laser, so it gets no
+  warning; Current Position, User Origin or Verified Origin is told that it puts the job at the head
+  or origin along the cylinder, away from the picture, and to choose Absolute Coordinates. On **Y**
+  no single mode keeps both: at Absolute it warns that the cylinder turns back to work Y 0 and says
+  to jog the head over the artwork on the picture, turn the face to the laser and choose Current
+  Position (or switch Rotary off if none is fitted); at a placed mode it says the job goes to the
+  head or origin along the cylinder too, and to jog or set the origin over the artwork first. This
+  rotary wording replaces the Place Board and jig wording. **Engrave target** refuses while the
+  rotary is on, asking for it to be switched off: the rings belong on the flat bed.
 - **Edge / minimized wizard.** The wizard can minimize into a small non-modal panel so the
   operator can watch the camera and reach the machine while the target engraves.
 - **Fix / a small offset (ADR-663 Amendment 2).** For a calibrated camera fixed above the bed,
@@ -9203,17 +9586,22 @@ as the pane's design record.
   made with it known, gets a warning on the result step. **Fix** then still moves the
   calibration, but marks it as made before the bed position was known. Once homed, the
   calibration row says so.
-- **Warn / the camera seems to have moved (ADR-663 Amendment 3).** KerfDesk keeps a small view of
-  what a fixed calibrated camera sees when its calibration is saved, a check keeps it, or a nudge
-  fix is applied. Each new held picture, and one picture a few seconds after the camera starts, is
-  compared with it over the part of the view outside the bed (10 mm clear of its edge). A
-  confident match (score 0.6 or more, the surround at least 4 % of the view) that puts the middle
-  of the bed 1 mm or more off shows **The camera may have moved, by about N mm** in the Camera
-  panel, with **Fix a small offset…**, **Check camera…** and **Dismiss**, and one toast when the
-  panel is closed. **Dismiss** keeps that warning quiet while the camera stays where it was then;
-  a view confirmed steady since (a nudge fix, a kept check), or a further shift of 1 mm or more,
-  warns again. A weaker match, too little surround, a head camera or no kept view says
-  nothing; Camera settings says how to start the warning for a calibration without a view.
+- **Warn / the camera seems to have moved (ADR-663 Amendments 3 and 5).** KerfDesk keeps a small
+  view of what a fixed calibrated camera sees when its calibration is saved, a check keeps it, or a
+  nudge fix is applied. Each new held picture, and one picture a few seconds after the camera
+  starts, is compared with it over the part of the view outside the bed (10 mm clear of its edge),
+  patch by patch, and the patches' moves are fitted on the bed, so a camera that turned or tipped
+  is measured as well as one that slid. When a point of the bed (its centre or a corner) shows 1 mm
+  or more off, the Camera panel shows **The camera may have moved: the picture may be up to about
+  N mm off**, with **Fix a small offset…** (left out when the camera turned, which it cannot fix),
+  **Check camera…** and **Dismiss**, and one toast when the panel is closed. Two checks in a row
+  that no longer match say **what it sees around the bed no longer matches its calibration**. A
+  warning stays until a confident match finds the camera back, a calibration, check or nudge is
+  kept, or **Dismiss**; a weaker match never takes it away. **Dismiss** keeps that warning quiet
+  while the camera stays where it was then; a further shift of 1 mm or more at any bed point warns
+  again. While camera placement is on, Job Review says the same. Too little surround, a plain
+  surround, a head camera or no kept view says nothing; Camera settings says how to start the
+  warning for a calibration without a view.
 - **Check / has the camera moved?** With a calibration saved, **Check camera…** opens the wizard
   at the photo, using the saved target's area and height. The photo is measured against the saved
   calibration. The result says either that the camera has not moved, or how far and which way on
@@ -9283,9 +9671,18 @@ as the pane's design record.
   remains available, but saved network geometry cannot be verified for precision placement.
 - **Error / another camera or picture shape.** A frame from a different camera, or of a different
   aspect ratio than the calibration, is not drawn; the canvas says why. The same camera at another
-  resolution of the same shape is drawn with the lens scaled to it.
+  resolution of the same shape is drawn with the lens scaled to it only once that size is shown to
+  be a resize and not a cut-out of the sensor (ADR-440 Amendment 9): a fixed camera is compared
+  with the view kept at calibration when it starts and on each refreshed picture, and **Check
+  camera…** proves it from the target's rings. Until then the canvas says the picture is W × H, not
+  the size it was calibrated at, and how to check it; a size found not to show the calibrated view
+  is refused with **Set the camera back to … or calibrate again at this size**.
 - **Error / no WebGL2.** A browser with graphics acceleration off says the corrected picture cannot
   be drawn instead of showing an uncorrected one.
+- **Edge / large bridge camera while a job runs.** An RTSP or polled machine camera is drawn from
+  each new picture, decoded away from the window at about the canvas's size, and uploaded once; at
+  most 10 pictures a second, and 2 a second while a job streams. A 4K camera on the canvas keeps
+  every window task under the 50 ms job-time budget (ADR-440 Amendment 10).
 - **Empty / nothing to show.** Without a saved calibration the overlay row is absent and the canvas
   is untouched; with no still and no running camera nothing renders.
 - **Edge / reload and old files.** A corrupt saved calibration is dropped on load (never trusted).
@@ -9450,6 +9847,13 @@ as the pane's design record.
   print scale is more than 2 % off, or the turn is near 180°, the dialog says why and applies it
   only once **Use this registration anyway** is ticked. Job Review repeats the note at Start and
   never refuses (Amendment 1).
+- **Edge / sheet turned or upside down (Amendment 3).** Two marks fit either way round, so the
+  camera checks both against the print: the order that lays the design's artwork on printed ink
+  wins, even past a quarter turn or upside down, and the dialog says so. When the print cannot tell
+  (no artwork beside the marks, or artwork as symmetric as they are) and the sheet reads as turned
+  more than 45°, the dialog says it could not tell which way round the sheet lies and Apply waits
+  for **Use this registration anyway**. Job Review's line for a Start from other than Absolute
+  says the cut lines up with the print only from Absolute Coordinates.
 - **Edge / repeated marks.** When other pairs of marks are the same distance apart, the pair
   nearest the design's targets is used and the dialog says how many others fitted.
 - **Edge / no pair.** When no two marks are the design's spacing apart (within 2 %), the points
@@ -9548,6 +9952,10 @@ as the pane's design record.
 - **Edge / head in the way.** When the head or gantry covered part of the job, the panel says what
   share was hidden. The operator jogs the head clear and presses **Take the after picture
   again**.
+- **Edge / large camera while the job runs (Amendment 2).** Each timelapse frame and the burn
+  check's first picture are read, flattened and encoded in a background worker, so a 4K camera or
+  a calibrated whole-bed job never holds the window: Abort, Pause and the window's streaming
+  answer at once. A phone or MCP camera still is made the same way, at most one a second.
 - **Edge / long job.** A long job keeps at most 480 frames, spread evenly over the whole job.
 - **Edge / panel closed.** While either choice is ticked, the camera stays on with the panel
   closed.
@@ -9647,9 +10055,20 @@ Selecting **Download update** immediately shows that the request is starting. Th
 
 #### Success - update prompt on the canvas (ADR-561 Amendment 5)
 
-1. When a manual update is offered, a non-modal **Update available** card appears at the top centre of the canvas with the new version and up to three improvement notes. **Update** starts the same download as **Download update**; **Not now** clears the card until KerfDesk next starts. The status bar button and Help → Check for Updates remain.
+1. When a manual update is offered, a non-modal **Update available** card appears at the top centre of the canvas with the new version and up to three improvement notes. **Update** starts the same download as **Download update**; **Not now** clears the card until KerfDesk next starts. The toolbar's **Update** button and Help → Check for Updates remain.
 2. After **Update**, the card shows download progress (**Hide** keeps downloading in the background). Once verified it shows **Update ready to install** with **Install now** (the explicit install-and-close action above), **When I close** (install on a normal close) and **Not now**. Downloading never installs by itself.
 3. The card does not appear, and hides, while a job, Fire, owned or external motion, MPG, a modal dialog or the updates panel owns the window; it returns once that ends. A failure after the user acted in the card is reported there with **Details**, which opens Help → Check for Updates.
+
+#### Success - Update button in the toolbar (ADR-561 Amendment 7)
+
+1. While a desktop update is offered, downloading or downloaded, a filled copper **Update** button with a gentle glow sits first among the toolbar's right-hand controls, in laser and CNC workspaces. The glow holds still when the system asks for reduced motion.
+2. An offered update downloads on one click; the button shows the progress (**Updating 42%**, **Verifying…**). On macOS and Linux the click opens the verified download page instead.
+3. Once verified, the click asks "Install KerfDesk X.Y.Z now?" with **Install now**, **Not now** and **Details…**. **Install now** is **Install and close KerfDesk**: unsaved work gets the usual Save, Don't Save or Cancel, then KerfDesk closes and the installer opens.
+4. While a job runs or is paused, or Fire, motion, Frame preparation, Job Review or MPG owns the window, the button reads **Update after job** and does nothing. When the work ends it is offered again; nothing installs or closes by itself.
+
+#### Edge case - browser build
+
+The web app keeps its status bar **Update** button (ADR-227, ADR-228); applying it reloads the page.
 
 1. On each packaged unsigned Preview launch, KerfDesk makes at most one anonymous
    metadata request to `https://dl.kerfdesk.com/desktop/previews/latest.json`.
@@ -9760,7 +10179,7 @@ Selecting **Download update** immediately shows that the request is starting. Th
    shows the installed version and where updates stand (checking, downloading,
    ready to install when KerfDesk closes, not covered by the licence, waiting for
    the licence to be confirmed, failed), offers Check now and the beta choice, and
-   the status bar shows **Update ready** once a version has downloaded (ADR-547).
+   the toolbar shows **Update ready** once a version has downloaded (ADR-547, ADR-561 Amendment 7).
    A failed licence confirmation holds a covered paid or trial update back, and the
    panel says so rather than that the licence's updates ended (ADR-547 Amendment 1).
    The newest eligible
@@ -10266,7 +10685,9 @@ The G-code Inspector is free in every edition (ADR-627).
    moves in `G55`-`G59` are left out and named in the warnings. Arcs count by their exact
    extent in the plane they run in: XY (`G17`), XZ (`G18`) or YZ (`G19`) (ADR-630 Amendment 2).
    A program that never moves frames the point where the head stands. A large file is prepared a
-   slice at a time.
+   slice at a time, and its review is made off the page beside the parse, once for each start;
+   the dialog never repeats it while the head frames or the job starts, so ABORT JOB and Ctrl+.
+   are handled at once (ADR-630 Amendment 9).
    On Marlin, the baseline is two separate lines, `G21` then `G90`, and significant whitespace is
    preserved. Review reads the first command on each line with that command's parameters; later
    G/M words do not execute as extra commands. Firmware-dependent motion and its dependent
@@ -10369,8 +10790,8 @@ into the drawing.
 
 The Design Studio is a full-window overlay for drawing a part to size by hand.
 Flow IDs use the `F-DS` prefix (`F-L` belongs to Image Studio, `F-CNC` to the
-router flows). Stages DS-2 and DS-3 are what these flows describe today; flows
-for the modify operations, dimensions, and the 2.5D view land with DS-6..DS-8.
+router flows). Each flow names the stage that built it; typed entry during a
+draw gesture is F-DS13 (DS-3c); tracking and deferred snaps are F-DS14 (DS-4b); dimensions are F-DS15 (DS-7); Trim is F-DS16 (DS-6c).
 
 Nothing in this surface refuses anything (rule 7). Closing never prompts, an
 unfinished tool explains itself in the status bar rather than being disabled, and
@@ -10517,7 +10938,9 @@ is selected so it can be acted on immediately.
 #### Error — a degenerate gesture
 
 1. A press-and-release that never moved commits nothing and consumes no undo
-   step. A click is not a draw. Nothing is reported as a failure.
+   step. Since DS-3c it is not discarded either: the shape stays anchored at
+   the press, follows the pointer, and the next click or a typed value finishes
+   it (F-DS13). Esc drops it. Nothing is reported as a failure.
 
 #### Empty — no drag yet
 
@@ -10851,6 +11274,164 @@ the edge it sits on, and a midpoint over the same edge.
 
 1. One tool section, no tool-change pause: exactly the pre-layer behavior.
 
+### F-DS13. Type a length, angle, or size while drawing (DS-3c, ADR-272 Amendment 5)
+
+1. Arm Line, Rectangle, Circle, Polyline, or Arc. The options bar shows that
+   tool's entry boxes - Length and Angle; Width and Height; Radius and
+   Diameter; Length and Angle for the next Polyline segment; an Arc's Radius
+   and Angle, then Sweep. They are disabled until the first point is placed.
+2. Place the first point: press-and-drag as before, or click once and move
+   away - a click now anchors the shape instead of discarding it.
+3. Type a number without clicking anywhere. It lands in the first unlocked box.
+   Tab locks it and moves to the next box; the locked box takes an accent
+   border and the pointer keeps steering whatever is not typed.
+4. Press Enter. The shape commits at the typed values (one entity, one undo
+   step), a Polyline places its next corner, or an Arc places its start or end.
+   Enter with nothing typed ends a Polyline open.
+
+#### Success
+
+The committed entity measures exactly the typed values in the DS-3b inspector,
+and its direction follows the pointer for every quantity that was not typed.
+
+#### Error - a value that draws nothing
+
+1. A zero or negative size, a sweep of 360 degrees or more, or text that is not
+   a number is refused in that box: it turns red, its tooltip gives the reason,
+   and the gesture and its other locks are unchanged.
+
+#### Empty - nothing typed
+
+1. The boxes track the live values and Enter behaves like the click it stands
+   in for.
+
+#### Edge - releasing, cancelling, and the next segment
+
+1. Emptying a box releases its lock. Esc in a box drops the typing and returns
+   the keyboard to the canvas; the next Esc cancels the gesture, taking every
+   lock with it. A tool switch does the same.
+2. Shift still squares a rectangle: one typed side sets both. With Alt (from
+   the centre), a typed width is the whole width, not the half the pointer
+   spans.
+3. A Polyline's locks clear when its corner is placed, so each segment is typed
+   afresh.
+
+### F-DS14. Track angles, tangents and alignments while drawing (DS-4b, ADR-272 Amendment 6)
+
+1. With Snap and **Track** on (the default; Shift+T toggles Track), start a
+   Line, Polyline or Arc. Moving the pointer near a multiple of the polar step
+   (15 degrees by default; change it in the picker beside Track) pulls it onto
+   that ray; a dotted guide runs from the start and the angle is labelled.
+2. Hover a circle or arc from the start point: its tangent points and radial
+   points snap, marked with the tangent glyph or the right-angle glyph. Hover a
+   line or straight edge: the foot of the perpendicular from the start snaps.
+3. Move level with another object's corner, midpoint, centre or quadrant, or
+   with a corner already placed in this gesture: the pointer lines up on X
+   and/or Y and a dotted guide connects the two. Where a polar ray crosses such
+   a line, the pointer takes the crossing.
+4. Drag a selection: its box lines up with other objects' left / centre /
+   right and bottom / middle / top, with a guide along the shared line.
+
+#### Success
+
+The status bar names the snap ("Snap: tangent") or the tracking ("Track: 30°",
+"Track: aligned"), and the committed point is exactly on the guide or target
+shown.
+
+#### Error - nothing to track
+
+1. A tangent needs a start outside the circle, and a foot must land within the
+   segment; when neither exists no target is offered. Ellipses and rounded
+   rectangle corners offer no tangent or perpendicular. Nothing is reported as
+   a failure.
+
+#### Empty - no gesture yet
+
+1. Before the first point, only alignment guides act (there is no start to
+   track an angle or a tangent from).
+
+#### Edge - priorities and switches
+
+1. A real point (endpoint, intersection, midpoint, centre, quadrant) always
+   beats tangent and perpendicular, which beat an edge; every object snap
+   beats tracking, and tracking beats the grid.
+2. Ortho turns polar tracking off; Snap off turns all of it off and leaves the
+   pointer where it is. A rectangle or circle tracks alignment only, never a
+   polar angle.
+
+### F-DS15. Dimension a part and drive it by value (DS-7, ADR-272 Amendment 7)
+
+1. Arm **Dimension** (D). Click a rectangle edge for its width or height, a
+   polyline segment for its length, a circle for its diameter, or an arc for
+   its radius. The dimension appears at once, driving, at the current size.
+2. Click a line: the status bar asks for a second pick. Click another line for
+   the angle between them, or anywhere else for the line's length.
+3. The options bar shows the dimension being edited: type a value and press
+   Enter. The shape re-solves to it as one undo step.
+4. Untick **Driving** to make it a reference: it is drawn in parentheses and
+   follows the geometry. Tick it again to drive at the current reading.
+5. Click a placed dimension's line to edit it again; **Delete dimension** (or
+   the Delete key) removes it and leaves the geometry.
+
+#### Success
+
+The shape measures exactly the typed value in the inspector, the dimension
+reads it, and one Ctrl+Z restores both.
+
+#### Error - a value that cannot be honoured
+
+1. A size at or below 0.01 mm, an angle of 0 or 180 degrees or more, or text
+   that is not a number turns the box red with the reason; the geometry is
+   unchanged. Parallel lines and ellipses offer no dimension.
+
+#### Empty - no dimensions
+
+1. A sketch without dimensions saves, applies and cuts exactly as before.
+
+#### Edge - ownership and removal
+
+1. While a dimension drives, a stretch, grip or node edit cannot change that
+   quantity: the driving value is re-imposed. Typing the same quantity in the
+   properties box drives the dimension instead, so the typed value sticks.
+2. Deleting a dimensioned shape, or turning a circle into an ellipse by
+   stretching it, drops the dimensions that named it.
+3. Only the dimensioned entity moves: a line joined to the resized one does
+   not follow (there is no constraint solver, ADR-272 clause 5).
+4. In the 3D surface dimensions are picked and edited but drawn only in 2D.
+
+### F-DS16. Trim a piece back to its crossings (DS-6c, ADR-272 Amendment 8)
+
+1. Arm **Trim** (T) on the Modify rail.
+2. Hover a piece of a line, polyline, rectangle, circle or arc that other
+   geometry crosses. The piece between the nearest crossing on each side is
+   highlighted dashed in the trim colour, and the status bar says a click will
+   trim it.
+3. Click. The piece is removed as one undo step; the highlight moves to
+   whatever piece is now under the pointer, so keep clicking to trim a row.
+
+#### Success
+
+A line trimmed in the middle becomes two lines; a closed outline opens into a
+polyline; a circle becomes an arc. Each piece keeps its layer and construction
+flag, and Ctrl+Z restores the entity whole.
+
+#### Error - nothing to trim to
+
+1. A piece nothing crosses, or a closed outline crossed fewer than twice, is
+   reported in the status bar and left alone: Delete removes a whole shape.
+2. Ellipses and round-cornered rectangles are reported as not trimmable yet.
+
+#### Empty - nothing under the pointer
+
+1. No highlight; the status bar describes the tool. A click does nothing.
+
+#### Edge - cutting edges and dimensions
+
+1. Every other entity cuts, construction geometry included; an ellipse cuts
+   along its drawn outline.
+2. A dimension on a circle that becomes an arc is dropped with it (F-DS15).
+3. Escape disarms Trim and keeps the selection, as it does Extend.
+
 ## F-LEARN1. Contextual visual tutorials
 
 ### Success
@@ -10859,6 +11440,7 @@ the edge it sits on, and a midpoint over the same edge.
 2. Global entry points show a searchable library with categories and machine filters. A contextual entry opens that feature's lesson directly, regardless of the library's current filters.
 3. The user reads the prerequisite/location, chooses a numbered step, and compares the illustrated Before/Action/Result stages. Optional playback changes only the example. Next, Back and Restart navigate the lesson.
 4. **Finish lesson** records completion on this device. Closing or Escape returns focus to the originating control when it remains available. Closing nested help leaves the underlying editor/dialog open.
+5. **Burn your first coaster** also offers **Guide me in KerfDesk**, which closes the lesson and opens the guided first job (F-LEARN2, ADR-698) to do the same journey with the real controls.
 
 ### Error
 
@@ -10871,3 +11453,36 @@ No search matches: show a clear empty state and **Show all tutorials**, which cl
 ### Edge
 
 Tutorials never open automatically, submit forms, invoke tool commands, change artwork or send controller commands. Every lesson remains reachable from Learn, including those for controls that no longer carry their own button. Reduced motion keeps explicit static example-stage controls. The learning surface registers as a modal to isolate application shortcuts, appears above studio dialogs, and stays below the live-motion control bar. Completion is a reading aid, not a qualification or prerequisite for using a tool or starting a job.
+
+## F-LEARN2. Guided first job (ADR-698)
+
+### Success
+
+1. The user opens **Help → Guided first job…**, presses **Guide me in KerfDesk** in the "Burn your first coaster" lesson, or finds it with Ctrl+K. A panel opens over the bottom-left of the canvas; the workspace stays usable around it.
+2. The panel lists six steps and expands the first one not done: **Connect your laser**, **Choose your machine**, **Put something on the canvas**, **Pick a material preset**, **Frame it**, **Start and stay with it**. The real control for that step (Connect, the Machine Setup button, the Artwork panel's Materials tab, Frame job, Start) is outlined; **Show me** opens its panel and focuses it without pressing it.
+3. Each step completes when the app's state does: the controller connects; Machine Setup is saved for the connected profile and controller; artwork is on the canvas (the operator may press **Add a sample circle**, a 40 mm circle in the middle of the bed, one undo step); a job material is chosen or an output operation in use holds or links a library preset; a clean Frame of the current job completes; a job starts. The panel then says the job is under way, to stay with the laser and that ABORT JOB stops it.
+4. Start still goes through the Frame gate and Job Review exactly as in F-B6; the guide adds no check, warning or refusal of its own.
+5. **Close** hides the panel; Help → Guided first job reopens it at the current step. **Start over** clears skipped steps for another job.
+
+### Edge
+
+- An edit after Frame expires the Frame as usual; the guide goes back to **Frame it**. Disconnecting goes back to **Connect your laser**.
+- **Choose your machine** and **Pick a material preset** offer **Skip this step** for an operator using the maker's settings or a material test; Frame and Start cannot be skipped.
+- With the machine set to CNC the panel says it follows a laser job; the Frame and Start steps work the same.
+- The guide never opens by itself, connects, homes, frames, starts or changes a setting. Dialogs, Job Review, toasts and Live Motion sit above it.
+
+## F-LEARN3. Simple view (ADR-698)
+
+### Success
+
+1. **Window → Simple View** or **Settings → General → Simple view → Hide advanced operation settings** turns it on. The choice belongs to this computer and is off until the operator turns it on.
+2. With laser artwork selected, the Operation tab shows the process (Line, Fill, Image), Power, Speed, Passes and every notice it shows anyway (starter values, mixed settings, process notices, who an edit reaches, Include in output). Fill's spacing and angle, the Image essentials, **Scan both ways**, **Air assist** and **More cut settings** give way to a short note.
+3. The note lists, with its value, each hidden setting this process uses whose value differs from a new operation's (for example `Line spacing: 0.05 mm`, `Air assist: on`, `Overcut: 1.5 mm`), or that differs between the selected artworks. With none, it says the other settings are at their usual values.
+4. **Show all settings** turns Simple view off and every control returns. Window → Simple View turns it back on.
+5. On the Artwork tab, **Advanced artwork settings** (the Power multiplier) is hidden only while it is 100% for every selected artwork.
+
+### Edge
+
+- Simple view changes only what the operation panel shows: no value, project, recipe, Preview, Job Review warning, Pause, Abort, run control or G-code changes, and it adds no undo step.
+- A Cut Settings dialog already open stays open when Simple view turns on.
+- CNC operation settings and the Cut Settings dialog show every setting in this increment.

@@ -9,6 +9,8 @@ import {
   ARC_FIT_MIN_RADIUS_MM,
 } from './arc-fit-limits';
 import { arcSweep } from './arc-primitives';
+import { appendAll } from '../../util';
+import { isFinitePoint } from '../point-math';
 
 export type ArcMove =
   | { readonly kind: 'line'; readonly to: Vec2 }
@@ -37,7 +39,7 @@ export function arcMovesConnect(start: Vec2, moves: ReadonlyArray<ArcMove>, end:
   if (last === undefined || last.to.x !== end.x || last.to.y !== end.y) return false;
   let from = start;
   for (const move of moves) {
-    if (!finite(move.to)) return false;
+    if (!isFinitePoint(move.to)) return false;
     if (move.kind === 'arc' && !arcIsSound(from, move)) return false;
     from = move.to;
   }
@@ -45,7 +47,7 @@ export function arcMovesConnect(start: Vec2, moves: ReadonlyArray<ArcMove>, end:
 }
 
 function arcIsSound(from: Vec2, move: Extract<ArcMove, { kind: 'arc' }>): boolean {
-  if (!finite(move.center)) return false;
+  if (!isFinitePoint(move.center)) return false;
   const radius = Math.hypot(from.x - move.center.x, from.y - move.center.y);
   const endRadius = Math.hypot(move.to.x - move.center.x, move.to.y - move.center.y);
   if (radius < ARC_FIT_MIN_RADIUS_MM * 0.5 || radius > ARC_FIT_MAX_RADIUS_MM * 2) return false;
@@ -130,7 +132,7 @@ export function sampleArcMoves(
   const points: Vec2[] = [start];
   let from = start;
   for (const move of moves) {
-    if (move.kind === 'arc') points.push(...arcInteriorPoints(from, move, maxSagittaMm));
+    if (move.kind === 'arc') appendAll(points, arcInteriorPoints(from, move, maxSagittaMm));
     points.push(move.to);
     from = move.to;
   }
@@ -199,8 +201,4 @@ function extendPoint(bounds: ArcMoveBounds, point: Vec2): void {
   if (point.x > bounds.maxX) bounds.maxX = point.x;
   if (point.y < bounds.minY) bounds.minY = point.y;
   if (point.y > bounds.maxY) bounds.maxY = point.y;
-}
-
-function finite(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
 }

@@ -37,6 +37,12 @@ import type { BoxRelief } from './box-spec';
 // δ = c/4 inward per the play derivation in the header.
 const CLEARANCE_TO_OFFSET_FACTOR = -0.25;
 const REFLEX_CROSS_EPS = 1e-9;
+// A seat is where a square tab or shoulder must bottom out: the ring turns
+// through at least 60° there. Every joint corner the generator draws turns
+// 90° (miter offsets keep it one vertex), while a polyline arc such as the
+// slide lid's thumb notch turns 15° per vertex and is a handhold, never a
+// seat (ADR-116 Amd 1).
+const MAX_SEAT_TURN_COSINE = 0.5;
 
 export type PanelRings = {
   readonly outline: Polyline;
@@ -178,6 +184,8 @@ function seatCorners(ring: PathD, convex: boolean): ReadonlyArray<DogboneCorner>
     const cross = inX * outY - inY * outX;
     const threshold = REFLEX_CROSS_EPS * inLength * outLength;
     if (!(convex ? cross > threshold : cross < -threshold)) continue;
+    const turnCosine = (inX * outX + inY * outY) / (inLength * outLength);
+    if (turnCosine > MAX_SEAT_TURN_COSINE) continue;
     const corner = dogboneCorner(prev, curr, next);
     if (corner !== null) corners.push(corner);
   }

@@ -1,6 +1,7 @@
 // Job Review's re-prepare on Confirm reuses the displayed compile when every
 // input it depends on is unchanged, and still recompiles when one is not
-// (ADR-345). Split from job-review-gate.test.ts at the file-size cap.
+// (ADR-345). Split from job-review-gate.test.ts at the file-size cap, which
+// also leaves the warning-order check here.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StatusReport } from '../../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../../core/devices';
@@ -21,6 +22,7 @@ import { prepareCurrentStartJob } from '../start-job-source';
 import { runJobReviewGate } from './job-review-gate';
 import { useJobReviewStore } from './job-review-store';
 import { captureJobReviewModels } from './testing';
+import { WINDOW_STREAM_LIT_STOP_PREFIX } from './window-stream-lit-stop-warnings';
 
 vi.mock('../../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
@@ -173,5 +175,39 @@ describe('Job Review reuse of the displayed compile', () => {
     const confirmed = await review;
     capture.stop();
     expect(confirmed?.bundle.prepared).not.toBe(initial.prepared);
+  });
+});
+
+// ADR-676 decision 5 and Amendment 5: a beam that can stay lit over a head the
+// window stopped leads Job Review, ahead of the Frame's WCS note and the live
+// controller-identity disclosure that the gate adds after it.
+describe('Job Review warning order', () => {
+  it('puts the lit-stop warning first, with the advice for why the window streams', async () => {
+    useLaserStore.setState({
+      activeControllerKind: 'grbl-v1.1',
+      detectedControllerKind: 'marlin',
+      jobStreamHost: 'window',
+      windowStreamReason: 'worker-unavailable',
+    });
+    const bundle = await unframedReviewBundle();
+    const frameWcsNormalizationWarning = 'Controller was using G55. KerfDesk selected G54.';
+    const initial = {
+      ...bundle,
+      prepared: { ...bundle.prepared, gcode: 'M3 S0\nG0 X1\nG1 X2 S800 F1500\nM5\n' },
+      frameWcsNormalizationWarning,
+    };
+    const capture = captureJobReviewModels();
+    const review = runJobReviewGate({ initial, completedReceipt: null, purpose: 'frame' });
+    await vi.waitFor(() => expect(capture.models).toHaveLength(1));
+    const warnings = capture.models[0]?.warnings ?? [];
+    useJobReviewStore.getState().cancel();
+    await review;
+    capture.stop();
+
+    expect(warnings[0]).toContain(WINDOW_STREAM_LIT_STOP_PREFIX);
+    expect(warnings[0]).toContain('its worker could not start for this connection');
+    expect(warnings).toContain(frameWcsNormalizationWarning);
+    expect(warnings.join('\n')).toContain('Controller identity mismatch:');
+    expect(warnings.filter((w) => w.includes(WINDOW_STREAM_LIT_STOP_PREFIX))).toHaveLength(1);
   });
 });

@@ -95,9 +95,12 @@ function decideUnavailable(window: BrowserWindow): WindowUnloadDecision {
     noLink: true,
     title: 'App controls unavailable',
     message: 'KerfDesk cannot reach its controls to finish closing.',
+    // The E-stop line is not conditional: a beam or spindle left on gives no sign
+    // on screen, and this box can hold up main's own stop (rolling audit v12 X1-P2-1).
     detail:
-      'Software Abort and saving cannot be confirmed. Closing may lose unsaved changes. ' +
-      'Use the physical E-stop or power cutoff if the machine may be unsafe.',
+      'Software Abort and saving cannot be confirmed. If a job, Fire or the laser was running, ' +
+      'the beam or spindle may still be on: use the physical E-stop or power cutoff first. ' +
+      'Closing may lose unsaved changes.',
   });
   return response === 1 ? 'leave' : 'stay';
 }

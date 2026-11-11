@@ -23,6 +23,7 @@ import { useFramedRunLaserState } from './use-framed-run-laser-state';
 import { useJobEstimate } from './use-job-estimate';
 import { useJobStartMarkPreparation } from './use-job-start-mark';
 import { useFocusThroughDisable } from '../common/use-focus-through-disable';
+import { useFreshKeyActivation } from '../common/use-fresh-key-activation';
 
 type Props = {
   readonly disabled: boolean;
@@ -103,7 +104,12 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
   const markPending = useJobStartMarkPreparation((state) => state.pending);
   const expiredBecause = useFrameExpiryNote((state) => state.reason);
   const frameActive = laser.motionOperation?.kind === 'frame';
+  // The job itself, not controlsBusy: a Frame in progress is busy too.
+  const jobRunning = useLaserStore((s) => JOB_RUNNING.has(s.streamer?.status ?? 'idle'));
   const frameDeferred = frameIsDeferred(laser.motionOperation);
+  // An XY jog under a fixed placement sets the Frame aside and returns it when
+  // the head stops (ADR-565 Amendment 1); Start stays off for the move itself.
+  const jogKeepsFrame = jogCarriesFrame(laser.motionOperation);
   const preparingFrame = framePending && !frameActive;
   const busy = [props.disabled, props.streaming, framePending, markPending].some(Boolean);
   const frame = currentCompletedFrame(laser);
@@ -112,27 +118,26 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
   const frameControl = frameControlProps(busy, laser.statusReport?.state, connected);
   return {
     onFrame,
-    framedRunIssue,
+    framedRunIssue: shownFrameIssue(framedRunIssue, jogKeepsFrame),
     framedReady,
     preparingFrame,
     cancellablePreparation: preparingFrame && cancellable,
     frameControl,
     // The dock's one bright action: Frame the current placement, then Start.
     frameIsNext: !framedReady && !frameControl.disabled,
-    frameLabel: preparingFrame ? 'Preparing Frame…' : framedReady ? 'Frame again' : 'Frame job',
+    frameLabel: frameButtonLabel(preparingFrame, framedReady, jogKeepsFrame),
     // Frame is the only Start gate (ADR-228): Start stays greyed out until a
     // clean Frame of this footprint and placement completes.
     startControl: {
       disabled: busy || !framedReady,
       title: framedReady
         ? startJobTitle(estimate, jobTimeNoun(machineKind))
-        : connected
-          ? 'Start unlocks after a clean Frame of this footprint and placement. Press Frame job first.'
-          : `${CONNECT_MACHINE_FIRST} Then Frame the job; Start unlocks after a clean Frame.`,
+        : unframedStartTitle(jogKeepsFrame, connected),
     },
     statusText: framedRunStatusText({
       frameActive,
       frameDeferred,
+      jogKeepsFrame,
       stage,
       framedReady,
       hasFramedRun: frame !== null,
@@ -140,14 +145,35 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
       expiredBecause,
       preparingFrame,
       progress,
+      jobRunning,
     }),
     estimate,
   };
 }
 
-function frameIsDeferred(
-  operation: ReturnType<typeof useFramedRunLaserState>['motionOperation'],
-): boolean {
+type MotionOperation = ReturnType<typeof useFramedRunLaserState>['motionOperation'];
+
+function jogCarriesFrame(operation: MotionOperation): boolean {
+  return operation?.heldFrame !== undefined;
+}
+
+function shownFrameIssue(issue: string | null, jogKeepsFrame: boolean): string | null {
+  return jogKeepsFrame ? JOG_KEEPS_FRAME_TITLE : issue;
+}
+
+function frameButtonLabel(preparing: boolean, framedReady: boolean, jogKeepsFrame: boolean) {
+  if (preparing) return 'Preparing Frame…';
+  return framedReady || jogKeepsFrame ? 'Frame again' : 'Frame job';
+}
+
+function unframedStartTitle(jogKeepsFrame: boolean, connected: boolean): string {
+  if (jogKeepsFrame) return JOG_KEEPS_FRAME_TITLE;
+  return connected
+    ? 'Start unlocks after a clean Frame of this footprint and placement. Press Frame job first.'
+    : `${CONNECT_MACHINE_FIRST} Then Frame the job; Start unlocks after a clean Frame.`;
+}
+
+function frameIsDeferred(operation: MotionOperation): boolean {
   return (
     operation?.kind === 'frame' &&
     operation.candidate !== undefined &&
@@ -163,6 +189,8 @@ function JobActionButtons(props: {
   const { model, docked } = props;
   // Frame job turns itself off while it runs; focus waits beside it (U7-P3-1).
   const frameRef = useFocusThroughDisable<HTMLButtonElement>(model.frameControl.disabled);
+  // Focus comes back to it as Frame again: a held Enter must not frame twice.
+  const frameKeys = useFreshKeyActivation(model.frameLabel);
   const frame = (
     <button
       ref={frameRef}
@@ -171,6 +199,7 @@ function JobActionButtons(props: {
       data-primary={docked ? model.frameIsNext : undefined}
       data-search-target="frame-job"
       onClick={model.onFrame}
+      {...frameKeys}
       disabled={model.frameControl.disabled}
       title={model.frameControl.title}
     >
@@ -206,9 +235,19 @@ function JobActionButtons(props: {
   );
 }
 
+const JOB_RUNNING: ReadonlySet<string> = new Set(['streaming', 'paused', 'tool-change']);
+
+// Shown while a jog carries a fixed-placement Frame: it has not expired, but
+// Start waits for the head to stop (ADR-565 Amendment 1).
+export const JOG_KEEPS_FRAME_STATUS =
+  'Jogging — the Frame is kept. Start unlocks when the head stops';
+const JOG_KEEPS_FRAME_TITLE =
+  'The head is moving. The completed Frame is kept, because this job is placed by a fixed origin; Start unlocks when the head stops.';
+
 function framedRunStatusText(args: {
   readonly frameActive: boolean;
   readonly frameDeferred: boolean;
+  readonly jogKeepsFrame: boolean;
   readonly stage: FramePreparationStage;
   readonly framedReady: boolean;
   readonly hasFramedRun: boolean;
@@ -216,7 +255,11 @@ function framedRunStatusText(args: {
   readonly expiredBecause: string | null;
   readonly preparingFrame: boolean;
   readonly progress: OutputCompilationProgress | null;
+  readonly jobRunning: boolean;
 }): string {
+  // The running job holds its one-use Frame permit, so readiness reads as
+  // expired; that is not news while the framed job runs (UX audit U4-P3-3).
+  if (args.jobRunning) return 'Running the framed job';
   if (args.frameActive) {
     // A split Frame traces the compiled outline while the exact program is
     // still being prepared (ADR-353); no permit exists until it arrives.
@@ -225,6 +268,7 @@ function framedRunStatusText(args: {
       : 'Framing exact job…';
   }
   if (args.preparingFrame) return preparingFrameStatusText(args.progress, args.stage);
+  if (args.jogKeepsFrame) return JOG_KEEPS_FRAME_STATUS;
   if (args.framedReady) return 'Ready to start — framed placement unchanged';
   if (args.hasFramedRun) return `Frame expired — ${args.framedRunIssue}`;
   if (args.expiredBecause !== null) {
@@ -238,13 +282,18 @@ function framedRunStatusText(args: {
 // the button waits for the controller instead of refusing after a click.
 // With no machine connected nothing will report, so the hint says to connect
 // rather than to wait (UX audit U1-P2-4).
+// Plain words for what Frame does (UX audit U4-P3-6: "generated motion
+// envelope with the tool off").
+export const FRAME_JOB_TITLE =
+  'Move the head around the outside of the job with the laser or spindle off, so you can check it fits your material. Start unlocks when the Frame completes and stays unlocked while the job and its placement are unchanged.';
+
 export function frameControlProps(busy: boolean, state: string | undefined, connected: boolean) {
   const ready = state === 'Idle' || state === 'Alarm';
   return {
     disabled: busy || !ready,
     title:
       state === 'Idle'
-        ? "Trace the job's generated motion envelope with the tool off. A clean Frame stays valid while its footprint and placement remain unchanged."
+        ? FRAME_JOB_TITLE
         : state === 'Alarm'
           ? 'The controller is in Alarm. Frame offers Home or Unlock first.'
           : frameBlockedTitle(state, connected),

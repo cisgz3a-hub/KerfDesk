@@ -41,6 +41,7 @@ import {
   type GrblMachineMode,
 } from './grbl-machine-mode';
 import type { ControllerEvent } from '../controller-event';
+import { maxOf, minOf } from '../../util';
 
 export type ControllerSettingsSnapshot = Partial<
   Pick<
@@ -96,6 +97,14 @@ export type ControllerSettingsSnapshot = Partial<
   readonly stepsPerMmX?: number;
   readonly stepsPerMmY?: number;
   readonly stepsPerMmZ?: number;
+  // `$103`: steps per unit of a 4th (A) axis, degrees on a rotary. Job Review
+  // checks rotary image rows against it (ADR-315 Amendment 1, ADR-695).
+  readonly stepsPerUnitA?: number;
+  // `$112` / `$113`: the Z and A axes' max rates. A rotary on Z or A cannot
+  // turn faster; the planner caps any move that asks for more (ADR-695
+  // Amendment 1).
+  readonly maxRateZ?: number;
+  readonly maxRateA?: number;
   // `$30=0` was reported. `maxPowerS` holds only a positive S range, because a
   // zero top must never reach a profile, but the report itself is evidence:
   // the controller has no S range at all (ADR-567 Amendment 1).
@@ -338,14 +347,23 @@ function isStockGrblSetting(id: number): boolean {
 
 function stepsPerMmFields(
   map: ReadonlyMap<number, string>,
-): Pick<ControllerSettingsSnapshot, 'stepsPerMmX' | 'stepsPerMmY' | 'stepsPerMmZ'> {
+): Pick<
+  ControllerSettingsSnapshot,
+  'stepsPerMmX' | 'stepsPerMmY' | 'stepsPerMmZ' | 'stepsPerUnitA' | 'maxRateZ' | 'maxRateA'
+> {
   const stepsPerMmX = parsePositiveNumber(map.get(100));
   const stepsPerMmY = parsePositiveNumber(map.get(101));
   const stepsPerMmZ = parsePositiveNumber(map.get(102));
+  const stepsPerUnitA = parsePositiveNumber(map.get(103));
+  const maxRateZ = parsePositiveNumber(map.get(112));
+  const maxRateA = parsePositiveNumber(map.get(113));
   return {
+    ...(maxRateZ === undefined ? {} : { maxRateZ }),
+    ...(maxRateA === undefined ? {} : { maxRateA }),
     ...(stepsPerMmX === undefined ? {} : { stepsPerMmX }),
     ...(stepsPerMmY === undefined ? {} : { stepsPerMmY }),
     ...(stepsPerMmZ === undefined ? {} : { stepsPerMmZ }),
+    ...(stepsPerUnitA === undefined ? {} : { stepsPerUnitA }),
   };
 }
 
@@ -435,11 +453,11 @@ function parseFiniteNumber(value: string | undefined): number | null {
 function pickGreaterPositive(a: number | null, b: number | null): number | null {
   const candidates = [a, b].filter((n): n is number => n !== null && n > 0);
   if (candidates.length === 0) return null;
-  return Math.max(...candidates);
+  return maxOf(candidates);
 }
 
 function pickLesserPositive(a: number | null, b: number | null): number | null {
   const candidates = [a, b].filter((n): n is number => n !== null && n > 0);
   if (candidates.length === 0) return null;
-  return Math.min(...candidates);
+  return minOf(candidates);
 }

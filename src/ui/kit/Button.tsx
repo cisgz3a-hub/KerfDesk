@@ -34,6 +34,8 @@ export function Button({
   return (
     <button
       {...rest}
+      // The one place a button's type is a value: it defaults to "button" above.
+      // eslint-disable-next-line react/button-has-type
       type={type}
       title={hoverTitle}
       className={VARIANT_CLASS[variant]}

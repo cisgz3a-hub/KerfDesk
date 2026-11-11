@@ -1,3 +1,5 @@
+import type { CameraModelRecord } from '../../core/camera/model/camera-model-record';
+import { cameraOffTargetWarnings } from './camera-off-target-warning';
 import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
 import type { StatusQueryCapability } from '../../core/controllers';
@@ -54,7 +56,7 @@ import {
   largeJobPreparationWarning,
   largeRasterPreparationWarning,
   partitionEmitPreflight,
-  preparedProgramIntegrityIssue,
+  preparedStartRefusal,
 } from './start-job-readiness-policy';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import { collectPrintCutFrameWarnings } from './print-cut-frame-warnings';
@@ -79,6 +81,7 @@ import {
   bindPreparedLaserPowerScale,
   type LaserPowerScale,
 } from './connected-laser-power-scale';
+import type { RotaryTurnSinceAbort } from './abort-rotary-turn';
 
 export { STATUS_ALARM_START_MESSAGE } from './start-job-input';
 
@@ -117,6 +120,11 @@ export type MachineStartSnapshot = {
   /** Explicit for connected sessions before their first position report. */
   readonly connected?: boolean;
   readonly statusReport: StatusReport | null;
+  // The axis letters grblHAL's `$I` reported (`[AXS:4:XYZA]` → "XYZA"), or
+  // null when unread. Checked against a dedicated rotary axis (ADR-695).
+  readonly reportedAxisLetters?: string | null;
+  // ADR-695 Amendment 1: after an Abort on an A or Z rotary, the turn since.
+  readonly rotaryTurnSinceAbort?: RotaryTurnSinceAbort | null;
   readonly alarmCode: number | null;
   readonly hasActiveStreamer: boolean;
   readonly motionOperationActive?: boolean;
@@ -160,6 +168,13 @@ export type MachineStartSnapshot = {
   readonly cameraPlacementActive?: boolean;
   readonly cameraConfirmedPositionEpoch?: number | null;
   readonly cameraPlacementGeometryIssue?: string | null;
+  // The camera calibration target's rings are on the canvas (ADR-441 Amendment 10).
+  readonly cameraTargetOnCanvas?: boolean;
+  // The Camera panel's "camera may have moved" warning, while it shows for
+  // the running camera (ADR-663 Amendment 5).
+  readonly cameraMovedWarning?: string | null;
+  // The running camera's own calibration (ADR-441 Amendment 9).
+  readonly cameraCalibration?: CameraModelRecord | null;
   // Where this project's jig outline last burned from in this session, so the
   // artwork run can be checked against it (ADR-057 Amendment 6). null: unseen.
   readonly registrationOutline?: JobPlacementSettings | null;
@@ -334,12 +349,7 @@ export function finalizeStartPreparation(
   const { gcode, preflight } = emitStartProgram(prepared, options, coordinates.emitOptions);
   const emitSplit = partitionEmitPreflight(preflight);
   if (emitSplit.blocking.length > 0) return { ok: false, messages: emitSplit.blocking };
-  const programIssue = preparedProgramIntegrityIssue(
-    gcode,
-    options.project.device.rxBufferBytes,
-    preflight,
-    options.machine.activeControllerKind,
-  );
+  const programIssue = preparedStartRefusal(gcode, preflight, options.project, options.machine);
   if (programIssue !== null) return { ok: false, messages: programIssue };
   if (options.requireFrame) {
     const verifiedFrameIssue = requiredFrameIssueFromPrepared({
@@ -373,6 +383,7 @@ export function finalizeStartPreparation(
       ...compiledWorkAdvisories(prepared.job),
       ...detectCompiledVCarveDepthWarningsForJob(prepared.project, prepared.job),
       ...demotedPolicyWarnings(options.project, options.machine, options.placement.jobOrigin),
+      ...cameraOffTargetWarnings(options.machine, options.placement.jobOrigin, prepared),
       ...advisoryWarnings,
       ...emitSplit.warnings,
       ...collectPrintCutFrameWarnings(

@@ -7,7 +7,7 @@
 // macOS text fields use Control-K to delete to the end of the line, so there
 // only Cmd+K opens the search while typing.
 
-import { isEditableShortcutTarget } from '../common/keyboard-targets';
+import { isTextEntryTarget } from '../common/keyboard-targets';
 import { isApplePlatform } from '../common/operating-system';
 
 export function handleCommandSearchShortcut(
@@ -17,7 +17,7 @@ export function handleCommandSearchShortcut(
 ): boolean {
   if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return false;
   if (e.key.toLowerCase() !== 'k') return false;
-  if (applePlatform && !e.metaKey && isEditableShortcutTarget(e.target)) return false;
+  if (applePlatform && !e.metaKey && isTextEntryTarget(e.target)) return false;
   e.preventDefault();
   openSearch();
   return true;

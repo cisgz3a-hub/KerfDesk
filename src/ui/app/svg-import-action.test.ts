@@ -125,7 +125,11 @@ describe('importSvgFiles', () => {
       pushToast,
     );
     expect(pushToast.mock.calls).toEqual([
-      ['Re-imported clean.svg — new layer settings (1 new, 1 removed)', 'success'],
+      [
+        'Re-imported clean.svg — new layer settings (1 new, 1 removed). New parts start from ' +
+          'default settings: check them before you burn.',
+        'warning',
+      ],
     ]);
   });
 

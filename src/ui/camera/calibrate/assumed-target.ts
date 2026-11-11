@@ -18,6 +18,7 @@ import {
   rememberedEngravedTarget,
   type EngravedTarget,
 } from './engraved-target-memory';
+import { roundToTenth } from '../../../core/util/rounding';
 
 export type AssumedTarget = {
   readonly area: BedArea;
@@ -82,9 +83,7 @@ export function assumedTarget(args: {
       source: 'engraved',
       description: `the target ${howPlaced(remembered)} from this computer on ${date}: ${layoutWords(settings, remembered.area, bedThen)}${changed}`,
       bedFrame,
-      ...(unseenBurnAfterChange(remembered, bedFrame, frameNow)
-        ? { refusal: CANVAS_TARGET_FRAME_CHANGED }
-        : {}),
+      ...canvasTargetRefusal(remembered, bedFrame, frameNow),
     };
   }
   const area = calibrationTargetArea(args.bedWidthMm, args.bedHeightMm, settings);
@@ -147,6 +146,42 @@ function howPlaced(target: EngravedTarget): string {
   return target.burnSeen === true ? 'added to the canvas and engraved' : 'added to the canvas';
 }
 
+const START_FROM_WORDS = {
+  'current-position': 'Current Position',
+  'user-origin': 'User Origin',
+  'verified-origin': 'Verified Origin',
+} as const;
+
+/** A canvas target whose rings were burned from another Start from than Absolute. */
+export function canvasTargetBurnedOffAbsolute(
+  from: NonNullable<EngravedTarget['burnedFrom']>,
+): string {
+  return `This target's rings were burned from ${START_FROM_WORDS[from]}, not Absolute Coordinates, so they are not where the target put them on the bed, and a calibration from them would put every camera placement that far off. Add the target to the canvas again and Start it at Absolute Coordinates, or use Engrave target.`;
+}
+
+export const CANVAS_TARGET_BURN_NOT_SEEN =
+  'KerfDesk has not seen a Start burn this target at Absolute Coordinates, so it cannot tell where on the bed its rings are. Start the target on the canvas at Absolute Coordinates (Frame, then Start), or use Engrave target, then take the photo.';
+
+// Rolling audit v13 Y3-P1-2: rings burned from User Origin or Current
+// Position calibrated as if they had burned where the target put them, 26-156
+// mm off, and were graded "Accurate enough". Only a burn seen at Absolute
+// Coordinates is calibrated on (ADR-441 Amendment 10).
+function canvasTargetRefusal(
+  target: EngravedTarget,
+  bedFrame: CameraBedFrame,
+  frameNow: CameraBedFrame,
+): { readonly refusal?: string } {
+  if (target.onCanvas !== true || target.burnSeen === true) return {};
+  if (target.burnedFrom !== undefined) {
+    return { refusal: canvasTargetBurnedOffAbsolute(target.burnedFrom) };
+  }
+  return {
+    refusal: unseenBurnAfterChange(target, bedFrame, frameNow)
+      ? CANVAS_TARGET_FRAME_CHANGED
+      : CANVAS_TARGET_BURN_NOT_SEEN,
+  };
+}
+
 export const CANVAS_TARGET_FRAME_CHANGED =
   'This target was added to the canvas while the machine was set up differently (bed size, origin or machine travel), and KerfDesk has not seen a Start burn its rings since, so it cannot tell where on the bed they are. Add the target to the canvas again and Start it, or use Engrave target.';
 
@@ -181,18 +216,14 @@ function ringSetting(settings: LayoutSettings): number {
 
 function layoutWords(settings: LayoutSettings, area: BedArea, bed: string): string {
   const ring = ringSetting(settings);
-  const rings = ring === DEFAULT_RING_DIAMETER_MM ? '' : `, ${round(ring)} mm rings`;
+  const rings = ring === DEFAULT_RING_DIAMETER_MM ? '' : `, ${roundToTenth(ring)} mm rings`;
   if (settings.headCamera) {
     return `a ${size(area.width, area.height)} square in the middle of a ${bed} bed${rings}`;
   }
   const sheet = size(area.width + 2 * settings.marginMm, area.height + 2 * settings.marginMm);
-  return `${size(area.width, area.height)} with a ${round(settings.marginMm)} mm margin on a ${sheet} sheet in the middle of a ${bed} bed${rings}`;
+  return `${size(area.width, area.height)} with a ${roundToTenth(settings.marginMm)} mm margin on a ${sheet} sheet in the middle of a ${bed} bed${rings}`;
 }
 
 function size(width: number, height: number): string {
-  return `${round(width)} × ${round(height)} mm`;
-}
-
-function round(value: number): number {
-  return Math.round(value * 10) / 10;
+  return `${roundToTenth(width)} × ${roundToTenth(height)} mm`;
 }

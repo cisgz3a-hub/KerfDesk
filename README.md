@@ -25,6 +25,8 @@ fidelity**. Be specific about what that means:
 | GRBL-family streaming | **Not qualified.** Used informally on a Creality Falcon A1 Pro and a Neotronics 4040, both running GRBL-family firmware (exact builds unconfirmed). |
 | FluidNC · Marlin · Smoothieware | Simulator-verified only |
 | Ruida `.rd` export | Encode→decode round-trip proven; **never accepted by a real controller** |
+| Ruida network control (desktop) | Simulator only; **never run against a real controller** |
+| Moshiboard USB control (experimental) | Simulator only; **never run against a real Moshiboard** |
 | Laser raster/image engrave | **Not qualified.** Code + tests, plus informal use such as a photo engraving on a Neotronics 4040. |
 | **The entire CNC / router surface** | **Not qualified.** Code + tests, plus informal cuts on a Neotronics 4040. |
 | Box generator physical fit | Never cut and assembled |
@@ -90,10 +92,12 @@ LongMill), design in Inkscape / Illustrator / Affinity, and expect a LightBurn-s
 - Three operation modes: **Line** (vector outline cut), **Fill/Scan** (hatch the interior) and
   **Image** (dithered raster engrave). Sub-layers let one operation stack fill *then* line.
 - Fill: scanline hatch with configurable angle and spacing, bidirectional/snake, cross-hatch,
-  plus **Follow Shape** (concentric offset) and **Island Fill** styles.
-- Image: 11 dither/conversion modes (threshold, Floyd–Steinberg, Jarvis, Stucki, Atkinson,
-  Burkes, three Sierra variants, ordered Bayer, grayscale), 5–25 lines/mm, dot-width correction,
-  negative and pass-through.
+  plus **Follow Shape** (concentric offset) and **Island Fill** styles, and a LightBurn-style
+  **Ramp** that slopes the walls of a fill from Min power at its edges, for rubber stamps.
+- Image: 13 dither/conversion modes (threshold, Floyd–Steinberg, Jarvis, Stucki, Atkinson,
+  Burkes, three Sierra variants, Blue Noise, ordered Bayer, grayscale and **3D Sliced**, which
+  burns a depth map one threshold pass per slice), 5–25 lines/mm, dot-width correction, negative
+  and pass-through.
 - Image trace with five presets across three in-house engines: filled-contour (Line Art, Smooth,
   Sharp), **centerline/medial-axis**, and Canny **edge detection**.
 - Kerf compensation, automatic holding tabs, **lead-in/lead-out** that finds the scrap side of
@@ -105,7 +109,8 @@ LongMill), design in Inkscape / Illustrator / Affinity, and expect a LightBurn-s
 - Eight selectable cut types: profile outside/inside/on-path, pocket, engrave, **V-carve**,
   inlay pair and drill (explicit peck cycles — GRBL has no `G81`/`G83`).
 - Pocket clearing by contour-parallel rings, raster X/Y, or **constant-load adaptive clearing**
-  (island-free pockets only), with two-tool **rest machining** and finish allowance.
+  (pockets with islands too, ADR-154 Amendment 4), with two-tool **rest machining** and finish
+  allowance.
 - Depth passes, ramp entry, native `G2`/`G3` **helical entry**, arc/line lead-in-out, climb vs
   conventional with hole mirroring, and **holding tabs as a Z-rise** inside one continuous
   toolpath (draggable per contour).
@@ -129,6 +134,9 @@ last, inner contours before outer — a part is machined completely before the c
 |---|---|
 | `.svg` | DOMParser + DOMPurify sanitisation. **Convert text to paths first** — `<text>` and `<image>` are counted and skipped. |
 | `.dxf` | Clean-room ASCII parser: LINE, CIRCLE, ARC, LWPOLYLINE (with bulges), POLYLINE, ELLIPSE, SPLINE, INSERT/MINSERT. Binary DXF is rejected with a message. |
+| `.pdf` `.ai` (PDF-based) | Pick a page, then editable paths or a rendered image (ADR-357). |
+| `.eps` `.epsf` `.ps` `.ai` (Illustrator 3–8) | Clean-room PostScript subset reader (ADR-700): paths, fills, strokes and colours become editable artwork through the SVG import. Text, clipping, dashes and gradients are skipped with a warning; embedded images and unknown operators are refused with a reason. Tested against KerfDesk's own EPS output and specification-based samples, not yet against a broad set of real third-party files. |
+| `.hpgl` `.plt` | Plotter files, clean-room HP-GL/2 subset. |
 | `.lbrn` / `.lbrn2` | LightBurn projects → a new KerfDesk project, carrying speed, power, passes and Line/Fill mode. Group/Rect/Ellipse/Path shapes; bitmaps and BackupPath-less text are dropped. Proven against five real public `.lbrn2` files; **`.lbrn` v1 has no test fixture**. |
 | `.clb` | LightBurn cut libraries → material presets. Proven against four real public libraries. Replaces the active library. |
 | `.lbdev` | LightBurn device profiles, with an Applied / Needs Review / Ignored card before anything is applied. GRBL-flavoured devices only. **Experimental — written against an inferred schema and never tested against a real LightBurn export.** |
@@ -141,9 +149,10 @@ last, inner contours before outer — a part is machined completely before the c
 
 Also: `.lfml.json` material libraries, `.lfmachine.json` machine profiles, `.lfsettings.json`
 controller snapshots. **File → Import...**, `Ctrl/Cmd+I`, the toolbar, and drag-and-drop share the
-ordered SVG, DXF, PNG/JPG, and STL import surface; specialized formats retain their own dialogs.
+ordered SVG, DXF, PDF/AI, EPS, HPGL, image and STL import surface; specialized formats retain
+their own dialogs.
 
-Not supported: `.ai`, PDF, EPS, `.cdr`, Gerber, OBJ/3MF, and LightBurn `.lbzip` bundles.
+Not supported: `.cdr`, Gerber, OBJ/3MF, and LightBurn `.lbzip` bundles.
 
 ### Write
 
@@ -167,7 +176,8 @@ capability-gated per firmware.
 | FluidNC | WebSerial | Simulator only (settings read-only) |
 | Marlin | WebSerial | Simulator only |
 | Smoothieware | WebSerial | Simulator only |
-| Ruida | File export only | `.rd` round-trip proven; never accepted by hardware |
+| Ruida | `.rd` file export; experimental UDP network link on the desktop (ADR-697) | `.rd` round-trip proven, never accepted by hardware; network link simulator only |
+| Moshiboard | Experimental USB link (CH341), Frame/Start/Abort/Home only; no file export (ADR-705) | Simulator only |
 
 No controller family or machine is qualified. An earlier claim that the Falcon was
 hardware-verified, and that this proved the driver refactor on real hardware, was withdrawn after
@@ -175,12 +185,16 @@ the 2026-09-19 audit found no reproducible evidence for it; see ADR-322 in
 [`DECISIONS.md`](DECISIONS.md).
 
 Output dialects: `grbl-compatible`, `grbl-dynamic`, `grbl-raster`, `neotronics-4040-safe`, plus
-`marlin-inline` (LASER_FEATURE) and `marlin-fan` (fan-mosfet). Eighteen device profiles and nine
+`marlin-inline` (LASER_FEATURE) and `marlin-fan` (fan-mosfet). Nineteen device profiles and nine
 CNC machine presets ship in the catalog.
 
 Streaming is exercised end-to-end against scripted firmware simulators
 ([`src/__fixtures__/controllers/`](src/__fixtures__/controllers/) — GRBL, Marlin, Smoothieware and
 a Ruida decoder, over a fake serial port) driving the real application store rather than a mock.
+The desktop Ruida network link is exercised against a scripted Ruida UDP simulator built on that
+decoder, driving the real Ruida network store.
+The Moshiboard USB link is exercised against a scripted Moshiboard that decodes each program with
+this repo's Moshi decoder, driving the real Moshi USB store.
 grblHAL and FluidNC ride the GRBL driver with capability deltas rather than having simulators of
 their own.
 

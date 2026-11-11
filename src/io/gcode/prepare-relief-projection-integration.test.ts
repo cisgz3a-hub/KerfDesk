@@ -101,7 +101,10 @@ describe('exact projected relief output integration', () => {
     ).toContainEqual(
       expect.stringContaining('runs before later relief machining on layer "Named surface"'),
     );
-    expect(groups.find((group) => group.layerId === 'engrave')?.depthPerPassMm).toBeUndefined();
+    // A projection steps down by its layer's Depth per pass (ADR-572 Amendment 3).
+    expect(groups.find((group) => group.layerId === 'engrave')?.depthPerPassMm).toBe(
+      DEFAULT_CNC_LAYER_SETTINGS.depthPerPassMm,
+    );
     expect(groups.find((group) => group.layerId === 'engrave')?.requestedDepthMm).toBeUndefined();
     expect(groups.find((group) => group.layerId === 'target')?.depthPerPassMm).toBe(1);
   });

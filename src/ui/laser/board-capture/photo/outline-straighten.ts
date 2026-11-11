@@ -1,4 +1,5 @@
 import type { Vec2 } from '../../../../core/scene';
+import { maxOf } from '../../../../core/util';
 
 // Straightening fixes points that are a little off a straight edge. Moving a
 // point further than this share of the edge's length would reshape the board
@@ -65,8 +66,8 @@ function largestOffset(
   start: Vec2,
   end: Vec2,
 ): number {
-  return Math.max(
-    ...run.map((index) => {
+  return maxOf(
+    run.map((index) => {
       const point = points[index] as Vec2;
       const projected = projectOnto(point, start, end);
       return Math.hypot(point.x - projected.x, point.y - projected.y);

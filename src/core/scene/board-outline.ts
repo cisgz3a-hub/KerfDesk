@@ -1,6 +1,7 @@
 import type { Bounds, Vec2 } from './scene-object';
 import { simplifyClosedRing } from './board-outline-simplify';
 import { outlineInsideGrid } from './board-outline-grid';
+import { crossAbout, distance, isFinitePoint } from '../geometry/point-math';
 
 export const MAX_BOARD_OUTLINE_POINTS = 512;
 export const MAX_BOARD_OUTLINE_ANCHORS = 6;
@@ -19,7 +20,7 @@ const MIN_AREA_MM2 = 1;
 
 export function normalizeBoardOutline(points: ReadonlyArray<Vec2>): Vec2[] | null {
   if (points.length < 3 || points.length > MAX_BOARD_OUTLINE_POINTS + 1) return null;
-  if (points.some((point) => !finitePoint(point))) return null;
+  if (points.some((point) => !isFinitePoint(point))) return null;
   const result: Vec2[] = [];
   for (const point of points) {
     const previous = result.at(-1);
@@ -94,7 +95,7 @@ export function sizeBoardOutline(
   heightMm: number,
 ): Vec2[] | null {
   if (!(widthMm > 0) || !(heightMm > 0) || !Number.isFinite(widthMm + heightMm)) return null;
-  if (points.length < 3 || points.some((point) => !finitePoint(point))) return null;
+  if (points.length < 3 || points.some((point) => !isFinitePoint(point))) return null;
   const bounds = outlineBounds(points);
   const width = bounds.maxX - bounds.minX;
   const height = bounds.maxY - bounds.minY;
@@ -103,20 +104,6 @@ export function sizeBoardOutline(
     x: ((point.x - bounds.minX) * widthMm) / width,
     y: ((point.y - bounds.minY) * heightMm) / height,
   }));
-}
-
-export function boardOutlineDraft(
-  points: ReadonlyArray<Vec2>,
-  widthMm: number,
-  heightMm: number,
-): BoardOutlineDraft | null {
-  const normalized = normalizeBoardOutline(points);
-  if (normalized === null) return null;
-  const localPointsMm = sizeBoardOutline(normalized, widthMm, heightMm);
-  if (localPointsMm === null) return null;
-  const anchorIndices = boardOutlineAnchors(localPointsMm);
-  const captureOrder = defaultCaptureOrder(localPointsMm, anchorIndices);
-  return captureOrder === null ? null : { localPointsMm, anchorIndices, captureOrder };
 }
 
 export function outlineBounds(points: ReadonlyArray<Vec2>): Bounds {
@@ -212,10 +199,10 @@ function selfIntersects(points: ReadonlyArray<Vec2>): boolean {
 }
 
 function segmentsIntersect(a: Vec2, b: Vec2, c: Vec2, d: Vec2): boolean {
-  const abC = cross(a, b, c);
-  const abD = cross(a, b, d);
-  const cdA = cross(c, d, a);
-  const cdB = cross(c, d, b);
+  const abC = crossAbout(a, b, c);
+  const abD = crossAbout(a, b, d);
+  const cdA = crossAbout(c, d, a);
+  const cdB = crossAbout(c, d, b);
   if (oppositeSigns(abC, abD) && oppositeSigns(cdA, cdB)) return true;
   return (
     (Math.abs(abC) < 1e-9 && pointOnSegment(c, a, b)) ||
@@ -231,7 +218,7 @@ function oppositeSigns(left: number, right: number): boolean {
 
 function pointOnSegment(point: Vec2, a: Vec2, b: Vec2): boolean {
   return (
-    Math.abs(cross(a, b, point)) < 1e-9 &&
+    Math.abs(crossAbout(a, b, point)) < 1e-9 &&
     point.x >= Math.min(a.x, b.x) - 1e-9 &&
     point.x <= Math.max(a.x, b.x) + 1e-9 &&
     point.y >= Math.min(a.y, b.y) - 1e-9 &&
@@ -262,7 +249,9 @@ function lastHullTurnIsClockwise(
 ): boolean {
   const previous = hull[hull.length - 2]?.point;
   const current = hull[hull.length - 1]?.point;
-  return previous !== undefined && current !== undefined && cross(previous, current, point) <= 0;
+  return (
+    previous !== undefined && current !== undefined && crossAbout(previous, current, point) <= 0
+  );
 }
 
 function extremeIndices(points: ReadonlyArray<Vec2>): number[] {
@@ -299,18 +288,6 @@ function signedArea(points: ReadonlyArray<Vec2>): number {
       return sum + point.x * next.y - next.x * point.y;
     }, 0) / 2
   );
-}
-
-function cross(a: Vec2, b: Vec2, c: Vec2): number {
-  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function finitePoint(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
 }
 
 function invalidNormalizedOutline(points: ReadonlyArray<Vec2>): boolean {

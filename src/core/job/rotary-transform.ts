@@ -10,6 +10,12 @@
 // the same transform; reverse mode maps source-row traversal onto descending Y.
 
 import { withoutArcMoves } from './cut-arc-moves';
+import { maxOf, minOf } from '../util/spread-free';
+import {
+  normalizedScanAngleDeg,
+  rasterScanFrame,
+  scanRectMachineCorners,
+} from '../raster/raster-scan-frame';
 import type { CutSegment, FillSegment, Job, RasterGroup } from './job';
 import type { Vec2 } from '../scene';
 
@@ -19,8 +25,9 @@ export function restoreRotarySurfacePoint(
   point: Vec2,
   yScale: number,
   reverse = false,
+  zeroAtAnchor = false,
 ): Vec2 {
-  const map = rotaryYMap(job, yScale, reverse);
+  const map = rotaryYMap(job, yScale, reverse, zeroAtAnchor);
   if (map === null) return point;
   const forward = reverse ? map.reverseOriginY - point.y : point.y - map.forwardOriginY;
   return { x: point.x, y: map.baseY + forward / yScale };
@@ -41,12 +48,20 @@ type RotaryYMap = {
 // engraving around the cylinder. An Absolute job mirrors Y within the wrap
 // window [0, extent], so its bounds stay that window either way. A placed job
 // mirrors about its anchor, which stays where the cylinder already is.
-function rotaryYMap(job: Job, scale: number, reverse: boolean): RotaryYMap | null {
+// zeroAtAnchor (ADR-695): a dedicated A or Z axis starts each job at 0, so the
+// anchor lands there instead of on the head's work Y.
+function rotaryYMap(
+  job: Job,
+  scale: number,
+  reverse: boolean,
+  zeroAtAnchor = false,
+): RotaryYMap | null {
   const range = jobYRange(job);
   if (range === null) return null;
   const anchor = job.rotaryAnchorY;
   if (anchor !== undefined) {
-    return { baseY: anchor, forwardOriginY: anchor, reverseOriginY: anchor, scale, reverse };
+    const origin = zeroAtAnchor ? 0 : anchor;
+    return { baseY: anchor, forwardOriginY: origin, reverseOriginY: origin, scale, reverse };
   }
   const extent = (range.max - range.min) * scale;
   return { baseY: range.min, forwardOriginY: 0, reverseOriginY: extent, scale, reverse };
@@ -68,13 +83,20 @@ function mapRotaryYRange(
   return map.reverse ? { minY: high, maxY: low } : { minY: low, maxY: high };
 }
 
-export function applyRotaryYScale(job: Job, yScale: number, reverse = false): Job {
-  const map = rotaryYMap(job, yScale, reverse);
+export function applyRotaryYScale(
+  job: Job,
+  yScale: number,
+  reverse = false,
+  zeroAtAnchor = false,
+): Job {
+  const map = rotaryYMap(job, yScale, reverse, zeroAtAnchor);
   if (map === null) return job;
   if (yScale === 1 && !reverse && map.baseY === map.forwardOriginY) return job;
   const mapCut = <T extends CutSegment>(s: T): T => mapSegment(s, map);
   return {
     ...job,
+    // ADR-127 Amd 2: the emitters match each move's feed to the surface.
+    ...(yScale === 1 ? {} : { rotarySurfaceYScale: yScale }),
     ...(job.contourEntryBounds == null
       ? {}
       : {
@@ -100,8 +122,9 @@ export function jobYRange(job: Job): { readonly min: number; readonly max: numbe
   let max = Number.NEGATIVE_INFINITY;
   for (const group of job.groups) {
     if (group.kind === 'raster') {
-      min = Math.min(min, group.bounds.minY);
-      max = Math.max(max, group.bounds.maxY);
+      const raster = rasterMachineYRange(group);
+      min = Math.min(min, raster.min);
+      max = Math.max(max, raster.max);
       continue;
     }
     if (group.kind !== 'cut' && group.kind !== 'fill') continue;
@@ -120,7 +143,22 @@ export function jobYRange(job: Job): { readonly min: number; readonly max: numbe
   return Number.isFinite(min) && Number.isFinite(max) ? { min, max } : null;
 }
 
+// ADR-699 Amd 1: a turned raster's bounds are in its scan frame, not bed Y.
+function rasterMachineYRange(group: RasterGroup): { readonly min: number; readonly max: number } {
+  const ys = scanRectMachineCorners(rasterScanFrame(group.scanAngleDeg), group.bounds).map(
+    (corner) => corner.y,
+  );
+  return { min: minOf(ys), max: maxOf(ys) };
+}
+
 function mapRasterGroup(group: RasterGroup, map: RotaryYMap): RasterGroup {
+  // ADR-492 D9 and ADR-699 Amd 1: compilation scans every raster along X on a
+  // rotary. A turned one cannot be scaled round the part, so it never runs.
+  if (normalizedScanAngleDeg(group.scanAngleDeg) !== 0) {
+    throw new Error(
+      'A raster scanned at an angle cannot run on a rotary; rotary rasters scan along X.',
+    );
+  }
   return {
     ...group,
     bounds: { ...group.bounds, ...mapRotaryYRange(map, group.bounds.minY, group.bounds.maxY) },

@@ -9,6 +9,7 @@ import { computeJobBounds, frameBoundsSignature } from '../job';
 import { signedAreaMm2 } from '../geometry/polyline-orientation';
 import { scallopRowSpacingMm } from '../relief';
 import { finishingRows, pointsAlongMoves } from '../relief/relief-finishing-test-rows';
+import { stepDownEvidence, withoutStepDown } from '../relief/relief-step-down.test-support';
 import { cncGrblStrategy } from '../output';
 import {
   createLayer,
@@ -190,10 +191,12 @@ describe('relief finishing compile (H.8)', () => {
         plungeMmPerMin: 123,
         spindleRpm: 9000,
       });
-      expect(groups.map((group) => group.passes)).toEqual(
-        original.groups.map((group) => (group.kind === 'cnc' ? group.passes : [])),
+      // The recipe's depth per pass sets only the step-down levels (ADR-421 Amd 2).
+      expect(groups.map((group) => withoutStepDown(group.passes))).toEqual(
+        original.groups.map((group) => (group.kind === 'cnc' ? withoutStepDown(group.passes) : [])),
       );
-      expect(job.cncCompilation?.reliefPlans).toEqual(original.cncCompilation?.reliefPlans);
+      expect(stepDownEvidence(job).plans).toEqual(stepDownEvidence(original).plans);
+      expect(stepDownEvidence(job).levels).toBeGreaterThan(stepDownEvidence(original).levels);
       expect(computeJobBounds(job, DEFAULT_DEVICE_PROFILE)).toEqual(
         computeJobBounds(original, DEFAULT_DEVICE_PROFILE),
       );
@@ -383,7 +386,7 @@ describe('relief finishing compile (H.8)', () => {
       (group) => group.kind === 'cnc' && group.cutType === 'relief-finish',
     );
     if (finish?.kind !== 'cnc') throw new Error('finish group missing');
-    const rowYs = finishingRows(finish.passes).map((row) => row.y);
+    const rowYs = finishingRows(withoutStepDown(finish.passes)).map((row) => row.y);
     const maxGap = Math.max(...rowYs.slice(1).map((y, index) => Math.abs(y - (rowYs[index] ?? y))));
     const tool = DEFAULT_CNC_MACHINE_CONFIG.tools.find((candidate) => candidate.id === 'bn-3175');
     if (tool === undefined) throw new Error('ball-nose fixture tool missing');
@@ -408,7 +411,8 @@ describe('relief finishing compile (H.8)', () => {
       (group) => group.kind === 'cnc' && group.cutType === 'relief-finish',
     );
     if (finish?.kind !== 'cnc') throw new Error('small-tool finish group missing');
-    const rowYs = finishingRows(finish.passes).map((row) => row.y);
+    // Rows only: the 0.1 mm ball steps down first where roughing missed (ADR-421 Amd 3).
+    const rowYs = finishingRows(withoutStepDown(finish.passes)).map((row) => row.y);
     expect(rowYs.length).toBeGreaterThan(20);
     const maxGap = Math.max(...rowYs.slice(1).map((y, index) => Math.abs(y - (rowYs[index] ?? y))));
     const radius = SMALL_BALL_NOSE.diameterMm / 2;

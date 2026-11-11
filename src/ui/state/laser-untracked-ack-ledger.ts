@@ -58,6 +58,32 @@ export function consumeUntrackedAck(refs: UntrackedAckLedgerRefs): LaserMotionOp
   return reservation.motionOperationId;
 }
 
+/**
+ * Drops every reservation written before the oldest one that put a line
+ * `answered` matches on the wire, and returns how many replies they still
+ * owed. Only for a caller that holds proof that the controller has answered
+ * that line: GRBL-family firmware answers in order, so a reply still owed by an
+ * older write will never come (ADR-696). Returns 0, and drops nothing, when no
+ * reservation holds such a line.
+ */
+export function dropUntrackedAcksAheadOf(
+  refs: UntrackedAckLedgerRefs,
+  answered: (line: string) => boolean,
+): number {
+  const queue = currentQueue(refs);
+  const index = queue.findIndex((reservation) => reservation.lines.some(answered));
+  if (index <= 0) return 0;
+  return queue.splice(0, index).reduce((owed, reservation) => owed + reservation.remaining, 0);
+}
+
+/** True when the oldest current-session reservation put such a line on the wire. */
+export function oldestUntrackedLineMatches(
+  refs: UntrackedAckLedgerRefs,
+  matches: (line: string) => boolean,
+): boolean {
+  return currentQueue(refs)[0]?.lines.some(matches) ?? false;
+}
+
 function currentQueue(refs: UntrackedAckLedgerRefs): UntrackedAckReservation[] {
   const queue = (refs.untrackedAckReservations ??= []);
   const writeEpoch = refs.writeEpoch ?? 0;

@@ -10,6 +10,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import { readRasterSourceFile } from '../import/paged-raster-source';
 import { pickPreparedSaveTarget } from './pick-prepared-save-target';
 import type { ToastVariant } from '../state/toast-store';
+import { errorMessage } from '../../core/util/error-message';
 
 export type OriginalImageFormat = 'png' | 'jpeg' | 'bmp';
 
@@ -51,7 +52,7 @@ export async function saveOriginalImage(ctx: SaveOriginalImageCtx): Promise<void
     await target.write(blob);
     ctx.pushToast(`Saved the original image to ${target.displayName}`, 'success');
   } catch (error) {
-    ctx.pushToast(`Could not save the image: ${message(error)}`, 'error');
+    ctx.pushToast(`Could not save the image: ${errorMessage(error)}`, 'error');
   }
 }
 
@@ -96,8 +97,4 @@ function fileStem(source: string): string {
     .map((char) => (/[<>:"/\\|?*]/u.test(char) || char < ' ' ? '-' : char))
     .join('');
   return safe.trim() === '' ? 'image' : safe.trim();
-}
-
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

@@ -26,6 +26,7 @@ import {
 } from '../../core/job/laser-lead-settings';
 import { DITHER_ALGORITHMS, type Layer, type LayerMode } from '../../core/scene';
 import { numberField, reconciledNumberField, submittedNumber } from './cut-settings-number-field';
+import { readFillRampPatch } from './cut-settings-fill-ramp-patch';
 
 export type LayerPatch = Partial<Omit<Layer, 'id' | 'color'>>;
 export type CutSettingsLimits = {
@@ -83,6 +84,7 @@ export function readCutSettingsPatch(
     ...readScanPatternPatch(data, layer, mode),
     ...readAutoOverscanPatch(data, mode),
     ...fillSettings,
+    ...readFillRampPatch(data, layer, mode, power),
     ditherAlgorithm: parseDither(String(data.get('ditherAlgorithm') ?? layer.ditherAlgorithm)),
     linesPerMm,
     ...readScanOverridePatch(data, layer, mode),

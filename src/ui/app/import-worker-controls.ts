@@ -42,9 +42,7 @@ export function createImportWorkerControls(
   };
 }
 
-export function isImportCancellation(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError';
-}
+export { isAbortError as isImportCancellation } from '../../core/util/error-message';
 
 function progressMessage(name: string, progress: ImportWorkerProgress): string {
   if (progress.phase === 'queued') {

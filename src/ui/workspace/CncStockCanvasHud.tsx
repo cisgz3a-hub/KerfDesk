@@ -4,6 +4,7 @@ import { Icon } from '../kit';
 import { openMachineSetup } from '../laser/device-setup';
 import { useStore } from '../state';
 import { cncStockCanvasHudStyles as styles } from './cnc-stock-canvas-hud-styles';
+import { formatGroupedUpTo3Decimals } from '../../core/util/number-format';
 
 const STOCK_DETAILS_ID = 'cnc-stock-canvas-reference-details';
 
@@ -97,13 +98,9 @@ function StockReferenceDetails(props: { readonly stock: CncStock }): JSX.Element
 }
 
 function stockSummary(stock: CncStock): string {
-  return `${formatNumber(stock.widthMm)} x ${formatNumber(stock.heightMm)} x ${formatNumber(stock.thicknessMm)} mm`;
+  return `${formatGroupedUpTo3Decimals(stock.widthMm)} x ${formatGroupedUpTo3Decimals(stock.heightMm)} x ${formatGroupedUpTo3Decimals(stock.thicknessMm)} mm`;
 }
 
 function originSummary(stock: CncStock): string {
-  return `X ${formatNumber(stock.originOffset.x)}, Y ${formatNumber(stock.originOffset.y)} mm`;
-}
-
-function formatNumber(value: number): string {
-  return value.toLocaleString('en-US', { maximumFractionDigits: 3 });
+  return `X ${formatGroupedUpTo3Decimals(stock.originOffset.x)}, Y ${formatGroupedUpTo3Decimals(stock.originOffset.y)} mm`;
 }

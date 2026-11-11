@@ -19,9 +19,10 @@ vi.mock('./artcraft-process-lease.js', () => ({
 }));
 vi.mock('./artcraft-client.js', () => ({ artcraftRequest: mocks.request }));
 
-function child(pid: number | undefined = 42) {
+function child(pid = 42) {
   return Object.assign(new EventEmitter(), {
-    pid,
+    // A child that never started has no PID, so tests may clear it.
+    pid: pid as number | undefined,
     exitCode: null,
     signalCode: null,
     unref: vi.fn(),

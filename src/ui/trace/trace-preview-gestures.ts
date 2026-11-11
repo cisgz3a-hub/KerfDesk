@@ -13,6 +13,8 @@
 // keeps that intent, so a fast two-finger flick never turns into a zoom halfway
 // through. Pan intents are left to the browser's native, inertial scrolling.
 
+import { midpoint, distance } from '../../core/geometry/point-math';
+
 export type WheelIntent = 'zoom' | 'pan';
 
 export type WheelSample = {
@@ -106,12 +108,4 @@ function wheelPixels(delta: number, mode: number): number {
   if (mode === 1) return delta * LINE_PX;
   if (mode === 2) return delta * PAGE_PX;
   return delta;
-}
-
-function distance(a: Point, b: Point): number {
-  return Math.hypot(b.x - a.x, b.y - a.y);
-}
-
-function midpoint(a: Point, b: Point): Point {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }

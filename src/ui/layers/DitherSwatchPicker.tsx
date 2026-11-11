@@ -39,6 +39,11 @@ const DITHER_COPY: Readonly<
     label: 'Grayscale',
     description: 'No dots: power follows brightness between Min power and Power.',
   },
+  '3d-sliced': {
+    label: '3D Sliced',
+    description:
+      'A depth map: darker burns deeper. Each pass is one slice at full Power; Passes sets the slice count.',
+  },
 };
 
 /** The name a dither is shown by. */

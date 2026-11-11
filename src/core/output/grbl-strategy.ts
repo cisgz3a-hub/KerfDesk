@@ -25,7 +25,6 @@ import { offsetForSpeed } from '../job/scan-offset';
 import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '../job';
 import { emitRasterGroupWithEnd } from '../raster/emit-raster';
 import { assertNever } from '../scene';
-import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { formatGcodePowerS } from '../gcode/decimal-word';
 import { gcodeCommentLabel } from '../gcode-comments';
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
@@ -58,7 +57,6 @@ import {
   noteRasterGroupEnd,
   takeHeldLines,
   transitionLinesNow,
-  type EmittedHead,
   type LaserOutputCursor,
 } from './grbl-output-cursor';
 import { laserModeWord, vectorPowerWord } from './grbl-power-modes';
@@ -67,6 +65,13 @@ import { laserArcMovesEnabled } from '../devices/laser-arc-moves';
 import { jobWritesArcMoves } from '../job/cut-arc-moves';
 import { arcSegmentBurns } from './grbl-laser-arc-moves';
 import { operationProvenanceComment } from './operation-provenance-comment';
+import { polylineSegmentBurns, type SegmentBurns } from './grbl-polyline-burns';
+import {
+  rotaryFeedComment,
+  rotaryFeedMatchFor,
+  surfaceMatchedFeed,
+  type RotaryFeedContext,
+} from './rotary-surface-feed';
 import { emitFocusTestGroup } from './focus-test-emission';
 import {
   powerScaleVersionForDevice,
@@ -119,7 +124,7 @@ function postamble(
 // Shared emission context for contour segments (Line mode and offset fill).
 // entryRunwayMm carries the group's ADR-239 tangential entry and exitRunwayMm
 // its M3 exit (Amendment 2); undefined keeps legacy byte-identical motion.
-type SegmentEmissionContext = {
+type SegmentEmissionContext = RotaryFeedContext & {
   readonly laserPowerScaleVersion: LaserPowerScaleVersion;
   readonly s: number;
   readonly feed: number;
@@ -132,10 +137,11 @@ type SegmentEmissionContext = {
   /** ADR-432: the machine takes G2/G3, so fitted arc moves may be written. */
   readonly arcMovesEnabled: boolean;
 };
-type GroupEmissionContext = Pick<
-  SegmentEmissionContext,
-  'device' | 'dialect' | 'entryBounds' | 'cursor' | 'arcMovesEnabled' | 'laserPowerScaleVersion'
->;
+type GroupEmissionContext = RotaryFeedContext &
+  Pick<
+    SegmentEmissionContext,
+    'device' | 'dialect' | 'entryBounds' | 'cursor' | 'arcMovesEnabled' | 'laserPowerScaleVersion'
+  >;
 
 function emitSegment(seg: CutSegment, context: SegmentEmissionContext): string[] {
   const first = seg.polyline[0];
@@ -159,10 +165,11 @@ function emitSegment(seg: CutSegment, context: SegmentEmissionContext): string[]
   return [...lines, ...contourExitLines(seg, context)];
 }
 
-type SegmentBurnContext = Pick<
-  SegmentEmissionContext,
-  'laserPowerScaleVersion' | 's' | 'feed' | 'dialect' | 'arcMovesEnabled' | 'entryRunwayMm'
->;
+type SegmentBurnContext = RotaryFeedContext &
+  Pick<
+    SegmentEmissionContext,
+    'laserPowerScaleVersion' | 's' | 'feed' | 'dialect' | 'arcMovesEnabled' | 'entryRunwayMm'
+  >;
 
 function segmentBurnLines(
   seg: CutSegment,
@@ -175,44 +182,6 @@ function segmentBurnLines(
     return arcs.firstTarget === null ? null : { ...arcs, firstTarget: arcs.firstTarget };
   return polylineSegmentBurns(seg, first, context);
 }
-
-function polylineSegmentBurns(
-  seg: CutSegment,
-  first: { readonly x: number; readonly y: number },
-  context: SegmentBurnContext,
-): SegmentBurns | null {
-  const { s, feed, dialect } = context;
-  const lines: string[] = [];
-  let head = emittedHead(first.x, first.y);
-  let firstTarget: SegmentBurns['firstTarget'] | null = null;
-  for (let i = 1; i < seg.polyline.length; i += 1) {
-    const pt = seg.polyline[i];
-    if (pt === undefined) continue;
-    const target = emittedHead(pt.x, pt.y);
-    // Formatting is part of the executable artifact: points that differ in
-    // memory can collapse to one machine coordinate at 3 dp. Never emit a
-    // stationary positive-power G1, and keep F/S for the first real move.
-    if (target.x === head.x && target.y === head.y) continue;
-    const burnEmitted = firstTarget !== null;
-    const feedWord =
-      !burnEmitted || !dialect.modalFeedrate ? ` F${formatGcodeFeedMmPerMin(feed)}` : '';
-    const sWord =
-      !burnEmitted || dialect.emitSOnEveryBurnMove
-        ? ` S${formatGcodePowerS(s, context.laserPowerScaleVersion)}`
-        : '';
-    lines.push(`G1 X${target.x} Y${target.y}${feedWord}${sWord}`);
-    firstTarget ??= pt;
-    head = target;
-  }
-  return firstTarget === null ? null : { lines, end: head, firstTarget };
-}
-
-type SegmentBurns = {
-  readonly lines: ReadonlyArray<string>;
-  readonly end: EmittedHead;
-  /** Where the first emitted burn goes (it starts at the segment's first point). */
-  readonly firstTarget: { readonly x: number; readonly y: number };
-};
 
 // ADR-239: with an entry runway, seek to the tangential entry point instead of
 // the ink edge, then ramp to the first vertex laser-off at burn feed. The ramp
@@ -243,7 +212,16 @@ function segmentApproachLines(
       emittedHead(entry.x, entry.y),
       laserOffSeekLine(entry.x, entry.y, device, dialect),
     ),
-    ...laserOffMoveLines(cursor, firstHead, laserOffRunwayLine(first.x, first.y, context.feed)),
+    // ADR-127 Amd 2: the ramp is collinear with the first burn, so it takes its feed.
+    ...laserOffMoveLines(
+      cursor,
+      firstHead,
+      laserOffRunwayLine(
+        first.x,
+        first.y,
+        surfaceMatchedFeed(context.feed, entry, first, context.rotaryFeed),
+      ),
+    ),
   ];
 }
 
@@ -458,6 +436,8 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
   const arcMovesEnabled = laserArcMovesEnabled(device);
   const parts: string[] = [];
   parts.push(preamble(dialect, arcMovesEnabled && jobWritesArcMoves(job)));
+  const rotaryFeed = rotaryFeedMatchFor(job, device.maxFeed);
+  parts.push(rotaryFeedComment(rotaryFeed));
   let mode: 'M3' | 'M4' | 'off' = laserModeWord(dialect.cutPowerMode);
   let coolant: CoolantMode = 'off';
   const cursor = createLaserOutputCursor(mode, options.stopKeepsPower === true);
@@ -484,6 +464,7 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
         cursor,
         arcMovesEnabled,
         laserPowerScaleVersion,
+        rotaryFeed,
       }),
     );
     if (group.kind === 'raster') mode = 'off'; // raster ends in M5, written or held

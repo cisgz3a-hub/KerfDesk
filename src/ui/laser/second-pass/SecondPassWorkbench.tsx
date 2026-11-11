@@ -107,6 +107,7 @@ function WorkbenchFooter({ model: m }: { model: SecondPassWorkbenchModel }): JSX
       <PreviewSummary model={m} />
       <SecondPassAbortButton />
       <button
+        type="button"
         className="lf-btn lf-btn--sm"
         disabled={m.working.current && m.busy !== SECOND_PASS_BUSY.compile}
         onClick={m.close}
@@ -116,6 +117,7 @@ function WorkbenchFooter({ model: m }: { model: SecondPassWorkbenchModel }): JSX
       </button>
       {m.preview ? (
         <button
+          type="button"
           className="lf-btn lf-btn--sm"
           disabled={m.busy !== ''}
           onClick={() => m.setShowPreview(!m.showPreview)}
@@ -129,6 +131,7 @@ function WorkbenchFooter({ model: m }: { model: SecondPassWorkbenchModel }): JSX
         </button>
       ) : null}
       <button
+        type="button"
         className="lf-btn lf-btn--sm"
         disabled={
           m.busy !== '' || !m.drawing || !m.strokes.some((stroke) => stroke.mode === 'paint')
@@ -139,6 +142,7 @@ function WorkbenchFooter({ model: m }: { model: SecondPassWorkbenchModel }): JSX
         Preview second pass
       </button>
       <button
+        type="button"
         className="lf-btn lf-btn--sm"
         disabled={m.busy !== '' || !m.preview || !m.connected}
         onClick={m.frame}
@@ -147,6 +151,7 @@ function WorkbenchFooter({ model: m }: { model: SecondPassWorkbenchModel }): JSX
         Frame second pass
       </button>
       <button
+        type="button"
         className="lf-btn lf-btn--primary"
         disabled={m.busy !== '' || !m.ready || !m.connected}
         onClick={m.start}

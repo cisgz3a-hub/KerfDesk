@@ -12,15 +12,13 @@ import { useCommandStoreState } from './use-command-store-state';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import type { useLaserStore } from '../state/laser-store';
+import { useSimpleViewStore } from '../state/simple-view';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { setAppThemePreference } from '../theme/app-theme';
 import { useAppThemePreference } from '../theme/use-app-theme';
-import {
-  selectedCloseableOpenFillContourCount,
-  selectedOpenFillContourCount,
-} from '../common/fill-diagnostics';
+import { selectedOpenFillContourCounts } from '../common/fill-diagnostics';
 import type { CommandDialogs, CommandShellCallbacks } from './app-command-context-types';
 import { buildAppCommands, type AppCommand } from './command-registry';
 import { toolCommandContext } from './tool-command-context';
@@ -78,6 +76,8 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   // Re-render when guidelines lock, so the menu item re-labels.
   useGuideLockStore((s) => s.locked);
   useDesignHierarchyStore((s) => s.focusId);
+  // Re-render when Simple view switches, so its check mark follows (ADR-698).
+  useSimpleViewStore((s) => s.enabled);
   const edition = useEdition();
   const commands = buildAppCommands(
     appCommandContext(callbacks, platform, app, laser, pushToast, {
@@ -125,6 +125,11 @@ function appCommandContext(
   const hasMaskedRasterSelection =
     selected?.kind === 'raster-image' && selected.imageMaskId !== undefined;
   const activeStreamer = isActiveStreamerStatus(laser.streamer?.status);
+  const openFill = selectedOpenFillContourCounts(
+    app.project,
+    app.selectedObjectId,
+    app.additionalSelectedIds,
+  );
   return {
     ...fileCommandContext(callbacks, platform, app, pushToast),
     ...storeOwnedCommandContext(),
@@ -161,15 +166,8 @@ function appCommandContext(
     canCombineSelection: selectionCanCombine(app.project, selectedIds),
     hasFillableSelection: selectionHasVectorObject(app.project, selectedIds),
     canApplyImageMask: imageMaskPair !== null,
-    canCloseOpenFillContours:
-      selectedCloseableOpenFillContourCount(
-        app.project,
-        app.selectedObjectId,
-        app.additionalSelectedIds,
-      ) > 0,
-    canReviewCloseOpenFillContours:
-      selectedOpenFillContourCount(app.project, app.selectedObjectId, app.additionalSelectedIds) >
-      0,
+    canCloseOpenFillContours: openFill.closeableCount > 0,
+    canReviewCloseOpenFillContours: openFill.openCount > 0,
     hasMaskedRasterSelection,
     canPaste: app.sceneClipboard !== null && app.sceneClipboard.objects.length > 0,
     canGroupSelection: selectedIds.length >= 2,

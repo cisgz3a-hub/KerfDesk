@@ -10,6 +10,7 @@ import { registerBoardRemote, type BoardRemoteStatus } from './board-capture-rem
 import { remoteBoardFinishReview } from './board-remote-finish-review';
 import type { BoardCapture, BoardRegistrationEpoch } from './use-board-capture';
 import type { BoardCaptureHandlers } from './use-board-capture-handlers';
+import { roundToTenth } from '../../../core/util/rounding';
 
 type LatestBoardCapture = {
   readonly capture: BoardCapture;
@@ -113,12 +114,12 @@ function boardSummary(geometry: BoardCapture['state']['geometry']): BoardRemoteS
   if (geometry.kind === 'rect') {
     return {
       kind: 'rect',
-      widthMm: roundMm(geometry.widthMm),
-      heightMm: roundMm(geometry.heightMm),
+      widthMm: roundToTenth(geometry.widthMm),
+      heightMm: roundToTenth(geometry.heightMm),
     };
   }
   if (geometry.kind === 'circle') {
-    const diameter = roundMm(geometry.radiusMm * 2);
+    const diameter = roundToTenth(geometry.radiusMm * 2);
     return { kind: 'circle', widthMm: diameter, heightMm: diameter };
   }
   return outlineSummary(geometry);
@@ -131,14 +132,10 @@ function outlineSummary(geometry: OutlineBoardGeometry): NonNullable<BoardRemote
   const registration = geometry.measured.length >= 3 ? outlineRegistration(geometry) : null;
   return {
     kind: 'outline',
-    widthMm: roundMm(bounds.maxX - bounds.minX),
-    heightMm: roundMm(bounds.maxY - bounds.minY),
+    widthMm: roundToTenth(bounds.maxX - bounds.minX),
+    heightMm: roundToTenth(bounds.maxY - bounds.minY),
     anchors: geometry.anchorIndices.length,
     checkedAnchors: geometry.measured.length,
-    ...(registration === null ? {} : { maxMissMm: roundMm(registration.maxResidualMm) }),
+    ...(registration === null ? {} : { maxMissMm: roundToTenth(registration.maxResidualMm) }),
   };
-}
-
-function roundMm(value: number): number {
-  return Math.round(value * 10) / 10;
 }

@@ -55,7 +55,7 @@ export function completeNativeProjectOpen(
       `Opened ${fileName}${migration}`,
       result.migratedFrom === undefined ? 'success' : 'info',
     );
-    pushProjectLoadNotices(result, ctx.pushToast, { migration: false });
+    pushProjectLoadNotices(result, ctx.pushToast, { migration: false, project: result.project });
     const missingFonts = missingFontOpenNotice(result.project);
     if (missingFonts !== null) ctx.pushToast(missingFonts, 'warning');
     reportMachineCapabilityRepair(loadResult, ctx.pushToast);

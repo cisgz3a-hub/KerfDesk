@@ -5,6 +5,18 @@ import type { MachineNetworkProtocol } from './machine-network-protocol.js';
 const RX_LIMIT = 512 * 1024;
 const WRITE_QUEUE_LIMIT = 512 * 1024;
 const WRITE_LIMIT = 64 * 1024;
+// Both channels reach a GRBL-family controller (grblHAL raw TCP, FluidNC
+// Telnet), whose stop is the realtime reset; M5 and M9 follow it, as
+// Disconnect sends them (laser-disconnect-stop.ts).
+const RESET = Buffer.from([0x18]);
+const STOP_LINES = Buffer.from('M5\nM9\n');
+// The reset clears the controller's receive buffer, so M5 and M9 wait for its
+// restart banner, for at most the store's banner wait (laser-reset-cleanup.ts).
+const STOP_BANNER_WAIT_MS = 500;
+const STOP_WRITE_WAIT_MS = 500;
+// After the stop the socket ends gracefully, so the controller reads the stop
+// before the connection goes; a peer that never closes is destroyed after this.
+const STOP_CLOSE_WAIT_MS = 1_000;
 type ReadResult = { readonly data: string; readonly closed: boolean; readonly error?: string };
 
 export class MachineNetworkSession {
@@ -14,6 +26,9 @@ export class MachineNetworkSession {
   private nextWrite = 1;
   private closed = false;
   private failure: string | undefined;
+  private stopping: Promise<void> | null = null;
+  private resetSent: Promise<boolean> | null = null;
+  private stopReceive: ((chunk: Buffer) => void) | null = null;
   private waiting: {
     readonly resolve: (result: ReadResult) => void;
     readonly timer: ReturnType<typeof setTimeout>;
@@ -31,7 +46,10 @@ export class MachineNetworkSession {
     socket.on('close', () => this.close('Network connection closed. No commands were replayed.'));
   }
   private receive(chunk: Buffer): void {
-    if (this.closed) return;
+    if (this.closed) {
+      this.stopReceive?.(chunk);
+      return;
+    }
     try {
       const decoded = this.codec?.decode(chunk) ?? { data: chunk, reply: Buffer.alloc(0) };
       if (decoded.reply.length > 0) {
@@ -43,7 +61,7 @@ export class MachineNetworkSession {
         this.chunks.push(decoded.data);
       }
       if (this.queuedBytes > RX_LIMIT) {
-        this.close(
+        void this.stopAndClose(
           'Network receive queue exceeded its limit; the session was closed without dropping acknowledgements into a live stream.',
           { discardReceived: true },
         );
@@ -51,7 +69,7 @@ export class MachineNetworkSession {
       }
       this.deliver();
     } catch {
-      this.close('Invalid Telnet framing; the network session was closed.');
+      void this.stopAndClose('Invalid Telnet framing; the network session was closed.');
     }
   }
   read(): Promise<ReadResult> {
@@ -69,7 +87,7 @@ export class MachineNetworkSession {
   async write(sequence: number, encoded: string): Promise<void> {
     if (this.closed) throw new Error('Network session is closed.');
     if (sequence !== this.nextWrite) {
-      this.close('Out-of-order or repeated network write. Nothing was replayed.');
+      void this.stopAndClose('Out-of-order or repeated network write. Nothing was replayed.');
       throw new Error('Network write sequence was not accepted.');
     }
     const data = validPayload(encoded);
@@ -97,15 +115,111 @@ export class MachineNetworkSession {
   // Bytes the controller sent before closing (a final ALARM or error line) stay
   // queued for the last read; only an oversized receive queue is discarded.
   close(error?: string, options: { readonly discardReceived?: boolean } = {}): void {
-    if (this.closed) return;
+    if (!this.end(error, options)) return;
+    this.socket.destroy();
+  }
+  /**
+   * Closes the session with the stop Disconnect sends, for a close no window
+   * stop precedes: a crashed or silent window, the app quitting, a refused
+   * write (rolling audit v11 W3-P1-1). Closing the socket stops nothing, and
+   * under M3 the controller keeps the beam lit after its last move. The reset
+   * goes at once; `immediate` sends M5 and M9 with it, for a process about to
+   * exit, rather than after the restart banner. A session already closed sends
+   * nothing; its socket is gone.
+   *
+   * Resolves once the reset was written, or could not be: true only when the
+   * OS took it, so nobody is told a stop went out that did not (rolling audit
+   * v12 X1-P3-1). M5, M9 and the close carry on after it.
+   */
+  stopAndClose(
+    error?: string,
+    options: { readonly discardReceived?: boolean; readonly immediate?: boolean } = {},
+  ): Promise<boolean> {
+    if (!this.end(error, options)) return this.resetSent ?? Promise.resolve(false);
+    let reportReset: (sent: boolean) => void = () => undefined;
+    this.resetSent = new Promise((resolve) => {
+      reportReset = resolve;
+    });
+    this.stopping = this.sendStop(options.immediate === true, reportReset).finally(() => {
+      reportReset(false);
+      this.stopReceive = null;
+      this.socket.destroy();
+    });
+    return this.resetSent;
+  }
+  /** Resolves once a stop this session sent has gone out or given up. */
+  settled(): Promise<void> {
+    return this.stopping ?? Promise.resolve();
+  }
+  // The window sees the session closed at once; the socket may still carry a stop.
+  private end(error: string | undefined, options: { readonly discardReceived?: boolean }): boolean {
+    if (this.closed) return false;
     this.closed = true;
     this.failure = error;
-    this.socket.destroy();
     if (options.discardReceived === true) {
       this.chunks.length = 0;
       this.queuedBytes = 0;
     }
     this.deliver();
+    return true;
+  }
+  private async sendStop(immediate: boolean, reportReset: (sent: boolean) => void): Promise<void> {
+    if (this.socket.destroyed) return;
+    if (immediate) {
+      // Written and ended synchronously, so both reach the OS before the process exits.
+      const written = this.writeStop(Buffer.concat([RESET, STOP_LINES]));
+      const ended = this.endGracefully();
+      reportReset(await written);
+      await ended;
+      return;
+    }
+    const restarted = this.awaitRestartBanner();
+    const sent = await this.writeStop(RESET);
+    reportReset(sent);
+    if (!sent) return;
+    await restarted;
+    if (!(await this.writeStop(STOP_LINES))) return;
+    await this.endGracefully();
+  }
+  // Destroying at once would reset the connection, and a TCP reset can make
+  // the controller's side drop bytes it has not read yet.
+  private endGracefully(): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, STOP_CLOSE_WAIT_MS);
+      timer.unref();
+      this.socket.once('close', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      this.socket.end();
+    });
+  }
+  private awaitRestartBanner(): Promise<void> {
+    return new Promise((resolve) => {
+      let text = '';
+      const timer = setTimeout(resolve, STOP_BANNER_WAIT_MS);
+      this.stopReceive = (chunk) => {
+        // GRBL's, grblHAL's and FluidNC's banners all start with "Grbl".
+        text = (text + chunk.toString('latin1')).slice(-256);
+        if (!/grbl/i.test(text)) return;
+        clearTimeout(timer);
+        resolve();
+      };
+    });
+  }
+  private writeStop(data: Buffer): Promise<boolean> {
+    if (this.socket.destroyed) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), STOP_WRITE_WAIT_MS);
+      timer.unref();
+      this.socket.write(this.wire(data), (error?: Error | null) => {
+        clearTimeout(timer);
+        resolve(error == null);
+      });
+    });
+  }
+  private wire(data: Buffer): Buffer {
+    return this.codec === null ? data : encodeMachineTelnet(data);
   }
   private take(): ReadResult {
     const data = Buffer.concat(this.chunks, this.queuedBytes).toString('base64');

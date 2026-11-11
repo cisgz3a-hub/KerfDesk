@@ -6,6 +6,7 @@ import { useState } from 'react';
 import type { MeshReliefObject, ReliefTwoSidedSplitRecord } from '../../core/scene/relief';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
+import { formatUpTo2Decimals } from '../../core/util/number-format';
 
 const DEFAULT_WEB_MM = 1;
 const DEFAULT_MARGIN_MM = 10;
@@ -34,11 +35,11 @@ function ReliefSplitSideNote(props: {
     <details style={detailsStyle}>
       <summary title="This relief is one side of a two-sided carve">Two-sided carving</summary>
       <p style={noteStyle}>
-        {name} of a split {format(record.modelDepthMm)} mm model. Both sides follow Machine Setup ›
-        Stock: they keep the model centred in the {format(stock)} mm stock with the holding web they
-        were split with.
+        {name} of a split {formatUpTo2Decimals(record.modelDepthMm)} mm model. Both sides follow
+        Machine Setup › Stock: they keep the model centred in the {formatUpTo2Decimals(stock)} mm
+        stock with the holding web they were split with.
         {stock < record.modelDepthMm
-          ? ` The stock is thinner than the model, so both stock faces cut it down: the part comes out ${format(stock)} mm thick.`
+          ? ` The stock is thinner than the model, so both stock faces cut it down: the part comes out ${formatUpTo2Decimals(stock)} mm thick.`
           : ''}
       </p>
     </details>
@@ -63,14 +64,14 @@ function ReliefSplitControls(props: {
     }
     pushToast(
       'Created side A (top) and side B (bottom) reliefs, centred in the ' +
-        `${format(stockThicknessMm ?? result.stockThicknessMm)} mm stock` +
+        `${formatUpTo2Decimals(stockThicknessMm ?? result.stockThicknessMm)} mm stock` +
         (result.setupEnabled ? ' and switched on two-sided machining' : '') +
         '. Both follow a later change to the stock thickness. Carve side A, flip the stock as ' +
         'set in Machine Setup › Two-sided machining, set Z0 on ' +
         'the new top, then make side B active and carve it.' +
         (result.fitsStock
           ? ''
-          : ` The stock is thinner than the ${format(relief.reliefDepthMm)} mm model, so both ` +
+          : ` The stock is thinner than the ${formatUpTo2Decimals(relief.reliefDepthMm)} mm model, so both ` +
             'stock faces cut the model down and the web still holds it. Enter the board’s real ' +
             'thickness in Machine Setup › Stock: both sides follow it.'),
       result.fitsStock ? 'success' : 'warning',
@@ -84,9 +85,9 @@ function ReliefSplitControls(props: {
       <p style={noteStyle}>
         A router reaches the model from above only. Splitting makes a side A relief (the top, down
         to the split) and a side B relief (the bottom, carved after flipping the stock), centred in
-        the {stockThicknessMm === undefined ? '' : `${format(stockThicknessMm)} mm `}stock, with a
-        holding web at the split and a stock frame round the outside. Both sides follow a later
-        change to the stock thickness.
+        the {stockThicknessMm === undefined ? '' : `${formatUpTo2Decimals(stockThicknessMm)} mm `}
+        stock, with a holding web at the split and a stock frame round the outside. Both sides
+        follow a later change to the stock thickness.
       </p>
       <NumberRow
         label="Split height"
@@ -144,10 +145,6 @@ function NumberRow(props: {
       </span>
     </label>
   );
-}
-
-function format(value: number): string {
-  return String(Number(value.toFixed(2)));
 }
 
 const detailsStyle: React.CSSProperties = { marginTop: 6 };

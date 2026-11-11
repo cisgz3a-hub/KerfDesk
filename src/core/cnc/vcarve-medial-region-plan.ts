@@ -8,7 +8,6 @@ import {
   type VCarveMedialRegion,
 } from './vcarve-medial-region';
 import { vcarveMedialRoutes } from './vcarve-medial-route';
-import { vcarveSourceRegionRankFromLayout, type VCarveRegionLayout } from './vcarve-region-order';
 import { radialEnvelopeFootprintMm } from './radial-envelope';
 import type { DetailDepthLaw } from './vcarve-detail-input';
 import { vcarveTipReachability } from './vcarve-tip-reachability';
@@ -44,23 +43,6 @@ export function pairVCarveMedialRoutes(
   return routes.length === referenceRoutes.length
     ? { routes, referenceRoutes }
     : { routes: referenceRoutes, referenceRoutes };
-}
-
-export function planVCarveMedialRegion(
-  region: VCarveMedialRegion,
-  sourceLayout: VCarveRegionLayout,
-  normalizedIndex: number,
-  options: {
-    readonly law: DetailDepthLaw;
-    readonly floorPitchMm: number;
-    readonly resolutionMm: number;
-  },
-): VCarveMedialRegionPlan {
-  const unranked = planUnrankedVCarveMedialRegion(region, normalizedIndex, options);
-  return {
-    ...unranked.plan,
-    sourceRank: vcarveSourceRegionRankFromLayout(unranked.witness, sourceLayout),
-  };
 }
 
 /** Region-local work that does not need the global source-order layout. */
@@ -112,12 +94,4 @@ export function planUnrankedVCarveMedialRegion(
         tipReachability.residualThin || axis.graph.nodes.length === 0 || medialRoutes.length === 0,
     },
   };
-}
-
-export function orderVCarveMedialRegionPlans(
-  plans: ReadonlyArray<VCarveMedialRegionPlan>,
-): ReadonlyArray<VCarveMedialRegionPlan> {
-  return [...plans].sort(
-    (a, b) => a.sourceRank - b.sourceRank || a.normalizedIndex - b.normalizedIndex,
-  );
 }

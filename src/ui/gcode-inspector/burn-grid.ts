@@ -16,6 +16,7 @@
 import { SEG_KIND } from '../../core/gcode-view';
 import { doseDensity, passDoseJPerMm2, powerDensity } from './burn-energy';
 import type { StockChange, StockTarget } from './stock-carving';
+import { lerpPoint } from '../../core/geometry/point-math';
 
 /** What decides how dark a pass burns (ADR-501). */
 export type BurnShading =
@@ -190,7 +191,7 @@ function burnRange(
     const a = { x: moves.positions[at] ?? 0, y: moves.positions[at + 1] ?? 0 };
     const b = { x: moves.positions[at + 3] ?? 0, y: moves.positions[at + 4] ?? 0 };
     const density = passDensity(moves, laser, index);
-    burnLine(canvas, lerp(a, b, start), lerp(a, b, end), density, laser.spotMm, rows);
+    burnLine(canvas, lerpPoint(a, b, start), lerpPoint(a, b, end), density, laser.spotMm, rows);
   }
 }
 
@@ -292,10 +293,6 @@ function shade(
   for (let at = from; at < to; at += 1) {
     darkness[at] = Math.round(255 * (1 - Math.exp(-(density[at] ?? 0))));
   }
-}
-
-function lerp(a: Point, b: Point, t: number): Point {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
 function before(target: StockTarget, done: StockTarget): boolean {

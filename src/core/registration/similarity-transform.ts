@@ -1,4 +1,6 @@
 import type { Project, SceneObject, Vec2 } from '../scene';
+import { subtractPoints, vectorLength } from '../geometry/point-math';
+import { normalizeDegrees } from '../math/wrap';
 
 export type TwoPointRegistration = {
   readonly design: readonly [Vec2, Vec2];
@@ -27,10 +29,10 @@ export function solveTwoPointRegistration(
   ) {
     return { ok: false, reason: 'Registration target coordinates must be finite.' };
   }
-  const designVector = subtract(registration.design[1], registration.design[0]);
-  const machineVector = subtract(registration.machine[1], registration.machine[0]);
-  const designLength = length(designVector);
-  const machineLength = length(machineVector);
+  const designVector = subtractPoints(registration.design[1], registration.design[0]);
+  const machineVector = subtractPoints(registration.machine[1], registration.machine[0]);
+  const designLength = vectorLength(designVector);
+  const machineLength = vectorLength(machineVector);
   if (!Number.isFinite(designLength) || !Number.isFinite(machineLength)) {
     return {
       ok: false,
@@ -43,7 +45,7 @@ export function solveTwoPointRegistration(
   const scale = machineLength / designLength;
   const rotationRad = angle(machineVector) - angle(designVector);
   const mappedFirst = rotateScale(registration.design[0], scale, rotationRad);
-  const translation = subtract(registration.machine[0], mappedFirst);
+  const translation = subtractPoints(registration.machine[0], mappedFirst);
   if (
     !(scale > 0) ||
     !Number.isFinite(scale) ||
@@ -122,19 +124,6 @@ function rotateScale(point: Vec2, scale: number, radians: number): Vec2 {
   return { x: point.x * cosine - point.y * sine, y: point.x * sine + point.y * cosine };
 }
 
-function subtract(a: Vec2, b: Vec2): Vec2 {
-  return { x: a.x - b.x, y: a.y - b.y };
-}
-
-function length(vector: Vec2): number {
-  return Math.hypot(vector.x, vector.y);
-}
-
 function angle(vector: Vec2): number {
   return Math.atan2(vector.y, vector.x);
-}
-
-function normalizeDegrees(value: number): number {
-  const normalized = value % 360;
-  return normalized < 0 ? normalized + 360 : normalized;
 }

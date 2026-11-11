@@ -25,6 +25,7 @@ import {
 } from '../../core/scene';
 import { PHOTO_DITHERS } from '../raster/photo-engraving-settings';
 import type { ToneCalibrationSettings } from './tone-calibration-library';
+import { formatUpTo2Decimals } from '../../core/util/number-format';
 
 /** The photo settings a wedge starts from, and where they came from. */
 export type ToneCalibrationSeed = {
@@ -93,10 +94,7 @@ export function formatDpi(linesPerMm: number): string {
   return String(Number(linesPerMmToDpi(linesPerMm).toFixed(2)));
 }
 
-// A power times a multiplier can carry float noise (0.7 × 33% is 0.23099…%).
-export function formatPower(power: number): string {
-  return String(Number(power.toFixed(2)));
-}
+export { formatUpTo2Decimals as formatPower } from '../../core/util/number-format';
 
 export function seededToneWedgeDraft(
   seed: ToneCalibrationSeed,
@@ -106,7 +104,7 @@ export function seededToneWedgeDraft(
     ...stored,
     ditherAlgorithm: seed.settings.ditherAlgorithm,
     dpi: formatDpi(seed.settings.linesPerMm),
-    power: formatPower(seed.settings.power),
+    power: formatUpTo2Decimals(seed.settings.power),
     speed: String(seed.settings.speed),
     marking: seed.settings.negativeImage ? 'light' : 'dark',
   };
@@ -147,7 +145,7 @@ export function toneWedgeSettings(
   seed: ToneCalibrationSeed | null,
 ): ToneCalibrationSettings {
   const seededDpi = seed === null ? null : formatDpi(seed.settings.linesPerMm);
-  const seededPower = seed === null ? null : formatPower(seed.settings.power);
+  const seededPower = seed === null ? null : formatUpTo2Decimals(seed.settings.power);
   const ditherAlgorithm = DITHER_ALGORITHMS.find((value) => value === draft.ditherAlgorithm);
   return {
     ditherAlgorithm: ditherAlgorithm ?? 'jarvis',
@@ -227,7 +225,7 @@ export function describeToneSettings(
   return [
     ditherName(settings.ditherAlgorithm),
     `${formatDpi(settings.linesPerMm)} DPI`,
-    `${formatPower(settings.power)}%`,
+    `${formatUpTo2Decimals(settings.power)}%`,
     `${settings.speed} mm/min`,
     settings.negativeImage ? 'light marks' : 'dark marks',
   ].join(' · ');

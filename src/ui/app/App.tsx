@@ -13,6 +13,7 @@ import { CanvasGcodeView, CanvasViewSwitch } from '../gcode-inspector';
 import { useCanvasViewStore } from '../state/canvas-view-store';
 import { UpdatePrompt } from '../licensing/UpdatePrompt';
 import { LiveMotionBar, useAbortShortcut, useStartShortcut } from '../laser';
+import { useAbortAutoRestore } from '../laser/abort-auto-restore';
 import { MachineSetupDialogHost } from '../laser/device-setup';
 import { BoardCapturePanel } from '../laser/board-capture';
 import { JobReviewDialog } from '../laser/job-review';
@@ -60,6 +61,7 @@ import { ExternalGcodePreviewBanner } from './ExternalGcodePreviewBanner';
 import { DesktopCloseNotice } from './DesktopCloseNotice';
 import { DesktopSessionEndNotice } from './DesktopSessionEndNotice';
 import { TutorialHost } from '../tutorials/TutorialHost';
+import { FirstJobGuideHost } from '../first-job/FirstJobGuide';
 import { RecentProjectsHost } from '../recent-projects/RecentProjectsHost';
 import { SupportReportHost } from '../support/SupportReportHost';
 import { RemotePairingHost } from '../remote-access/RemotePairingHost';
@@ -139,6 +141,7 @@ function AppWorkspace(): JSX.Element {
       <ImageEditorHost />
       <DesignStudioHost />
       <TutorialHost />
+      <FirstJobGuideHost />
       <RemotePairingHost />
       <WorkspaceLifecycle />
     </div>
@@ -157,6 +160,7 @@ function WorkspaceLifecycle(): null {
   usePolylineFairingUpgrade();
   useSingleArtworkSelection();
   useStartShortcut();
+  useAbortAutoRestore();
   useShortcuts();
   useSpacePan();
   useOperationColorPeek();

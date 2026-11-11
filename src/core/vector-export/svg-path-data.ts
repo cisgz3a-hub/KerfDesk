@@ -30,6 +30,7 @@ import {
   retainedArtworkArc,
 } from './artwork-parametric-arc';
 import { formatGridIndex, gridIndex, snapToGrid, type DecimalGrid } from './decimal-grid';
+import { samePoint } from '../geometry/point-math';
 
 type GridPoint = { readonly x: number; readonly y: number };
 
@@ -182,10 +183,6 @@ function writeRelative(
   if (!curve.closed) return current;
   writer.close();
   return start;
-}
-
-function samePoint(a: GridPoint, b: GridPoint): boolean {
-  return a.x === b.x && a.y === b.y;
 }
 
 function pointText(p: Vec2): string[] {

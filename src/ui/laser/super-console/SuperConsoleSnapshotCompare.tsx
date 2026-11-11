@@ -36,6 +36,7 @@ import {
   snapshotTableWrapStyle as tableWrapStyle,
   snapshotValueCellStyle as valueCellStyle,
 } from './super-console-snapshot-styles';
+import { errorMessage } from '../../../core/util/error-message';
 
 const MAX_SNAPSHOT_BYTES = 2 * 1024 * 1024;
 type SnapshotSlotId = 'A' | 'B';
@@ -402,8 +403,4 @@ function fileSafeLabel(label: string): string {
     .replaceAll(/[^a-z0-9]+/g, '-')
     .replaceAll(/^-|-$/g, '');
   return safe === '' ? 'controller' : safe;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

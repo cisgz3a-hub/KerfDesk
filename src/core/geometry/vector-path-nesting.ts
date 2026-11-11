@@ -34,6 +34,7 @@ import { canonicalizeVectorPaths } from './vector-path-canonical';
 import { paintNestedUnits, type NestedUnit } from './vector-path-nesting-paint';
 import { VECTOR_PATH_PRECISION_DECIMALS } from './vector-path-regions';
 import { tryVectorOp, type VectorOpError } from './vector-path-tools';
+import { boundsOfPoints } from './box-math';
 
 // What is left of a ring after taking an enclosing ring away is rounding when it
 // is thinner than one step of the 1 µm grid both were normalized on: a ring
@@ -113,7 +114,7 @@ function addRings(node: PolyPathD, parent: number | null, batch: number, rings: 
       parent,
       isHole: child.isHole,
       area: Math.abs(area),
-      bounds: boundsOf(path),
+      bounds: boundsOfPoints(path),
     });
     addRings(child, at, batch, rings);
   }
@@ -204,20 +205,6 @@ function union(paths: PathsD): PathsD {
   return canonicalizeVectorPaths(
     unionD(paths, [], FillRule.NonZero, VECTOR_PATH_PRECISION_DECIMALS),
   );
-}
-
-function boundsOf(path: PathD): RingBounds {
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (const point of path) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
-  }
-  return { minX, minY, maxX, maxY };
 }
 
 function boundsEnclose(outer: RingBounds, inner: RingBounds): boolean {

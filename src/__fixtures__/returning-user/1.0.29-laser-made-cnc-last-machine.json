@@ -1,0 +1,65 @@
+{
+  "format": "laserforge-machine-profile",
+  "schemaVersion": 1,
+  "profile": {
+    "profileId": "generic-grbl-400x400",
+    "vendor": "Generic",
+    "model": "GRBL 400x400",
+    "profileSource": "built-in",
+    "catalogVersion": "2026-09-19",
+    "capabilities": [
+      "grbl",
+      "wcs",
+      "verified-origin",
+      "scan-offsets",
+      "no-go-zones",
+      "rotary",
+      "cnc-output"
+    ],
+    "evidence": [
+      {
+        "label": "KerfDesk default",
+        "status": "default-starter",
+        "note": "Generic GRBL firmware template with unspecified machine and output kind. The 400 x 400 mm work area, S1000 scale and feed values are starter assumptions. Controller-reported configured travel does not measure usable work area. Confirm the fitted tool, firmware, homing and S range."
+      }
+    ],
+    "name": "Default 400×400",
+    "cncSubProfile": {
+      "safeZMm": 3.81,
+      "spindleMaxRpm": 12000,
+      "spindleSpinupSec": 3,
+      "coolant": "off",
+      "maxFeedMmPerMin": 5000
+    },
+    "gcodeDialect": {
+      "dialectId": "grbl-dynamic"
+    },
+    "streamingMode": "char-counted",
+    "rxBufferBytes": 120,
+    "bedWidth": 400,
+    "bedHeight": 400,
+    "maxFeed": 6000,
+    "maxPowerS": 1000,
+    "minPowerS": 0,
+    "laserModeEnabled": true,
+    "airAssistCommand": "none",
+    "scanningOffsets": [],
+    "bidirectionalScanPolicy": "allow-requested",
+    "noGoZones": [],
+    "origin": "front-left",
+    "homing": {
+      "enabled": false,
+      "direction": "front-left"
+    },
+    "autofocusCommand": "",
+    "framingFeedMmPerMin": 6000,
+    "accelMmPerSec2": 500,
+    "junctionDeviationMm": 0.01
+  },
+  "source": {
+    "kind": "built-in",
+    "label": "Default 400×400"
+  },
+  "reviewNotes": [],
+  "machineKind": "cnc"
+}

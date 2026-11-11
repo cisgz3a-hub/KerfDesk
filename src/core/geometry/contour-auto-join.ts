@@ -8,6 +8,7 @@
 // bridge segment is added.
 
 import { curveEndpointJoin, curveNodeCount, type CurveSubpath, type Vec2 } from '../scene';
+import { distance } from './point-math';
 
 export type JoinCandidate = {
   readonly curve: CurveSubpath;
@@ -115,8 +116,4 @@ function snapEnd(curve: CurveSubpath, node: number, point: Vec2): CurveSubpath {
     index === curve.segments.length - 1 ? { ...segment, to: point } : segment,
   );
   return { ...curve, segments };
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
 }

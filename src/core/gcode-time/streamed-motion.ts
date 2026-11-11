@@ -36,6 +36,7 @@ import {
 } from './program-time';
 import type { ProgramTimingOptions } from './program-timing-options';
 import { storedSegmentBlock } from './segment-blocks';
+import { appendAll } from '../util';
 
 const CUTTING = 1;
 const RAPID = 2;
@@ -142,7 +143,7 @@ export class StreamedMotion {
     if (last !== undefined && first !== undefined && compareBoundaries(first, last) < 0) {
       throw new Error('Program events arrived out of line order.');
     }
-    this.boundaries.push(...added);
+    appendAll(this.boundaries, added);
   }
 
   // motionSpans' merge of moves and boundaries, one move at a time.

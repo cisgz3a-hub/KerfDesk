@@ -1,7 +1,13 @@
 import type { DeviceProfile } from '../devices';
 import type { Layer, Polyline, SceneObject } from '../scene';
 import { layerOperationOutputEqual } from '../scene/layer';
-import { collectFillSegmentsForLayer, islandFillGroupsForLayer } from './layer-fill';
+import {
+  collectFillContoursForLayer,
+  collectFillSegmentsForLayer,
+  islandFillGroupsForLayer,
+} from './layer-fill';
+import { fillRampApplies, rampedFillGroups, rotaryRampLayer } from './fill-ramp';
+import type { LaserPowerScaleVersion } from '../output/laser-power-scale-version';
 import { buildFillGroup } from './fill-group-build';
 import { hasExecutableFillSweep } from './fill-group-emission';
 import { contourEntryRunwayMm, contourExitRunwayMm } from './contour-entry';
@@ -32,6 +38,7 @@ export function compileVectorGroupsForLayer(
   scope: string,
   keepLeadRings = false,
   kerfSides?: () => KerfSceneSides,
+  laserPowerScaleVersion?: LaserPowerScaleVersion,
 ): VectorCompilation {
   const buckets = vectorProcessBuckets(objects, layer);
   const fillBuckets = buckets.filter((bucket) => bucket.layer.mode === 'fill');
@@ -58,6 +65,7 @@ export function compileVectorGroupsForLayer(
                 bucket.powerSource,
                 priorityObjectId,
                 fill.fillContours.get(bucket),
+                laserPowerScaleVersion,
               )
         : lineGroups(
             lines.get(bucket) ?? { segments: [], tabSpans: [], kerfDiagnostics: [] },
@@ -159,32 +167,77 @@ function vectorGroupsForLayer(
   powerSource: SceneObject | { readonly powerScale: number },
   sourceObjectId?: string,
   suppliedContours?: ReadonlyArray<Polyline>,
+  laserPowerScaleVersion?: LaserPowerScaleVersion,
 ): VectorCompilation {
+  // ADR-699 Amd 1: a ramped Fill on a rotary scans one way along X, as an image does.
+  const rotaryRamp = rotaryRampLayer(layer, device);
+  const rotaryNotice: VectorCompilation = {
+    groups: [],
+    diagnostics:
+      rotaryRamp?.turnedAside === true
+        ? [{ kind: 'fill-ramp-scan-angle-rotary', layerName: layer.name }]
+        : NO_DIAGNOSTICS,
+  };
   // ADR-492: with an angle change per pass, each angle hatches as its own group.
-  return vectorCompilation(
-    fillPassLayers(layer).map((passLayer) =>
-      passLayer.fillStyle === 'island'
-        ? {
-            groups: islandFillGroupsForLayer(
-              objects,
-              passLayer,
-              device,
-              powerSource,
-              sourceObjectId,
-              suppliedContours,
-            ),
-            diagnostics: NO_DIAGNOSTICS,
-          }
-        : offsetOrHatchFillGroups(
-            objects,
-            passLayer,
-            device,
-            powerSource,
-            sourceObjectId,
-            suppliedContours,
-          ),
-    ),
-  );
+  const passLayers = rotaryRamp === null ? fillPassLayers(layer) : [rotaryRamp.layer];
+  return vectorCompilation([
+    rotaryNotice,
+    ...passLayers.map((passLayer) => {
+      if (!fillRampApplies(passLayer))
+        return flatFillGroups(
+          objects,
+          passLayer,
+          device,
+          powerSource,
+          sourceObjectId,
+          suppliedContours,
+        );
+      // ADR-699: a ramp too large to grade burns flat, with a warning.
+      const ramped = rampedFillGroups({
+        contours: suppliedContours ?? collectFillContoursForLayer(objects, passLayer, device),
+        layer: passLayer,
+        device,
+        powerSource,
+        sourceObjectId,
+        laserPowerScaleVersion,
+      });
+      if (ramped.diagnostics.length === 0) return ramped;
+      return vectorCompilation([
+        { groups: [], diagnostics: ramped.diagnostics },
+        flatFillGroups(objects, passLayer, device, powerSource, sourceObjectId, suppliedContours),
+      ]);
+    }),
+  ]);
+}
+
+function flatFillGroups(
+  objects: ReadonlyArray<SceneObject>,
+  passLayer: Layer,
+  device: DeviceProfile,
+  powerSource: SceneObject | { readonly powerScale: number },
+  sourceObjectId?: string,
+  suppliedContours?: ReadonlyArray<Polyline>,
+): VectorCompilation {
+  return passLayer.fillStyle === 'island'
+    ? {
+        groups: islandFillGroupsForLayer(
+          objects,
+          passLayer,
+          device,
+          powerSource,
+          sourceObjectId,
+          suppliedContours,
+        ),
+        diagnostics: NO_DIAGNOSTICS,
+      }
+    : offsetOrHatchFillGroups(
+        objects,
+        passLayer,
+        device,
+        powerSource,
+        sourceObjectId,
+        suppliedContours,
+      );
 }
 
 function lineGroups(

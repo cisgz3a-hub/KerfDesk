@@ -11,6 +11,7 @@ import {
   invalidSavedHeadPositionIndex,
   isLaserFinishPosition,
 } from '../../core/devices/head-position-shape';
+import { ROTARY_AXES } from '../../core/devices/rotary-axis';
 import {
   firstError,
   isObject,
@@ -128,7 +129,27 @@ export function optionalRotarySetup(obj: Record<string, unknown>, path: string):
     requirePositiveNumber(value, `${path}.mmPerRotation`),
     requirePositiveNumber(value, `${path}.objectDiameterMm`),
     optionalPositiveNumber(value, `${path}.rollerDiameterMm`),
+    // ADR-695: absent is Y, as every file before it.
+    optionalLiteral(value, `${path}.axis`, ROTARY_AXES),
+    optionalLiteral(value, `${path}.axisConfirmed`, ['A', 'Z']),
     optionalBoolean(value, `${path}.reverseAxis`),
+    optionalRotaryTaper(value, `${path}.taper`),
+  ]);
+}
+
+// ADR-694. Shape only here; a taper whose ends are further apart than its side
+// is long loads, and the rotary then reports its measurements unusable.
+function optionalRotaryTaper(obj: Record<string, unknown>, path: string): string | null {
+  const value = valueAtPath(obj, path);
+  if (value === undefined) return null;
+  if (!isObject(value)) return `missing or invalid \`${path}\``;
+  return firstError([
+    requireBoolean(value, `${path}.enabled`),
+    requirePositiveNumber(value, `${path}.topDiameterMm`),
+    requirePositiveNumber(value, `${path}.bottomDiameterMm`),
+    requirePositiveNumber(value, `${path}.lengthMm`),
+    requireLiteral(value, `${path}.topSide`, ['left', 'right']),
+    requireNonNegativeNumber(value, `${path}.artworkFromTopMm`),
   ]);
 }
 

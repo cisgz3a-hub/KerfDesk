@@ -4,6 +4,7 @@ import {
   type VCarveBoundarySegment,
   type VCarveMedialRegion,
 } from './vcarve-medial-region';
+import { isFinitePoint } from '../geometry/point-math';
 
 export type VCarveRouteLink = {
   readonly routeIndex: number;
@@ -55,8 +56,8 @@ export function nearestVCarveRouteLink(
   const floorEntries = indexedFloorPoints(floorPoints);
   if (routeEntries.length === 0 || floorEntries.length === 0) return null;
   if (
-    !routeEntries.every(({ point }) => finitePoint(point)) ||
-    !floorEntries.every(({ point }) => finitePoint(point))
+    !routeEntries.every(({ point }) => isFinitePoint(point)) ||
+    !floorEntries.every(({ point }) => isFinitePoint(point))
   ) {
     return nearestVCarveRouteLinkBruteForce(routes, floorPoints, region, segments);
   }
@@ -272,5 +273,3 @@ function nearestVCarveRouteLinkBruteForce(
   });
   return best;
 }
-
-const finitePoint = (point: Vec2): boolean => Number.isFinite(point.x) && Number.isFinite(point.y);

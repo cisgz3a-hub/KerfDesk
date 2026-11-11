@@ -15,6 +15,7 @@ import {
 import { effectiveOperationForObject } from '../scene/effective-operation';
 import type { DeviceProfile } from '../devices';
 import { machineKinematics } from '../devices/device-profile';
+import { maxOf } from '../util';
 
 // Laser G-code coordinates are emitted to three decimal places. Rounding both
 // endpoints can change each axis delta by one full 0.001 mm quantum, so the
@@ -40,37 +41,43 @@ export function maxOutputOverscanMm(scene: Scene, device: DeviceProfile): number
   // ADR-415: each image operation (and artwork override) sets its own overscan.
   const imageOverscan = Math.max(
     0,
-    ...scene.objects.flatMap((object) =>
-      object.kind === 'raster-image'
-        ? imageLayers
-            .filter((layer) => sceneObjectUsesOperation(object, layer))
-            // The longest automatic runway is along an axis on a Cartesian
-            // machine and on the diagonal on a CoreXY one (ADR-675); any other
-            // scan angle the operation adds can only shorten it.
-            .map((layer) =>
-              imageScanOverscanMm(
-                effectiveOperationForObject(layer, object),
-                device,
-                longestAngleDeg,
-              ),
-            )
-        : [],
+    maxOf(
+      scene.objects.flatMap((object) =>
+        object.kind === 'raster-image'
+          ? imageLayers
+              .filter((layer) => sceneObjectUsesOperation(object, layer))
+              // The longest automatic runway is along an axis on a Cartesian
+              // machine and on the diagonal on a CoreXY one (ADR-675); any other
+              // scan angle the operation adds can only shorten it.
+              .map((layer) =>
+                imageScanOverscanMm(
+                  effectiveOperationForObject(layer, object),
+                  device,
+                  longestAngleDeg,
+                ),
+              )
+          : [],
+      ),
     ),
   );
   const fillOverscan = Math.max(
     0,
-    ...outputLayers
-      .filter((layer) => layer.mode === 'fill')
-      .map((layer) => longestFillOverscanMm(layer, device)),
-    ...scene.objects.flatMap((object) =>
-      outputLayers.flatMap((layer) => {
-        if (object.kind === 'raster-image' || object.kind === 'relief') return [];
-        if (!sceneObjectUsesOperation(object, layer)) return [];
-        const effectiveLayer = effectiveOperationForObject(layer, object);
-        return effectiveLayer.mode === 'fill'
-          ? [longestFillOverscanMm(effectiveLayer, device)]
-          : [];
-      }),
+    maxOf(
+      outputLayers
+        .filter((layer) => layer.mode === 'fill')
+        .map((layer) => longestFillOverscanMm(layer, device)),
+    ),
+    maxOf(
+      scene.objects.flatMap((object) =>
+        outputLayers.flatMap((layer) => {
+          if (object.kind === 'raster-image' || object.kind === 'relief') return [];
+          if (!sceneObjectUsesOperation(object, layer)) return [];
+          const effectiveLayer = effectiveOperationForObject(layer, object);
+          return effectiveLayer.mode === 'fill'
+            ? [longestFillOverscanMm(effectiveLayer, device)]
+            : [];
+        }),
+      ),
     ),
   );
   return Math.max(imageOverscan, fillOverscan);

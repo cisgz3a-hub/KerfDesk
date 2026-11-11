@@ -22,6 +22,10 @@ import { knownOptionalChoices, validateMachineProfileShape } from './machine-pro
 import { recoverProfileCommands } from './machine-profile-autofocus';
 import { optionalRotarySetup } from '../project/project-device-profile-validator';
 import { firstError } from '../project/project-shape-primitives';
+import { rotaryAxisSchema, schemaTooNew } from './machine-profile-rotary-version';
+import { isRecord } from '../../core/util/is-record';
+import { isPositiveFiniteNumber, isNonNegativeFiniteNumber } from '../../core/util/finite';
+import { isNonEmptyString } from '../../core/util/text';
 
 export const MACHINE_PROFILE_FORMAT = 'laserforge-machine-profile';
 export const MACHINE_PROFILE_SCHEMA_VERSION = 1;
@@ -51,7 +55,8 @@ const ORIGINS = ['front-left', 'front-right', 'rear-left', 'rear-right', 'center
 const PROFILE_SOURCES = ['built-in', 'custom', 'imported', 'lightburn'] as const;
 
 export function serializeMachineProfileDocument(document: MachineProfileDocument): string {
-  return `${JSON.stringify(canonicalDocument(document), null, 2)}\n`;
+  // ADR-695: a dedicated rotary axis is written as a schema older readers refuse.
+  return `${JSON.stringify(rotaryAxisSchema(canonicalDocument(document)), null, 2)}\n`;
 }
 
 /** Stable profile-only representation used for forensic identities. Unlike a
@@ -91,7 +96,7 @@ export function deserializeMachineProfileDocument(
   if (typeof schemaVersion !== 'number' || !Number.isFinite(schemaVersion)) {
     return { kind: 'invalid', reason: 'missing or non-numeric schemaVersion' };
   }
-  if (schemaVersion > MACHINE_PROFILE_SCHEMA_VERSION) {
+  if (schemaTooNew(schemaVersion, MACHINE_PROFILE_SCHEMA_VERSION)) {
     return { kind: 'schema-too-new', sawVersion: schemaVersion };
   }
   if (schemaVersion < MACHINE_PROFILE_SCHEMA_VERSION) {
@@ -262,10 +267,10 @@ function parseNoGoZones(
       !isNonEmptyString(zone['id']) ||
       !isNonEmptyString(zone['name']) ||
       typeof zone['enabled'] !== 'boolean' ||
-      !isNonNegativeFinite(zone['x']) ||
-      !isNonNegativeFinite(zone['y']) ||
-      !isPositiveFinite(zone['width']) ||
-      !isPositiveFinite(zone['height'])
+      !isNonNegativeFiniteNumber(zone['x']) ||
+      !isNonNegativeFiniteNumber(zone['y']) ||
+      !isPositiveFiniteNumber(zone['width']) ||
+      !isPositiveFiniteNumber(zone['height'])
     ) {
       return invalidNoGoZone(index);
     }
@@ -421,22 +426,6 @@ function canonicalZMetadata(profile: DeviceProfile): Partial<DeviceProfile> {
 
 function invalidNoGoZone(index: number): { readonly kind: 'invalid'; readonly reason: string } {
   return { kind: 'invalid', reason: `profile.noGoZones[${index}] is invalid` };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function isPositiveFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
-}
-
-function isNonNegativeFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
 function isProfileSource(value: unknown): value is MachineProfileSource {

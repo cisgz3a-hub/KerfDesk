@@ -41,6 +41,7 @@ import { effectiveOperationForObject } from '../../core/scene/effective-operatio
 import { fillOperationsAmong, fillPoolRuns } from '../../core/scene/fill-operations';
 import { transformCurveSubpathExact } from '../../core/vector-export/affine-curves';
 import { svgObjectMatrix } from './export-svg-paths';
+import { appendAll } from '../../core/util';
 
 export type ExportVectorObject = Extract<SceneObject, { readonly paths: readonly ColoredPath[] }>;
 
@@ -283,7 +284,7 @@ function resolvedRegion(
         ? normalizeClosedPolylinesNonZeroChecked(closed)
         : normalizeClosedPolylinesEvenOddChecked(closed);
     if (resolved.kind === 'error') return null;
-    batches.push(...resolved.value);
+    appendAll(batches, resolved.value);
   }
   const union = normalizeClosedPolylinesNonZeroChecked(batches);
   return union.kind === 'ok' ? union.value : null;

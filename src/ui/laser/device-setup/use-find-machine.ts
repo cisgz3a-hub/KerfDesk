@@ -9,6 +9,7 @@ import { usePlatform } from '../../app/platform-context';
 import { pauseAutoConnect } from '../../state/auto-connect-session';
 import { waitForControllerQueueSettled } from '../../state/controller-queue-settle';
 import { useLaserStore, type ConnectControllerOptions } from '../../state/laser-store';
+import { isActiveJob } from '../../state/laser-store-helpers';
 import { useToastStore } from '../../state/toast-store';
 import {
   baudScanAnswer,
@@ -21,6 +22,7 @@ import type { DeviceSetupStepProps } from './device-setup-flow';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
 import { connectionForMachineSetup, type MachineSetupConnection } from './machine-setup-connection';
 import { liveConnectionAttempt, type DeviceSetupAutomatic } from './use-controller-auto-fill';
+import { assertReconnectAllowed, RECONNECT_DURING_JOB_TITLE } from '../reconnect-job-guard';
 
 const ANSWER_WAIT_MS = 4_000;
 
@@ -105,6 +107,8 @@ export function useFindMachine(
     scan,
     networkTarget: connection.networkTarget,
     connectionBlocked: connection.blockedReason,
+    /** Why Reconnect is disabled now: a job is running (V3-P2-1), or null. */
+    reconnectBlocked: laser.jobActive ? RECONNECT_DURING_JOB_TITLE : null,
     supportsSerial: connection.supportsSerial,
   };
 }
@@ -149,7 +153,10 @@ function findConnectionActions(deps: {
         await openForFind(requestFind, { portSelection: 'choose' });
       })().catch(showError);
     },
+    // Reconnecting resets the controller, so neither reconnect runs mid-job
+    // (V3-P2-1); the operator's own Disconnect and port choice still do.
     reconnect: async (): Promise<void> => {
+      assertReconnectAllowed();
       stopScan();
       await disconnect();
       await openConnection();
@@ -161,6 +168,7 @@ function findConnectionActions(deps: {
     },
     // Find's follow-up reconnect with the adopted firmware keeps Find's claim.
     reconnectForFind: async (): Promise<void> => {
+      assertReconnectAllowed();
       stopScan();
       await disconnect();
       await openForFind((attempt) => automatic?.continueFind(attempt));
@@ -180,6 +188,7 @@ function useFindLaserState() {
     serialPortInfo: useLaserStore((s) => s.serialPortInfo ?? null),
     connectedBaudRate: useLaserStore((s) => s.connectedBaudRate ?? null),
     controllerOperation: useLaserStore((s) => s.controllerOperation),
+    jobActive: useLaserStore((s) => isActiveJob(s.streamer)),
     connect: useLaserStore((s) => s.connect),
     disconnect: useLaserStore((s) => s.disconnect),
     readMachineSettings: useLaserStore((s) => s.readMachineSettings),

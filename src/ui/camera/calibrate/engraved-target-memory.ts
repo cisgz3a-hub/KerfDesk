@@ -16,6 +16,8 @@ import {
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import { DEFAULT_RING_DIAMETER_MM } from '../../../core/camera/target/bed-target';
 import type { DeviceProfile } from '../../../core/devices';
+import { isRecord } from '../../../core/util/is-record';
+import { isFiniteNumber } from '../../../core/util/finite';
 
 export type EngravedTarget = {
   /** Where the rings were engraved, bed mm. */
@@ -36,6 +38,12 @@ export type EngravedTarget = {
    * frame when the target was added, which holds only while Machine Setup does.
    */
   readonly burnSeen?: true;
+  /**
+   * A target put on the canvas whose rings a Start streamed from another Start
+   * from than Absolute Coordinates (rolling audit v13 Y3-P1-2): they burned
+   * away from where the target put them, so they cannot be calibrated on.
+   */
+  readonly burnedFrom?: 'current-position' | 'user-origin' | 'verified-origin';
   /** Outer diameter of its rings, mm; absent on targets remembered before ring sizes (10 mm). */
   readonly ringDiameterMm?: number;
 };
@@ -172,12 +180,19 @@ function parseTarget(value: unknown): EngravedTarget | null {
 // How the target was placed and how large its rings are, when remembered.
 function targetExtras(
   value: Record<string, unknown>,
-): Pick<EngravedTarget, 'onCanvas' | 'burnSeen' | 'ringDiameterMm'> {
+): Pick<EngravedTarget, 'onCanvas' | 'burnSeen' | 'burnedFrom' | 'ringDiameterMm'> {
   const ring = value['ringDiameterMm'];
   const onCanvas = value['onCanvas'] === true;
+  const burnedFrom = value['burnedFrom'];
   return {
     ...(onCanvas ? { onCanvas: true as const } : {}),
     ...(onCanvas && value['burnSeen'] === true ? { burnSeen: true as const } : {}),
+    ...(onCanvas &&
+    (burnedFrom === 'current-position' ||
+      burnedFrom === 'user-origin' ||
+      burnedFrom === 'verified-origin')
+      ? { burnedFrom }
+      : {}),
     ...(isFiniteNumber(ring) && ring > 0 ? { ringDiameterMm: ring } : {}),
   };
 }
@@ -186,12 +201,4 @@ type SevenNumbers = readonly [number, number, number, number, number, number, nu
 
 function allFinite(values: ReadonlyArray<unknown>): values is SevenNumbers {
   return values.length === 7 && values.every(isFiniteNumber);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
 }

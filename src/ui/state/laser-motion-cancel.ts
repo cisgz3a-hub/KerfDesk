@@ -3,6 +3,7 @@ import {
   waitForFreshControllerStatus,
 } from './laser-controller-status-wait';
 import { startControllerCommand } from './laser-interactive-command';
+import { heldFrameThroughCancel } from './jog-held-frame';
 import type { LaserMotionOperation, LaserMotionOperationId } from './laser-motion-operation';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { GetFn, SafeWriteFn, SetFn } from './laser-line-shared';
@@ -15,6 +16,7 @@ import {
 } from './laser-motion-cancel-context';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
 import { cancelPendingManualMotions } from './manual-motion-intent';
+import { sleep } from '../common/sleep';
 
 const CANCEL_QUEUE_TIMEOUT_MS = 8_000;
 const CANCEL_QUEUE_POLL_MS = 10;
@@ -30,11 +32,12 @@ const CONTROLLER_STATE_TIMEOUT_MESSAGE = 'Timed out waiting for controller state
 // settles and releases the owner itself on the controller's next Idle report.
 const MOTION_STOP_TIMEOUT_MESSAGE =
   'Timed out waiting for motion to stop after Cancel. KerfDesk releases motion control when the controller next reports Idle; use ABORT MOTION to stop the machine now.';
-// A reply that never came keeps the owner: it may still arrive, and only a
-// new serial session proves it will not. Once the controller reports Idle,
-// Disconnect and Connect stay available for that (ADR-640).
+// A reply that never came keeps the owner: it may still arrive. Once the
+// controller reports Idle, a GRBL-family controller's answer to one `$G`
+// proves whether it was dropped and releases the owner in place (ADR-696);
+// Disconnect and Connect stay available meanwhile (ADR-640).
 const MISSING_MOTION_REPLY_MESSAGE =
-  'The controller did not answer the last motion command within 8 seconds. Once the machine has stopped, Disconnect and connect again to clear it; use ABORT MOTION to stop it now.';
+  'The controller did not answer the last motion command within 8 seconds. Once the machine reports Idle, KerfDesk asks it to confirm it has read every line and then releases motion control; if motion stays locked, Disconnect and connect again. Use ABORT MOTION to stop the machine now.';
 const AUTOMATIC_RELEASE_FAILURE_HEADING = 'Releasing the stopped motion needs attention';
 
 export async function runCancelJog(
@@ -51,7 +54,9 @@ export async function runCancelJog(
   const operationId = context.operationId;
   // Cancel intent itself expires a completed Frame permit, even when no live
   // motion owner exists (for example a key/button release after a zero-length
-  // jog). Authorization never survives a realtime cancel attempt.
+  // jog). Live authorization never survives a realtime cancel attempt; a Frame
+  // a healthy jog set aside comes back only if this Cancel settles that jog
+  // cleanly (cancellingMotionOperation, ADR-565 Amendment 1).
   set((state) => ({
     manualMotionCancelEpoch: state.manualMotionCancelEpoch + 1,
     frameVerification: null,
@@ -144,12 +149,17 @@ function cancellingMotionOperation(
   attemptId: symbol,
   automaticRelease: boolean,
 ): LaserMotionOperation {
-  const { cancelStatusQueryAfterSequence: staleFence, ...unstamped } = operation;
+  const { cancelStatusQueryAfterSequence: staleFence, heldFrame: before, ...unstamped } = operation;
   void staleFence;
+  void before;
+  // A Frame held through the jog survives only the operator Cancel that stops
+  // a still-healthy move, and only if this attempt settles it (ADR-565 Amd 1).
+  const heldFrame = heldFrameThroughCancel(operation, attemptId, automaticRelease);
   return {
     ...unstamped,
     cancelRequested: true,
     cancelAttemptId: attemptId,
+    ...(heldFrame === undefined ? {} : { heldFrame }),
     ...(automaticRelease
       ? { automaticReleaseAttempts: (operation.automaticReleaseAttempts ?? 0) + 1 }
       : {}),
@@ -391,10 +401,4 @@ async function confirmCancelledMotionIdle(
     }
     throw error;
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }

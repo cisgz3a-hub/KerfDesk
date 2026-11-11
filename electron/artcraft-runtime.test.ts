@@ -6,6 +6,7 @@ import path from 'node:path';
 import type { ChildProcess } from 'node:child_process';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createArtcraftRuntime } from './artcraft-runtime';
+import type * as ArtcraftOperations from './artcraft-operations';
 import { initialiseEditor, inspectEditor, saveEditorRevision } from './artcraft-operations';
 import { launchArtcraftProcess } from './artcraft-process';
 import { checkEditorLease } from './artcraft-process-lease';
@@ -19,7 +20,7 @@ vi.mock('./artcraft-installation.js', () => ({
 vi.mock('./artcraft-process.js', () => ({ launchArtcraftProcess: vi.fn() }));
 vi.mock('./artcraft-process-lease.js', () => ({ checkEditorLease: vi.fn(async () => undefined) }));
 vi.mock('./artcraft-operations.js', async (original) => ({
-  ...(await original<typeof import('./artcraft-operations')>()),
+  ...(await original<typeof ArtcraftOperations>()),
   initialiseEditor: vi.fn(),
   inspectEditor: vi.fn(),
   saveEditorRevision: vi.fn(),

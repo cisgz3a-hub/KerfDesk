@@ -215,6 +215,11 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Review selected open Fill contours before closing a larger endpoint gap.',
   },
+  'tools.leave-white-unburned': {
+    family: 'tools',
+    tooltip:
+      'Cut solid white SVG shapes out of the fills under them and leave them unburned. One undo step.',
+  },
   'arrange.align-left': {
     family: 'arrange',
     tooltip: 'Align selected objects to the reference left edge.',
@@ -336,6 +341,11 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'window',
     tooltip: 'Edit notes saved inside the current KerfDesk project file.',
   },
+  'window.simple-view': {
+    family: 'window',
+    tooltip:
+      'Show only power, speed and passes for each laser operation. Any other setting this burn uses stays listed with its value; Show all settings turns Simple view off.',
+  },
   'window.undo-history': {
     family: 'window',
     tooltip:
@@ -363,6 +373,11 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'help.tutorials': {
     family: 'help',
     tooltip: 'Browse step-by-step visual tutorials for tools, artwork, and machine workflows.',
+  },
+  'help.first-job-guide': {
+    family: 'help',
+    tooltip:
+      'Open a side panel that walks your first laser job from Connect to Start. It highlights each real control and moves on when you use it; it never frames or starts by itself.',
   },
   'help.keyboard-shortcuts': {
     family: 'help',

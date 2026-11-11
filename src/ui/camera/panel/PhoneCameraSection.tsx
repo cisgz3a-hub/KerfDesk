@@ -6,7 +6,11 @@
 
 import { useState } from 'react';
 import { usePlatform } from '../../app';
-import { loadPhoneCamera, savePhoneCamera } from '../../state/camera-preference-storage';
+import {
+  loadPhoneCamera,
+  rememberedPhoneCamera,
+  savePhoneCamera,
+} from '../../state/remembered-camera-addresses';
 import { type CameraSourceState, useCameraStore } from '../../state/camera-store';
 import { CameraSourceView } from '../CameraSourceView';
 import { publicCameraSourceId, type ActiveCameraSource } from '../frame-source';
@@ -80,15 +84,21 @@ function usePhoneCamera() {
   const control = phoneControl(sourceState, startedUrl);
 
   const connect = (): void => {
-    const address = phoneCameraAddress(app, typed);
-    if (address.kind === 'invalid') {
-      setProblem(address.message);
-      return;
-    }
-    setProblem(null);
-    savePhoneCamera({ app, address: typed });
-    setStartedUrl(address.url);
-    void startSnapshotSource(bridge, address.url);
+    void (async () => {
+      // The remembered address, shown in its public form, connects as the
+      // desktop's secure storage kept it (ADR-692 Amendment 1).
+      const unchanged = stored !== null && app === stored.app && typed.trim() === stored.address;
+      const remembered = unchanged ? await rememberedPhoneCamera() : null;
+      const address = phoneCameraAddress(app, remembered?.address ?? typed);
+      if (address.kind === 'invalid') {
+        setProblem(address.message);
+        return;
+      }
+      setProblem(null);
+      if (remembered === null) savePhoneCamera({ app, address: typed });
+      setStartedUrl(address.url);
+      await startSnapshotSource(bridge, address.url);
+    })();
   };
 
   return {

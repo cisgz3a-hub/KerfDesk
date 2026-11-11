@@ -26,6 +26,4 @@ export function validDepthInputs(
   );
 }
 
-export function validDepthTolerance(value: number, fallback: number): number {
-  return Number.isFinite(value) && value > 0 ? value : fallback;
-}
+export { finitePositiveOr as validDepthTolerance } from '../util/finite';

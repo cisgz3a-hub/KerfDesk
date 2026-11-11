@@ -35,11 +35,22 @@ function valid(command: string, args: Record<string, unknown>): boolean {
   if (command === 'get_machine_status') return keys(args, []);
   if (command === 'get_control_operation') return validReceipt(args);
   if (!uuid(args['requestId'])) return false;
+  if (command === 'resume_job') return validResume(args);
   if (NO_REVISION.has(command)) return keys(args, ['requestId']);
   if (command === 'jog_hold_stop')
     return keys(args, ['requestId', 'operationId']) && uuid(args['operationId']);
   if (!validRevision(args['expectedRevision'])) return false;
   return validAction(command, args);
+}
+/** An optional confirmation of the paused CNC job's Resume warning (ADR-585 Amendment 2). */
+function validResume(args: Record<string, unknown>): boolean {
+  const confirm = args['confirmAdvisory'];
+  if (confirm === undefined) return keys(args, ['requestId']);
+  return (
+    keys(args, ['requestId', 'confirmAdvisory']) &&
+    typeof confirm === 'string' &&
+    /^[0-9a-f]{8}$/.test(confirm)
+  );
 }
 function validRevision(value: unknown): value is string {
   return typeof value === 'string' && value.length >= 1 && value.length <= 200;

@@ -42,6 +42,42 @@ export type TransportCapability =
 
 export type StartProtocolCapability = 'grbl-live' | 'marlin-line' | 'smoothie-live' | 'file-only';
 
+/** A live link outside the line-based controller store (ADR-697: Ruida over
+ *  UDP on the desktop). Each control it offers is listed; the UI mounts only
+ *  those, and every other machine control stays off. */
+export type DatagramNetworkCapabilities = {
+  readonly start: 'stream-rd';
+  readonly frame: 'travel-only-rd';
+  readonly pause: boolean;
+  readonly resume: boolean;
+  readonly abort: boolean;
+  readonly status: 'memory-read';
+  readonly jog: false;
+  readonly home: false;
+  readonly console: false;
+  readonly settings: false;
+  readonly origin: false;
+  readonly overrides: false;
+};
+
+/** A live link over USB outside the line-based controller store (ADR-703:
+ *  a Lihuiyu board behind its CH341 bridge). Each control it offers is listed;
+ *  the UI mounts only those, and every other machine control stays off. */
+export type UsbLinkCapabilities = {
+  readonly start: 'stream-packets';
+  readonly frame: 'travel-only';
+  readonly pause: boolean;
+  readonly resume: boolean;
+  readonly abort: boolean;
+  readonly home: boolean;
+  readonly jog: 'relative' | false;
+  readonly status: 'status-byte';
+  readonly console: false;
+  readonly settings: false;
+  readonly origin: false;
+  readonly overrides: false;
+};
+
 export type ControllerCapabilities = {
   // Compatibility class for live Start semantics. Controller labels may
   // differ while queue, status, realtime, and emitted-job contracts match.

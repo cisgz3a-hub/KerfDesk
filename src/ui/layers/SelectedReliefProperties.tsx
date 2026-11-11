@@ -31,6 +31,7 @@ import { ReliefSourceMeaning } from './ReliefSourceMeaning';
 import { proportionalReliefPatch, ReliefProportionControls } from './ReliefProportionControls';
 import { ReliefTwoSidedSplit } from './ReliefTwoSidedSplit';
 import type { ReliefParamPatch } from '../state/relief-param-actions';
+import { isFinitePositive } from '../../core/util/finite';
 
 const VERTICES_PER_TRIANGLE_FLOATS = 9;
 
@@ -273,7 +274,7 @@ function ReliefNumberInput(props: {
       // bounds at irrational transform scales.
       if (input.trim() === canonicalDisplay) return props.value;
       const parsed = Number.parseFloat(input) / scale;
-      return positiveFinite(parsed) ? parsed : props.value;
+      return isFinitePositive(parsed) ? parsed : props.value;
     },
     format: (value) => formatReliefValue(value * scale),
   });
@@ -305,10 +306,6 @@ function formatReliefValue(value: number): string {
     .replace(/0+$/, '')
     .replace(/\.$/, '');
   return rounded === '0' && value !== 0 ? String(value) : rounded;
-}
-
-function positiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }
 
 function BackgroundSelect(props: { readonly relief: MeshReliefObject }): JSX.Element {

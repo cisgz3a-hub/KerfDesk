@@ -16,6 +16,7 @@ import {
 import { DEFAULT_OVERSCAN_MM, MAX_FILL_OVERSCAN_MM } from '../../../core/job/compile-job-defaults';
 import { laserLeadSpecFor } from '../../../core/job/laser-lead-settings';
 import { passAngleStepApplies } from '../../../core/job/scan-pass-angles';
+import { fillRampParts, slicedImagePart } from './job-review-depth-parts';
 import { normalizedScanAngleDeg } from '../../../core/raster/raster-scan-frame';
 import {
   DEFAULT_CNC_STOCK,
@@ -26,9 +27,11 @@ import {
 import type { MaterialLibraryDocument } from '../../../io/material-library';
 import { materialBindingStatus } from '../../layers/material-binding-status';
 import { closedShapesGetTabs, cncDepthParts } from './job-review-cnc-depth';
+import { cncProjectionParts, type CompiledProjectionFacts } from './job-review-projection-detail';
 import { formatMm } from './job-review-format';
 import { laserTabsPart } from './job-review-laser-tabs';
 import type { CncStrategyFallback } from '../../../core/job/cnc-compilation-sidecar-types';
+import { formatGroupedUpTo3Decimals } from '../../../core/util/number-format';
 
 const FILL_STYLE_LABELS: Readonly<Record<LayerOperationSettings['fillStyle'], string>> = {
   scanline: 'Scanline',
@@ -66,23 +69,20 @@ function lineDetail(settings: LayerOperationSettings, placedTabCount: number): s
 function fillDetail(settings: LayerOperationSettings): string {
   return [
     `${FILL_STYLE_LABELS[settings.fillStyle]} fill`,
-    `${formatIntervalMm(settings.hatchSpacingMm)} mm hatch at ${settings.hatchAngleDeg}°`,
+    `${formatGroupedUpTo3Decimals(settings.hatchSpacingMm)} mm hatch at ${settings.hatchAngleDeg}°`,
     settings.fillBidirectional ? 'bidirectional' : 'one-way',
     ...(settings.fillCrossHatch ? ['cross-hatch'] : []),
     ...passAngleStepPart(settings),
+    ...fillRampParts(settings),
     ...fillOverscanParts(settings),
     ...localScanOffsetPart(settings),
     ...powerModePart(settings),
   ].join(SEPARATOR);
 }
 
-function formatIntervalMm(value: number): string {
-  return value.toLocaleString('en-US', { maximumFractionDigits: 3 });
-}
-
 function imageDetail(settings: LayerOperationSettings): string {
   return [
-    `${capitalizeToken(settings.ditherAlgorithm)} dither`,
+    ...imageModeParts(settings),
     `${settings.linesPerMm} lines/mm`,
     settings.imageBidirectional ? 'bidirectional' : 'one-way',
     ...(settings.negativeImage ? ['negative'] : []),
@@ -93,6 +93,10 @@ function imageDetail(settings: LayerOperationSettings): string {
     ...imageScanPatternParts(settings),
     ...localScanOffsetPart(settings),
   ].join(SEPARATOR);
+}
+
+function imageModeParts(settings: LayerOperationSettings): ReadonlyArray<string> {
+  return [slicedImagePart(settings) ?? `${capitalizeToken(settings.ditherAlgorithm)} dither`];
 }
 
 // ADR-495: automatic overscan follows the speed and the machine, so Job Review
@@ -121,7 +125,7 @@ const AUTOMATIC_OVERSCAN_PART = 'automatic overscan from speed and acceleration'
 function imageScanPatternParts(settings: LayerOperationSettings): ReadonlyArray<string> {
   const angleDeg = normalizedScanAngleDeg(settings.imageScanAngleDeg);
   return [
-    ...(angleDeg === 0 ? [] : [`scan at ${formatIntervalMm(angleDeg)}°`]),
+    ...(angleDeg === 0 ? [] : [`scan at ${formatGroupedUpTo3Decimals(angleDeg)}°`]),
     ...(settings.imageCrossHatch === true ? ['cross-hatch'] : []),
     ...passAngleStepPart(settings),
   ];
@@ -130,7 +134,8 @@ function imageScanPatternParts(settings: LayerOperationSettings): ReadonlyArray<
 function passAngleStepPart(settings: LayerOperationSettings): ReadonlyArray<string> {
   if (!passAngleStepApplies(settings)) return [];
   const stepDeg = settings.passAngleStepDeg ?? 0;
-  const signed = stepDeg > 0 ? `+${formatIntervalMm(stepDeg)}` : formatIntervalMm(stepDeg);
+  const signed =
+    stepDeg > 0 ? `+${formatGroupedUpTo3Decimals(stepDeg)}` : formatGroupedUpTo3Decimals(stepDeg);
   return [`angle ${signed}° per pass`];
 }
 
@@ -167,7 +172,10 @@ function leadPart(settings: LayerOperationSettings): ReadonlyArray<string> {
 function localScanOffsetPart(settings: LayerOperationSettings): ReadonlyArray<string> {
   const offsetMm = settings.bidirectionalScanOffsetMm;
   if (offsetMm === undefined) return [];
-  const signed = offsetMm > 0 ? `+${formatIntervalMm(offsetMm)}` : formatIntervalMm(offsetMm);
+  const signed =
+    offsetMm > 0
+      ? `+${formatGroupedUpTo3Decimals(offsetMm)}`
+      : formatGroupedUpTo3Decimals(offsetMm);
   return [`local scan offset ${signed} mm — replaces device table only for bidirectional output`];
 }
 
@@ -185,6 +193,10 @@ export type CompiledReliefFacts = {
   readonly maxDepthMm: number;
   // Whether the operation's other shapes compiled groups of their own.
   readonly cutsOtherShapes: boolean;
+  // W6-P2-2: area the roughing bit could not reach, and the step-down levels
+  // the finishing bit cut there; absent when roughing reached everything.
+  readonly roughingMissedAreaMm2?: number;
+  readonly finishingStepLevels?: number;
 };
 
 /** The read-only strategy a CNC operation cuts with, joined for one line.
@@ -202,7 +214,18 @@ export function cncOperationDetail(
   unrampedShapes = false,
   compiledTabs?: boolean,
   strategyFallback?: CncStrategyFallback['kind'],
+  projection?: CompiledProjectionFacts,
 ): string {
+  // W6-P2-1: a projection cuts its Vertical depth under the relief surface,
+  // so its depth and tabs come from the compiled projection, not Cut depth.
+  if (projection !== undefined) {
+    return [
+      ...cncProjectionParts(settings, projection, stockThicknessMm),
+      ...cncDirectionPart(settings),
+      ...cncEntryPart(settings, [], true, unrampedShapes),
+      feedSourcePart(settings),
+    ].join(SEPARATOR);
+  }
   // A relief roughs to its own depth, level by level, and takes no tabs. An
   // operation that cut only reliefs cut no shape of its cut type, so that
   // type's depth, tabs and strategy parts would describe nothing.
@@ -235,8 +258,8 @@ function reliefRoughingPart(relief: CompiledReliefFacts | undefined): ReadonlyAr
   if (relief === undefined) return [];
   const levels = relief.roughingLevelDepthsMm;
   const deepestMm = levels[levels.length - 1];
-  if (deepestMm === undefined) return ['no relief roughing levels'];
-  const to = `to ${formatIntervalMm(deepestMm)} mm`;
+  if (deepestMm === undefined) return [`no relief roughing levels${missedNote(relief)}`];
+  const to = `to ${formatGroupedUpTo3Decimals(deepestMm)} mm`;
   // The reliefs of one operation share a roughing group, so its levels are
   // the distinct depths across them all, not a count for each relief.
   if (relief.reliefCount > 1) {
@@ -244,7 +267,18 @@ function reliefRoughingPart(relief: CompiledReliefFacts | undefined): ReadonlyAr
     return [`relief roughing at ${depths} ${to} across ${relief.reliefCount} reliefs`];
   }
   const noun = levels.length === 1 ? 'level' : 'levels';
-  return [`relief roughing ${levels.length} ${noun} ${to}`];
+  return [`relief roughing ${levels.length} ${noun} ${to}${missedNote(relief)}`];
+}
+
+// W6-P2-2: the levels above do not reach everywhere, so name what they miss.
+function missedNote(relief: CompiledReliefFacts): string {
+  const areaMm2 = relief.roughingMissedAreaMm2;
+  if (areaMm2 === undefined || areaMm2 <= 0) return '';
+  const area = `about ${Math.max(1, Math.round(areaMm2))} mm²`;
+  const steps = relief.finishingStepLevels ?? 0;
+  if (steps === 0) return `, not reaching ${area}`;
+  const noun = steps === 1 ? 'level' : 'levels';
+  return `, not reaching ${area} (finishing steps down ${steps} ${noun} there)`;
 }
 
 // Relief roughing rings step by the stepover on every cut type, V-carve too.

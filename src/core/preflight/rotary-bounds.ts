@@ -24,13 +24,32 @@ export function rotaryXOnlyBounds(bounds: MachineBounds): MachineBounds {
   };
 }
 
+/** What the operator measured: the rotary's machine Y mm per surface mm and
+ * the object's diameter, so the warning speaks the artwork's own units. */
+export type RotaryWrapSurface = {
+  readonly yScale: number;
+  readonly objectDiameterMm: number;
+};
+
 /** A program taller than one turn burns onto its own start. */
 export function rotaryWrapIssue(
   gcodeLines: string | Iterable<string>,
   wrapMm: number,
+  surface?: RotaryWrapSurface,
 ): string | null {
   const span = programMotionYSpan(gcodeLines);
   if (span === null || span <= wrapMm) return null;
+  if (surface !== undefined && surface.yScale > 0 && Number.isFinite(surface.yScale)) {
+    // Rolling audit v12 X8-P3-1: surface mm and turns, as Rotary Setup's
+    // wrap preview names them, never the machine millimetres behind them.
+    const turnMm = Math.PI * surface.objectDiameterMm;
+    return (
+      `The artwork wraps ${(span / surface.yScale).toFixed(1)} mm round the part ` +
+      `(${(span / wrapMm).toFixed(2)} turns), more than one turn of the ` +
+      `Ø${Number(surface.objectDiameterMm.toFixed(2))} mm object (${turnMm.toFixed(1)} mm), ` +
+      'so it would burn over its own start. Scale the artwork down or check the rotary setup.'
+    );
+  }
   return (
     `Rotary job motion spans ${span.toFixed(3)} mm in Y, more than one turn of the object ` +
     `(${wrapMm.toFixed(3)} mm), so it would burn over its own start. Scale the artwork down ` +

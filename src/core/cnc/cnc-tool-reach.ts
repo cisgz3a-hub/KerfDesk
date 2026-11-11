@@ -6,6 +6,7 @@ import {
   type CncReachFixture,
   type CncReachPoint,
 } from './cnc-reach-geometry';
+import { isPositiveFiniteNumber } from '../util/finite';
 export type { CncReachFixture, CncReachPoint } from './cnc-reach-geometry';
 
 export type CncToolReachFinding = {
@@ -88,7 +89,7 @@ function unknownGeometryMessage(tool: CncTool, checksFixtures: boolean): string 
   if (missing.length === 0) return null;
   const parts = [`Unknown ${missing.join(', ')}.`];
   if (checksFixtures) {
-    if (!positive(tool.fluteLengthMm) && positive(tool.diameterMm))
+    if (!isPositiveFiniteNumber(tool.fluteLengthMm) && isPositiveFiniteNumber(tool.diameterMm))
       parts.push(
         `Fixtures were checked against the cutter's ${tool.diameterMm} mm width only, as a column from its tip up past every fixture top.`,
       );
@@ -105,9 +106,9 @@ function unknownGeometryMessage(tool: CncTool, checksFixtures: boolean): string 
 }
 function missingAssemblyFields(tool: CncTool): ReadonlyArray<string> {
   return [
-    !positive(tool.fluteLengthMm) ? 'flute length' : '',
-    !positive(tool.stickoutMm) ? 'stickout' : '',
-    !positive(tool.shankDiameterMm) ? 'shank diameter' : '',
+    !isPositiveFiniteNumber(tool.fluteLengthMm) ? 'flute length' : '',
+    !isPositiveFiniteNumber(tool.stickoutMm) ? 'stickout' : '',
+    !isPositiveFiniteNumber(tool.shankDiameterMm) ? 'shank diameter' : '',
     !tool.holderSegments?.length ? 'holder envelope' : '',
   ].filter(Boolean);
 }
@@ -121,7 +122,7 @@ function reachDepthFindings(tool: CncTool, depthMm: number): CncToolReachFinding
         'The requested cutting depth is invalid; reach was not evaluated.',
       ),
     );
-  if (positive(tool.fluteLengthMm) && depthMm > tool.fluteLengthMm)
+  if (isPositiveFiniteNumber(tool.fluteLengthMm) && depthMm > tool.fluteLengthMm)
     out.push(
       finding(
         tool,
@@ -129,7 +130,7 @@ function reachDepthFindings(tool: CncTool, depthMm: number): CncToolReachFinding
         `Cut depth ${depthMm} mm exceeds the recorded ${tool.fluteLengthMm} mm flute length.`,
       ),
     );
-  if (positive(tool.stickoutMm) && depthMm > tool.stickoutMm)
+  if (isPositiveFiniteNumber(tool.stickoutMm) && depthMm > tool.stickoutMm)
     out.push(
       finding(
         tool,
@@ -142,8 +143,8 @@ function reachDepthFindings(tool: CncTool, depthMm: number): CncToolReachFinding
 function assemblyContradictions(tool: CncTool): CncToolReachFinding[] {
   const out: CncToolReachFinding[] = [];
   if (
-    positive(tool.fluteLengthMm) &&
-    positive(tool.stickoutMm) &&
+    isPositiveFiniteNumber(tool.fluteLengthMm) &&
+    isPositiveFiniteNumber(tool.stickoutMm) &&
     tool.fluteLengthMm > tool.stickoutMm
   )
     out.push(
@@ -156,7 +157,8 @@ function assemblyContradictions(tool: CncTool): CncToolReachFinding[] {
   if (
     tool.holderSegments?.some(
       (segment) =>
-        !validHolder(segment) || (positive(tool.stickoutMm) && segment.startMm < tool.stickoutMm),
+        !validHolder(segment) ||
+        (isPositiveFiniteNumber(tool.stickoutMm) && segment.startMm < tool.stickoutMm),
     )
   )
     out.push(
@@ -175,19 +177,19 @@ function toolEnvelopes(
   const tool = input.tool;
   const out: CncReachEnvelope[] = [];
   const length = tool.fluteLengthMm;
-  if (positive(tool.diameterMm))
+  if (isPositiveFiniteNumber(tool.diameterMm))
     out.push({
       component: 'cutter',
       name: 'Cutter',
       startMm: 0,
-      lengthMm: positive(length) ? length : cutterColumnLengthMm(input, fixtures),
+      lengthMm: isPositiveFiniteNumber(length) ? length : cutterColumnLengthMm(input, fixtures),
       diameterMm: tool.diameterMm,
     });
   if (
-    positive(length) &&
-    positive(tool.stickoutMm) &&
+    isPositiveFiniteNumber(length) &&
+    isPositiveFiniteNumber(tool.stickoutMm) &&
     tool.stickoutMm > length &&
-    positive(tool.shankDiameterMm)
+    isPositiveFiniteNumber(tool.shankDiameterMm)
   )
     out.push({
       component: 'shank',
@@ -322,17 +324,14 @@ function finding(
 ): CncToolReachFinding {
   return { kind, toolId: tool.id, message };
 }
-function positive(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
-}
 function validPoint(point: CncReachPoint): boolean {
   return [point.x, point.y, point.z].every(Number.isFinite);
 }
 function validFixture(f: CncReachFixture): boolean {
   return (
     [f.xMm, f.yMm, f.bottomZMm, f.topZMm].every(Number.isFinite) &&
-    positive(f.widthMm) &&
-    positive(f.heightMm) &&
+    isPositiveFiniteNumber(f.widthMm) &&
+    isPositiveFiniteNumber(f.heightMm) &&
     f.topZMm >= f.bottomZMm
   );
 }
@@ -344,8 +343,8 @@ function validHolder(s: {
   return (
     Number.isFinite(s.startMm) &&
     s.startMm >= 0 &&
-    positive(s.lengthMm) &&
-    positive(s.diameterMm) &&
+    isPositiveFiniteNumber(s.lengthMm) &&
+    isPositiveFiniteNumber(s.diameterMm) &&
     Number.isFinite(s.startMm + s.lengthMm)
   );
 }

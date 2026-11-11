@@ -2,6 +2,7 @@ import { DEFAULT_RASTER_LAYER_COLOR, type RasterImage, type SceneObject } from '
 import type { ParsedSvgFragment, SvgImageDescriptor } from '../../io/svg/svg-import-fragment';
 import { loadImageSamples, type LoadedImageSamples } from './prepare-image-samples';
 import { shouldDecodeDimensionQualifiedPng, shouldPageBackPng } from './qualified-png-raster';
+import { errorMessage } from '../../core/util/error-message';
 
 export type PreparedSvgFragment = {
   readonly objects: readonly SceneObject[];
@@ -155,8 +156,4 @@ function bitmapHeader(dataUrl: string): {
     throw new Error('SVG images must contain an embedded PNG, JPEG, BMP, or WebP bitmap.');
   }
   return { mimeType, payloadOffset: header[0].length };
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

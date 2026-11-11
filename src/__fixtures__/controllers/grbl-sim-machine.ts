@@ -60,7 +60,7 @@
 //    (grbl-sim-lines.ts): G0/G1 past the travel raises no ALARM:2, and the
 //    grblHAL mode checks no soft limits.
 
-import { formatVec3, SIM_ZERO_VEC3 } from './grbl-sim-gcode';
+import { formatVec3, SIM_ZERO_VEC3, type SimVec3 } from './grbl-sim-gcode';
 import { reduceGrblSimLine } from './grbl-sim-lines';
 import {
   applyGrblSimOverrideByte,
@@ -161,12 +161,17 @@ export function statusReportLine(state: GrblSimState): string {
     state.machine === 'Hold' ? 'Hold:0' : state.machine === 'Door' ? door : state.machine;
   const isMoving = state.machine === 'Run' || state.machine === 'Jog' || state.machine === 'Hold';
   const feed = isMoving ? Math.round(state.feed) : 0;
-  const spindle = isMoving ? Math.round(state.spindle) : 0;
+  // DISABLE_LASER_DURING_HOLD (config.h:587, on by default): in laser mode a
+  // feed hold stops the laser with the motion (protocol.c:536-540); a router's
+  // spindle keeps turning. The programmed power returns with cycle start.
+  const heldDark = state.machine === 'Hold' && state.settings.get(32) === '1';
+  const spindle = isMoving && !heldDark ? Math.round(state.spindle) : 0;
   const wco = totalWco(state);
   const overrides = grblSimOverrideField(state.overrides, state.machine === 'Door');
   // GRBL prints Pn: after FS: and only while an input is active (report.c).
   const pins = state.probeClosed === true ? '|Pn:P' : '';
-  return `<${label}|MPos:${formatVec3(state.mpos)}|FS:${feed},${spindle}${pins}|WCO:${formatVec3(wco)}${overrides}>`;
+  const { mpos, wcoText } = reportedAxes(state, wco);
+  return `<${label}|MPos:${mpos}|FS:${feed},${spindle}${pins}|WCO:${wcoText}${overrides}>`;
 }
 
 function reduceTimedEvent(
@@ -368,5 +373,18 @@ function reduceSoftReset(state: GrblSimState, opts: GrblSimOptions): GrblSimReac
   return {
     state: { ...base, machine: 'Idle', locked: false },
     effects: [emit(opts.firmwareBanner, opts)],
+  };
+}
+
+// A four-axis build reports A after XYZ in MPos and WCO (ADR-695).
+function reportedAxes(
+  state: GrblSimState,
+  wco: SimVec3,
+): { readonly mpos: string; readonly wcoText: string } {
+  const a = state.aAxis;
+  if (a === undefined) return { mpos: formatVec3(state.mpos), wcoText: formatVec3(wco) };
+  return {
+    mpos: `${formatVec3(state.mpos)},${a.mpos.toFixed(3)}`,
+    wcoText: `${formatVec3(wco)},${a.g92.toFixed(3)}`,
   };
 }

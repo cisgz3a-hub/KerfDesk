@@ -12,6 +12,7 @@ import {
   effectiveOperationForObject,
   operationOverrideForObject,
 } from '../../core/scene/effective-operation';
+import { formatUpTo3Decimals } from '../../core/util/number-format';
 
 // Image-mode energy advisory (ADR-359). Every raster row burns at the
 // operation's power and speed, and rows sit 1/(lines/mm) apart, so energy per
@@ -66,7 +67,9 @@ function describeRasterEnergy(
 ): string | null {
   const layer = operations.find((operation) => operation.id === group.layerId);
   const obj = project.scene.objects.find((candidate) => candidate.id === group.sourceObjectId);
-  if (layer === undefined || obj === undefined) return null;
+  // ADR-699: a ramped Fill also burns as a raster; its density is its line
+  // interval, which Fill already shows, so only images are measured here.
+  if (layer === undefined || obj?.kind !== 'raster-image') return null;
   const op = effectiveOperationForObject(layer, obj);
   // group.power is the burned power after the artwork's Power scale.
   if (!(op.power > 0) || !(group.power > 0)) return null;
@@ -114,7 +117,7 @@ function defaultMessage(context: EnergyContext): string {
   const { dose } = context;
   return (
     `Image "${context.source}" on "${context.operationName}" burns ${formatCount(dose.linesPerMm)} lines/mm ` +
-    `(rows ${formatMm(1 / dose.linesPerMm)} mm apart): ${formatCount(context.ratio)}× the energy per area ` +
+    `(rows ${formatUpTo3Decimals(1 / dose.linesPerMm)} mm apart): ${formatCount(context.ratio)}× the energy per area ` +
     `of ${LAYER_DEFAULTS.linesPerMm} lines/mm at the same power and speed.`
   );
 }
@@ -163,7 +166,7 @@ function fillIn(project: Project, linesPerMm: number): string {
     'white lines and dots can fill in and the image can burn darker than the canvas shows.';
   if (spotMm === undefined || !(spotMm > 0)) return ` Fine ${effect}`;
   return (
-    ` The profile's nominal ${formatMm(spotMm)} mm spot spans about ${formatCount(spotMm * linesPerMm)} ` +
+    ` The profile's nominal ${formatUpTo3Decimals(spotMm)} mm spot spans about ${formatCount(spotMm * linesPerMm)} ` +
     `row intervals. Actual burn width depends on focus and material, so fine ${effect}`
   );
 }
@@ -194,10 +197,6 @@ function relativeAdvice(context: EnergyContext): string {
 
 function formatCount(value: number): string {
   return Number(value.toFixed(1)).toString();
-}
-
-function formatMm(value: number): string {
-  return Number(value.toFixed(3)).toString();
 }
 
 function formatPercent(value: number): string {

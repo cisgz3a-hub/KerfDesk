@@ -6,6 +6,7 @@
 
 import type { Polyline } from '../scene';
 import { deriveBoxDims, type BoxSpec } from './box-spec';
+import { maxOf, minOf } from '../util';
 
 export type SlideLidRefereePart = {
   readonly panel: string;
@@ -51,7 +52,14 @@ export function checkSlideLidAssembly(
     );
   }
   issues.push(...checkFront(parts, t + dims.innerHeightMm, channelBottom, playMm, tolMm));
-  issues.push(...checkLid(parts, dims.outerWidthMm, channelEnd, playMm, tolMm));
+  issues.push(
+    ...checkLid(
+      parts,
+      { outerWidth: dims.outerWidthMm, shoulder: channelEnd, tongueEnd: dims.outerDepthMm - t, t },
+      playMm,
+      tolMm,
+    ),
+  );
   return issues;
 }
 
@@ -96,7 +104,7 @@ function checkFront(
 ): string[] {
   const front = parts.find((part) => part.panel === 'front');
   if (front === undefined) return ['front: panel missing'];
-  const maxY = Math.max(...front.outline.points.map((p) => p.y));
+  const maxY = maxOf(front.outline.points.map((p) => p.y));
   // The fit offset recedes the front's top by play/4 — the lid clearance.
   if (Math.abs(maxY - (frontTop - playMm / 4)) > tolMm) {
     return [`front: tops out at ${maxY}, claimed ${frontTop - playMm / 4}`];
@@ -107,12 +115,23 @@ function checkFront(
   return [];
 }
 
-// The lid spans the full outer width, stops at the back wall's inner face,
-// and carries the thumb notch on its leading edge.
+type LidClaim = {
+  readonly outerWidth: number;
+  /** Where the full-width part stops against the channel posts. */
+  readonly shoulder: number;
+  /** The back wall's inner face, where the tongue stops. */
+  readonly tongueEnd: number;
+  readonly t: number;
+};
+
+// The lid spans the full outer width up to the channel posts, then a tongue
+// one inner width wide runs between the posts to the back wall's inner face
+// (ADR-116 Amd 1: no slit at the back, and the tongue locates the lid
+// sideways). The thumb notch sits on its leading edge. With play the fit
+// offset recedes every edge by play/4.
 function checkLid(
   parts: ReadonlyArray<SlideLidRefereePart>,
-  outerWidth: number,
-  channelEnd: number,
+  claim: LidClaim,
   playMm: number,
   tolMm: number,
 ): string[] {
@@ -121,20 +140,55 @@ function checkLid(
   const xs = lid.outline.points.map((p) => p.x);
   const ys = lid.outline.points.map((p) => p.y);
   const issues: string[] = [];
-  const width = Math.max(...xs) - Math.min(...xs);
-  if (Math.abs(width - (outerWidth - playMm / 2)) > tolMm) {
-    issues.push(`lid: width ${width}, claimed ${outerWidth - playMm / 2}`);
+  const width = maxOf(xs) - minOf(xs);
+  if (Math.abs(width - (claim.outerWidth - playMm / 2)) > tolMm) {
+    issues.push(`lid: width ${width}, claimed ${claim.outerWidth - playMm / 2}`);
   }
-  const length = Math.max(...ys) - Math.min(...ys);
-  if (Math.abs(length - (channelEnd - playMm / 2)) > tolMm) {
-    issues.push(`lid: length ${length}, claimed ${channelEnd - playMm / 2}`);
+  const length = maxOf(ys) - minOf(ys);
+  if (Math.abs(length - (claim.tongueEnd - playMm / 2)) > tolMm) {
+    issues.push(`lid: length ${length}, claimed ${claim.tongueEnd - playMm / 2}`);
   }
+  issues.push(...checkTongue(lid.outline, claim, playMm, tolMm));
   // Thumb notch: material on the leading edge is interrupted around center.
-  const leadingRuns = runsNear(lid.outline, Math.min(...ys), tolMm);
+  const leadingRuns = runsNear(lid.outline, minOf(ys), tolMm);
   if (leadingRuns.length < 2) {
     issues.push('lid: thumb notch missing on the leading edge');
   }
   return issues;
+}
+
+// The tongue's end runs between the wall inner faces with play/4 per side,
+// and each shoulder spans exactly the wall thickness it stops against.
+function checkTongue(outline: Polyline, claim: LidClaim, playMm: number, tolMm: number): string[] {
+  const inset = playMm / 4;
+  const near = (value: number, expected: number): boolean => Math.abs(value - expected) <= tolMm;
+  const end = runsNear(outline, claim.tongueEnd - inset, tolMm);
+  const tongue = end[0];
+  if (
+    end.length !== 1 ||
+    tongue === undefined ||
+    !near(tongue.fromMm, claim.t + inset) ||
+    !near(tongue.toMm, claim.outerWidth - claim.t - inset)
+  ) {
+    return [
+      `lid: tongue end ${JSON.stringify(end)}, claimed ${claim.t + inset}..${claim.outerWidth - claim.t - inset}`,
+    ];
+  }
+  const shoulders = runsNear(outline, claim.shoulder - inset, tolMm);
+  const left = shoulders[0];
+  const right = shoulders[shoulders.length - 1];
+  if (
+    shoulders.length !== 2 ||
+    left === undefined ||
+    right === undefined ||
+    !near(left.fromMm, inset) ||
+    !near(left.toMm, claim.t + inset) ||
+    !near(right.fromMm, claim.outerWidth - claim.t - inset) ||
+    !near(right.toMm, claim.outerWidth - inset)
+  ) {
+    return [`lid: shoulders ${JSON.stringify(shoulders)} do not span the channel posts`];
+  }
+  return [];
 }
 
 // Horizontal runs of the ring near a given y line, as sorted x-intervals.

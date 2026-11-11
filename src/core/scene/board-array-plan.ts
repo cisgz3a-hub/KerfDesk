@@ -11,6 +11,7 @@ import {
   type TileLayout,
   type TileOffset,
 } from './tile-into-region';
+import { finiteNonNegative } from '../util/finite';
 
 export type BoardArrayPlan = {
   readonly offsets: ReadonlyArray<TileOffset>;
@@ -29,7 +30,7 @@ export function planBoardArray(
 ): BoardArrayPlan {
   const boardBounds = board.spec.kind === 'ellipse' ? circleBounds(board) : transformedBBox(board);
   const circular = board.spec.kind === 'ellipse' && layout.circlePacking === 'rows';
-  const margin = nonNegative(layout.marginMm ?? 0);
+  const margin = finiteNonNegative(layout.marginMm ?? 0);
   const boundary = arrayBoundary(board, boardBounds, circular);
   const usableBounds = {
     minX: boundary.minX + margin,
@@ -54,8 +55,8 @@ export function planBoardArray(
   const regionH = usableBounds.maxY - usableBounds.minY;
   if (Math.min(width, height, regionW, regionH) <= 0)
     return { ...base, offsets: [], limited: false };
-  const gapX = nonNegative(layout.gapXMm);
-  const gapY = nonNegative(layout.gapYMm);
+  const gapX = finiteNonNegative(layout.gapXMm);
+  const gapY = finiteNonNegative(layout.gapYMm);
   const fittingCols = Math.floor((regionW + gapX) / (width + gapX));
   const fittingRows = Math.floor((regionH + gapY) / (height + gapY));
   const { cols, rows } = requestedGrid(layout, fittingCols, fittingRows);
@@ -75,8 +76,8 @@ function circleRowPlan(
 ): Pick<BoardArrayPlan, 'offsets' | 'limited'> {
   const width = cell.maxX - cell.minX;
   const height = cell.maxY - cell.minY;
-  const gapX = nonNegative(layout.gapXMm);
-  const gapY = nonNegative(layout.gapYMm);
+  const gapX = finiteNonNegative(layout.gapXMm);
+  const gapY = finiteNonNegative(layout.gapYMm);
   // Centre each row on the circle. The row's farthest vertical edge determines
   // its available chord, ensuring every rectangular footprint corner fits.
   const radius = (region.maxX - region.minX) / 2;
@@ -160,10 +161,6 @@ function requestedGrid(
   return layout.kind === 'grid'
     ? { cols: Math.min(count(layout.cols), cols), rows: Math.min(count(layout.rows), rows) }
     : { cols, rows };
-}
-
-function nonNegative(value: number): number {
-  return Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
 function count(value: number): number {

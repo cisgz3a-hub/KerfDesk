@@ -1,5 +1,5 @@
 import { describeNestLayout, layoutNest, type NestingInput, type NestLayout } from './layout-nest';
-import { quickNest, type NestRotation } from './quick-nest';
+import { quickNest } from './quick-nest';
 import {
   productionPartRotations,
   productionStockCompatible,
@@ -130,9 +130,6 @@ function identifyProductionLayout(
 }
 function footprint(result: ProductionNestResult): number {
   return result.sheets.reduce((area, sheet) => area + sheet.footprintAreaMm2, 0);
-}
-export function productionRotationAngle(value: number): NestRotation | null {
-  return value === 0 || value === 90 || value === 180 || value === 270 ? value : null;
 }
 function assertProductionNestInput(input: ProductionNestingInput): void {
   const parts = input.definition.parts;

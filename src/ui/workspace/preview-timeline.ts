@@ -1,6 +1,7 @@
 import type { Toolpath } from '../../core/job';
 import type { JobDurationBreakdown } from '../../core/job/estimate-duration';
 import { previewRouteSummary, type PreviewRouteTimelineBasis } from './preview-route-summary';
+import { isNonNegativeFiniteNumber } from '../../core/util/finite';
 
 export type PreviewTimeline = SegmentPreviewTimeline | RoutePreviewTimeline;
 
@@ -84,7 +85,7 @@ function detailedTravelTiming(
 ): { readonly rapidTravelSeconds: number; readonly feedTravelSeconds: number } | null {
   const rawRapid = breakdown.rapidTravelSeconds;
   const rawFeed = breakdown.feedTravelSeconds;
-  if (!isFiniteNonNegative(rawRapid) || !isFiniteNonNegative(rawFeed)) return null;
+  if (!isNonNegativeFiniteNumber(rawRapid) || !isNonNegativeFiniteNumber(rawFeed)) return null;
   const detailTotal = rawRapid + rawFeed;
   const tolerance = 1e-6 * Math.max(1, travelSeconds);
   if (Math.abs(detailTotal - travelSeconds) > tolerance) return null;
@@ -206,10 +207,6 @@ function interpolate(
 
 function finiteNonNegative(value: number): number {
   return Number.isFinite(value) && value > 0 ? value : 0;
-}
-
-function isFiniteNonNegative(value: number | undefined): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
 function clamp01(value: number): number {

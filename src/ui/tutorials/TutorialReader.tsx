@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { openFirstJobGuide } from '../first-job/first-job-guide-store';
 import { useTutorialStore } from './tutorial-store';
 import type { Tutorial } from './tutorial-types';
 import { TutorialExample } from './TutorialExample';
@@ -57,6 +58,7 @@ export function TutorialReader({ tutorial, progress, remember }: ReaderProps): J
         <LessonNotes key={stepIndex} tutorial={tutorial} phase={phase} />
       </div>
       <nav className="lf-learn-navigation" aria-label="Tutorial steps">
+        {tutorial.guided === 'first-job' ? <GuideMeButton /> : null}
         <button
           type="button"
           className="lf-btn"
@@ -90,6 +92,23 @@ export function TutorialReader({ tutorial, progress, remember }: ReaderProps): J
         )}
       </nav>
     </div>
+  );
+}
+
+// ADR-698: the same journey, done in the workspace with the real controls.
+function GuideMeButton(): JSX.Element {
+  return (
+    <button
+      type="button"
+      className="lf-btn"
+      title="Close this lesson and open the guided first job, which highlights each real control and moves on when you use it"
+      onClick={() => {
+        useTutorialStore.getState().closeTutorial();
+        openFirstJobGuide();
+      }}
+    >
+      Guide me in KerfDesk
+    </button>
   );
 }
 

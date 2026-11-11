@@ -18,6 +18,7 @@ import { continuationOtherEnd, penEndpointAt } from './pen-continuation';
 import { penContour, penHasHandles } from './pen-curve';
 import { pxToMmForCanvas } from './view-transform';
 import { snapWorkspacePointer } from './workspace-pointer-snap';
+import { distance } from '../../core/geometry/point-math';
 
 type ViewArg = { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
 
@@ -56,10 +57,6 @@ export function penClickOutcome(args: {
     return { kind: 'close' };
   }
   return { kind: 'append', point: args.point };
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 // Canvas-coupled wrapper: resolve the scene point + close threshold, then apply

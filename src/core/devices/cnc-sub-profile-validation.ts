@@ -1,4 +1,6 @@
 import type { CncSubProfile } from './device-profile';
+import { isRecord } from '../util/is-record';
+import { isFiniteNumber } from '../util/finite';
 
 export type CncSubProfileValidation = {
   readonly value: CncSubProfile | undefined;
@@ -88,14 +90,6 @@ function recoveredOptionalFields(value: Record<string, unknown>): Partial<CncSub
     if (isPositiveFinite(feed)) recovered[field] = feed;
   }
   return recovered;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
 }
 
 function isPositiveFinite(value: unknown): value is number {

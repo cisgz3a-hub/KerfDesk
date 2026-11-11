@@ -45,6 +45,12 @@ export function SecondPassCompletionPrompt(props: {
   // cannot answer it (ADR-341 Amendment 3).
   return (
     <Dialog title="Job complete" size="sm" initialFocus="surface" onClose={() => dismiss(runId)}>
+      {/* The facts first, then the optional second pass, then the plain way to
+          burn it again (UX audit U4-P3-8: the first "Job complete" was only
+          about a second pass). */}
+      <p>
+        <strong>The job finished and the laser is off.</strong>
+      </p>
       <p>Would you like to darken selected areas?</p>
       <p>
         Paint the parts you want to engrave again or cut deeper, erase any spill, and adjust power
@@ -52,6 +58,7 @@ export function SecondPassCompletionPrompt(props: {
       </p>
       <p>
         Until you start another job, you can also open Paint a second pass from the Machine panel.
+        To burn the same job again, choose Not now, then Run same job again from start.
       </p>
       {unarchived ? (
         <p>
@@ -61,6 +68,7 @@ export function SecondPassCompletionPrompt(props: {
       ) : null}
       <DialogActions>
         <button
+          type="button"
           className="lf-btn"
           onClick={() => dismiss(runId)}
           title="Close this offer. Until you start another job, Paint a second pass in the Machine panel opens this job."
@@ -68,6 +76,7 @@ export function SecondPassCompletionPrompt(props: {
           Not now
         </button>
         <button
+          type="button"
           className="lf-btn lf-btn--primary"
           onClick={() => openEditor(runId, returnFocusTo.current)}
           title="Open this completed job to paint areas for another pass and adjust their power."

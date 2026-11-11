@@ -1,7 +1,6 @@
 import {
   applyTransform,
   findRegistrationBoxes,
-  type AABB,
   type Project,
   type Scene,
   type SceneObject,
@@ -10,6 +9,8 @@ import {
 import { reliefAuthoringLinkIds } from '../../../core/relief/relief-authoring-link-ids';
 import { registrationJigArtworkInstances } from '../../../core/scene/registration-jig-artwork';
 import { sceneObjectCopyDependencyIds } from '../../state/scene-object-copy-dependencies';
+import { maxOf, minOf } from '../../../core/util';
+import { pointInBox } from '../../../core/geometry/box-math';
 
 // The jig editor opens on a clean canvas (ADR-652): it shows the jig's outlines
 // and the artwork that belongs to them, never the rest of the main canvas. That
@@ -95,13 +96,13 @@ function sitsOnOutline(object: SceneObject, outline: SceneObject): boolean {
   const sx = Math.abs(outline.transform.scaleX);
   const sy = Math.abs(outline.transform.scaleY);
   if (
-    (Math.max(...xs) - Math.min(...xs)) * sx > (local.maxX - local.minX) * sx + SIZE_TOLERANCE_MM ||
-    (Math.max(...ys) - Math.min(...ys)) * sy > (local.maxY - local.minY) * sy + SIZE_TOLERANCE_MM
+    (maxOf(xs) - minOf(xs)) * sx > (local.maxX - local.minX) * sx + SIZE_TOLERANCE_MM ||
+    (maxOf(ys) - minOf(ys)) * sy > (local.maxY - local.minY) * sy + SIZE_TOLERANCE_MM
   )
     return false;
   const centre = {
-    x: (Math.max(...xs) + Math.min(...xs)) / 2,
-    y: (Math.max(...ys) + Math.min(...ys)) / 2,
+    x: (maxOf(xs) + minOf(xs)) / 2,
+    y: (maxOf(ys) + minOf(ys)) / 2,
   };
   if (outline.kind === 'shape' && outline.spec.kind === 'ellipse') {
     const rx = (local.maxX - local.minX) / 2;
@@ -111,16 +112,7 @@ function sitsOnOutline(object: SceneObject, outline: SceneObject): boolean {
     const dy = (centre.y - (local.minY + ry)) / ry;
     return dx * dx + dy * dy <= 1;
   }
-  return inside(centre, local);
-}
-
-function inside(point: Vec2, bounds: AABB): boolean {
-  return (
-    point.x >= bounds.minX &&
-    point.x <= bounds.maxX &&
-    point.y >= bounds.minY &&
-    point.y <= bounds.maxY
-  );
+  return pointInBox(centre, local);
 }
 
 // The inverse of applyTransform: translate, rotate, mirror, then scale back.

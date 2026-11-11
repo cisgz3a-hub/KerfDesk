@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "33bc394c67e37011961af46b799e1d7d30efcedf",
+  "sinceSourceSha": "ffd9fe66b03a6f8c00488887e662c0dd367c276d",
   "highlights": [
-    "Older CNC jobs: crossing loops and flat Drill contours now count toward Job Origin, so some jobs saved in 1.0.28 or earlier cut in a new, correct place. Opening one names how far its cut moved.",
-    "Safer Marlin jobs: a line the controller skips ends the job, and Pause and network failures send their beam-off first. A busy page no longer stops a healthy job, and Frame waits for a report after Set origin.",
-    "Photo engraving has portrait recipes, Auto tones and an On material preview. Trace keeps text marks at any angle, holds hard art in any ink colour and draws large 1-bit curves smoother.",
-    "Text frames converted by 1.0.28 are repaired, single-line frames keep their line rule, and output names every missing glyph. Placed tabs follow resizes and Studio rebuilds; full stops and i-dots stay.",
-    "Fill pools match what output burns, GRBL Compatible fills get constant-power advice, and a grblHAL Resume left Idle at a job end warns instead of blocking. The A1 Pro uses its homed travel.",
-    "Camera setup probes RTSP logins and shows its status in Machine Setup, the phone pairing scanner reads the PC code on every phone, and Studio keeps drawings applied before a crash."
+    "Rotary: line, cut and fill moves now run at the layer speed on the part, so text and outlines burn evenly all the way round. Rotary projects from 1.0.30 or earlier may burn darker or lighter; images are unchanged.",
+    "Rotary Setup adds Tapered part for tumblers and a choice of Y, A or Z axis. Job Review checks rotary image rows against the motor steps, and rotary camera placement advice now fits the axis that turns the part.",
+    "Camera: a picture at a new resolution is checked before it's placed, the calibration grade covers the whole bed, the moved-camera warning catches turns and tips, and the calibration target keeps Absolute Coordinates.",
+    "Camera Print and Cut checks which way round the printed sheet lies against the print. Camera logins now stay out of process lists, saved files and plain-text requests.",
+    "A glowing Update button at the top of the window downloads and installs a new version in two clicks, and waits while a job runs. The G-code Inspector's Run also asks if 1.0.29 set your laser up as a CNC.",
+    "CNC relief cut-outs report the real thickness of their holding tabs and warn when tabs are thin, roughed-only reliefs step down, and the box generator adds lift-off lid and open-front boxes."
   ]
 }

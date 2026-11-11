@@ -98,33 +98,6 @@ export function RegistrationJigGridFields(props: {
   );
 }
 
-export function LockRegistrationJigSetControl(props: {
-  readonly show: boolean;
-  readonly checked: boolean;
-  readonly disabled: boolean;
-  readonly outlineCount: number;
-  readonly onChange: (locked: boolean) => void;
-}): JSX.Element | null {
-  if (!props.show) return null;
-  return (
-    <label style={lockRowStyle}>
-      <input
-        type="checkbox"
-        checked={props.checked}
-        disabled={props.disabled}
-        aria-label="Lock registration outlines"
-        title={
-          props.disabled
-            ? 'A captured board stays locked — its position is the work origin'
-            : 'Lock every outline so the jig set cannot move between the two burns'
-        }
-        onChange={(event) => props.onChange(event.target.checked)}
-      />
-      Lock {props.outlineCount === 1 ? 'outline' : 'all outlines'}
-    </label>
-  );
-}
-
 export function RemoveRegistrationJigSetButton(props: {
   readonly show: boolean;
   readonly outlineCount: number;
@@ -202,9 +175,3 @@ const shapeSelectStyle: React.CSSProperties = { width: 92 };
 const sizeInputStyle: React.CSSProperties = { width: 56 };
 const gridInputStyle: React.CSSProperties = { width: 48 };
 const mutedStyle: React.CSSProperties = { color: 'var(--lf-text-faint)', fontSize: 12 };
-const lockRowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  fontSize: 12,
-};

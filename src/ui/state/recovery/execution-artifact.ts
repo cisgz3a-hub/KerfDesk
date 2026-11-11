@@ -40,6 +40,8 @@ import {
   type LaserResumeStep,
   type LaserSecondPassChain,
 } from './laser-second-pass-lineage';
+import { isNonNegativeInteger } from '../../../core/util/finite';
+import { isRecord } from '../../../core/util/is-record';
 
 export { estimateExecutionArtifactBytes } from './execution-artifact-size';
 
@@ -462,12 +464,4 @@ function isFingerprint(value: unknown): value is GcodeFingerprint {
     isNonNegativeInteger(value['lines']) &&
     value['lines'] >= 1
   );
-}
-
-function isNonNegativeInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

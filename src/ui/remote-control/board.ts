@@ -14,6 +14,7 @@ import { REMOTE_IMPORT_BASE64_LIMIT } from './design-validation';
 import { RemoteFault } from './fault';
 import { editableArtwork } from './transforms';
 import type { RemoteAppStore, RemoteWrite } from './types';
+import { roundToTenth } from '../../core/util/rounding';
 
 type BoardPhotoArgs = Extract<RemoteWrite, { command: 'set_board_photo' }>['args'];
 type PlaceBoardArgs = Extract<RemoteWrite, { command: 'place_on_board' }>['args'];
@@ -33,8 +34,8 @@ export function boardProjection(store: RemoteAppStore): Record<string, unknown> 
     board: {
       kind:
         board.spec.kind === 'rect' ? 'rect' : board.spec.kind === 'ellipse' ? 'circle' : 'outline',
-      widthMm: roundMm(bounds.maxX - bounds.minX),
-      heightMm: roundMm(bounds.maxY - bounds.minY),
+      widthMm: roundToTenth(bounds.maxX - bounds.minX),
+      heightMm: roundToTenth(bounds.maxY - bounds.minY),
     },
   };
 }
@@ -169,4 +170,3 @@ const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const JPEG = [0xff, 0xd8, 0xff];
 const starts = (bytes: Uint8Array, magic: readonly number[]) =>
   magic.every((value, index) => bytes[index] === value);
-const roundMm = (value: number) => Math.round(value * 10) / 10;

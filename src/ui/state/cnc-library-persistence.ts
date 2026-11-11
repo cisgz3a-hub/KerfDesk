@@ -11,6 +11,7 @@ import type { CncCuttingPreset } from '../../core/scene/cnc-cutting-preset';
 import { isValidCncTipAngleDeg } from '../../core/cnc-tip-angle';
 import type { CncLayerSettings, CncMachineConfig, CncTool, CncToolKind } from '../../core/scene';
 import { normalizeCncMachineConfig } from '../../io/project/deserialize-project';
+import { isPositiveFiniteNumber, isPositiveInteger } from '../../core/util/finite';
 
 export const CNC_LIBRARY_STORAGE_KEY = 'laserforge.cnc-library.v1';
 
@@ -137,7 +138,7 @@ function parseToolCore(record: Record<string, unknown>): CncTool | null {
   if (typeof record['id'] !== 'string') return null;
   if (typeof record['name'] !== 'string') return null;
   if (kind === undefined) return null;
-  if (!isPositive(record['diameterMm'])) return null;
+  if (!isPositiveFiniteNumber(record['diameterMm'])) return null;
   return {
     id: record['id'],
     name: record['name'],
@@ -170,16 +171,12 @@ function parseToolMetadata(record: Record<string, unknown>): Partial<CncTool> {
     metadata.tipDiameterMm = record['tipDiameterMm'];
   }
   if (family !== null) metadata.family = family;
-  if (isPositive(record['shankDiameterMm'])) {
+  if (isPositiveFiniteNumber(record['shankDiameterMm'])) {
     metadata.shankDiameterMm = record['shankDiameterMm'];
   }
-  if (validFluteCount(record['fluteCount'])) metadata.fluteCount = record['fluteCount'];
+  if (isPositiveInteger(record['fluteCount'])) metadata.fluteCount = record['fluteCount'];
   if (catalogId !== null) metadata.catalogId = catalogId;
   return metadata;
-}
-
-function validFluteCount(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
 function boundedString(value: unknown): string | null {
@@ -203,8 +200,4 @@ function parseMachineProfile(raw: unknown): CncMachineProfile | null {
     name: record['name'],
     machine,
   };
-}
-
-function isPositive(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }

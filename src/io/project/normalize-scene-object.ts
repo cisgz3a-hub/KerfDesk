@@ -8,14 +8,12 @@ import {
 } from './project-relief-authoring-validator';
 import { parsePartGeneratorSource } from './project-part-generator-validator';
 import { parseConstrainedSketch } from './project-constrained-sketch-validator';
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+import { isRecord } from '../../core/util/is-record';
 export function normalizeSceneObject(
   obj: unknown,
   resolvedDocuments?: ReliefAuthoringResolutions,
 ): unknown {
-  if (!isObject(obj)) return obj;
+  if (!isRecord(obj)) return obj;
   const { libraryProvenance: rawLibraryProvenance, ...withoutLibraryProvenance } = obj;
   const libraryProvenance =
     obj['kind'] === 'imported-svg'

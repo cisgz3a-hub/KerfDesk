@@ -54,7 +54,7 @@ The coupon could not show it, because it measures the two directions against eac
 - Machines calibrated before this change keep their tables and their zipper-free result; their
   calibrated fills and images move half the table value onto the design. The update notes should
   say so.
-- The emitter revision advances to v43.
+- The emitter revision advances to `scan-offset-half-each-row-20261111-v45` (v43 was held for this change while it waited; v44 went to ADR-159 Amd 3).
 - Code and test evidence only. Nothing was burned or run on a machine.
 
 ### Verification

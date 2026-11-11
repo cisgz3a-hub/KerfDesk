@@ -4,6 +4,8 @@ import {
 } from '../state/recovery/execution-artifact';
 import { executionArtifactIntegrityIsValid } from '../state/recovery/execution-artifact-integrity';
 import { sha256Utf8 } from '../state/recovery/execution-provenance';
+import { isNonNegativeSafeInteger } from '../../core/util/finite';
+import { isRecord } from '../../core/util/is-record';
 
 export const EXECUTION_ARTIFACT_EXPORT_FORMAT = 'kerfdesk-execution-artifact';
 export const EXECUTION_ARTIFACT_EXPORT_SCHEMA_VERSION = 1;
@@ -264,8 +266,8 @@ function decodeBinary(value: Record<string, unknown>): ArrayBuffer | ArrayBuffer
   const base64 = tag['base64'];
   if (
     !isBinaryType(type) ||
-    !isSafeNonNegativeInteger(byteLength) ||
-    !isSafeNonNegativeInteger(elementLength) ||
+    !isNonNegativeSafeInteger(byteLength) ||
+    !isNonNegativeSafeInteger(elementLength) ||
     typeof base64 !== 'string'
   ) {
     throw new Error('Malformed binary export metadata.');
@@ -358,12 +360,4 @@ function assertDepth(depth: number): void {
 
 function isSha256(value: unknown): value is `sha256:${string}` {
   return typeof value === 'string' && /^sha256:[0-9a-f]{64}$/.test(value);
-}
-
-function isSafeNonNegativeInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

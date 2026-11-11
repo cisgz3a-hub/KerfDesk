@@ -11,6 +11,7 @@
 import { cube01 } from './fast-cube';
 import { hypot2 } from './fast-hypot';
 import type { Vec2 } from '../scene';
+import { negatePoint } from './point-math';
 
 export type CubicBezier = {
   readonly p0: Vec2;
@@ -160,7 +161,8 @@ function fitRun(
   seamTangent?: Vec2,
 ): void {
   const tangentStart = seamTangent ?? chordTangent(run, 'start');
-  const tangentEnd = seamTangent === undefined ? chordTangent(run, 'end') : negate(seamTangent);
+  const tangentEnd =
+    seamTangent === undefined ? chordTangent(run, 'end') : negatePoint(seamTangent);
   fitRecursive(run, 0, run.length - 1, tangentStart, tangentEnd, tolerance, out, 0);
 }
 
@@ -207,7 +209,16 @@ function fitRecursive(
   // curve), so the left half ends with the negated tangent while the right
   // half starts with it as-is — G1 across the split by construction.
   const centered = centeredTangent(points, split);
-  fitRecursive(points, first, split, tangentStart, negate(centered), tolerance, out, depth + 1);
+  fitRecursive(
+    points,
+    first,
+    split,
+    tangentStart,
+    negatePoint(centered),
+    tolerance,
+    out,
+    depth + 1,
+  );
   fitRecursive(points, split, last, centered, tangentEnd, tolerance, out, depth + 1);
 }
 
@@ -407,10 +418,6 @@ function normalize(v: Vec2): Vec2 {
   const len = Math.hypot(v.x, v.y);
   if (len < 1e-12) return { x: 1, y: 0 };
   return { x: v.x / len, y: v.y / len };
-}
-
-function negate(v: Vec2): Vec2 {
-  return { x: -v.x, y: -v.y };
 }
 
 function heuristicCubic(p0: Vec2, p3: Vec2, t1: Vec2, t2: Vec2): CubicBezier {

@@ -1,5 +1,5 @@
 import type { SceneObject } from '../../core/scene';
-import { parseSvg } from '../../io/svg';
+import { parseSvg } from '../../io/svg/parse-svg';
 import { importImageFile } from '../commands/import-image-action';
 import { parseSvgOffThread } from './document-import-worker-client';
 import type { PreparedArtworkPage } from './paged-artwork-source';

@@ -12,6 +12,7 @@ import { numbersClose } from '../../../core/util';
 import { describePatch } from '../DetectedSettingsBanner';
 import { deviceSetupSupportsMachineKind } from './device-setup-capability';
 import type { DeviceSetupState } from './device-setup-flow';
+import { isDefinedFinitePositive } from '../../../core/util/finite';
 
 export type SetupChangeRow = ReturnType<typeof describePatch>[number];
 type ChangeRow = SetupChangeRow;
@@ -123,7 +124,7 @@ function detectedCncMaxFeed(
   patch: Partial<DeviceProfile>,
 ): number | undefined {
   if (!deviceSetupSupportsMachineKind(state, 'cnc')) return undefined;
-  return positive(patch.maxFeed) ? patch.maxFeed : undefined;
+  return isDefinedFinitePositive(patch.maxFeed) ? patch.maxFeed : undefined;
 }
 
 // $32=0 alone does not make a configured PWM scale into physical RPM, so $30
@@ -133,9 +134,5 @@ function detectedSpindleMaxRpm(
   patch: Partial<DeviceProfile>,
 ): number | undefined {
   if (state.machineKind !== 'cnc' || patch.laserModeEnabled !== false) return undefined;
-  return positive(patch.maxPowerS) ? patch.maxPowerS : undefined;
-}
-
-function positive(value: number | undefined): value is number {
-  return value !== undefined && Number.isFinite(value) && value > 0;
+  return isDefinedFinitePositive(patch.maxPowerS) ? patch.maxPowerS : undefined;
 }

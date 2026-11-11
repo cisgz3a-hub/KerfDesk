@@ -24,7 +24,7 @@ export function scanQualityWarnings(job: Job, project: Project): ReadonlyArray<s
     if (!isPoweredScan(group)) continue;
     const operationName = names.get(group.layerId) ?? group.layerId;
     const label =
-      group.kind === 'raster'
+      group.kind === 'raster' && group.fillRamp !== true
         ? `Image "${group.source ?? 'image'}" on "${operationName}"`
         : `Fill operation "${operationName}"`;
     const runway = runwayWarning(group, label, project.device);

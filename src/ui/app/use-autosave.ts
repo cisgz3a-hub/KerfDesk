@@ -37,6 +37,11 @@ import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capabi
 import { preserveUnadmittedProProject } from '../state/pending-pro-project';
 import { initialLicenceStatus } from '../licensing/edition';
 import { isAutosaveDiscardPending } from './autosave-file-cleanup';
+import { rememberStartFresh } from './autosave-recovery-summary';
+import { desktopCloseController } from './desktop-close-runtime';
+import { platformCanPickFiles } from './browser-file-access';
+import { usePlatformOptional } from './platform-context';
+import { requestPersistentStorageOnce } from './persistent-storage-request';
 
 export const AUTOSAVE_FAILURE_MESSAGE =
   'Autosave could not preserve the newest project. Save the .lf2 file manually; image-heavy projects can exceed browser storage.';
@@ -55,16 +60,29 @@ export const AUTOSAVE_RECOVERY_VERSION_MESSAGE =
 
 type PushToast = ReturnType<typeof useToastStore.getState>['pushToast'];
 
+// A project the loader refuses is not a storage problem: quote the refusal,
+// which names the object (ADR-307 Amendment 5, audit W5-P2-1), instead of
+// blaming image size and sending the operator to a Save that fails too.
+export function autosaveInvalidProjectMessage(reason: string): string {
+  return `Autosave cannot keep a recovery copy, and Save will refuse it too: ${reason.replace(/\.$/, '')}.`;
+}
+
+function autosaveFailureMessage(failure: AutosaveWriteFailure | undefined): string {
+  if (failure?.kind !== 'failed') return AUTOSAVE_FAILURE_MESSAGE;
+  if (failure.error instanceof AutosavePreparationTimeoutError) return AUTOSAVE_TIMEOUT_MESSAGE;
+  if (failure.reason === 'invalid-project' && failure.error instanceof Error) {
+    return autosaveInvalidProjectMessage(failure.error.message);
+  }
+  return AUTOSAVE_FAILURE_MESSAGE;
+}
+
 /** Warns once per session for each cause, naming the cause the failure carries. */
 export function createAutosaveFailureReporter(
   pushToast: PushToast,
 ): (failure?: AutosaveWriteFailure) => void {
   const warned = new Set<string>();
   return (failure) => {
-    const message =
-      failure?.kind === 'failed' && failure.error instanceof AutosavePreparationTimeoutError
-        ? AUTOSAVE_TIMEOUT_MESSAGE
-        : AUTOSAVE_FAILURE_MESSAGE;
+    const message = autosaveFailureMessage(failure);
     if (warned.has(message)) return;
     warned.add(message);
     pushToast(message, 'warning');
@@ -87,8 +105,30 @@ function createSnapshotForAutosave(): AutosaveSnapshotFn {
   };
 }
 
+/**
+ * The autosave writer. In a browser without file pickers (Firefox, Safari) the
+ * autosave holds the work until the operator downloads it, so its first
+ * successful write also asks the browser to keep this site's storage
+ * (ADR-688 Amendment 2). Elsewhere the first manual save asks instead.
+ */
+export function autosaveWriter(
+  askToPersist: boolean,
+  write: (
+    project: ReturnType<AutosaveSnapshotFn>['project'],
+  ) => Promise<AutosaveDurableWriteResult> = (project) => projectAutosaveService.write(project),
+): (project: ReturnType<AutosaveSnapshotFn>['project']) => Promise<AutosaveDurableWriteResult> {
+  if (!askToPersist) return write;
+  return async (project) => {
+    const result = await write(project);
+    if (result.kind === 'ok') requestPersistentStorageOnce();
+    return result;
+  };
+}
+
 export function useAutosave(): void {
   const pushToast = useToastStore((s) => s.pushToast);
+  const platform = usePlatformOptional();
+  const askToPersist = platform !== null && !platformCanPickFiles(platform);
   useEffect(() => {
     const reportAutosaveFailure = createAutosaveFailureReporter(pushToast);
     const snapshotForAutosave = createSnapshotForAutosave();
@@ -96,10 +136,10 @@ export function useAutosave(): void {
       snapshotForAutosave,
       AUTOSAVE_INTERVAL_MS,
       reportAutosaveFailure,
-      (project) => projectAutosaveService.write(project),
+      autosaveWriter(askToPersist),
     );
     void projectAutosaveService.session();
-    const onBeforeUnload = (): void => {
+    const onBeforeUnload = (event: BeforeUnloadEvent): void => {
       const snap = snapshotForAutosave();
       // Even mid-stream: if the user closed the window, persisting
       // their scene is more important than respecting "don't write
@@ -108,9 +148,16 @@ export function useAutosave(): void {
       // applies once the page is unloading.
       if (snap.dirty) {
         const result = writeAutosave(snap.project);
-        // Before the Studio's own last write, which records that it is held.
-        if (result.kind === 'ok') noteProjectCopyOnDisk(snap.project);
-        else reportAutosaveFailure();
+        if (result.kind === 'ok') {
+          // Before the Studio's own last write, which records that it is held.
+          noteProjectCopyOnDisk(snap.project);
+          // Don't Save at the desktop close question: this copy stays under
+          // File > Recover unsaved work, and the next launch does not ask
+          // about it (ADR-688 Amendment 3). Only this exact copy goes quiet.
+          if (desktopCloseController.unloadDiscardsUnsavedWork(event)) rememberStartFresh(result);
+        } else {
+          reportAutosaveFailure();
+        }
       }
     };
     window.addEventListener('beforeunload', onBeforeUnload);
@@ -118,7 +165,7 @@ export function useAutosave(): void {
       stopInterval();
       window.removeEventListener('beforeunload', onBeforeUnload);
     };
-  }, [pushToast]);
+  }, [pushToast, askToPersist]);
 }
 
 type AutosaveRecoveryService = {
@@ -226,7 +273,10 @@ function reportRestoredProject(
   if (loadResult.kind === 'capability-warning') {
     pushToast(loadedMachineCapabilityWarningMessage(loadResult.activeKind), 'warning');
   }
-  pushProjectLoadNotices(record.loadNotices ?? {}, pushToast, { migration: true });
+  pushProjectLoadNotices(record.loadNotices ?? {}, pushToast, {
+    migration: true,
+    project: record.project,
+  });
 }
 
 export function recoveryAgeLabel(savedAt: number): string {

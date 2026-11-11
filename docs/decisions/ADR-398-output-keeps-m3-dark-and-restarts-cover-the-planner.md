@@ -5,7 +5,10 @@ to Marlin image layers by ADR-398 Amendment 2; Decision 2 extended to a lost lin
 shows the controller restarted by ADR-398 Amendment 3, to KerfDesk's own resets, the app
 closing and the app restarting by ADR-398 Amendment 5, and to a desktop network session the
 window could no longer read or write, whose reset now goes out before it closes, by ADR-398
-Amendment 6, and to the same session streamed from its worker by ADR-398 Amendment 7. |
+Amendment 6, and to the same session streamed from its worker by ADR-398 Amendment 7; the main process
+sends that stop itself on the closes no window can (a crash, the lease, the quit, a refused
+write) by ADR-398 Amendment 8, ahead of the close guard and counting only resets written by
+ADR-398 Amendment 9. |
 **Date:** 2026-09-25
 
 Amends the GRBL laser emitter of ADR-006/ADR-322, the Marlin output of ADR-095, recovery item 8

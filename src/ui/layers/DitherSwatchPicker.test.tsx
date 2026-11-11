@@ -99,9 +99,10 @@ describe('Dither swatch picker', () => {
         'Blue Noise',
         'Ordered',
         'Grayscale',
+        '3D Sliced',
       ]);
       expect(radios(view.host).every((input) => input.title.length > 20)).toBe(true);
-      expect(view.host.querySelectorAll('svg path')).toHaveLength(DITHER_ALGORITHMS.length - 1);
+      expect(view.host.querySelectorAll('svg path')).toHaveLength(DITHER_ALGORITHMS.length - 2);
       expect(
         radio(view.host, 'grayscale').closest('label')?.querySelector('linearGradient'),
       ).not.toBeNull();
@@ -162,16 +163,16 @@ describe('Dither swatch picker', () => {
       await press(radio(view.host, 'floyd-steinberg'), 'ArrowLeft');
       expect(checkedValue(view.host)).toBe('threshold');
       await press(radio(view.host, 'threshold'), 'ArrowLeft');
-      expect(checkedValue(view.host)).toBe('grayscale');
-      expect(document.activeElement).toBe(radio(view.host, 'grayscale'));
-      await press(radio(view.host, 'grayscale'), 'ArrowRight');
+      expect(checkedValue(view.host)).toBe('3d-sliced');
+      expect(document.activeElement).toBe(radio(view.host, '3d-sliced'));
+      await press(radio(view.host, '3d-sliced'), 'ArrowRight');
       expect(checkedValue(view.host)).toBe('threshold');
       expect(view.onChange.mock.calls.map(([algorithm]) => algorithm)).toEqual([
         'floyd-steinberg',
         'jarvis',
         'floyd-steinberg',
         'threshold',
-        'grayscale',
+        '3d-sliced',
         'threshold',
       ]);
       expect(radios(view.host).filter((input) => input.tabIndex === 0)).toEqual([
@@ -225,8 +226,8 @@ describe('Dither swatch picker', () => {
     const view = await mountPicker('atkinson');
     try {
       await press(radio(view.host, 'atkinson'), 'End');
-      expect(checkedValue(view.host)).toBe('grayscale');
-      await press(radio(view.host, 'grayscale'), 'Home');
+      expect(checkedValue(view.host)).toBe('3d-sliced');
+      await press(radio(view.host, '3d-sliced'), 'Home');
       expect(checkedValue(view.host)).toBe('threshold');
       const letter = await press(radio(view.host, 'threshold'), 'a');
       const shortcut = await press(radio(view.host, 'threshold'), 'ArrowRight', { ctrlKey: true });

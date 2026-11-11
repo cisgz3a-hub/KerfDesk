@@ -3,8 +3,10 @@
 // dialog renders issues and disables generation — nothing here throws.
 
 import { edgePattern, MIN_FINGER_WIDTH_MM } from './edge-pattern';
+import { minOf } from '../util';
+import { formatRoundedTo2Decimals } from '../util/number-format';
 
-export type BoxStyle = 'closed' | 'open-top' | 'slide-lid';
+export type BoxStyle = 'closed' | 'open-top' | 'slide-lid' | 'lift-lid' | 'open-front';
 export type BoxDimensionMode = 'inner' | 'outer';
 
 export type BoxRelief =
@@ -65,22 +67,25 @@ export type BoxSpecValidation =
     };
 
 /**
- * Derive both dimension sets. Outer = inner + 2T per axis, except the
- * height, which adds one T per horizontal layer the style stacks around the
- * cavity: closed 2T (bottom + top), open-top T (bottom only, ADR-106 Amd 1),
- * slide-lid 3T (bottom + lid + captive top strip, ADR-116 V3). The entered
- * inner height therefore always stays the usable cavity height.
+ * Derive both dimension sets. Each axis adds one T per layer the style
+ * stacks around the cavity. Width always has two walls. Depth has two,
+ * except open-front, which has only the back (ADR-693). Height: closed 2T
+ * (bottom + top), open-top T (bottom only, ADR-106 Amd 1), slide-lid 3T
+ * (bottom + lid + captive top strip, ADR-116 V3), lift-lid 3T (bottom + lid
+ * lip band + lid top, ADR-693), open-front 2T. The entered inner
+ * dimensions therefore always stay the usable cavity.
  */
 export function deriveBoxDims(spec: BoxSpec): BoxDims {
   const t2 = 2 * spec.thicknessMm;
-  const zExtra = heightLayers(spec.style) * spec.thicknessMm;
+  const yExtra = depthLayers(spec.style) * spec.thicknessMm;
+  const zExtra = HEIGHT_LAYERS[spec.style] * spec.thicknessMm;
   if (spec.dimensionMode === 'inner') {
     return {
       innerWidthMm: spec.widthMm,
       innerDepthMm: spec.depthMm,
       innerHeightMm: spec.heightMm,
       outerWidthMm: spec.widthMm + t2,
-      outerDepthMm: spec.depthMm + t2,
+      outerDepthMm: spec.depthMm + yExtra,
       outerHeightMm: spec.heightMm + zExtra,
     };
   }
@@ -89,14 +94,29 @@ export function deriveBoxDims(spec: BoxSpec): BoxDims {
     outerDepthMm: spec.depthMm,
     outerHeightMm: spec.heightMm,
     innerWidthMm: spec.widthMm - t2,
-    innerDepthMm: spec.depthMm - t2,
+    innerDepthMm: spec.depthMm - yExtra,
     innerHeightMm: spec.heightMm - zExtra,
   };
 }
 
-function heightLayers(style: BoxStyle): number {
-  if (style === 'open-top') return 1;
-  return style === 'slide-lid' ? 3 : 2;
+const HEIGHT_LAYERS: Readonly<Record<BoxStyle, number>> = {
+  closed: 2,
+  'open-top': 1,
+  'slide-lid': 3,
+  'lift-lid': 3,
+  'open-front': 2,
+};
+
+function depthLayers(style: BoxStyle): number {
+  return style === 'open-front' ? 1 : 2;
+}
+
+/**
+ * Height of the fingered walls: the full outer height, except a lift-off
+ * lid, whose loose lid top sits on the wall rim (ADR-693).
+ */
+export function wallHeightMm(spec: BoxSpec, dims: BoxDims): number {
+  return spec.style === 'lift-lid' ? dims.outerHeightMm - spec.thicknessMm : dims.outerHeightMm;
 }
 
 /** Validate a spec; generation must be gated on `kind === 'valid'`. */
@@ -152,7 +172,7 @@ function collectInteriorIssues(spec: BoxSpec, issues: BoxSpecIssue[]): void {
     if (innerMm <= 0) {
       issues.push({
         field,
-        message: `Outer ${field} ${fmt(enteredMm)} mm leaves no interior at thickness ${fmt(spec.thicknessMm)} mm.`,
+        message: `Outer ${field} ${formatRoundedTo2Decimals(enteredMm)} mm leaves no interior at thickness ${formatRoundedTo2Decimals(spec.thicknessMm)} mm.`,
       });
     }
   }
@@ -173,14 +193,14 @@ function collectReliefIssues(
   if (minCellMm <= toolMm) {
     issues.push({
       field: 'reliefTool',
-      message: `Finger width ${fmt(minCellMm)} mm is not larger than the ${fmt(toolMm)} mm relief tool — tabs cannot be relieved. Increase finger width or use a smaller bit.`,
+      message: `Finger width ${formatRoundedTo2Decimals(minCellMm)} mm is not larger than the ${formatRoundedTo2Decimals(toolMm)} mm relief tool — tabs cannot be relieved. Increase finger width or use a smaller bit.`,
     });
     return;
   }
   if (minCellMm < 2 * toolMm) {
     warnings.push({
       field: 'reliefTool',
-      message: `Finger width ${fmt(minCellMm)} mm is under twice the ${fmt(toolMm)} mm relief tool; joints will be mostly relief. Consider a wider finger.`,
+      message: `Finger width ${formatRoundedTo2Decimals(minCellMm)} mm is under twice the ${formatRoundedTo2Decimals(toolMm)} mm relief tool; joints will be mostly relief. Consider a wider finger.`,
     });
   }
 }
@@ -193,11 +213,18 @@ function collectClearanceIssues(spec: BoxSpec, minCellMm: number, issues: BoxSpe
     });
     return;
   }
+  if (spec.style === 'lift-lid' && spec.clearanceMm <= 0) {
+    issues.push({
+      field: 'clearance',
+      message: 'A lift-off lid needs clearance to drop into the box — use 0.2 mm or more.',
+    });
+    return;
+  }
   const clearanceLimitMm = Math.min(minCellMm, spec.thicknessMm) / 2;
   if (Math.abs(spec.clearanceMm) >= clearanceLimitMm) {
     issues.push({
       field: 'clearance',
-      message: `Clearance must stay under ${fmt(clearanceLimitMm)} mm (half the smallest finger or the thickness).`,
+      message: `Clearance must stay under ${formatRoundedTo2Decimals(clearanceLimitMm)} mm (half the smallest finger or the thickness).`,
     });
   }
 }
@@ -216,11 +243,19 @@ function collectDividerIssues(spec: BoxSpec, issues: BoxSpecIssue[]): void {
       continue;
     }
     if (count === 0) continue;
+    if (field === 'dividersY' && spec.style === 'open-front') {
+      issues.push({
+        field,
+        message:
+          'An open-front box takes dividers across its width only — dividers across its depth would close off the opening.',
+      });
+      continue;
+    }
     const pitchMm = (innerMm - count * spec.thicknessMm) / (count + 1);
     if (pitchMm < 2 * spec.thicknessMm) {
       issues.push({
         field,
-        message: `${count} dividers leave ${fmt(pitchMm)} mm compartments — under twice the ${fmt(spec.thicknessMm)} mm thickness.`,
+        message: `${count} dividers leave ${formatRoundedTo2Decimals(pitchMm)} mm compartments — under twice the ${formatRoundedTo2Decimals(spec.thicknessMm)} mm thickness.`,
       });
     }
   }
@@ -235,7 +270,7 @@ function collectDividerReliefIssues(spec: BoxSpec, issues: BoxSpecIssue[]): void
   if (spec.relief.toolDiameterMm < spec.thicknessMm) return;
   issues.push({
     field: 'reliefTool',
-    message: `Divider slots are ${fmt(spec.thicknessMm)} mm wide — the ${fmt(spec.relief.toolDiameterMm)} mm relief tool cannot seat in them.`,
+    message: `Divider slots are ${formatRoundedTo2Decimals(spec.thicknessMm)} mm wide — the ${formatRoundedTo2Decimals(spec.relief.toolDiameterMm)} mm relief tool cannot seat in them.`,
   });
 }
 
@@ -243,13 +278,13 @@ function collectDividerReliefIssues(spec: BoxSpec, issues: BoxSpecIssue[]): void
 // junction cells when dividers are present — bounds both relief feasibility
 // and the clearance the joint can absorb.
 function minFingerCellMm(spec: BoxSpec, dims: BoxDims): number {
-  const spans = [dims.outerWidthMm, dims.outerDepthMm, dims.outerHeightMm];
+  const spans = [dims.outerWidthMm, dims.outerDepthMm, wallHeightMm(spec, dims)];
   if ((spec.dividersXCount ?? 0) > 0 || (spec.dividersYCount ?? 0) > 0) {
     // Dividers rise the full cavity: inner height for every style.
     spans.push(dims.innerHeightMm + 2 * spec.thicknessMm);
   }
-  return Math.min(
-    ...spans.map(
+  return minOf(
+    spans.map(
       (fullSpanMm) =>
         edgePattern({
           fullSpanMm,
@@ -264,10 +299,6 @@ function checkPositive(issues: BoxSpecIssue[], field: BoxSpecField, value: numbe
   if (!Number.isFinite(value) || value <= 0) {
     issues.push({ field, message: 'Must be greater than 0.' });
   }
-}
-
-function fmt(value: number): string {
-  return String(Math.round(value * 100) / 100);
 }
 
 export { MIN_FINGER_WIDTH_MM };

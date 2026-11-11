@@ -14,6 +14,7 @@ import {
   serializeMaterialLibrary,
   type MaterialLibraryDocument,
 } from '../../io/material-library';
+import { isRecord } from '../../core/util/is-record';
 
 export type StoredLibraryEntry = {
   readonly payload: string;
@@ -193,10 +194,6 @@ export function parseCollection(raw: string): MaterialLibraryCollection | null {
   const active =
     activeLibraryId !== null && !Object.hasOwn(entries, activeLibraryId) ? null : activeLibraryId;
   return { activeLibraryId: active, libraries: entries };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isStoredEntry(value: unknown): value is StoredLibraryEntry {

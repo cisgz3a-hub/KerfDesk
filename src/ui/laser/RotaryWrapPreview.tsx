@@ -22,9 +22,22 @@ export function RotaryWrapPreview(props: {
           ? '(Y moves the surface directly)'
           : 'machine mm per surface mm'}
       </span>
-      <span>
-        Wrap limit: artwork up to {model.circumferenceMm.toFixed(2)} mm tall fits one revolution
-      </span>
+      {model.taper === null ? (
+        <span>
+          Wrap limit: artwork up to {model.circumferenceMm.toFixed(2)} mm tall fits one revolution
+        </span>
+      ) : (
+        <>
+          <span>
+            Taper: one turn is {model.taper.topTurnMm.toFixed(2)} mm round the top and{' '}
+            {model.taper.bottomTurnMm.toFixed(2)} mm round the bottom
+          </span>
+          <span>
+            Wrap limit: artwork up to {model.wrapLimitMm.toFixed(2)} mm tall fits one revolution
+            where the part is narrowest under it
+          </span>
+        </>
+      )}
       <WrapDiagram model={model} hasArtwork={props.artwork != null} />
       {props.artwork == null ? (
         <p style={hintStyle}>Add artwork to compare its surface height with one revolution.</p>
@@ -41,6 +54,9 @@ export function RotaryWrapPreview(props: {
       <p style={hintStyle}>
         Circumference = π × object diameter. Source: the measurements in this profile.{' '}
         {model.scaleSource}
+        {model.taper === null
+          ? ''
+          : ' Taper warp: each point turns the part by its surface distance ÷ the radius at its height, so the artwork keeps its size round the part at every height.'}
       </p>
       <p style={hintStyle}>
         Seam reference: surface Y = 0 and Y = circumference meet on the same line around the part.
@@ -101,7 +117,7 @@ function WrapDiagram(props: {
         Seam · Y = 0
       </text>
       <text x="52" y="148" fill="var(--lf-text)" fontSize="11">
-        Same seam · Y = {model.circumferenceMm.toFixed(2)} mm
+        Same seam · Y = {model.wrapLimitMm.toFixed(2)} mm
       </text>
       <text x="350" y="83" fill="var(--lf-text)" fontSize="18">
         {model.reverse ? '↑' : '↓'}

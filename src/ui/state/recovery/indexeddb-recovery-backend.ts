@@ -15,6 +15,7 @@ import {
 } from './recovery-model';
 import { activeStoredArtifactStagingLeaseExpiry } from './recovery-artifact-staging';
 import { persistedRecoveryArtifactRunIds } from './recovery-artifact-retention';
+import { isRecord } from '../../../core/util/is-record';
 
 const DATABASE_NAME = 'laserforge-job-recovery-v1';
 const DATABASE_VERSION = 2;
@@ -330,8 +331,4 @@ function abortIfActive(tx: IDBTransaction): void {
   } catch {
     // The transaction already completed or aborted.
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

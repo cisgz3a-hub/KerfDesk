@@ -25,7 +25,7 @@ Method and areas: [AREAS.md](AREAS.md).
 | L7-P2-1 | P2 | Reverse-only scan compensation left a calibrated fill or image half its table value off the design and off vector cuts; LightBurn moves every row half the gap | ADR-052 Amendment 2 (#1623): every row of a two-way scan moves half the stored value along its own travel |
 | L3-P3-1 | P3 | A Scan Line fill whose edge lies on its grid burns its first line on that edge and stops one interval short of the opposite edge | open: changes every Scan Line fill; no primary source on LightBurn's grid phase |
 
-Emitter revision: `scan-offset-half-each-row-20261108-v43` (#1623, on top of v42 in #1622).
+Emitter revision: `scan-offset-half-each-row-20261111-v45` (#1623, landed after v44; v43 was held for it and never shipped).
 
 ## Next loop
 

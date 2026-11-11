@@ -36,7 +36,7 @@ describe('CNC jog-to-point readiness ordering', () => {
     {
       name: 'another motion operation is active',
       arrange: () => useLaserStore.setState({ motionOperation: startMotionOperation('jog') }),
-      message: /jog or frame operation is active/i,
+      message: /jog or Frame is still running/i,
     },
     {
       name: 'a controller operation is active',

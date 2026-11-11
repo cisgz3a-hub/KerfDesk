@@ -66,7 +66,7 @@ dimensions at most 100000 mm and positive font sizes at most 1000 mm.
 | `set_work_origin` | Machine write admission, `axes` xy/z | Desktop Set origin here (Absolute start becomes User Origin) / Zero Z, refused where the PC would ask to confirm (ADR-657); no motion. |
 | `capture_board_point` | Machine write admission | Same as Capture in the open Place Board panel. |
 | `finish_board` | Machine write admission | Finish the current board capture. |
-| `pause_job`, `resume_job` | `requestId` UUID | Desktop Pause/Resume with controller confirmation; no artwork revision required. |
+| `pause_job`, `resume_job` | `requestId` UUID; `resume_job` also takes `confirmAdvisory` | Desktop Pause/Resume with controller confirmation; no artwork revision required. A paused CNC job's status carries the PC's Resume warning as `job.resumeAdvisory`; where it has a `confirmation`, Resume is refused with the warning unless `confirmAdvisory` echoes it (ADR-585 Amendment 2). |
 | `get_camera_snapshot` | None | Control scope plus artwork sharing: one JPEG still ≤1024 px and ≤240000 base64 characters of the live PC camera. |
 
 Place Board photos open on the computer, where the operator clicks the board outline and sizes it.

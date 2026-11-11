@@ -9,9 +9,12 @@
 // designs against), so it deliberately does NOT call this.
 
 import { isRotaryActive, rotaryYLimitMm, rotaryYScale, type DeviceProfile } from '../devices';
+import { dedicatedRotaryAxisOf } from '../devices/rotary-axis';
+import type { DedicatedRotaryAxis } from '../devices/rotary';
 import type { MachineConfig } from '../scene';
 import type { Job } from './job';
 import type { JobOriginPlacement } from './job-origin';
+import { applyRotaryTaperWarp } from './rotary-taper-warp';
 import { applyRotaryYScale } from './rotary-transform';
 
 // True when this project should apply rotary machine-space scaling: a laser
@@ -47,14 +50,31 @@ export function withRotaryAnchor(
 }
 
 // The machine-space job (Y scaled, around its anchor or rebased to 0). Identity
-// when rotary is inactive, so non-rotary callers are byte-identical.
+// when rotary is inactive, so non-rotary callers are byte-identical. A tapered
+// part's warp (ADR-694) runs first, in design space, as its own step; it is the
+// identity without an active taper.
 export function machineSpaceJob(
   job: Job,
   device: DeviceProfile,
   machine: MachineConfig | undefined,
 ): Job {
   if (!rotaryAppliesTo(device, machine) || device.rotary === undefined) return job;
-  return applyRotaryYScale(job, rotaryYScale(device.rotary), device.rotary.reverseAxis === true);
+  const warped = applyRotaryTaperWarp(job, device.rotary);
+  return applyRotaryYScale(
+    warped,
+    rotaryYScale(device.rotary),
+    device.rotary.reverseAxis === true,
+    dedicatedRotaryAxisOf(device.rotary) !== null,
+  );
+}
+
+// The dedicated axis (A or Z) this project's rotary writes its turn to, or
+// null when the rotary is off, on Y, or the project is CNC (ADR-695).
+export function rotaryOutputAxis(
+  device: DeviceProfile,
+  machine: MachineConfig | undefined,
+): DedicatedRotaryAxis | null {
+  return rotaryAppliesTo(device, machine) ? dedicatedRotaryAxisOf(device.rotary) : null;
 }
 
 // Y wrap limit (one revolution) for bounds checks, or null when rotary is

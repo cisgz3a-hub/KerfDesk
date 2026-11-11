@@ -4,6 +4,7 @@ import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import { continueControllerOperation } from './laser-controller-operation';
+import { sleep } from '../common/sleep';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -104,10 +105,4 @@ function rejectCncStart(set: SetFn, get: GetFn, message: string): never {
     log: pushLog(get(), `[lf2] CNC Start blocked: ${message}`),
   });
   throw new Error(message);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }

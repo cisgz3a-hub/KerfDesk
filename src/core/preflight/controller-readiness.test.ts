@@ -257,6 +257,23 @@ describe('runControllerReadiness', () => {
       );
     });
 
+    // A laser that KerfDesk 1.0.29 made a CNC reports exactly this, and
+    // raising $30 would not make its job safe (ADR-637 Amendment 8).
+    it('names the laser before advising a higher $30 when $30 is at a laser scale', () => {
+      const atLaserScale = runControllerReadiness(cncProject, { ...routerOk, maxPowerS: 1000 });
+      const message =
+        atLaserScale.errors.find((e) => e.code === 'spindle-scale-mismatch')?.message ?? '';
+      expect(message).toContain('1000 is the scale lasers use');
+      expect(message).toContain('fires the beam at full power, so do not start it');
+      expect(message).toContain('open Machine Setup and choose Laser');
+      expect(message.indexOf('choose Laser')).toBeLessThan(message.indexOf('set $30=12000'));
+
+      const atSpindleScale = runControllerReadiness(cncProject, { ...routerOk, maxPowerS: 10000 });
+      expect(atSpindleScale.errors.find((e) => e.code === 'spindle-scale-mismatch')?.message).toBe(
+        "Controller $30 is 10000 but this machine's spindle max RPM is 12000. Set $30=12000 (or update the machine profile) so S values map to real RPM.",
+      );
+    });
+
     // A lathe-mode controller has laser mode OFF, so the router hazard the
     // $32 gate exists for (laser mode zeroing spindle output during rapids)
     // does not apply. It still gets a Job Review warning: grblHAL's set_mode

@@ -19,6 +19,7 @@ import {
   type MachineReportInput,
   type SupportReportFacts,
 } from './support-report';
+import { errorMessage } from '../../core/util/error-message';
 
 const CONSOLE_LINES = 100;
 
@@ -36,7 +37,7 @@ export async function saveSupportReport(
       extensions: ['.txt'],
     });
   } catch (error) {
-    pushToast(`Could not save the support report: ${errorText(error)}`, 'error');
+    pushToast(`Could not save the support report: ${errorMessage(error)}`, 'error');
     return;
   }
   if (target === null) return;
@@ -47,7 +48,7 @@ export async function saveSupportReport(
       'success',
     );
   } catch (error) {
-    pushToast(`Could not save the support report: ${errorText(error)}`, 'error');
+    pushToast(`Could not save the support report: ${errorMessage(error)}`, 'error');
   }
 }
 
@@ -131,15 +132,11 @@ async function readDesktopLog(platform: PlatformAdapter): Promise<DesktopLogFact
   try {
     return { kind: 'read', text: await platform.readSupportLog() };
   } catch (error) {
-    return { kind: 'failed', message: errorText(error) };
+    return { kind: 'failed', message: errorMessage(error) };
   }
 }
 
 function fileStamp(date: Date): string {
   const two = (value: number): string => String(value).padStart(2, '0');
   return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}-${two(date.getHours())}${two(date.getMinutes())}`;
-}
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

@@ -47,8 +47,8 @@ export function ScanOffsetMeasurementFormatControls(props: {
       {isLightBurn ? (
         <p role="note" style={limitationStyle}>
           Pair-alignment magnitude is converted, but correction sign and absolute placement still
-          require a LaserForge coupon. LightBurn Initial Offset and .lbso import are not
-          represented, so also verify raster-to-vector placement.
+          require a KerfDesk coupon. LightBurn Initial Offset and .lbso import are not represented,
+          so also verify raster-to-vector placement.
         </p>
       ) : null}
     </div>

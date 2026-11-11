@@ -15,16 +15,8 @@ import { compilationPolylines } from './compilation-polylines';
 import { laserArcFitFor } from './cut-arc-moves';
 import type { CutSegment, CutTopologyRing, JobDiagnostic } from './job';
 import { placedTabPointsForContour } from './laser-tab-anchors';
-import {
-  kerfArcSourceRings,
-  layerKerfDiagnostics,
-  withLayerKerf,
-  type KerfSource,
-  type PendingKerfGroup,
-} from './layer-kerf';
+import { kerfArcSourceRings, type KerfSource, type PendingKerfGroup } from './layer-kerf';
 import { laserLeadSourceKey } from './laser-lead-sides';
-import { perforateLineSegments } from './line-cut-extras';
-import { applyLineTabs } from './line-tabs';
 
 export type LineSegmentCollection = {
   readonly segments: ReadonlyArray<CutSegment>;
@@ -58,23 +50,6 @@ export function collectLineSourcesForLayer(
   const out: LineSegmentSink = { segments: [], placedTabs: new Map(), kerf: [] };
   for (const obj of objects) appendSegmentsFromObject(obj, layer, device, out, leadSources);
   return out;
-}
-
-export function collectLineSegmentsForLayer(
-  objects: ReadonlyArray<SceneObject>,
-  layer: Layer,
-  device: DeviceProfile,
-): LineSegmentCollection {
-  const out = collectLineSourcesForLayer(objects, layer, device);
-  // The kerf offset runs once for the whole layer, so a hole drawn as its own
-  // object is offset as a hole (ADR-486). A failure is reported, not dropped.
-  const kerfed = withLayerKerf(out, layer, device);
-  const tabbed = applyLineTabs(kerfed.segments, kerfed.placedTabs, layer);
-  return {
-    segments: perforateLineSegments(tabbed.segments, layer),
-    tabSpans: tabbed.tabSpans,
-    kerfDiagnostics: layerKerfDiagnostics(kerfed, layer),
-  };
 }
 
 function appendSegmentsFromObject(

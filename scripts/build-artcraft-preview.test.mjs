@@ -6,7 +6,8 @@ test('source preview omits only the commercial client from the verified developm
   const source = await readFile(new URL('../src/ui/app/main.tsx', import.meta.url), 'utf8');
   const transformed = artcraftPreviewEntry(source);
   assert.match(transformed, /const desktopLicenceClient = undefined;/u);
-  assert.ok(transformed.includes('<ErrorBoundary softwareAbort={softwareAbort}>'));
+  // The root boundary keeps its software Abort (the entry spreads it over several lines).
+  assert.match(transformed, /<ErrorBoundary\s+softwareAbort=\{machineSoftwareAbort\}/u);
   assert.ok(transformed.includes('desktopWindow: createDesktopWindowCommands()'));
   assert.ok(transformed.includes('? { unlicensedRunsFree: false }'));
   assert.equal(await readFile(new URL('../src/ui/app/main.tsx', import.meta.url), 'utf8'), source);

@@ -10,7 +10,14 @@
 import { parseCssColor } from './svg-css-color';
 
 export type SvgNoPaint = { readonly kind: 'none' };
-export type SvgColorPaint = { readonly kind: 'color'; readonly color: string };
+/** `alpha` is set only for a see-through colour such as rgba(255,255,255,0.25):
+ * the hex keys the operation, and the alpha keeps a translucent white from being
+ * taken for paper (ADR-686 Amendment 1). */
+export type SvgColorPaint = {
+  readonly kind: 'color';
+  readonly color: string;
+  readonly alpha?: number;
+};
 export type SvgCurrentColorPaint = { readonly kind: 'currentcolor' };
 export type SvgSimplePaint = SvgNoPaint | SvgColorPaint | SvgCurrentColorPaint;
 /** url(#id) [fallback]. `id` is null for a reference outside the document. */
@@ -73,13 +80,22 @@ export function simplePaintColor(paint: SvgSimplePaint, color: SvgColorValue): s
   return resolved.kind === 'color' ? resolved.color : '';
 }
 
+/** The alpha a simple paint paints with: 1 unless its colour is see-through. */
+export function simplePaintAlpha(paint: SvgSimplePaint, color: SvgColorValue): number {
+  const resolved = paint.kind === 'currentcolor' ? color : paint;
+  return resolved.kind === 'color' ? (resolved.alpha ?? 1) : 1;
+}
+
 function simplePaint(text: string): SvgSimplePaint | null {
   const keyword = text.toLowerCase();
   if (keyword === 'none') return NO_PAINT;
   if (keyword === 'currentcolor') return { kind: 'currentcolor' };
   const color = parseCssColor(keyword);
   if (color === null) return null;
-  return color.alpha > 0 ? { kind: 'color', color: color.hex } : NO_PAINT;
+  if (color.alpha <= 0) return NO_PAINT;
+  return color.alpha < 1
+    ? { kind: 'color', color: color.hex, alpha: color.alpha }
+    : { kind: 'color', color: color.hex };
 }
 
 // An !important on an inline style value decides the cascade, not the paint.

@@ -63,6 +63,7 @@ import { recordStatusPollTick } from './laser-status-poll-schedule';
 import { cancelAttemptOwnsStatusBoundary } from './laser-motion-operation';
 import { browserLocalStorage } from './browser-local-storage';
 import { forgetRememberedSerialPort } from './serial-port-memory';
+import { machineZeroMovedPatch } from './work-origin-state';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -229,6 +230,7 @@ function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserS
     serialPortInfo: null,
     connectedBaudRate: null,
     controllerSessionEpoch: nextEpoch,
+    ...machineZeroMovedPatch(state),
     statusReport: null,
     statusObservation: null,
     statusResponseObservation: null,

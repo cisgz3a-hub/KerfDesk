@@ -15,6 +15,7 @@ import {
   createCalibrationLabelObject,
 } from './calibration-labels';
 import { MIN_HATCH_SPACING_MM } from './fill-hatching';
+import { finiteOr } from '../util/finite';
 
 const MIN_STEPS = 1;
 const MAX_STEPS = 10;
@@ -66,27 +67,27 @@ export function generateScanOffsetCalibrationPattern(
 ): ScanOffsetCalibrationPattern {
   const steps = clampInteger(options.steps, MIN_STEPS, MAX_STEPS);
   const [speedLow, speedHigh] = orderedPair(
-    clampFinite(options.speedMin, MIN_SPEED_MM_MIN),
-    clampFinite(options.speedMax, MIN_SPEED_MM_MIN),
+    finiteOr(options.speedMin, MIN_SPEED_MM_MIN),
+    finiteOr(options.speedMax, MIN_SPEED_MM_MIN),
   );
   const power = clampPower(options.power);
   const swatchWidth = Math.max(
     MIN_SWATCH_SIZE_MM,
-    clampFinite(options.swatchWidthMm, MIN_SWATCH_SIZE_MM),
+    finiteOr(options.swatchWidthMm, MIN_SWATCH_SIZE_MM),
   );
   const swatchHeight = Math.max(
     MIN_SWATCH_SIZE_MM,
-    clampFinite(options.swatchHeightMm, MIN_SWATCH_SIZE_MM),
+    finiteOr(options.swatchHeightMm, MIN_SWATCH_SIZE_MM),
   );
   const hatchSpacingMm = Math.max(
     MIN_HATCH_SPACING_MM,
-    clampFinite(options.hatchSpacingMm ?? DEFAULT_HATCH_SPACING_MM, DEFAULT_HATCH_SPACING_MM),
+    finiteOr(options.hatchSpacingMm ?? DEFAULT_HATCH_SPACING_MM, DEFAULT_HATCH_SPACING_MM),
   );
   const overscanMm = Math.max(
     0,
-    clampFinite(options.overscanMm ?? DEFAULT_OVERSCAN_MM, DEFAULT_OVERSCAN_MM),
+    finiteOr(options.overscanMm ?? DEFAULT_OVERSCAN_MM, DEFAULT_OVERSCAN_MM),
   );
-  const gapMm = Math.max(0, clampFinite(options.gapMm ?? DEFAULT_GAP_MM, DEFAULT_GAP_MM));
+  const gapMm = Math.max(0, finiteOr(options.gapMm ?? DEFAULT_GAP_MM, DEFAULT_GAP_MM));
   const origin = options.origin ?? DEFAULT_ORIGIN;
   const mode = options.mode ?? 'baseline';
   const speeds = emittedCalibrationSpeeds(linspace(speedHigh, speedLow, steps), device);
@@ -254,11 +255,7 @@ function clampInteger(value: number, min: number, max: number): number {
 }
 
 function clampPower(value: number): number {
-  return Math.max(MIN_POWER_PERCENT, Math.min(MAX_POWER_PERCENT, clampFinite(value, 0)));
-}
-
-function clampFinite(value: number, fallback: number): number {
-  return Number.isFinite(value) ? value : fallback;
+  return Math.max(MIN_POWER_PERCENT, Math.min(MAX_POWER_PERCENT, finiteOr(value, 0)));
 }
 
 function roundMm(value: number): number {

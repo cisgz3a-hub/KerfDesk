@@ -51,6 +51,10 @@ const SOFT_RESET_BYTE = '\x18';
 const JOG_CANCEL_BYTE = '\x85';
 
 export type CreateGrblSimulatorOptions = Partial<GrblSimOptions> & {
+  /** A four-axis build with an A axis, as a grblHAL rotary machine has: A words
+   *  move it and reports carry it after XYZ (ADR-695). Unset: three axes, and an
+   *  A word is error:20 as on stock GRBL. */
+  readonly fourthAxisA?: boolean;
   /** Override or extend the default $$ settings table. */
   readonly settings?: ReadonlyArray<readonly [number, string]>;
   /** Emit the welcome banner when the port opens (default true). */
@@ -79,6 +83,12 @@ export type CreateGrblSimulatorOptions = Partial<GrblSimOptions> & {
    * false: stock GRBL. Not modelled together with `plannerBlocks`.
    */
   readonly jogCancelFlushesInput?: boolean;
+  /**
+   * With `jogCancelFlushesInput`: how long the main loop stays busy before it
+   * reads bytes that just arrived (default 1 ms). Longer than Cancel's 500 ms
+   * reply grace, a jog line is still unread when 0x85 flushes it (ADR-696).
+   */
+  readonly lineParseDelayMs?: number;
   /**
    * Work offsets an earlier session left in non-volatile storage. Power-up
    * loads G54 on every firmware, and G92 only as grblHAL with `$384` off, its
@@ -187,7 +197,9 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
     blockRetireMs,
     rxBufferBytes,
     jogCancelFlushesInput,
+    lineParseDelayMs,
     storedOffsets,
+    fourthAxisA,
     ...optionOverrides
   } = options;
   if (jogCancelFlushesInput === true && plannerBlocks !== undefined) {
@@ -198,7 +210,10 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
   for (const [id, value] of settingOverrides ?? []) settings.set(id, value);
 
   const port = createFakeSerialPort();
-  let state = powerUpState(settings, homingInitLock === true, storedOffsets, opts.firmware);
+  let state = withFourthAxisA(
+    powerUpState(settings, homingInitLock === true, storedOffsets, opts.firmware),
+    fourthAxisA,
+  );
 
   const runEffect = (effect: GrblSimEffect): void => {
     if (effect.kind === 'emit') {
@@ -247,7 +262,9 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
         );
   const feeder: HostByteFeeder =
     backpressure ??
-    (jogCancelFlushesInput === true ? createDelayedParseFeeder(deps) : createImmediateFeeder(deps));
+    (jogCancelFlushesInput === true
+      ? createDelayedParseFeeder(deps, lineParseDelayMs)
+      : createImmediateFeeder(deps));
   const inertRxWindow = createRxWindow(0);
   const inertPlanner = createPlanner(0);
 
@@ -310,4 +327,9 @@ function powerUpState(
   return homingInitLock && settings.get(22) === '1'
     ? { ...booted, machine: 'Alarm', locked: true }
     : booted;
+}
+
+/** A four-axis build starts with A at 0 and no offset (ADR-695). */
+function withFourthAxisA(state: GrblSimState, fourthAxisA: boolean | undefined): GrblSimState {
+  return fourthAxisA === true ? { ...state, aAxis: { mpos: 0, g92: 0 } } : state;
 }

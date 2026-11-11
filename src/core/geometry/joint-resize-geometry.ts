@@ -1,11 +1,12 @@
 import type { Vec2 } from '../scene';
+import { dot, distance, cross } from './point-math';
 
 const EPS = 1e-7;
 export const jointPointEqual = (a: Vec2, b: Vec2): boolean => distance(a, b) <= EPS;
 export const subtract = (a: Vec2, b: Vec2): Vec2 => ({ x: a.x - b.x, y: a.y - b.y });
-export const dot = (a: Vec2, b: Vec2): number => a.x * b.x + a.y * b.y;
-export const cross = (a: Vec2, b: Vec2): number => a.x * b.y - a.y * b.x;
-export const distance = (a: Vec2, b: Vec2): number => Math.hypot(a.x - b.x, a.y - b.y);
+export { dot } from './point-math';
+export { cross } from './point-math';
+export { distance } from './point-math';
 export const unit = (v: Vec2): Vec2 => {
   const length = Math.hypot(v.x, v.y);
   return { x: v.x / length, y: v.y / length };

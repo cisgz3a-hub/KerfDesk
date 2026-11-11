@@ -29,7 +29,9 @@ export function reliefObjectToHeightmap(
   if (relief.reliefSource.kind === 'heightfield-v1') {
     return heightfieldToHeightmap(relief.reliefSource, {
       ...options,
-      exactSurface: options.sampling === 'exact-mesh',
+      // An explicit request stands: the carving comparison reads the surface
+      // CAM carves without changing how it samples a mesh (ADR-487).
+      exactSurface: options.exactSurface ?? options.sampling === 'exact-mesh',
     });
   }
   return meshToHeightmap(

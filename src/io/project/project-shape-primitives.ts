@@ -1,4 +1,6 @@
 /** Largest persisted local/scene coordinate magnitude accepted by project v4. */
+import { isFiniteNumber } from '../../core/util/finite';
+
 export const MAX_PROJECT_COORDINATE_MAGNITUDE_MM = 1_000_000;
 /** Largest persisted object-transform scale magnitude accepted by project v4. */
 export const MAX_PROJECT_TRANSFORM_SCALE = 100_000;
@@ -162,14 +164,8 @@ export function optionalLiteral(
     : `missing or invalid \`${path}\``;
 }
 
-export function isObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
+export { isRecord as isObject } from '../../core/util/is-record';
 
 export function valueAtPath(obj: Record<string, unknown>, path: string): unknown {
   return obj[path.slice(path.lastIndexOf('.') + 1)];
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
 }

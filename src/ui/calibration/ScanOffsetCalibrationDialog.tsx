@@ -3,6 +3,7 @@ import type { ScanOffsetCalibrationPatternOptions } from '../../core/job';
 import { Button, Dialog, DialogActions } from '../kit';
 import { CalibrationNumberField } from './CalibrationNumberField';
 import { calibrationGridStyle } from './calibration-dialog-styles';
+import { isPositiveFiniteNumber } from '../../core/util/finite';
 
 type CalibrationMode = 'baseline' | 'verification';
 
@@ -203,7 +204,7 @@ function parseDraft(
 }
 
 function initialDraft(maxFeedMmPerMin: number | undefined): ScanOffsetCalibrationDraft {
-  if (!isFinitePositive(maxFeedMmPerMin)) return DEFAULT_DRAFT;
+  if (!isPositiveFiniteNumber(maxFeedMmPerMin)) return DEFAULT_DRAFT;
   const speedMax = Math.max(1, Math.min(Number(DEFAULT_DRAFT.speedMax), maxFeedMmPerMin));
   const speedMin = Math.max(1, Math.min(Number(DEFAULT_DRAFT.speedMin), speedMax));
   return { ...DEFAULT_DRAFT, speedMin: String(speedMin), speedMax: String(speedMax) };
@@ -240,7 +241,7 @@ function qualificationWarnings(
       'The active profile has no measured scan-offset points. This coupon will be an uncorrected comparison, not proof of calibrated alignment.',
     );
   }
-  if (isFinitePositive(maxFeedMmPerMin) && options.speedMax > maxFeedMmPerMin) {
+  if (isPositiveFiniteNumber(maxFeedMmPerMin) && options.speedMax > maxFeedMmPerMin) {
     warnings.push(
       `Requested maximum speed ${options.speedMax} mm/min exceeds the profile ceiling of ${maxFeedMmPerMin} mm/min; generated swatches and their labels will use the effective capped feed.`,
     );
@@ -256,7 +257,7 @@ function validateSteps(options: ScanOffsetCalibrationPatternOptions): ReadonlyAr
 }
 
 function validateSpeeds(options: ScanOffsetCalibrationPatternOptions): ReadonlyArray<string> {
-  if (!isFinitePositive(options.speedMin) || !isFinitePositive(options.speedMax)) {
+  if (!isPositiveFiniteNumber(options.speedMin) || !isPositiveFiniteNumber(options.speedMax)) {
     return ['Minimum and maximum speed must be positive numbers.'];
   }
   if (options.speedMin > options.speedMax) {
@@ -271,10 +272,14 @@ function validatePower(options: ScanOffsetCalibrationPatternOptions): ReadonlyAr
 
 function validateGeometry(options: ScanOffsetCalibrationPatternOptions): ReadonlyArray<string> {
   const errors: string[] = [];
-  if (!isFinitePositive(options.swatchWidthMm) || !isFinitePositive(options.swatchHeightMm)) {
+  if (
+    !isPositiveFiniteNumber(options.swatchWidthMm) ||
+    !isPositiveFiniteNumber(options.swatchHeightMm)
+  ) {
     errors.push('Swatch width and height must be positive.');
   }
-  if (!isFinitePositive(options.hatchSpacingMm)) errors.push('Line interval must be positive.');
+  if (!isPositiveFiniteNumber(options.hatchSpacingMm))
+    errors.push('Line interval must be positive.');
   if ((options.overscanMm ?? 0) < 0 || (options.gapMm ?? 0) < 0) {
     errors.push('Overscan and gap cannot be negative.');
   }
@@ -284,10 +289,6 @@ function validateGeometry(options: ScanOffsetCalibrationPatternOptions): Readonl
 function numberValue(value: string): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function isFinitePositive(value: number | undefined): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 const purposeStyle: React.CSSProperties = {

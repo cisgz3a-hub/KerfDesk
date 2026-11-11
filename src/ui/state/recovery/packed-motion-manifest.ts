@@ -20,6 +20,7 @@ import {
   unpackLegacyMotionManifest,
   type LegacyPackedMotionManifest,
 } from './packed-motion-manifest-v1';
+import { isRecord } from '../../../core/util/is-record';
 
 const ENCODING = 'packed-motion-manifest-v2';
 /** Object blocks measured per step of the accepted run's archive (ADR-337 Amendment 1). */
@@ -253,8 +254,4 @@ function countStoredPoints(
 
 function samePoint(a: MotionPoint | undefined, b: MotionPoint): boolean {
   return a !== undefined && Object.is(a.x, b.x) && Object.is(a.y, b.y) && Object.is(a.z, b.z);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

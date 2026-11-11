@@ -1,4 +1,5 @@
 import type { Vec2 } from '../scene';
+import { isFinitePoint, lerpPoint, distance } from '../geometry/point-math';
 
 const SECONDS_PER_MINUTE = 60;
 const KINEMATIC_DIVISOR = 2;
@@ -96,7 +97,7 @@ export function backtrackContourPolyline(
     if (length <= GEOMETRY_EPSILON_MM) continue;
     if (remaining <= length + GEOMETRY_EPSILON_MM) {
       const ratio = Math.min(1, remaining / length);
-      reversed.push(interpolate(end, start, ratio));
+      reversed.push(lerpPoint(end, start, ratio));
       remaining = 0;
       break;
     }
@@ -111,14 +112,6 @@ export function isFiniteContourPolyline(points: ReadonlyArray<Vec2>): boolean {
   return points.length >= KINEMATIC_DIVISOR && points.every(isFinitePoint);
 }
 
-function isFinitePoint(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
-}
-
-function distance(left: Vec2, right: Vec2): number {
-  return Math.hypot(right.x - left.x, right.y - left.y);
-}
-
 function direction(start: Vec2, end: Vec2): Vec2 | null {
   const length = distance(start, end);
   if (length <= GEOMETRY_EPSILON_MM) return null;
@@ -128,8 +121,4 @@ function direction(start: Vec2, end: Vec2): Vec2 | null {
 function hasSameDirection(left: Vec2, right: Vec2): boolean {
   const dot = left.x * right.x + left.y * right.y;
   return dot >= 1 - DIRECTION_DOT_TOLERANCE;
-}
-
-function interpolate(from: Vec2, to: Vec2, ratio: number): Vec2 {
-  return { x: from.x + (to.x - from.x) * ratio, y: from.y + (to.y - from.y) * ratio };
 }

@@ -8,6 +8,7 @@ import { combinedBBox } from '../../core/scene/hit-test';
 import type { Bounds, SceneObject } from '../../core/scene/scene-object';
 import { formatDisplayMillimetres } from '../format-display-millimetres';
 import { sceneObjectCopyDependencyIds } from '../state/scene-object-copy-dependencies';
+import { boxCentre } from '../../core/geometry/box-math';
 
 export type ArrayCentre =
   | { readonly kind: 'selection' }
@@ -38,9 +39,9 @@ export function resolvedCentre(fields: CentreFields, context: ArrayDialogContext
   if (centre.kind === 'object') {
     const object = context.selected.find((candidate) => candidate.id === centre.id);
     const bounds = object === undefined ? null : combinedBBox([object]);
-    if (bounds !== null) return { ...boundsCentre(bounds), objectId: centre.id };
+    if (bounds !== null) return { ...boxCentre(bounds), objectId: centre.id };
   }
-  return boundsCentre(context.bounds);
+  return boxCentre(context.bounds);
 }
 
 /** What the Center X and Y fields show: the typed point, or the computed centre to 0.01 mm. */
@@ -72,7 +73,7 @@ export function centreObjectOptions(
   return [...selected].reverse().flatMap((object) => {
     const bounds = combinedBBox([object]);
     if (taken.has(object.id) || bounds === null) return [];
-    const centre = boundsCentre(bounds);
+    const centre = boxCentre(bounds);
     const at = `${formatDisplayMillimetres(round2(centre.x))}, ${formatDisplayMillimetres(round2(centre.y))} mm`;
     return [{ id: object.id, label: `${artworkOperationName(object)} at ${at}` }];
   });
@@ -91,10 +92,6 @@ export function offsetFromObject(
   const dy = (rest.minY + rest.maxY - own.minY - own.maxY) / 2;
   const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
   return { radius: Math.hypot(dx, dy), angleDeg: angleDeg < 0 ? angleDeg + 360 : angleDeg };
-}
-
-function boundsCentre(bounds: Bounds): { readonly x: number; readonly y: number } {
-  return { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
 }
 
 function round2(value: number): number {

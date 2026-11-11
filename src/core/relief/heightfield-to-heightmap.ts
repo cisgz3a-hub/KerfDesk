@@ -10,6 +10,7 @@ import { heightfieldMetadataError } from './heightfield-metadata-validator';
 import { heightfieldTargetGrid, targetCellFraction } from './heightfield-target-grid';
 import { DEFAULT_HEIGHTMAP_CELL_MM, heightmapCellSize, type Heightmap } from './heightmap';
 import type { ReliefHeightfield } from '../scene/relief';
+import { isPositiveFiniteNumber } from '../util/finite';
 
 export type HeightfieldHeightmapOptions = {
   readonly targetWidthMm: number;
@@ -227,10 +228,10 @@ function heightfieldTarget(
 ): HeightfieldTargetResult {
   const targetScaleX = options.targetScaleX ?? 1;
   const targetScaleY = options.targetScaleY ?? 1;
-  if (!positiveFinite(targetScaleX)) {
+  if (!isPositiveFiniteNumber(targetScaleX)) {
     return { kind: 'error', reason: 'Target X scale must be finite and positive.' };
   }
-  if (!positiveFinite(targetScaleY)) {
+  if (!isPositiveFiniteNumber(targetScaleY)) {
     return { kind: 'error', reason: 'Target Y scale must be finite and positive.' };
   }
   return {
@@ -384,10 +385,6 @@ function mappedDepth(
 function mappedUnitCode(code: number, low: number, high: number): number {
   if (low === high) return 0.5;
   return Math.min(1, Math.max(0, (code - low) / (high - low)));
-}
-
-function positiveFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 function record(value: unknown): Record<string, unknown> | null {

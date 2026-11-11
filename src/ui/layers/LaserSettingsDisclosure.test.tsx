@@ -18,7 +18,12 @@ describe('laser settings disclosures', () => {
     const view = await mount(
       <LayerRowSettingsFields
         layer={layer}
-        operationTarget={{ settings: layer, selectedObjectCount: 0, commit }}
+        operationTarget={{
+          settings: layer,
+          selectedObjectCount: 0,
+          commit,
+          owner: { operationId: layer.id },
+        }}
       />,
     );
     try {

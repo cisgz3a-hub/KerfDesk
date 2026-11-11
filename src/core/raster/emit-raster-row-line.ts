@@ -55,6 +55,4 @@ export function rasterRowLine(frame: RasterScanFrame, worldY: number): RasterRow
   };
 }
 
-export function sameRasterHead(a: ControllerHead, b: ControllerHead): boolean {
-  return a.x === b.x && a.y === b.y;
-}
+export { samePoint as sameRasterHead } from '../geometry/point-math';

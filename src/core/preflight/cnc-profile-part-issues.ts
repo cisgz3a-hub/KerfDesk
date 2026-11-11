@@ -2,6 +2,7 @@ import { PROFILE_OUTLINE_GAP_MM } from '../cnc/cnc-profile-outline-join';
 import type { Job } from '../job';
 import type { CncKeptPartCut, CncProfileOpenPaths } from '../job/cnc-compilation-sidecar-types';
 import type { PreflightIssue } from './preflight';
+import { formatUpTo2Decimals } from '../util/number-format';
 
 // Advisory only (rule 7, ADR-565): each program is cut as compiled. Read from
 // the evidence retained with this exact Job, so fresh and archived review agree.
@@ -29,7 +30,7 @@ function onLineIssue(entry: CncProfileOpenPaths): PreflightIssue {
       `Layer "${entry.layerName}": ${entry.onLine} open path${one ? ' is' : 's are'} cut on ` +
       `${one ? 'its' : 'their'} line, not ${side} ${one ? 'it' : 'them'}: only a closed shape ` +
       `has an ${side}. ${outlined} ${one ? 'it outlines' : 'they outline'} comes out ` +
-      `${mm(entry.cutWidthMm)} mm ${size} than drawn (one cut width). Close the outline with ` +
+      `${formatUpTo2Decimals(entry.cutWidthMm)} mm ${size} than drawn (one cut width). Close the outline with ` +
       'Tools > Join paths, or choose On path for this layer.',
   };
 }
@@ -62,14 +63,16 @@ export function cncKeptPartCutIssues(
 function keptPartIssue(cut: CncKeptPartCut, showPositions: boolean): PreflightIssue {
   const one = cut.contours === 1;
   const parts = `${cut.contours} part${one ? '' : 's'} that layer "${cut.keptLayerName}" keeps`;
-  const where = showPositions ? ` at X ${mm(cut.at.x)} · Y ${mm(cut.at.y)} mm` : '';
+  const where = showPositions
+    ? ` at X ${formatUpTo2Decimals(cut.at.x)} · Y ${formatUpTo2Decimals(cut.at.y)} mm`
+    : '';
   const reach =
     cut.depthMm === null
       ? `runs into ${parts}${where}`
-      : `reaches ${parts} and cuts up to ${mm(cut.depthMm)} mm into ${one ? 'it' : 'them'}${where}`;
+      : `reaches ${parts} and cuts up to ${formatUpTo2Decimals(cut.depthMm)} mm into ${one ? 'it' : 'them'}${where}`;
   return {
     code: 'cnc-profile-cuts-kept-part',
-    message: `Layer "${cut.layerName}": its ${mm(cut.cutWidthMm)} mm cut ${reach}. ${keptPartCause(cut)}`,
+    message: `Layer "${cut.layerName}": its ${formatUpTo2Decimals(cut.cutWidthMm)} mm cut ${reach}. ${keptPartCause(cut)}`,
   };
 }
 
@@ -81,16 +84,12 @@ function keptPartCause(cut: CncKeptPartCut): string {
     return 'The parts sit closer together than the bit can pass between. Move them further apart.';
   }
   const them = cut.contours === 1 ? 'it' : 'them';
-  const moved = `Its ${mm(allowance)} mm finish allowance moves the roughing pass out into ${them}.`;
+  const moved = `Its ${formatUpTo2Decimals(allowance)} mm finish allowance moves the roughing pass out into ${them}.`;
   // Each 0.01 mm less allowance draws the roughing ring 0.01 mm back. Rounded
   // down (past binary rounding), so the figure clears even where the offset's
   // own rounding decides.
   const clearing = Math.floor((allowance - cut.depthMm) * 100 + 1e-9) / 100;
   return clearing > 0
-    ? `${moved} An allowance of ${mm(clearing)} mm or less clears ${them}, or move the parts apart.`
+    ? `${moved} An allowance of ${formatUpTo2Decimals(clearing)} mm or less clears ${them}, or move the parts apart.`
     : `${moved} Remove the allowance or move the parts apart.`;
-}
-
-function mm(value: number): string {
-  return String(Number(value.toFixed(2)));
 }

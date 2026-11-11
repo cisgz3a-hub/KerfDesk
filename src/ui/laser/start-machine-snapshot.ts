@@ -1,7 +1,12 @@
 import type { StatusQueryCapability } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
+import { reportedControllerAxes } from '../state/rotary-axis-frame';
+import { rotaryTurnSinceAbort } from './abort-rotary-turn';
 import type { Project } from '../../core/scene';
+import { ownCameraModel } from '../camera/active-camera-model';
 import { cameraPlacementGeometryIssue } from '../camera/camera-model-frame';
+import { canvasTargetInScene } from '../camera/calibrate/canvas-target-burn';
+import { cameraMovedStartWarning } from '../camera/helpers/camera-moved-start-warning';
 import type { useCameraStore } from '../state/camera-store';
 import type { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
@@ -22,6 +27,9 @@ export function machineSnapshot(
   return {
     connected: laser.connection.kind === 'connected',
     statusReport: laser.statusReport,
+    // grblHAL's `$I` axes, when read this session (ADR-695).
+    reportedAxisLetters: reportedControllerAxes(laser).axisLetters ?? null,
+    rotaryTurnSinceAbort: rotaryTurnSinceAbort(laser),
     alarmCode: laser.alarmCode,
     hasActiveStreamer: isActiveJob(laser.streamer),
     cncJobsSupported: laser.capabilities.cncJobs,
@@ -50,6 +58,13 @@ export function machineSnapshot(
     cameraPlacementActive: camera.placementActive,
     cameraConfirmedPositionEpoch: camera.confirmedPositionEpoch,
     cameraPlacementGeometryIssue: cameraPlacementGeometryIssue(project.device.cameraModel),
+    // The camera target's rings, put on the canvas and unmoved (ADR-441 Amendment 10).
+    cameraTargetOnCanvas: canvasTargetInScene(project),
+    // ADR-663 Amendment 5: a showing "camera may have moved" warning.
+    cameraMovedWarning: cameraMovedStartWarning(project.device, camera.sourceState),
+    // The running camera's own calibration, for where its picture is only
+    // estimated (ADR-441 Amendment 9).
+    cameraCalibration: ownCameraModel(project.device, camera.sourceState) ?? null,
     registrationOutline: registrationOutlinePlacement(project, laser.registrationOutlineRun),
     homingState: laser.homingState,
     trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,
@@ -68,6 +83,6 @@ function liveStatusQueryCapability(
   configured: StatusQueryCapability,
 ): StatusQueryCapability {
   if (controllerKind === 'marlin') return 'queued-poll';
-  if (controllerKind === 'ruida') return 'none';
+  if (controllerKind === 'ruida' || controllerKind === 'moshi') return 'none';
   return configured;
 }

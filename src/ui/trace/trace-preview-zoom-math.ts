@@ -2,6 +2,8 @@
 // the stage is z times the viewport on both axes, and the fitted artwork scales
 // with it, so a stage-normalised point is the same image point at every zoom.
 
+import { isFinitePositive } from '../../core/util/finite';
+
 export const MIN_PREVIEW_ZOOM = 1;
 export const MAX_PREVIEW_ZOOM = 16;
 // Very large sources may still need a closer look than 16x Fit: allow up to
@@ -26,10 +28,11 @@ export const DEFAULT_PREVIEW_ZOOM_RANGE: PreviewZoomRange = {
 };
 
 export function previewZoomRange(image: Size | undefined, viewport: Size): PreviewZoomRange {
-  if (image === undefined || !positive(image.width) || !positive(image.height)) {
+  if (image === undefined || !isFinitePositive(image.width) || !isFinitePositive(image.height)) {
     return DEFAULT_PREVIEW_ZOOM_RANGE;
   }
-  if (!positive(viewport.width) || !positive(viewport.height)) return DEFAULT_PREVIEW_ZOOM_RANGE;
+  if (!isFinitePositive(viewport.width) || !isFinitePositive(viewport.height))
+    return DEFAULT_PREVIEW_ZOOM_RANGE;
   const fitScale = Math.min(viewport.width / image.width, viewport.height / image.height);
   const actualSize = 1 / fitScale;
   return {
@@ -103,7 +106,7 @@ export function anchoredScrollOffset(args: {
   readonly next: number;
 }): number {
   const { scroll, anchor, size, previous, next } = args;
-  if (!positive(size) || !positive(previous) || !positive(next)) return 0;
+  if (!isFinitePositive(size) || !isFinitePositive(previous) || !isFinitePositive(next)) return 0;
   const previousStage = previous * size;
   const nextStage = next * size;
   const stagePoint = scroll + anchor - centredMargin(size, previousStage);
@@ -133,8 +136,8 @@ export function liveLensTransform(args: {
   readonly targetScroll: { readonly left: number; readonly top: number };
 }): { readonly x: number; readonly y: number; readonly scale: number } | null {
   const { size, rendered, target, scroll, targetScroll } = args;
-  if (!positive(size.width) || !positive(size.height)) return null;
-  if (!positive(rendered) || !positive(target)) return null;
+  if (!isFinitePositive(size.width) || !isFinitePositive(size.height)) return null;
+  if (!isFinitePositive(rendered) || !isFinitePositive(target)) return null;
   const shift = (length: number, from: number, to: number): number =>
     centredMargin(length, target * length) - to - (centredMargin(length, rendered * length) - from);
   return {
@@ -153,8 +156,4 @@ export function formatPreviewZoom(zoom: number): string {
 
 function centredMargin(size: number, stage: number): number {
   return Math.max(0, (size - stage) / 2);
-}
-
-function positive(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }

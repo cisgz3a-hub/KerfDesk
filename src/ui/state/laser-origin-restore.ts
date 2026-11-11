@@ -26,6 +26,7 @@ import {
   cancelFreshControllerStatusWait,
   waitForFreshControllerStatus,
 } from './laser-controller-status-wait';
+import type { StatusReport } from '../../core/controllers/grbl';
 import { assertOriginActionReady, usesPrimaryWcs } from './laser-origin-readiness';
 import { runOriginTransaction, type OriginSafeWrite } from './laser-origin-transaction';
 import { beginOwnedReportUnitsLine } from './owned-report-units';
@@ -33,6 +34,7 @@ import { pushLog } from './laser-store-helpers';
 import { withheldControllerMPos } from './laser-status-position';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { WorkCoordinateOffset } from './origin-actions';
+import { sleep } from '../common/sleep';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -44,6 +46,22 @@ export type SavedXyOffsetMm = { readonly x: number; readonly y: number };
 export const RESTORE_ORIGIN_POSITION_UNKNOWN_MESSAGE =
   'KerfDesk does not know where the head is in machine coordinates yet, so it cannot put the ' +
   'saved origin back. Wait for a position report and try again.';
+
+/** Restore saved origin waits this long for a report that gives the machine
+ *  position: stock GRBL with $10=0 sends WCO: on one Idle report in ten, and
+ *  the wait asks for a report every 250 ms, so one comes within 2.5 s (V3-P2-2). */
+export const RESTORE_AIM_REPORT_WAIT_MS = 5_000;
+const RESTORE_AIM_QUERY_MS = 250;
+
+export const RESTORE_ORIGIN_WORK_POSITION_ONLY_MESSAGE =
+  'The saved origin was not written. The controller reports only the work position ($10=0), ' +
+  'and none of its reports in the last 5 s carried the work offset (WCO) that gives the ' +
+  'machine position. Try Restore saved origin again in a moment, or use Set origin here.';
+
+export const RESTORE_ORIGIN_NO_POSITION_REPORT_MESSAGE =
+  'The saved origin was not written. No position report in the last 5 s gave the head’s ' +
+  'machine position. Check that the controller is connected and answering, then try ' +
+  'Restore saved origin again, or use Set origin here.';
 
 export const RESTORE_ORIGIN_UNCONFIRMED_NOTICE =
   '[lf2] Saved origin written, but the controller has not confirmed the saved work offset. ' +
@@ -178,12 +196,14 @@ async function writeXyOffset(
   assertTargetCurrent?.();
   await assertOriginActionReady(set, get, refs, safeWrite);
   assertTargetCurrent?.();
-  const before = get();
-  const reportInches = before.controllerSettings?.reportInches === true;
-  const machineMm =
-    inferCurrentMachinePosition(before.statusReport, before.wcoCache, reportInches) ??
-    (action.readsWithheldPosition === true ? withheldMachineMm(before, reportInches) : null);
+  let machineMm = aimPoint(get(), action);
+  if (machineMm === null && action.readsWithheldPosition === true) {
+    machineMm = await waitForAimPoint(get, refs, safeWrite, action);
+    // The wait let reports in: check again that nothing else started.
+    await assertOriginActionReady(set, get, refs, safeWrite);
+  }
   if (machineMm === null) throw new Error(RESTORE_ORIGIN_POSITION_UNKNOWN_MESSAGE);
+  const before = get();
   const savedMm = targetFor(machineMm);
   const grblFamily = usesPrimaryWcs(before);
   const usesReportedOffset = before.capabilities.workOffsetSource !== 'host-recorded';
@@ -295,6 +315,66 @@ function restoredOffsetConfirmation(
   };
 }
 
+// The controller's machine position: the live report's (MPos, or WPos plus a
+// known WCO), else for Restore saved origin the MPos withheld after Unlock.
+function aimPoint(state: LaserState, action: XyOffsetWrite): SavedXyOffsetMm | null {
+  const reportInches = state.controllerSettings?.reportInches === true;
+  return (
+    inferCurrentMachinePosition(state.statusReport, state.wcoCache, reportInches) ??
+    (action.readsWithheldPosition === true ? withheldMachineMm(state, reportInches) : null)
+  );
+}
+
+// A $10=0 report gives the machine position only with WCO:, which stock GRBL
+// sends on one Idle report in ten, and the Idle poll asks once a second, so
+// after Unlock or Home the restore found none and failed (V3-P2-2). Ask for
+// reports at the busy rate for a bounded time instead; a timeout, a new
+// session, or Alarm or Sleep ends the wait with a message that says which.
+async function waitForAimPoint(
+  get: GetFn,
+  refs: LiveRefs,
+  safeWrite: OriginSafeWrite,
+  action: XyOffsetWrite,
+): Promise<SavedXyOffsetMm> {
+  if (refs.controllerStatusWait != null) throw new Error(RESTORE_ORIGIN_POSITION_UNKNOWN_MESSAGE);
+  const start = get();
+  let workPositionOnly = false;
+  const reportsWorkOnly = (report: StatusReport): void => {
+    if (report.mPos === null && report.wPos !== null) workPositionOnly = true;
+  };
+  const query = refs.driver.realtime.statusQuery;
+  const asking =
+    query === null
+      ? null
+      : setInterval(() => {
+          // A refused query only leaves the wait to the regular poll.
+          void safeWrite(query, 'origin', 'motion').catch(() => undefined);
+        }, RESTORE_AIM_QUERY_MS);
+  try {
+    await waitForFreshControllerStatus(refs, {
+      after: { sessionEpoch: start.controllerSessionEpoch, sequence: start.statusSequence },
+      onFreshReport: reportsWorkOnly,
+      // The status handler stores the report before consumers see it.
+      accept: () => aimPoint(get(), action) !== null,
+      timeoutMs: RESTORE_AIM_REPORT_WAIT_MS,
+      timeoutMessage: RESTORE_ORIGIN_NO_POSITION_REPORT_MESSAGE,
+    });
+  } catch (error: unknown) {
+    if (workPositionOnly) throw new Error(RESTORE_ORIGIN_WORK_POSITION_ONLY_MESSAGE);
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      reason === RESTORE_ORIGIN_NO_POSITION_REPORT_MESSAGE
+        ? reason
+        : `The saved origin was not written: ${reason}`,
+    );
+  } finally {
+    if (asking !== null) clearInterval(asking);
+  }
+  const machineMm = aimPoint(get(), action);
+  if (machineMm === null) throw new Error(RESTORE_ORIGIN_NO_POSITION_REPORT_MESSAGE);
+  return machineMm;
+}
+
 function withheldMachineMm(state: LaserState, reportInches: boolean): SavedXyOffsetMm | null {
   const withheld = withheldControllerMPos(state.statusReport);
   if (withheld === null) return null;
@@ -340,10 +420,4 @@ function writtenOffset(state: LaserState, savedMm: SavedXyOffsetMm): WorkCoordin
   if (prior === null) return null;
   const scale = state.controllerSettings?.reportInches === true ? 1 / 25.4 : 1;
   return { x: savedMm.x * scale, y: savedMm.y * scale, z: prior.z };
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }

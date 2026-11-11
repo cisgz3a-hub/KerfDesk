@@ -17,6 +17,7 @@ import {
   type Sides,
   type Vertex,
 } from './relief-rail-stations';
+import { crossAbout } from '../geometry/point-math';
 
 type Strip = { left0: Vertex; right0: Vertex; left1: Vertex; right1: Vertex };
 type Triangle = {
@@ -154,7 +155,7 @@ function requireInjectiveStrip(strip: Strip): void {
 }
 
 function orientedTriangle(a: Vertex, b: Vertex, c: Vertex, sign: number, strip: Strip): Triangle {
-  const area = cross(a, b, c);
+  const area = crossAbout(a, b, c);
   if (!Number.isFinite(area) || Math.abs(area) <= 1e-10 || (sign !== 0 && Math.sign(area) !== sign))
     throw new Error(
       'Rail sweep folds or collapses; a single XY height cannot represent this surface.',
@@ -200,17 +201,14 @@ export function railProfileSampler(
   };
 }
 
-function cross(a: Vec2, b: Vec2, c: Vec2): number {
-  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-}
 function triangleLocation(
   triangle: Triangle,
   p: Vec2,
   legacy: boolean,
 ): { u: number; t: number } | null {
   const { a, b, c, area } = triangle;
-  const wa = cross(p, b, c) / area,
-    wb = cross(a, p, c) / area,
+  const wa = crossAbout(p, b, c) / area,
+    wb = crossAbout(a, p, c) / area,
     wc = 1 - wa - wb;
   if (Math.min(wa, wb, wc) < -1e-9) return null;
   // v1 interpolated the two triangles, including non-bilinear strips.

@@ -1,6 +1,7 @@
 import type { CncPass } from '../job';
 import type { Heightmap } from './heightmap';
 import type { FinishingPoint } from './relief-finishing-path';
+import { lerp3 } from '../geometry/vec3';
 
 const MAX_FILTER_POINTS = 1_000_000;
 /** Retain pieces of contact-checked moves whose footprint can meet remaining stock.
@@ -41,8 +42,8 @@ export function reliefRestPasses(
       if (a === undefined || b === undefined) continue;
       const count = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / (map.mmPerCell / 2)));
       for (let k = 1; k <= count; k += 1) {
-        const from = pointAt(a, b, (k - 1) / count),
-          to = pointAt(a, b, k / count);
+        const from = lerp3(a, b, (k - 1) / count),
+          to = lerp3(a, b, k / count);
         if (selectedAt(map, footprint, from) || selectedAt(map, footprint, to)) {
           if (run.length === 0) run.push(from);
           if (lastInsideMove) run[run.length - 1] = to;
@@ -73,9 +74,6 @@ function selectedAt(map: Heightmap, mask: Uint8Array, p: FinishingPoint): boolea
   const col = Math.max(0, Math.min(map.widthCells - 1, Math.floor(p.x / map.mmPerCell)));
   const row = Math.max(0, Math.min(map.heightCells - 1, Math.floor(p.y / map.mmPerCell)));
   return mask[row * map.widthCells + col] === 1;
-}
-function pointAt(a: FinishingPoint, b: FinishingPoint, t: number): FinishingPoint {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t };
 }
 function rectangularDilation(
   mask: Uint8Array,

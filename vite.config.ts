@@ -7,6 +7,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { pdfResources } from './scripts/pdf-resources';
 import { browserFreeBuild } from './scripts/browser-free-build';
 import { startupArtwork } from './scripts/startup-artwork';
+import { bundleChunkReport } from './scripts/bundle-chunk-report';
 
 import {
   appVersion,
@@ -16,6 +17,15 @@ import {
 } from './src/platform/web/build-info';
 
 const PROJECT_ROOT = dirname(fileURLToPath(import.meta.url));
+// I/O modules that only workers or a rare in-window fallback load (see
+// manualChunks below and scripts/check-boot-bundle.mjs).
+// Also the PostScript reader (ADR-700): it loads on the first EPS/AI import.
+const WORKER_SIDE_IO =
+  /\/src\/io\/(?:tiff\/|raster-decode\/|postscript\/|svg\/parse-svg-worker\.ts$|xml\/read-xml-document-from-blob\.ts$)/;
+// USB controller links that load only when their panel opens (ADR-705: the
+// Moshiboard encoder, run loop and output). Only the driver's capability data
+// is boot code, because selectControllerDriver is.
+const LAZY_CONTROLLER_LINKS = /\/src\/(?:core\/controllers\/moshi\/(?!driver\.ts$)|io\/moshi\/)/;
 const DESKTOP_RELEASE_VERSION_ENV = 'KERFDESK_DESKTOP_VERSION';
 const BUILD_APP_VERSION = resolveBuildAppVersion(
   appVersion(),
@@ -64,6 +74,7 @@ export default defineConfig({
   plugins: [
     browserFreeBuild(),
     startupArtwork(),
+    bundleChunkReport(),
     react(),
     pdfResources(),
     // Offline PWA (ADR-060). registerType 'prompt' (never auto-reload — see
@@ -247,7 +258,13 @@ export default defineConfig({
           if (normalized.endsWith('/src/core/text/cnc-stroke-font-data.ts')) {
             return 'cnc-stroke-fonts';
           }
+          if (LAZY_CONTROLLER_LINKS.test(normalized)) return undefined;
           if (normalized.includes('/src/core/')) return 'core';
+          // Worker-side parsers and decoders stay out of the boot `io` chunk:
+          // a module forced into a manual chunk takes its dependencies with
+          // it, which put linkedom, saxes, tiff and fflate in every first
+          // download (S9-P3-2). Left to Rollup, they load with what needs them.
+          if (WORKER_SIDE_IO.test(normalized)) return undefined;
           if (normalized.includes('/src/io/')) return 'io';
           if (normalized.includes('/src/ui/laser/') || normalized.includes('/src/ui/workspace/')) {
             return 'ui-workbench';

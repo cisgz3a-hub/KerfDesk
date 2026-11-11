@@ -9,6 +9,8 @@ import {
 import { reliefHeightfieldDigest } from '../../core/relief/heightfield-digest';
 import type { ReliefHeightfield } from '../../core/scene/relief';
 import { isMigrationFailure, migrationFailure, type MigrationFailure } from './migration-failure';
+import { asRecord } from '../../core/util/is-record';
+import { isPositiveFiniteNumber } from '../../core/util/finite';
 
 type RawProject = Record<string, unknown>;
 
@@ -31,7 +33,7 @@ export function migrateV3ReliefSources(
   raw: RawProject,
   runtime: ReliefMigrationRuntime = DEFAULT_RUNTIME,
 ): RawProject | MigrationFailure {
-  const scene = record(raw['scene']);
+  const scene = asRecord(raw['scene']);
   if (scene === null || !Array.isArray(scene['objects'])) return { ...raw, schemaVersion: 4 };
   const objects: unknown[] = [];
   for (let index = 0; index < scene['objects'].length; index += 1) {
@@ -55,7 +57,7 @@ function migrateReliefObject(
   path: string,
   runtime: ReliefMigrationRuntime,
 ): unknown | MigrationFailure {
-  const object = record(value);
+  const object = asRecord(value);
   if (object === null || object['kind'] !== 'relief') return value;
   const hasCurrentSource = object['reliefSource'] !== undefined;
   const hasDepthMap = object['depthMap'] !== undefined;
@@ -80,7 +82,7 @@ function migrateDepthMapRelief(
   path: string,
   runtime: ReliefMigrationRuntime,
 ): unknown | MigrationFailure {
-  const depthMap = record(object['depthMap']);
+  const depthMap = asRecord(object['depthMap']);
   const converted =
     depthMap === null ? null : convertDepthMap(object, depthMap, `${path}.depthMap`, runtime);
   if (isMigrationFailure(converted)) return converted;
@@ -151,7 +153,7 @@ function legacyDepthMapMetadata(
     (polarity !== 'light-is-high' && polarity !== 'light-is-deep') ||
     typeof samplesBase64 !== 'string' ||
     typeof sourceName !== 'string' ||
-    !positiveFinite(maxDepthMm)
+    !isPositiveFiniteNumber(maxDepthMm)
   ) {
     return null;
   }
@@ -230,13 +232,13 @@ function legacyDimensions(
   if (
     !positiveSafeInteger(width) ||
     !positiveSafeInteger(height) ||
-    !positiveFinite(physicalWidthMm)
+    !isPositiveFiniteNumber(physicalWidthMm)
   ) {
     return null;
   }
   const sampleCount = width * height;
   const physicalHeightMm = physicalWidthMm * (height / width);
-  if (!Number.isSafeInteger(sampleCount) || !positiveFinite(physicalHeightMm)) return null;
+  if (!Number.isSafeInteger(sampleCount) || !isPositiveFiniteNumber(physicalHeightMm)) return null;
   return { width, height, sampleCount, physicalWidthMm, physicalHeightMm };
 }
 
@@ -283,16 +285,6 @@ function allocationFailure(path: string): MigrationFailure {
   return migrationFailure(`allocation failed for \`${path}\` during schema-v4 migration`);
 }
 
-function record(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
 function positiveSafeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
-}
-
-function positiveFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }

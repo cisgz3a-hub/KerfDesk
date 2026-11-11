@@ -4,6 +4,7 @@ import {
   isGrblhalPasswordSetting,
 } from '../core/controllers/controller-password-settings';
 import { settingsMapToRows, type GrblSettingRow } from '../core/controllers/grbl/grbl-settings';
+import { isRecord } from '../core/util/is-record';
 
 export const CONTROLLER_SETTINGS_SNAPSHOT_FORMAT = 'laserforge.controller-settings.snapshot';
 export const CONTROLLER_SETTINGS_SNAPSHOT_SCHEMA_VERSION = 1;
@@ -296,8 +297,4 @@ function isIsoTimestamp(value: unknown): value is string {
 
 function isTrimmedNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.trim() === value;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

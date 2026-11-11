@@ -75,10 +75,12 @@ import { installWindowReadinessPolicy } from './window-readiness-policy.js';
 import { sessionPermissionsOnce } from './session-permissions-once.js';
 import { installDesktopProjectOpens } from './desktop-project-open.js';
 import { installDesktopSerialPorts } from './desktop-serial-ports.js';
+import { installDesktopUsbDevices } from './desktop-usb-devices.js';
+import { createDevicePermissionRouter } from './device-permission-router.js';
 import { externalBrowserUrl } from './external-links.js';
 import { installDesktopContextMenu } from './desktop-context-menu.js';
 import { loadWindowPlacement, rememberWindowPlacement } from './desktop-window-placement.js';
-import { installRendererCrashRecovery } from './renderer-crash-recovery.js';
+import { installDesktopRendererCrashRecovery } from './desktop-renderer-crash.js';
 import { rendererContentSecurityPolicy } from './renderer-content-security-policy.js';
 import { withRendererIsolation, rendererResponsePolicyHeaders } from './renderer-isolation.js';
 import { createDesktopWindowReopener } from './desktop-window-reopen.js';
@@ -87,6 +89,7 @@ import { readLicensingConfig } from './licensing-config.js';
 import { refusedDebugSwitch } from './debug-switch-policy.js';
 import { startDesktopSupportLog } from './support-log.js';
 import { installSessionEndGuard } from './session-end-guard.js';
+import { stopDesktopMachines } from './desktop-machine-stop.js';
 import { installTaskbarJobProgress } from './taskbar-job-progress.js';
 import { withDesktopWorkspaceRoutes } from './desktop-routes.js';
 import { createDesktopBackgroundStartup } from './desktop-startup.js';
@@ -325,10 +328,14 @@ function installPermissionHandlers(ses: Session): void {
   // Only the picked port is granted, never every attached adapter (ADR-366);
   // Windows remembers the picks across restarts (ADR-552). Only the trusted
   // origin reaches the picker: requestPort is gated by the check handler above.
+  // Serial and the USB lasers share the session's one device handler (ADR-702).
+  const devicePermissions = createDevicePermissionRouter(ses);
   installDesktopSerialPorts(ses, {
     trustedOrigins: TRUSTED_RENDERER_ORIGINS,
     userDataPath: DESKTOP_DATA_PATH,
+    devicePermissions,
   });
+  installDesktopUsbDevices(ses, devicePermissions, { trustedOrigins: TRUSTED_RENDERER_ORIGINS });
 }
 
 function installNavigationPolicy(window: BrowserWindow): void {
@@ -405,31 +412,18 @@ async function createWindow(): Promise<void> {
     },
     quit: () => app.quit(),
   });
-  // Windows restarting or shutting down mid-job waits, or gets Abort (ADR-548),
-  // and the taskbar button shows the job's progress (ADR-553).
-  installSessionEndGuard(window);
+  // Windows restarting or shutting down mid-job waits, or gets Abort and a
+  // network machine its stop, written at once because Electron ends the process
+  // when `session-end` returns (ADR-548 Amendment 2); the taskbar button shows
+  // the job's progress (ADR-553).
+  installSessionEndGuard(window, undefined, undefined, () => stopDesktopMachines(true));
   installTaskbarJobProgress(window);
   // A crashed renderer, or a window closed on macOS where the app keeps running,
   // leaves no workspace behind it.
   window.webContents.on('render-process-gone', () => rendererGone?.());
   window.on('closed', () => rendererGone?.());
-  installRendererCrashRecovery(window, {
-    isClosing: () => closeGuard.isClosing(),
-    askToReload: async (prompt) => {
-      const result = await dialog.showMessageBox(window, {
-        type: 'warning',
-        buttons: [...prompt.buttons],
-        defaultId: 0,
-        cancelId: 1,
-        noLink: true,
-        title: 'KerfDesk',
-        message: prompt.message,
-        detail: prompt.detail,
-      });
-      return result.response === 0;
-    },
-    reportFailure: (error: unknown) => console.warn('Renderer reload offer failed:', error),
-  });
+  // A crash offers a reload, after a network machine gets its stop (W3-P1-1).
+  installDesktopRendererCrashRecovery(window, () => closeGuard.isClosing());
 
   // F-9 audit fix: set Content-Security-Policy via webRequest headers
   // rather than a <meta> tag. Per Electron docs, meta CSP is unreliable

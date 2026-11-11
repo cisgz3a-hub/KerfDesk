@@ -8,6 +8,7 @@
 
 import type { PathsD } from 'clipper2-ts';
 import type { Polyline, Vec2 } from '../../core/scene';
+import { lerpPoint, samePoint } from '../../core/geometry/point-math';
 
 // The region's vertices sit on a 1 µm grid (SVG_CLIP_PRECISION_DECIMALS).
 const ON_OUTLINE_MM = 1e-3;
@@ -67,7 +68,7 @@ function tracePieces(
     for (let k = 0; k + 1 < cuts.length; k += 1) {
       const t0 = cuts[k] as number;
       const t1 = cuts[k + 1] as number;
-      if (inside(index, lerp(a, b, (t0 + t1) / 2))) {
+      if (inside(index, lerpPoint(a, b, (t0 + t1) / 2))) {
         current ??= [pointAt(a, b, t0)];
         current.push(pointAt(a, b, t1));
         continue;
@@ -294,14 +295,10 @@ function overlapsRegion(index: RegionIndex, path: ReadonlyArray<Vec2>): boolean 
   );
 }
 
-function lerp(a: Vec2, b: Vec2, t: number): Vec2 {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-}
-
 // Segment ends stay the path's own points, so a ring's start is recognisable.
 function pointAt(a: Vec2, b: Vec2, t: number): Vec2 {
   if (t === 0) return a;
-  return t === 1 ? b : lerp(a, b, t);
+  return t === 1 ? b : lerpPoint(a, b, t);
 }
 
 function pieceLength(points: ReadonlyArray<Vec2>): number {
@@ -312,8 +309,4 @@ function pieceLength(points: ReadonlyArray<Vec2>): number {
     length += Math.hypot(b.x - a.x, b.y - a.y);
   }
   return length;
-}
-
-function samePoint(a: Vec2, b: Vec2): boolean {
-  return a.x === b.x && a.y === b.y;
 }

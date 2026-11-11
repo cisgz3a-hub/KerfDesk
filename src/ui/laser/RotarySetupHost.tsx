@@ -1,17 +1,20 @@
 import type { RotarySetup } from '../../core/devices';
 import { rotaryPresetsFor } from '../../core/devices/rotary-presets';
+import { rotaryAxesForController } from '../../core/devices/rotary-axis';
 import { generateRotaryCalibrationPattern } from '../../core/job';
 import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useToastStore } from '../state/toast-store';
 import { RotarySetupDialog } from './RotarySetupDialog';
 import { rotaryArtworkExtent } from './rotary-wrap-preview';
+import { newRotarySetupFor } from './rotary-setup-edit';
 
 export function RotarySetupHost(props: { readonly onClose: () => void }): JSX.Element {
   const setup = useStore((s) => s.project.device.rotary);
   const machineFamily = useStore((s) => s.project.device.machineFamily);
   const scene = useStore((s) => s.project.scene);
   const controller = useStore((s) => s.project.device.controllerKind ?? 'grbl-v1.1');
+  const commandSet = useStore((s) => s.project.device.controllerCommandSet);
   const dialect = useStore((s) => s.project.device.gcodeDialect?.dialectId);
   const dirty = useStore((s) => s.dirty);
   const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
@@ -42,11 +45,21 @@ export function RotarySetupHost(props: { readonly onClose: () => void }): JSX.El
   };
   return (
     <RotarySetupDialog
-      setup={setup}
+      setup={
+        setup ??
+        newRotarySetupFor({
+          ...(machineFamily === undefined ? {} : { machineFamily }),
+          ...(commandSet === undefined ? {} : { controllerCommandSet: commandSet }),
+        })
+      }
       onCancel={props.onClose}
       onApply={apply}
       onGenerateCalibration={generate}
-      presets={rotaryPresetsFor(machineFamily === undefined ? {} : { machineFamily })}
+      presets={rotaryPresetsFor({
+        ...(machineFamily === undefined ? {} : { machineFamily }),
+        ...(commandSet === undefined ? {} : { controllerCommandSet: commandSet }),
+      })}
+      axes={rotaryAxesForController({ controllerKind: controller })}
       artwork={rotaryArtworkExtent(scene)}
       outputDescription={`${controller}${dialect === undefined ? '' : ` / ${dialect}`}`}
     />

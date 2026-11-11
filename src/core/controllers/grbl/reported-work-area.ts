@@ -14,6 +14,7 @@
 import type { ControllerKind } from '../../devices/device-profile';
 import { jogTravelLimits, type JogTravelFirmware } from './jog-travel-limits';
 import type { ControllerSettingsSnapshot } from './parse-settings';
+import { roundToThousandth } from '../../util/rounding';
 
 export type ReportedWorkArea = { readonly widthMm: number; readonly heightMm: number };
 
@@ -71,12 +72,7 @@ function grblHalHomedArea(
   });
   if (limits === null) return null;
   return {
-    widthMm: roundMicron(limits.x.maxMm - limits.x.minMm),
-    heightMm: roundMicron(limits.y.maxMm - limits.y.minMm),
+    widthMm: roundToThousandth(limits.x.maxMm - limits.x.minMm),
+    heightMm: roundToThousandth(limits.y.maxMm - limits.y.minMm),
   };
-}
-
-// `$$` prints travel and pull-off to 0.001 mm.
-function roundMicron(mm: number): number {
-  return Math.round(mm * 1000) / 1000;
 }

@@ -1,6 +1,7 @@
 import type { DeviceProfile } from './device-profile';
 import { positioningLightSupported } from './positioning-light';
 import { isScanOffsetTableForProfile } from './scan-offset-profile';
+import { isFinitePositive } from '../util/finite';
 
 // Interactive profile edits must never leave the optional controlled seek
 // feed above the machine feed ceiling. Import and preflight paths deliberately
@@ -31,7 +32,7 @@ export function deviceProfileWithInteractivePatch(
       : { ...next, scanningOffsets: [], scanOffsetCalibrationStatus: undefined };
   const controlledFeed = scanSafe.controlledLaserOffTravelFeedMmPerMin;
   if (controlledFeed === undefined) return scanSafe;
-  if (!positiveFinite(scanSafe.maxFeed) || !positiveFinite(controlledFeed)) {
+  if (!isFinitePositive(scanSafe.maxFeed) || !isFinitePositive(controlledFeed)) {
     return { ...scanSafe, controlledLaserOffTravelFeedMmPerMin: undefined };
   }
   if (controlledFeed <= scanSafe.maxFeed) return scanSafe;
@@ -58,8 +59,4 @@ function scanCalibrationIdentity(profile: DeviceProfile): string {
     head?.wavelengthNm,
     head?.spotSizeMm,
   ]);
-}
-
-function positiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }

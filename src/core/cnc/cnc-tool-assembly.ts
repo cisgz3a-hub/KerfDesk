@@ -1,4 +1,5 @@
 import type { CncTool, CncToolHolderSegment } from '../scene/cnc-tool';
+import { isFiniteNumber } from '../util/finite';
 
 export type CncToolAssemblyMetadata = Pick<
   CncTool,
@@ -40,7 +41,8 @@ function normalizeSegment(raw: unknown): CncToolHolderSegment | null {
   const lengthMm = item['lengthMm'];
   const diameterMm = item['diameterMm'];
   if (typeof name !== 'string' || name.trim() === '' || name.length > 120) return null;
-  if (!finite(startMm) || startMm < 0 || !positive(lengthMm) || !positive(diameterMm)) return null;
+  if (!isFiniteNumber(startMm) || startMm < 0 || !positive(lengthMm) || !positive(diameterMm))
+    return null;
   if (!Number.isFinite(startMm + lengthMm)) return null;
   return { name, startMm, lengthMm, diameterMm };
 }
@@ -58,9 +60,6 @@ export function cncToolAssemblySignature(tool: CncTool): string {
   ]);
 }
 
-function finite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
 function positive(value: unknown): value is number {
-  return finite(value) && value > 0;
+  return isFiniteNumber(value) && value > 0;
 }

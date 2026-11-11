@@ -26,6 +26,9 @@ import {
   missingPositionMessage,
   type StatusReportFieldsOff,
 } from '../state/status-report-fields';
+import { useStore } from '../state/store';
+import { controllerStateGloss } from './controller-state-gloss';
+import { positionWithheldMessage, positionWithheldOriginLabel } from './frame-position-withheld';
 import { controllerReportsWorkOffset } from './work-offset-assumption';
 import { useLengthUnit } from '../state/display-units';
 import { feedUnitLabel, MM_PER_INCH, type DisplayLengthUnit } from '../display-length';
@@ -64,13 +67,13 @@ export function StatusDisplay({
       ) : (
         <UnknownMachinePositionRow fieldsOff={fieldsOff} />
       )}
-      <div
-        style={customOrigin ? originCustomStyle : originDefaultStyle}
+      <StatusOriginRow
+        customOrigin={customOrigin}
+        label={originLabel(customOrigin, wcoMm, reportsOffset, originName, unit, fieldsOff)}
         title={originTitle(wcoMm, fieldsOff)}
-      >
-        <strong>Origin:</strong>{' '}
-        {originLabel(customOrigin, wcoMm, reportsOffset, originName, unit, fieldsOff)}
-      </div>
+        offsetKnown={wcoMm !== null}
+      />
+
       {feedMmPerMin !== null && (
         <div style={feedRowStyle}>
           <strong>F:</strong> {feedText(feedMmPerMin, unit)} <strong>S:</strong>{' '}
@@ -83,6 +86,28 @@ export function StatusDisplay({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// After Unlock or Release motors KerfDesk withholds the position, and no report
+// brings the origin back: the row names what does, where it read "not reported
+// yet" (user annoyance audit A1, A3-P2-1; ADR-367 Amendment 3).
+function StatusOriginRow(props: {
+  readonly customOrigin: boolean;
+  readonly label: string;
+  readonly title: string | undefined;
+  readonly offsetKnown: boolean;
+}): JSX.Element {
+  const homingEnabled = useStore((s) => s.project.device.homing.enabled);
+  const withheld = useLaserStore((s) => positionWithheldMessage(s, homingEnabled));
+  const hidden = !props.offsetKnown && withheld !== null;
+  return (
+    <div
+      style={props.customOrigin ? originCustomStyle : originDefaultStyle}
+      title={hidden ? withheld : props.title}
+    >
+      <strong>Origin:</strong> {hidden ? positionWithheldOriginLabel(homingEnabled) : props.label}
     </div>
   );
 }
@@ -101,11 +126,15 @@ function StatusState({
   readonly report: NonNullable<LaserState['statusReport']>;
   readonly halted: boolean;
 }): JSX.Element {
+  const machineKind = useStore((s) => (s.project.machine?.kind === 'cnc' ? 'cnc' : 'laser'));
   const reported = report.subState === null ? report.state : `${report.state}:${report.subState}`;
   const label = halted ? "Halted (press the controller's reset button)" : reported;
+  // A halted controller's last report is stale, so it gets no plain-words gloss.
+  const gloss = halted ? null : controllerStateGloss(report.state, report.subState, machineKind);
   return (
     <div style={stateRowStyle}>
       <strong>State:</strong> {label}
+      {gloss !== null ? <span style={glossStyle}> · {gloss}</span> : null}
     </div>
   );
 }
@@ -217,3 +246,5 @@ const dimStyle: React.CSSProperties = {
   paddingBottom: 10,
   borderBottom: '1px solid var(--lf-border)',
 };
+
+const glossStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontWeight: 400 };

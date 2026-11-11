@@ -25,6 +25,7 @@ import type {
   BoxGenerationWorkerRequest,
   BoxGenerationWorkerResponse,
 } from './box-generation-worker-protocol';
+import { stopWorker } from '../common/stop-worker';
 
 export class BoxGenerationCancelledError extends Error {
   override readonly name = 'BoxGenerationCancelledError';
@@ -131,10 +132,6 @@ function failAllAndRetire(message: string): void {
 }
 
 function retireWorker(): void {
-  if (workerInstance === null) return;
-  workerInstance.onmessage = null;
-  workerInstance.onerror = null;
-  workerInstance.onmessageerror = null;
-  workerInstance.terminate();
+  if (workerInstance !== null) stopWorker(workerInstance);
   workerInstance = null;
 }

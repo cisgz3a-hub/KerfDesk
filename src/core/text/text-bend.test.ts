@@ -97,4 +97,23 @@ describe('bendTextRender', () => {
       expect(bent.anchor?.y).toBeCloseTo(landed?.y ?? NaN, 12);
     }
   });
+
+  // Audit S7-P2-3: any non-zero Bend threw "Maximum call stack size exceeded"
+  // once the text passed about 120,000 points.
+  it('bends text with more points than a call can take as arguments', () => {
+    const pointCount = 300_000;
+    const points = Array.from({ length: pointCount }, (_, index) => ({
+      x: (index / (pointCount - 1)) * 200,
+      y: index % 2,
+    }));
+    const long: TextRenderResult = {
+      bounds: { minX: 0, minY: 0, maxX: 200, maxY: 1 },
+      paths: [{ color: '#000000', polylines: [{ closed: false, points }] }],
+    };
+    const bent = bendTextRender(long, 45);
+    expect(bent.paths[0]?.polylines[0]?.points).toHaveLength(pointCount);
+    expect(bent.bounds.minX).toBe(0);
+    expect(bent.bounds.minY).toBe(0);
+    expect(bent.bounds.maxX).toBeGreaterThan(100);
+  });
 });

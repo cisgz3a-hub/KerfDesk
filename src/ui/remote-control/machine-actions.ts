@@ -6,7 +6,6 @@ import { isActiveJob, setupCommandBlockMessage } from '../state/laser-store-help
 import { hasPendingControllerWrite } from '../state/laser-start-queue-fence';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
-import type { MachineExecutionOwner } from '../state/machine-execution-owner';
 import type { MachineExecutionContext } from './machine-execution';
 import type { OwnedMachineOperation } from './machine-operation-state';
 import type { MachineCommand } from './machine-types';
@@ -18,6 +17,7 @@ import {
 } from '../laser/board-capture/board-capture-remote';
 import { proFeaturesUnlocked } from '../licensing/edition';
 import { freshBoardReportRefusal } from './machine-board-fresh-report';
+import { assertResumeAdvisoryConfirmed, remotePauseReceipt } from './machine-resume-advisory';
 
 /** A refusal whose fixed, controller-state message is safe to show remotely. */
 export class MachineRefusal extends RemoteFault {
@@ -230,18 +230,18 @@ async function awaitFreshBoardReport(
 export async function executePauseResume(
   pause: boolean,
   operation: OwnedMachineOperation,
+  confirmAdvisory?: string,
 ): Promise<void> {
   const laser = useLaserStore.getState();
   if (!isActiveJob(laser.streamer)) throw new MachineRefusal('No job is running.');
+  // The PC's paused-CNC Resume advisory is confirmed before anything is sent (W2-P2-1).
+  if (!pause) assertResumeAdvisoryConfirmed(laser, confirmAdvisory);
   await settle(
     operation,
     () => (pause ? useLaserStore.getState().pauseJob() : useLaserStore.getState().resumeJob()),
     pause ? 'Pause was not confirmed. Check the machine.' : 'Resume was not confirmed.',
-    pause ? 'Paused.' : 'Resumed.',
+    pause ? () => remotePauseReceipt(useLaserStore.getState()) : 'Resumed.',
   );
+  // A fixed policy text, not artwork: the receipt keeps it whole (ADR-585 Amendment 2).
+  if (pause) operation.policyMessage = true;
 }
-
-export type HoldExecution = (
-  operation: OwnedMachineOperation,
-  owner: MachineExecutionOwner,
-) => Promise<void>;

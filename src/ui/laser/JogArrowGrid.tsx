@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { JogAxisSigns, MachineBounds } from '../../core/devices';
 import type { Vec2 } from '../../core/scene';
 import { Icon, type IconName } from '../kit/icons';
+import { titleWhenDisabled } from './control-block-reason';
 import {
   continuousJogVector,
   jogVectorLabel,
@@ -31,6 +32,8 @@ const DIRECTIONS: ReadonlyArray<{
 export function JogArrowGrid(props: {
   readonly centerAction?: ReactNode;
   readonly disabled: boolean;
+  /** Why the arrows are off; replaces their tooltip while they are (A3-P3-4). */
+  readonly disabledReason?: string | null;
   readonly stepMm: number;
   readonly feed: number;
   readonly signs: JogAxisSigns;
@@ -97,7 +100,11 @@ function JogArrowButton(
       disabled={props.disabled}
       style={btnStyle}
       aria-label={label}
-      title={props.continuousJogSupported ? `${hinted}. Hold for continuous jog.` : hinted}
+      title={titleWhenDisabled(
+        props.disabled,
+        props.disabledReason ?? null,
+        props.continuousJogSupported ? `${hinted}. Hold for continuous jog.` : hinted,
+      )}
       {...handlers}
     >
       <Icon name={props.icon} size={18} />

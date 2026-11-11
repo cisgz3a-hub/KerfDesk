@@ -184,10 +184,15 @@ export type GcodeMetadata = {
 // centres, so its roughing and finishing Z change; 3D rest finishing keeps one
 // G1 per kept stretch of a move instead of one per half cell (CNC audit v1
 // F6-P3-2, same path); carries forward v41 above.
+// ADR-159 Amd 3 imports a DXF bulge or SVG arc whose sagitta is below 1e-9 of
+// its chord as a straight line, so a file with noise bulges (1e-17) or radii
+// ~1e16 times the chord now burns its edge straight instead of a loop; other
+// output is unchanged. v43 was held for PR #1623, which landed as v45 below;
+// carries forward v42 above.
 // ADR-052 Amd 2 moves every row of a calibrated two-way fill or image half the
 // scan offset along its own travel, as LightBurn does, instead of moving reverse
-// rows the whole offset; carries forward v42 above.
-export const EMITTER_REVISION = 'scan-offset-half-each-row-20261108-v43';
+// rows the whole offset; carries forward v44 above.
+export const EMITTER_REVISION = 'scan-offset-half-each-row-20261111-v45';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

@@ -19,6 +19,7 @@ import {
   type BitPreviewSceneFactory,
   type BitPreviewSceneHandle,
 } from './bit-preview-three-scene';
+import { formatUpTo3Decimals } from '../../core/util/number-format';
 
 export const BIT_PREVIEW_DURATION_MS = 5_000;
 export const BIT_PREVIEW_LOAD_TIMEOUT_MS = 8_000;
@@ -222,19 +223,19 @@ function geometryNote(tool: CncTool): string {
     const shankMetadata =
       shankDiameterMm === null
         ? 'Shank diameter is unknown.'
-        : `Catalog shank: ${formatMillimeters(shankDiameterMm)} mm (metadata only).`;
+        : `Catalog shank: ${formatUpTo3Decimals(shankDiameterMm)} mm (metadata only).`;
     return `${geometryIssue} ${action} ${shankMetadata} No cutting envelope or display stub was rendered. Flutes, coating, and cutting length are not modeled.`;
   }
   const shankNote =
     shankDiameterMm === null
       ? 'Shank diameter is unknown; the vertical stub is a display aid at cutter diameter.'
-      : `Catalog shank: ${formatMillimeters(shankDiameterMm)} mm (metadata only; its transition is not modeled).`;
+      : `Catalog shank: ${formatUpTo3Decimals(shankDiameterMm)} mm (metadata only; its transition is not modeled).`;
   const envelope = taperedBallEnvelope(tool);
   if (envelope !== null) {
     // The taper's own geometry fixes where it reaches the stored diameter, so
     // this cutter's cutting length is modeled rather than disclaimed (ADR-368).
     const lengthMm = Number(taperedBallCuttingLengthMm(envelope).toFixed(1));
-    return `Cutting shape and diameter follow the CAM model; the taper reaches ${formatMillimeters(tool.diameterMm)} mm about ${lengthMm} mm above the tip. ${shankNote} Flutes and coating are not modeled.`;
+    return `Cutting shape and diameter follow the CAM model; the taper reaches ${formatUpTo3Decimals(tool.diameterMm)} mm about ${lengthMm} mm above the tip. ${shankNote} Flutes and coating are not modeled.`;
   }
   return `Cutting shape and diameter follow the CAM model. ${shankNote} Flutes, coating, and cutting length are not modeled.`;
 }
@@ -242,10 +243,6 @@ function geometryNote(tool: CncTool): string {
 function operationalFallbackDetail(tool: CncTool, fallbackReason: string | null): string | null {
   if (fallbackReason === null || fallbackReason === bitPreviewGeometryIssue(tool)) return null;
   return fallbackReason;
-}
-
-function formatMillimeters(value: number): string {
-  return Number(value.toFixed(3)).toString();
 }
 
 function previewErrorMessage(error: unknown): string {

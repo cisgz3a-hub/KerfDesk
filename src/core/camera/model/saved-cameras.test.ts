@@ -116,7 +116,10 @@ describe('saved cameras', () => {
       { version: 2 },
       JSON.parse(JSON.stringify(savedCameraModel())),
     ]);
-    expect(read).toEqual([builtIn]);
+    // Read from a file, a camera is named by its public address (ADR-692 Amendment 1).
+    expect(read).toEqual([
+      { ...builtIn, capture: { ...builtIn.capture, sourceId: 'http://192.168.10.1:8080/' } },
+    ]);
     expect(normalizeOtherCameraModels([])).toBeUndefined();
     expect(normalizeOtherCameraModels('x')).toBeUndefined();
   });

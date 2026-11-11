@@ -316,7 +316,10 @@ describe('tab thickness in the spoilboard overcut warning (ADR-258 amendment 3)'
     const warnings = detectCncThroughCutTabWarnings(projectWith(6, { ...tabs, depthMm: 6.5 }));
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('into the spoilboard');
-    expect(warnings[0]).toContain('Its holding tabs stay 2 mm thick above the stock bottom');
+    expect(warnings[0]).toContain('Its holding tabs reach 2 mm above the stock bottom');
+    expect(warnings[0]).toContain(
+      'a relief or pocket cut deeper under them first leaves them thinner',
+    );
   });
 
   it('says how much of each tab the shipped default stock leaves after the overcut', () => {
@@ -336,7 +339,7 @@ describe('tab thickness in the spoilboard overcut warning (ADR-258 amendment 3)'
     const tabless = { ...tabs, tabsEnabled: false, depthMm: 6.5 };
     for (const cnc of [pocket, tabless]) {
       const [warning] = detectCncThroughCutTabWarnings(projectWith(6, cnc));
-      expect(warning).not.toContain('holding tabs stay');
+      expect(warning).not.toContain('holding tabs reach');
       expect(warning).not.toContain('measured from the cut floor');
     }
   });
@@ -386,7 +389,7 @@ describe('tab statements built from the compiled passes (ADR-258 amendment 4)', 
 
   it('reads the tabs from the compiled job it is given', () => {
     const project = projectWithStock(6, { ...outside, depthMm: 6.5 }, [artwork(SQUARE)]);
-    expect(detectCncThroughCutTabWarnings(project)[0]).toContain('Its holding tabs stay 2 mm');
+    expect(detectCncThroughCutTabWarnings(project)[0]).toContain('Its holding tabs reach 2 mm');
     // A job whose passes rise into no tab: the settings alone promise nothing.
     const [warning] = detectCncThroughCutTabWarnings(project, { groups: [] });
     expect(warning).toContain('into the spoilboard');

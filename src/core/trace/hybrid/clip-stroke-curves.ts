@@ -6,6 +6,7 @@
 // lies on the fill boundary, which is the Line + fill junction rule.
 
 import type { CurveSubpath, PathSegment, Vec2 } from '../../scene';
+import { lerpPoint } from '../../geometry/point-math';
 
 export type ClippedPiece = {
   readonly curve: CurveSubpath;
@@ -161,7 +162,7 @@ function approximateLength(from: Vec2, segment: PathSegment): number {
 
 function pointAt(from: Vec2, segment: PathSegment, t: number): Vec2 {
   if (segment.kind === 'elliptical-arc') return t < 1 ? from : segment.to;
-  if (segment.kind === 'line') return lerp(from, segment.to, t);
+  if (segment.kind === 'line') return lerpPoint(from, segment.to, t);
   const u = 1 - t;
   const a = u * u * u;
   const b = 3 * u * u * t;
@@ -189,18 +190,14 @@ function subSegment(span: Span): PathSegment {
 type Cubic = readonly [Vec2, Vec2, Vec2, Vec2];
 
 function splitCubic(c: Cubic, t: number): [Cubic, Cubic] {
-  const p01 = lerp(c[0], c[1], t);
-  const p12 = lerp(c[1], c[2], t);
-  const p23 = lerp(c[2], c[3], t);
-  const p012 = lerp(p01, p12, t);
-  const p123 = lerp(p12, p23, t);
-  const p = lerp(p012, p123, t);
+  const p01 = lerpPoint(c[0], c[1], t);
+  const p12 = lerpPoint(c[1], c[2], t);
+  const p23 = lerpPoint(c[2], c[3], t);
+  const p012 = lerpPoint(p01, p12, t);
+  const p123 = lerpPoint(p12, p23, t);
+  const p = lerpPoint(p012, p123, t);
   return [
     [c[0], p01, p012, p],
     [p, p123, p23, c[3]],
   ];
-}
-
-function lerp(a: Vec2, b: Vec2, t: number): Vec2 {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }

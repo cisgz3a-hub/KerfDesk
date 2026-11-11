@@ -20,7 +20,8 @@ describe('GRBL status reports with additional axes', () => {
     (field) => {
       const key = ({ MPos: 'mPos', WPos: 'wPos', WCO: 'wco' } as const)[field];
       const report = parseStatusReport(`<Idle|${field}:12.500,-4.250,3.000,90.000,0.000,1.000>`);
-      expect(report?.[key]).toEqual({ x: 12.5, y: -4.25, z: 3 });
+      // The fourth value is A, kept for a rotary on A (ADR-695 Amendment 1).
+      expect(report?.[key]).toEqual({ x: 12.5, y: -4.25, z: 3, a: 90 });
     },
   );
 

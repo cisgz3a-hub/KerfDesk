@@ -19,6 +19,7 @@ import {
   type LaserSafetyNotice,
 } from './laser-safety-notice';
 import { airOffLines, noResetStopLines } from './laser-quick-stop';
+import { NO_JOB_STREAM_HOST } from './laser-connect-attempt';
 import { sessionScopedJobStateReset } from './laser-session-reset';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import type { LaserState } from './laser-store';
@@ -31,13 +32,14 @@ import {
 } from './work-z-zero-evidence';
 
 export const LOG_MAX = 200;
-const AUTOFOCUS_BUSY_MESSAGE =
+export const AUTOFOCUS_BUSY_MESSAGE =
   'Auto-focus is running. Wait for it to finish before sending other motion commands.';
 export const ACTIVE_JOB_COMMAND_MESSAGE =
   'A job is active. Request ABORT before sending setup, jog, home, unlock, origin, settings, or autofocus commands.';
 export { CONNECT_MACHINE_FIRST, UNKNOWN_IDLE_STATUS_MESSAGE } from './status-unknown-message';
+// Names no firmware: it also shows on Marlin and Smoothieware (A3-P3-5).
 export const MOTION_OPERATION_ACTIVE_MESSAGE =
-  'A jog or frame operation is active. Wait for GRBL to report Idle, or cancel the operation, before sending another motion command.';
+  'A jog or Frame is still running. Wait for it to finish, or stop it with ABORT MOTION, then try again.';
 export const FIRE_ACTIVE_COMMAND_MESSAGE =
   'Release the momentary Fire control, or switch the laser dot off, before sending another machine command.';
 export const MPG_ACTIVE_MOTION_MESSAGE =
@@ -56,9 +58,7 @@ export const TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE =
 export const TOOL_CHANGE_XY_ORIGIN_MESSAGE =
   'A tool change re-zeroes Z only. The rest of the job is placed on the X/Y origin it started with, so the XYZ corner probe and Set or Reset origin wait until the job ends. Use the Z probe or Zero Z for the new bit.';
 
-export function serialWriteErrorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
+export { errorMessage as serialWriteErrorMessage } from '../../core/util/error-message';
 
 export function pushLog(state: LaserState, line: string): ReadonlyArray<string> {
   return [...state.log, line].slice(-LOG_MAX);
@@ -445,7 +445,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     ...sessionScopedJobStateReset(),
     connection: { kind: 'disconnected' },
     serialPortInfo: null,
-    jobStreamHost: null,
+    ...NO_JOB_STREAM_HOST,
     connectedBaudRate: null,
     statusReport: null,
     controllerSessionEpoch: state.controllerSessionEpoch + 1,

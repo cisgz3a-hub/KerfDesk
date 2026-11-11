@@ -19,6 +19,7 @@ import { useUiStore } from '../state/ui-store';
 import { useActiveCameraModel } from './active-camera-model';
 import { useCameraPlacementLatch } from './camera-placement-latch';
 import { computeView } from '../workspace/view-transform';
+import { CameraEstimatedArea } from './accuracy/CameraEstimatedArea';
 import { CameraAccuracyMap } from './accuracy/CameraAccuracyMap';
 import { CameraSourceView } from './CameraSourceView';
 import { BedPictureOverlay } from './head/BedPictureOverlay';
@@ -31,7 +32,12 @@ import {
   type OverlayFrame,
   type OverlayScene,
 } from './overlay/use-bed-overlay-drawing';
+import { overlayDisplayWidth, useMachineFrame } from './overlay/use-machine-frame';
 import { useElementSize, type ElementSize } from './use-element-size';
+import { stillCompanion } from './still-capture';
+import type { ActiveCameraSource } from './frame-source';
+import type { RgbaImage } from '../../core/camera/rgba-image';
+import type { CameraCaptureBinding } from '../../core/camera/camera-capture-binding';
 
 export function WorkspaceCameraOverlay(): JSX.Element | null {
   const model = useActiveCameraModel();
@@ -54,11 +60,15 @@ function ModelOverlay(props: { readonly model: CameraModelRecord }): JSX.Element
   const [liveElement, setLiveElement] = useState<LiveCaptureElement | null>(null);
 
   const liveSource = still === null && sourceState.kind === 'live' ? sourceState.source : null;
-  const frame = useMemo<OverlayFrame | null>(() => {
-    if (still !== null) return { kind: 'still', image: still, capture: stillCapture };
-    if (liveSource === null || liveElement === null) return null;
-    return { kind: 'live', element: liveElement, source: liveSource };
-  }, [still, stillCapture, liveSource, liveElement]);
+  // A USB camera is drawn from its <video>; a bridge camera from its newest
+  // picture, decoded off the UI thread (ADR-440 Amendment 10).
+  const usbSource = liveSource?.kind === 'usb' ? liveSource : null;
+  const frame = useOverlayFrame(
+    still === null ? null : { image: still, capture: stillCapture },
+    liveSource,
+    liveElement,
+    overlayDisplayWidth(box?.width ?? null, window.devicePixelRatio),
+  );
   const scene = useOverlayScene(props.model, box);
   const { unsupported, issue } = useBedOverlayDrawing(canvas, frame, scene);
   const accuracyMapVisible = useCameraStore((s) => s.accuracyMapVisible);
@@ -68,35 +78,19 @@ function ModelOverlay(props: { readonly model: CameraModelRecord }): JSX.Element
   return (
     <div ref={boxRef} style={boxStyle} aria-hidden={notice === null}>
       <canvas ref={setCanvas} style={canvasStyle} />
-      {accuracyMapVisible && scene !== null ? (
-        <CameraAccuracyMap
-          model={props.model}
-          view={scene.view}
-          width={scene.cssWidth}
-          height={scene.cssHeight}
-        />
-      ) : null}
       {scene === null ? null : (
-        <HeightAreaOutlines
-          areas={scene.heightAreas}
-          view={scene.view}
-          width={scene.cssWidth}
-          height={scene.cssHeight}
+        <SceneLayers
+          model={props.model}
+          scene={scene}
+          estimated={notice === null}
+          accuracyMap={accuracyMapVisible}
+          pieceScan={pieceScan}
         />
       )}
-      {scene === null || pieceScan === null ? null : (
-        <PieceOutlines
-          pieces={pieceScan.pieces}
-          excluded={pieceScan.excluded}
-          view={scene.view}
-          width={scene.cssWidth}
-          height={scene.cssHeight}
-        />
-      )}
-      {liveSource === null ? null : (
+      {usbSource === null ? null : (
         // The live element only feeds the overlay's texture; it is never seen.
         <div style={hiddenSourceStyle}>
-          <CameraSourceView source={liveSource} onElement={setLiveElement} />
+          <CameraSourceView source={usbSource} onElement={setLiveElement} />
         </div>
       )}
       {notice === null ? null : (
@@ -106,6 +100,58 @@ function ModelOverlay(props: { readonly model: CameraModelRecord }): JSX.Element
       )}
     </div>
   );
+}
+
+// What is drawn over the picture on the canvas's own grid: where the picture
+// is estimated (ADR-441 Amendment 9), the accuracy map, height areas, pieces.
+function SceneLayers(props: {
+  readonly model: CameraModelRecord;
+  readonly scene: OverlayScene;
+  readonly estimated: boolean;
+  readonly accuracyMap: boolean;
+  readonly pieceScan: ReturnType<typeof usePieceScanStore.getState>['scan'];
+}): JSX.Element {
+  const { scene } = props;
+  const size = { view: scene.view, width: scene.cssWidth, height: scene.cssHeight };
+  return (
+    <>
+      {props.estimated ? <CameraEstimatedArea model={props.model} {...size} /> : null}
+      {props.accuracyMap ? <CameraAccuracyMap model={props.model} {...size} /> : null}
+      <HeightAreaOutlines areas={scene.heightAreas} {...size} />
+      {props.pieceScan === null ? null : (
+        <PieceOutlines
+          pieces={props.pieceScan.pieces}
+          excluded={props.pieceScan.excluded}
+          {...size}
+        />
+      )}
+    </>
+  );
+}
+
+function useOverlayFrame(
+  still: { readonly image: RgbaImage; readonly capture: CameraCaptureBinding | null } | null,
+  liveSource: ActiveCameraSource | null,
+  liveElement: LiveCaptureElement | null,
+  displayWidth: number,
+): OverlayFrame | null {
+  const machineSource = liveSource !== null && liveSource.kind !== 'usb' ? liveSource : null;
+  const machineFrame = useMachineFrame(machineSource, displayWidth);
+  const stillImage = still?.image ?? null;
+  const stillCapture = still?.capture ?? null;
+  return useMemo<OverlayFrame | null>(() => {
+    if (stillImage !== null) {
+      const display = stillCompanion(stillImage)?.display ?? null;
+      return { kind: 'still', image: stillImage, capture: stillCapture, display };
+    }
+    if (machineSource !== null) {
+      return machineFrame === null
+        ? null
+        : { kind: 'bitmap', ...machineFrame, source: machineSource };
+    }
+    if (liveSource === null || liveElement === null) return null;
+    return { kind: 'live', element: liveElement, source: liveSource };
+  }, [stillImage, stillCapture, machineSource, machineFrame, liveSource, liveElement]);
 }
 
 function useOverlayScene(model: CameraModelRecord, box: ElementSize | null): OverlayScene | null {

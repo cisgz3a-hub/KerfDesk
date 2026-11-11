@@ -1,5 +1,7 @@
 import { isChiploadMaterialKey } from '../../core/cnc';
 import type { CncLayerSettings } from '../../core/scene';
+import { isRecord } from '../../core/util/is-record';
+import { isPositiveInteger } from '../../core/util/finite';
 
 type CncFeedSource = NonNullable<CncLayerSettings['feedSource']>;
 
@@ -7,7 +9,7 @@ export function normalizeCncFeedSource(
   value: unknown,
   materialKey: unknown,
 ): CncFeedSource | undefined {
-  if (!isObject(value)) return undefined;
+  if (!isRecord(value)) return undefined;
   if (
     value['kind'] === 'machine-starter' &&
     typeof value['starterId'] === 'string' &&
@@ -33,12 +35,4 @@ export function normalizeCncFeedSource(
     };
   }
   return undefined;
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isPositiveInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }

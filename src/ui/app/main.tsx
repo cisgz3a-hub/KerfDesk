@@ -14,13 +14,16 @@ import {
   createDesktopJobActivityReporter,
   createDesktopSerialAdapter,
   createDesktopMachineNetwork,
+  createDesktopRuidaNetwork,
   createDesktopAiAssistant,
+  createDesktopCameraAddressVault,
   desktopCameraBridgeConnection,
   createDesktopSupportLogReader,
   createDesktopWindowCommands,
   isElectronRenderer,
 } from '../../platform/electron';
 import type { PlatformAdapter } from '../../platform/types';
+import { installCameraAddressVault } from '../state/remembered-camera-addresses';
 import { webAdapter } from '../../platform/web';
 import { createHttpCameraBridge } from '../../platform/web/camera-bridge';
 import { createNetworkSessionOpener } from '../../platform/web/network-serial-connection';
@@ -77,6 +80,8 @@ const adapter: PlatformAdapter = isElectronRenderer()
             aiAssistant: createDesktopAiAssistant(),
             // A worker streams each network session, off this thread (ADR-676).
             machineNetwork: createDesktopMachineNetwork(undefined, createNetworkSessionOpener()),
+            // Ruida over UDP, through the main process's bridge (ADR-697).
+            ruidaNetwork: createDesktopRuidaNetwork(),
             cameraBridge: createHttpCameraBridge(() => desktopCameraBridgeConnection()),
           }
         : {}),
@@ -87,6 +92,11 @@ const desktopLicenceClient =
     ? createDesktopLicenceAdapter()
     : undefined;
 if (desktopLicenceClient !== undefined) startLicensedEditionLocked();
+// The remembered RTSP login lives only in the OS's secure storage (ADR-692),
+// installed before any camera can start.
+if (adapter.id === 'electron' && window.location.protocol === 'app:') {
+  installCameraAddressVault(createDesktopCameraAddressVault());
+}
 
 function prepareDesktopWorkspace(): void {
   // Native licensing routes open at the ready handshake. Start the key load
@@ -126,6 +136,7 @@ createRoot(rootElement).render(
   </StrictMode>,
 );
 
-// Static timber and branding paint together before JS. Hold from the first
-// startup frame in both editions, excluding time the document is hidden.
+// Static timber and branding paint together before JS. The first launch of a
+// version holds from the first startup frame in both editions, excluding time
+// the document is hidden; every other launch reveals a painted workspace.
 dismissStartupSplash({ desktop: adapter.id === 'electron' });

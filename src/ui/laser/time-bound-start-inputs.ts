@@ -15,6 +15,7 @@ import { projectHasVariableData } from '../../core/variables/object-variable-tem
 import type { OutputSnapshotRequest } from './output-preparation-protocol';
 import { currentPrintCutOutputRegistration, printCutOutputSwitchedOff } from './print-cut-output';
 import type { StartJobPreparation } from './start-job-readiness';
+import { maxOf } from '../../core/util';
 
 export type TimeBoundStartInputs = {
   /** Undefined: the project takes no registration. Null: it takes one, and
@@ -154,8 +155,8 @@ export function registrationDisagreementMm(
 ): number {
   const targets = project.printAndCutTargets;
   if (targets === undefined) return 0;
-  return Math.max(
-    ...[targets.first, targets.second].map((point) => {
+  return maxOf(
+    [targets.first, targets.second].map((point) => {
       const left = applySimilarityPoint(point, a);
       const right = applySimilarityPoint(point, b);
       return Math.hypot(left.x - right.x, left.y - right.y);

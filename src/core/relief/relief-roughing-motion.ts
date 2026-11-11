@@ -38,6 +38,7 @@ import type { Polyline, Vec2 } from '../scene';
 import { keepProvenAirFloors } from './relief-air-floor-proof';
 import { insideOutNearest, openLoop, ringPieces, type RoughingLoop } from './relief-roughing-order';
 import { reliefRampAlong } from './relief-ramp-entry';
+import { lerpPoint, crossAbout } from '../geometry/point-math';
 
 const MIN_LOOP_POINTS = 3;
 const MAX_RAMP_ANGLE_DEG = 45;
@@ -265,8 +266,8 @@ function linkIsClear(
   if (length > maxLengthMm) return false;
   if (length <= 2 * LINK_END_TRIM_MM) return true;
   const trim = LINK_END_TRIM_MM / length;
-  const a = lerp(from, to, trim);
-  const b = lerp(from, to, 1 - trim);
+  const a = lerpPoint(from, to, trim);
+  const b = lerpPoint(from, to, 1 - trim);
   for (const contour of region) {
     for (let index = 0; index < contour.length; index += 1) {
       const c = contour[index] as Vec2;
@@ -274,12 +275,8 @@ function linkIsClear(
       if (segmentsCross(a, b, c, d)) return false;
     }
   }
-  const middle = lerp(from, to, 0.5);
+  const middle = lerpPoint(from, to, 0.5);
   return region.filter((contour) => pointInPolygon(middle, contour)).length % 2 === 1;
-}
-
-function lerp(a: Vec2, b: Vec2, t: number): Vec2 {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
 function segmentsCross(a: Vec2, b: Vec2, c: Vec2, d: Vec2): boolean {
@@ -289,15 +286,11 @@ function segmentsCross(a: Vec2, b: Vec2, c: Vec2, d: Vec2): boolean {
   if (Math.max(a.y, b.y) < Math.min(c.y, d.y) || Math.max(c.y, d.y) < Math.min(a.y, b.y)) {
     return false;
   }
-  const d1 = cross(c, d, a);
-  const d2 = cross(c, d, b);
-  const d3 = cross(a, b, c);
-  const d4 = cross(a, b, d);
+  const d1 = crossAbout(c, d, a);
+  const d2 = crossAbout(c, d, b);
+  const d3 = crossAbout(a, b, c);
+  const d4 = crossAbout(a, b, d);
   return d1 * d2 <= 0 && d3 * d4 <= 0 && !(d1 === 0 && d2 === 0);
-}
-
-function cross(o: Vec2, a: Vec2, b: Vec2): number {
-  return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 }
 
 // A new chain: plunge at the middle of the loop's longest side, or ramp in
@@ -355,7 +348,8 @@ function longestSideMiddle(points: ReadonlyArray<Vec2>): LoopPoint {
     const a = points[index] as Vec2;
     const b = points[(index + 1) % points.length] as Vec2;
     const length = Math.hypot(b.x - a.x, b.y - a.y);
-    if (length > best.distance) best = { segment: index, point: lerp(a, b, 0.5), distance: length };
+    if (length > best.distance)
+      best = { segment: index, point: lerpPoint(a, b, 0.5), distance: length };
   }
   return best;
 }

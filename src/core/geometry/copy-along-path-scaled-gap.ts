@@ -5,6 +5,7 @@ import type {
   CopyAlongPathSpec,
 } from './copy-along-path';
 import { fitScaledGapPieces, type GapPiece } from './copy-along-path-piece-fit';
+import { finiteNonNegative } from '../util/finite';
 
 const FIT_EPS_MM = 1e-6;
 const MIN_STEP_MM = 1e-3;
@@ -33,13 +34,13 @@ export function scaledGapDistances(
   if (maxCopies < 1) return { kind: 'too-many' };
   const end = guide.closed
     ? start + guide.walk.lengthMm
-    : guide.walk.lengthMm - nonnegative(spec.endOffsetMm);
+    : guide.walk.lengthMm - finiteNonNegative(spec.endOffsetMm);
   const span = end - start;
   if (span < -FIT_EPS_MM) return { kind: 'no-room' };
   const pieces = guidePieces(guide, source, spec.rotateCopies);
   const first = pieces[0];
   if (first === undefined) return { kind: 'no-step' };
-  const gap = nonnegative(spec.spacingMm);
+  const gap = finiteNonNegative(spec.spacingMm);
   const lastScale = copyScale(spec, 1, 2);
   if (pieces.every((piece) => piece.extent === first.extent)) {
     return constantExtentDistances(
@@ -159,8 +160,4 @@ function guidePieces(guide: CopyAlongPathGuidePath, source: Bounds, rotate: bool
     end: piece.end + guide.walk.lengthMm,
   }));
   return pieces.concat(repeated);
-}
-
-function nonnegative(value: number): number {
-  return Number.isFinite(value) ? Math.max(0, value) : 0;
 }

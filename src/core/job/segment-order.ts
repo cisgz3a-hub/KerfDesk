@@ -19,6 +19,7 @@ import type { CutSegment } from './job';
 import { refineRoute } from './route-refine';
 import { polylineBounds, type SegmentBounds } from './segment-bounds';
 import { createNearestEntryQuery, type SegmentEntry } from './segment-entry-index';
+import { unionBox } from '../geometry/box-math';
 
 const ORIGIN: Vec2 = { x: 0, y: 0 };
 
@@ -153,15 +154,6 @@ function contourKey(segment: CutSegment): string | null {
   if (nesting.topologyContour !== undefined)
     return `contour\u0000${nesting.forest}\u0000${nesting.topologyContour}`;
   return segment.closed ? null : `forest\u0000${nesting.forest}\u0000${nesting.depth}`;
-}
-
-function unionBox(a: SegmentBounds, b: SegmentBounds): SegmentBounds {
-  return {
-    minX: Math.min(a.minX, b.minX),
-    minY: Math.min(a.minY, b.minY),
-    maxX: Math.max(a.maxX, b.maxX),
-    maxY: Math.max(a.maxY, b.maxY),
-  };
 }
 
 function refinedSegmentRoute<T extends CutSegment>(

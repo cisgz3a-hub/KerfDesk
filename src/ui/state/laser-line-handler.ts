@@ -19,7 +19,12 @@ import {
 } from '../../core/controllers/grbl';
 import { detectControllerFromBanner, type ControllerEvent } from '../../core/controllers';
 import { parseActiveWcsFromModalResponses } from '../../core/controllers/grbl/work-offset-readback';
-import { flushResetCleanup, ownedResetRetainedSettings } from './laser-reset-cleanup';
+import {
+  awaitsOwnedResetBoundary,
+  flushResetCleanup,
+  ownedResetRetainedSettings,
+} from './laser-reset-cleanup';
+import { machineZeroMovedPatch } from './work-origin-state';
 import {
   noteControllerSettingsRead,
   retainedControllerSettingsPatch,
@@ -54,9 +59,10 @@ import {
   takeNextAcknowledgedFramePrefixLine,
 } from './laser-motion-operation';
 import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
-import { forgetAlarmBeforeBanner, takeAlarmBeforeBanner } from './laser-reset-alarm';
+import { alarmAfterBannerPatch, forgetAlarmBeforeBanner } from './laser-reset-alarm';
 import { handleAlarmLine } from './laser-alarm-line';
 import { handleLostReplyProbeLine } from './laser-lost-ack-reconcile';
+import { handleMotionReplyProbeLine } from './laser-motion-reply-probe';
 import { rearmParserWhenDrained } from './laser-parser-rearm';
 import { handleStatusLine, originUnknownAfterControllerReset } from './laser-status-line';
 import { settleUntrackedAck, streamOwnsTerminalAck } from './laser-stream-ack';
@@ -120,6 +126,7 @@ function handleNonBannerLine(
   state: LaserState,
 ): void {
   handleLostReplyProbeLine(set, get, refs, safeWrite, cls.kind, line);
+  handleMotionReplyProbeLine(set, get, refs, line);
   const acknowledgesLine = cls.kind !== 'error' || cls.acknowledgesLine !== false;
   const ackSettlement = settleUntrackedAck(set, state, cls.kind, refs, acknowledgesLine);
   const ownedCommandLine = activeControllerCommandLine(refs);
@@ -372,6 +379,8 @@ function handleWelcomeLine(
   // The banner of a reset KerfDesk sent on this port keeps the `$$`/`$I`
   // snapshot; any other banner discards it (ADR-648).
   const retainedSettings = ownedResetRetainedSettings(refs);
+  // Any other banner is a power-up or a board reset KerfDesk did not send.
+  const ownedReset = awaitsOwnedResetBoundary(refs);
   refs.settingsCollector = idleCollector();
   refs.settingsCollectorSessionEpoch = null;
   clearCncLiveCaps();
@@ -403,8 +412,9 @@ function handleWelcomeLine(
     ...retainedControllerSettingsPatch(retainedSettings, nextSessionEpoch),
     // An ALARM:N the reset itself raised (Abort mid-motion) is still the
     // controller's alarm after the banner; any other code belonged to the
-    // previous boot (audit streaming-4).
-    alarmCode: takeAlarmBeforeBanner(refs),
+    // previous boot (audit streaming-4), except a position-kept alarm whose
+    // reset KerfDesk sent (position-kept-alarm.ts).
+    ...alarmAfterBannerPatch(refs, state, ownedReset),
     // The reboot is the soft reset a critical event asked for.
     ...resetBoundaryPatch(state),
     wcoCache: null,
@@ -427,6 +437,7 @@ function handleWelcomeLine(
     homingState: 'unknown',
     homingProof: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
+    ...(ownedReset ? {} : machineZeroMovedPatch(state)),
     ...mismatchLog,
     ...(ownedLiftReset ? ownedLiftResetPatch(state) : rebootDuringJobPatch(state)),
   });

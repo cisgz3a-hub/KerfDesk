@@ -7,7 +7,11 @@ import { createLayer, createProject } from '../../core/scene';
 import { installJobCheckpointTracking } from '../../ui/app/use-job-checkpoint';
 import { installFramedRunPermitForCurrentState } from '../../ui/laser/framed-run-testing';
 import { frameProofReset } from '../../ui/state/laser-session-reset';
-import { installAutoJobReview, useJobReviewStore } from '../../ui/laser/job-review';
+import {
+  captureJobReviewModels,
+  installAutoJobReview,
+  useJobReviewStore,
+} from '../../ui/laser/job-review';
 import { currentReplayExecutionSignature, RunAgainControl } from '../../ui/laser/RunAgainControl';
 import { hashOnSimulatedClock } from '../../ui/laser/host-sha256-testing';
 import { runCompletedJobAgainFlow, runStartJobFlow } from '../../ui/laser/start-job-flow';
@@ -15,6 +19,8 @@ import { jobAwareAlert, jobAwareConfirm } from '../../ui/state/job-aware-dialogs
 import { initialLaserState } from '../../ui/state/laser-store-helpers';
 import { useLaserStore } from '../../ui/state/laser-store';
 import { RecoveryRepository, type LastCompletedReceipt } from '../../ui/state/recovery';
+import { isExecutionProvenance } from '../../ui/state/recovery/execution-provenance';
+import { forgetSessionReviewedRuns } from '../../ui/state/session-reviewed-runs';
 import {
   MemoryRecoveryGenerationStore,
   MemoryRecoveryStorageBackend,
@@ -35,6 +41,7 @@ let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 let untrack: (() => void) | null = null;
 let uninstallReview: (() => void) | null = null;
+let stopReviewCapture: (() => void) | null = null;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -59,6 +66,9 @@ afterEach(async () => {
   untrack = null;
   uninstallReview?.();
   uninstallReview = null;
+  stopReviewCapture?.();
+  stopReviewCapture = null;
+  forgetSessionReviewedRuns();
   useJobReviewStore.getState().close();
   vi.useRealTimers();
   await useLaserStore.getState().disconnect();
@@ -92,8 +102,39 @@ function completedReceipt(repository: RecoveryRepository): LastCompletedReceipt 
   return receipt;
 }
 
+function archivedReview(receipt: LastCompletedReceipt) {
+  const review = receipt.artifact.provenance?.review;
+  if (review === undefined) throw new Error('The run archived no review.');
+  return review;
+}
+
+/** The run's own review evidence, marked as carried from the run it repeats
+ * and naming the run whose Job Review was actually clicked. */
+function expectCarriedReview(
+  receipt: LastCompletedReceipt,
+  from: { readonly repeats: LastCompletedReceipt; readonly clickedAt: LastCompletedReceipt },
+): void {
+  const clicked = archivedReview(from.clickedAt);
+  expect(archivedReview(receipt)).toMatchObject({
+    warningsShown: clicked.warningsShown,
+    acknowledgement: { kind: 'laser-verified' },
+    laserModeStartEvidence: { unverifiedAcknowledged: false },
+    carriedOver: {
+      fromRunId: from.repeats.runId,
+      operatorReviewedRunId: from.clickedAt.runId,
+      operatorReviewedAtIso: clicked.reviewedAtIso,
+    },
+  });
+  expect(isExecutionProvenance(receipt.artifact.provenance)).toBe(true);
+}
+
 describe('completion and consecutive same-job replay', () => {
-  it('retains spatial Frame proof through three freshly reviewed run identities', async () => {
+  // The first run is reviewed in the dialog. The simulator's `$30`/`$32` are
+  // verified and nothing changes, so the two repeats carry that review and
+  // show no dialog (ADR-237 Amendment 3). Every later check still runs.
+  it('retains spatial Frame proof through one reviewed and two carried run identities', async () => {
+    const reviews = captureJobReviewModels();
+    stopReviewCapture = reviews.stop;
     const base = createProject();
     useStore.setState({
       project: {
@@ -127,6 +168,8 @@ describe('completion and consecutive same-job replay', () => {
     expect(useLaserStore.getState().controllerOperation).toBeNull();
     const first = completedReceipt(repository);
     expect(useLaserStore.getState().frameVerification).toBe(retainedFrame);
+    expect(reviews.models.map((model) => model.acknowledgement.kind)).toEqual(['laser-verified']);
+    expect(archivedReview(first)).not.toHaveProperty('carriedOver');
 
     await onClock(runCompletedJobAgainFlow(first, repository));
     expect(useLaserStore.getState().streamer).not.toBeNull();
@@ -139,6 +182,7 @@ describe('completion and consecutive same-job replay', () => {
     expect(second.runId).not.toBe(first.runId);
     expect(second.artifact.gcode).toBe(first.artifact.gcode);
     expect(second.artifact.executionSignature).toBe(currentReplayExecutionSignature());
+    expectCarriedReview(second, { repeats: first, clickedAt: first });
 
     host = document.createElement('div');
     document.body.appendChild(host);
@@ -166,10 +210,13 @@ describe('completion and consecutive same-job replay', () => {
     expect(third.artifact.provenance?.review.reviewedAtIso).not.toBe(
       first.artifact.provenance?.review.reviewedAtIso,
     );
+    // A repeat of a repeat still names the one click behind all three runs.
+    expectCarriedReview(third, { repeats: second, clickedAt: first });
+    expect(reviews.models).toHaveLength(1);
     expect(host.querySelector('button')?.textContent).toBe('Run same job again from start');
 
     // Invalidation during the asynchronous archive/activation boundary must
-    // revoke the offer and refuse the wire handoff despite earlier review.
+    // revoke the offer and refuse the wire handoff despite the carried review.
     const armFreshStart = repository.armFreshStartIntent.bind(repository);
     const arming = vi
       .spyOn(repository, 'armFreshStartIntent')

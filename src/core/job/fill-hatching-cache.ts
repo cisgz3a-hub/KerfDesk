@@ -12,14 +12,6 @@ const hatchCache = new WeakMap<
   Map<string, ReadonlyArray<HatchPolyline>>
 >();
 
-export function memoizedFillHatching(
-  polylines: ReadonlyArray<Polyline>,
-  layer: Pick<Layer, 'hatchAngleDeg' | 'hatchSpacingMm' | 'fillBidirectional' | 'fillCrossHatch'>,
-  fillRule: HatchFillRule = 'evenodd',
-): ReadonlyArray<Polyline> {
-  return memoizedFillHatchingWithMetadata(polylines, layer, fillRule).map(stripHatchMetadata);
-}
-
 export function memoizedFillHatchingWithMetadata(
   polylines: ReadonlyArray<Polyline>,
   layer: Pick<Layer, 'hatchAngleDeg' | 'hatchSpacingMm' | 'fillBidirectional' | 'fillCrossHatch'>,
@@ -60,8 +52,4 @@ export function memoizedFillHatchingWithMetadata(
   }
   bySettings.set(cacheKey, output);
   return output;
-}
-
-function stripHatchMetadata(pl: HatchPolyline): Polyline {
-  return { points: pl.points, closed: pl.closed };
 }

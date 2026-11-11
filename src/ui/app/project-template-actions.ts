@@ -17,6 +17,7 @@ import type { PagedRasterAssetReader } from '../import/paged-raster-hydration';
 import { createProjectSaveWriteCoordinator } from '../state/project-save-write-coordinator';
 import { describePendingProProject } from '../state/pending-pro-project';
 import { pushProjectLoadNotices } from '../state/project-load-notices';
+import { errorMessage } from '../../core/util/error-message';
 
 type OpenTemplateContext = ProjectOpenCompletionContext & {
   readonly platform: PlatformAdapter;
@@ -44,7 +45,7 @@ export async function openProjectTemplate(ctx: OpenTemplateContext): Promise<voi
     if (file === undefined) return;
     await openTemplateFile(ctx, file, owner.isCurrent, () => ctx.getProject() === project);
   } catch (error) {
-    owner.pushToast(`Could not open template: ${message(error)}`, 'error');
+    owner.pushToast(`Could not open template: ${errorMessage(error)}`, 'error');
   }
 }
 
@@ -80,7 +81,7 @@ export async function openTemplateFile(
     `Started a new project from ${file.name}. Save will ask for a destination.`,
     'success',
   );
-  pushProjectLoadNotices(notices, ctx.pushToast, { migration: true });
+  pushProjectLoadNotices(notices, ctx.pushToast, { migration: true, project });
   if (loaded.kind === 'capability-warning')
     ctx.pushToast(loadedMachineCapabilityWarningMessage(loaded.activeKind), 'warning');
 }
@@ -121,18 +122,14 @@ export async function saveProjectTemplate(ctx: {
     await writer.write(target, json, (error) => {
       if (isCurrent())
         ctx.pushToast(
-          `Could not restore the newest template in ${target.displayName}: ${message(error)}. Save it again.`,
+          `Could not restore the newest template in ${target.displayName}: ${errorMessage(error)}. Save it again.`,
           'error',
         );
     });
     if (isCurrent()) ctx.pushToast(`Saved template to ${target.displayName}.`, 'success');
   } catch (error) {
-    if (isCurrent()) ctx.pushToast(`Could not save template: ${message(error)}`, 'error');
+    if (isCurrent()) ctx.pushToast(`Could not save template: ${errorMessage(error)}`, 'error');
   } finally {
     writer.release();
   }
-}
-
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

@@ -10,6 +10,8 @@ import type { Layer, LayerOperationSettings } from '../../core/scene';
 import { burnsAsGrayscale, DitherSwatchPicker, originalPixelsNotice } from './DitherSwatchPicker';
 import { mixedCheckboxProps, useMixedOperationNumber } from './mixed-operation-input';
 import type { MixedOperationFields } from './selected-operation-mixed';
+import { clamp } from '../../core/math/clamp';
+import { roundToDecimals } from '../../core/util/rounding';
 
 const inputStyle: React.CSSProperties = { width: 88, minWidth: 0 };
 const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
@@ -199,7 +201,7 @@ function LineIntervalInput(props: {
 }): JSX.Element {
   const { labelContext, settings, commit } = props;
   const debounced = useMixedOperationNumber({
-    value: displayNumber(linesPerMmToLineIntervalMm(settings.linesPerMm), 4),
+    value: roundToDecimals(linesPerMmToLineIntervalMm(settings.linesPerMm), 4),
     mixed: props.mixedFields?.linesPerMm,
     reconcileKey: props.reconcileKey,
     commit: (lineIntervalMm) => commit({ linesPerMm: lineIntervalMmToLinesPerMm(lineIntervalMm) }),
@@ -236,7 +238,7 @@ function DpiInput(props: {
 }): JSX.Element {
   const { labelContext, settings, commit } = props;
   const debounced = useMixedOperationNumber({
-    value: displayNumber(linesPerMmToDpi(settings.linesPerMm), 2),
+    value: roundToDecimals(linesPerMmToDpi(settings.linesPerMm), 2),
     mixed: props.mixedFields?.linesPerMm,
     reconcileKey: props.reconcileKey,
     commit: (dpi) => commit({ linesPerMm: dpiToLinesPerMm(dpi) }),
@@ -372,14 +374,6 @@ function numericValue(s: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function clamp(n: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, n));
-}
-
 function dotWidthCorrectionMax(settings: LayerOperationSettings): number {
   return 1 / Math.max(1, settings.linesPerMm);
-}
-
-function displayNumber(value: number, decimals: number): number {
-  return Number(value.toFixed(decimals));
 }

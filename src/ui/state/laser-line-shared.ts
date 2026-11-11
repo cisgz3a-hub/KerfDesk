@@ -57,10 +57,6 @@ export type SafeWriteFn = (
   assertBeforeWrite?: () => void,
 ) => Promise<void>;
 
-// Who a terminal ok/error belongs to. 'stream' routes it into the streamer's
-// ack accounting; 'untracked' means a console/origin/handshake write sent
-// before the stream owns it (FIFO), so the streamer must not see it.
-export type AckOwner = 'stream' | 'untracked';
 export type AckSettlement =
   | { readonly owner: 'stream' }
   | { readonly owner: 'untracked'; readonly motionOperationId: LaserMotionOperationId | null };

@@ -43,7 +43,12 @@ import { useLaserStore } from '../../state/laser-store';
 import type { NativeBedEvidence } from '../../state/native-bed-frame';
 import { resetStore } from '../../state/test-helpers';
 import { captureSourceFrame, type ActiveCameraSource } from '../frame-source';
-import { CANVAS_TARGET_FRAME_CHANGED, currentAssumedTarget } from './assumed-target';
+import {
+  CANVAS_TARGET_BURN_NOT_SEEN,
+  CANVAS_TARGET_FRAME_CHANGED,
+  canvasTargetBurnedOffAbsolute,
+  currentAssumedTarget,
+} from './assumed-target';
 import { addCalibrationTargetToCanvas, photographTarget } from './calibration-actions';
 import { DEFAULT_CALIBRATION_SETTINGS } from './camera-calibration-store';
 import {
@@ -206,9 +211,10 @@ describe('a calibration target added to the canvas', () => {
   it('is refused, not fitted 10 mm off, when Machine Setup changed and no Start was seen', () => {
     useMachine(MACHINE);
     addCalibrationTargetToCanvas(SETTINGS);
-    // Unchanged: the frame at the add still says where the rings are.
+    // Unchanged: the frame at the add still says where the rings are, but no
+    // Start has burned them at Absolute yet (ADR-441 Amendment 10).
     expect(currentAssumedTarget()).toMatchObject({ source: 'engraved', bedFrame: FRAME_400 });
-    expect(currentAssumedTarget().refusal).toBeUndefined();
+    expect(currentAssumedTarget().refusal).toBe(CANVAS_TARGET_BURN_NOT_SEEN);
     useStore.getState().updateDeviceProfile({ bedHeight: 410 });
     const assumed = currentAssumedTarget();
     expect(assumed.bedFrame).toEqual(FRAME_400);
@@ -276,8 +282,34 @@ describe('a calibration target added to the canvas', () => {
       },
     });
     expect(stampCanvasTargetBurn(moved, UNHOMED)).toBe(false);
-    expect(currentAssumedTarget().refusal).toBe(CANVAS_TARGET_FRAME_CHANGED);
+    // The User Origin burn is remembered, so the photo step names it (Y3-P1-2).
+    expect(currentAssumedTarget().refusal).toBe(canvasTargetBurnedOffAbsolute('user-origin'));
   });
+
+  // Rolling audit v13 Y3-P1-2: rings burned from Current Position or User
+  // Origin calibrated as if they burned where the target put them.
+  it.each(['current-position', 'user-origin'] as const)(
+    'refuses the photo of rings burned from %s, until a Start burns them at Absolute',
+    (startFrom) => {
+      useMachine(MACHINE);
+      addCalibrationTargetToCanvas(SETTINGS);
+      const relative = started({
+        preparedStart: {
+          jobOrigin:
+            startFrom === 'user-origin'
+              ? { startFrom, anchor: 'front-left' }
+              : { startFrom, anchor: 'center', currentPosition: { x: 300, y: 80 } },
+        },
+      });
+      expect(stampCanvasTargetBurn(relative, UNHOMED)).toBe(false);
+      expect(rememberedEngravedTarget(MACHINE, false)?.burnedFrom).toBe(startFrom);
+      expect(currentAssumedTarget().refusal).toBe(canvasTargetBurnedOffAbsolute(startFrom));
+      expect(stampCanvasTargetBurn(started({}), UNHOMED)).toBe(true);
+      expect(rememberedEngravedTarget(MACHINE, false)).toMatchObject({ burnSeen: true });
+      expect(rememberedEngravedTarget(MACHINE, false)?.burnedFrom).toBeUndefined();
+      expect(currentAssumedTarget().refusal).toBeUndefined();
+    },
+  );
 
   it('is stamped by the Start the laser store records, once', () => {
     useMachine(MACHINE);

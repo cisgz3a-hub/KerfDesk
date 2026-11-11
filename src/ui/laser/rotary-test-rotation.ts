@@ -15,9 +15,11 @@
 import type { JogParams } from '../../core/controllers/grbl';
 import {
   rotaryRevolutionTravelMm,
+  type RotaryAxis,
   type RotaryRevolutionTarget,
   type RotarySetup,
 } from '../../core/devices/rotary';
+import { rotaryAxisOf } from '../../core/devices/rotary-axis';
 import type { MachineKind } from '../../core/scene';
 import type { LaserState } from '../state/laser-store';
 import { useLaserStore } from '../state/laser-store';
@@ -28,6 +30,7 @@ import {
 import type { LaserMotionOperationId } from '../state/laser-motion-operation';
 import { clampJogFeed } from './jog-control-policy';
 import { isDeliberateCancellation } from './report-controller-action-failure';
+import { errorMessage } from '../../core/util/error-message';
 
 // One revolution in about this long: slow enough to follow a mark round.
 const TEST_REVOLUTION_SECONDS = 10;
@@ -37,8 +40,10 @@ export const ROTARY_TEST_PAUSE_MS = 1000;
 
 export type RotaryTestPlan = {
   readonly target: RotaryRevolutionTarget;
-  // Machine-Y mm for one revolution of the target.
+  // Commanded travel for one revolution of the target, on the rotary's axis:
+  // millimetres on Y and Z, degrees on A (ADR-695).
   readonly travelMm: number;
+  readonly axis: RotaryAxis;
   readonly feedMmPerMin: number;
   readonly legSeconds: number;
   // Out, then back by exactly the same distance.
@@ -66,6 +71,7 @@ export function planRotaryTestRotation(
 ): RotaryTestPlan | null {
   const travelMm = rotaryRevolutionTravelMm(setup, target);
   if (travelMm === null || !Number.isFinite(travelMm) || travelMm <= 0) return null;
+  const axis = rotaryAxisOf(setup);
   const paced = (travelMm * 60) / TEST_REVOLUTION_SECONDS;
   const feed = clampJogFeed(
     Math.min(TEST_MAX_FEED_MM_PER_MIN, Math.max(TEST_MIN_FEED_MM_PER_MIN, paced)),
@@ -76,11 +82,17 @@ export function planRotaryTestRotation(
     travelMm,
     feedMmPerMin: feed,
     legSeconds: (travelMm / feed) * 60,
-    legs: [
-      { dy: travelMm, feed },
-      { dy: -travelMm, feed },
-    ],
+    axis,
+    legs: [rotaryTurnJog(axis, travelMm, feed), rotaryTurnJog(axis, -travelMm, feed)],
   };
+}
+
+// One turn on the rotary's own axis (ADR-695): Y for a Y-port rotary, the
+// A or Z word for a dedicated rotary port.
+function rotaryTurnJog(axis: RotaryAxis, travel: number, feed: number): JogParams {
+  if (axis === 'A') return { da: travel, feed };
+  if (axis === 'Z') return { dz: travel, feed };
+  return { dy: travel, feed };
 }
 
 // Why the test cannot start now, or null. The jog action re-checks the same
@@ -153,12 +165,16 @@ async function runTurn(
   }
   const watch = watchOwnJog(store);
   try {
-    await store.getState().jog(params);
+    // A test turn may drive a roller through the Y motor: never a plain head
+    // move, so it expires a completed Frame whatever axis it uses (ADR-565 Amd 1).
+    await store.getState().jog(params, undefined, { voidsFrame: true });
   } catch (error) {
     watch.dispose();
     // A cancel from any surface (Stop here, Esc, the Live Motion bar) poisons
     // a turn still waiting for Idle; that is a stop, not a fault.
-    return signal.aborted || isDeliberateCancellation(error) ? STOPPED : failed(errorText(error));
+    return signal.aborted || isDeliberateCancellation(error)
+      ? STOPPED
+      : failed(errorMessage(error));
   }
   const release = await watch.released(signal);
   if (signal.aborted) return STOPPED;
@@ -251,8 +267,4 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
 
 function failed(message: string): RotaryTestOutcome {
   return { kind: 'failed', message };
-}
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

@@ -11,6 +11,7 @@ import type { ArrayPlacement } from '../scene/array-layout';
 import type { Bounds, Vec2 } from '../scene/scene-object';
 import { pointAtDistance, type PathWalk } from './path-walk';
 import { copyScale, scaledGapDistances } from './copy-along-path-scaled-gap';
+import { normalizeDegrees } from '../math/wrap';
 
 /** Place a number of copies, copies a set distance apart centre to centre, or a set gap apart edge to edge. */
 export type CopyAlongPathMode = 'count' | 'spacing' | 'gap';
@@ -292,11 +293,6 @@ function uniformStep(distances: Resolved, spec: CopyAlongPathSpec): number | nul
 
 function withScale(placement: ArrayPlacement, factor: number, center: Vec2): ArrayPlacement {
   return factor === 1 ? placement : { ...placement, scale: { factor, center } };
-}
-
-function normalizeDegrees(value: number): number {
-  const normalized = value % 360;
-  return normalized < 0 ? normalized + 360 : normalized;
 }
 
 function positiveCount(value: number): number {

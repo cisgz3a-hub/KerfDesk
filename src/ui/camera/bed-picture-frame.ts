@@ -21,6 +21,7 @@ import { useLaserStore } from '../state/laser-store';
 import { cameraBedFrameFor, selectNativeBedEvidence } from '../state/native-bed-frame';
 import { useToastStore } from '../state/toast-store';
 import { cameraBedFrameNow, useCameraBedFrame } from './camera-bed-frame-now';
+import { roundToTenth } from '../../core/util/rounding';
 
 /** The bed frame and machine a picture taken now belongs to. */
 export function bedPictureTakenNow(): BedPictureTaken {
@@ -166,10 +167,6 @@ function movedMessage(taken: CameraBedFrame, device: DeviceProfile, mm: number):
   const sameBed = taken.bedWidthMm === device.bedWidth && taken.bedHeightMm === device.bedHeight;
   const when = sameBed
     ? 'with other machine travel settings'
-    : `on a ${round(taken.bedWidthMm)} × ${round(taken.bedHeightMm)} mm bed`;
+    : `on a ${roundToTenth(taken.bedWidthMm)} × ${roundToTenth(taken.bedHeightMm)} mm bed`;
   return `The bed picture was taken ${when}. KerfDesk moves it ${mm} mm to match the machine as it is set up now.`;
-}
-
-function round(value: number): number {
-  return Math.round(value * 10) / 10;
 }

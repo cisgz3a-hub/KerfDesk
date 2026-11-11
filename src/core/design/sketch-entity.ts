@@ -13,6 +13,8 @@
 
 import type { Vec2 } from '../scene';
 import type { DesignLayer } from './layers/design-layer';
+import type { SketchDimension } from './dimensions/sketch-dimension';
+import { isFinitePoint } from '../geometry/point-math';
 
 export type SketchEntityBase = {
   readonly id: string;
@@ -86,14 +88,16 @@ export type SketchEntity =
   | SketchRectangle
   | SketchPath;
 
-export type SketchEntityKind = SketchEntity['kind'];
-
 export type Sketch = {
   readonly entities: ReadonlyArray<SketchEntity>;
   // Carve layers (ADR-272 Amendment 1). Absent or empty behaves as exactly the
   // default layer; the field materializes on the first layer edit so sketches
   // built before layers existed stay valid.
   readonly layers?: ReadonlyArray<DesignLayer>;
+  // Dimensions placed with the Dimension tool (ADR-272 Amendment 7). Absent
+  // when there are none, so a sketch without dimensions is byte-for-byte what
+  // it was before they existed.
+  readonly dimensions?: ReadonlyArray<SketchDimension>;
 };
 
 export const EMPTY_SKETCH: Sketch = { entities: [] };
@@ -122,9 +126,7 @@ export function entityBase(entity: SketchEntity): SketchEntityBase {
   };
 }
 
-export function isFiniteVec2(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
-}
+export { isFinitePoint as isFiniteVec2 } from '../geometry/point-math';
 
 function isPositive(value: number): boolean {
   return Number.isFinite(value) && value >= MIN_ENTITY_SIZE_MM;
@@ -151,14 +153,14 @@ export function sanitizeEntity(entity: SketchEntity): SketchEntity | null {
 }
 
 function sanitizeLine(entity: SketchLine): SketchLine | null {
-  if (!isFiniteVec2(entity.start) || !isFiniteVec2(entity.end)) return null;
+  if (!isFinitePoint(entity.start) || !isFinitePoint(entity.end)) return null;
   const dx = entity.end.x - entity.start.x;
   const dy = entity.end.y - entity.start.y;
   return Math.hypot(dx, dy) >= MIN_ENTITY_SIZE_MM ? entity : null;
 }
 
 function sanitizeArc(entity: SketchArc): SketchArc | null {
-  if (!isFiniteVec2(entity.center) || !isPositive(entity.radiusMm)) return null;
+  if (!isFinitePoint(entity.center) || !isPositive(entity.radiusMm)) return null;
   if (!Number.isFinite(entity.startAngleDeg) || !Number.isFinite(entity.sweepDeg)) return null;
   const magnitude = Math.min(Math.abs(entity.sweepDeg), FULL_TURN_DEG);
   if (magnitude < MIN_ENTITY_SIZE_MM) return null;
@@ -167,7 +169,7 @@ function sanitizeArc(entity: SketchArc): SketchArc | null {
 }
 
 function sanitizeCircle(entity: SketchCircle): SketchCircle | null {
-  if (!isFiniteVec2(entity.center) || !isPositive(entity.radiusMm)) return null;
+  if (!isFinitePoint(entity.center) || !isPositive(entity.radiusMm)) return null;
   return entity;
 }
 
@@ -175,13 +177,13 @@ function sanitizeCircle(entity: SketchCircle): SketchCircle | null {
 // line segment the ellipse sampler cannot express, so it is degenerate rather
 // than silently drawn as a sliver.
 function sanitizeEllipse(entity: SketchEllipse): SketchEllipse | null {
-  if (!isFiniteVec2(entity.center)) return null;
+  if (!isFinitePoint(entity.center)) return null;
   if (!isPositive(entity.radiusXMm) || !isPositive(entity.radiusYMm)) return null;
   return entity;
 }
 
 function sanitizeRectangle(entity: SketchRectangle): SketchRectangle | null {
-  if (!isFiniteVec2(entity.origin)) return null;
+  if (!isFinitePoint(entity.origin)) return null;
   if (!isPositive(entity.widthMm) || !isPositive(entity.heightMm)) return null;
   if (!Number.isFinite(entity.cornerRadiusMm) || entity.cornerRadiusMm < 0) return null;
   // Clamped like RectangleSpec: a square at radius = side / 2 becomes a
@@ -191,7 +193,7 @@ function sanitizeRectangle(entity: SketchRectangle): SketchRectangle | null {
 }
 
 function sanitizePath(entity: SketchPath): SketchPath | null {
-  const points = entity.points.filter(isFiniteVec2);
+  const points = entity.points.filter(isFinitePoint);
   if (points.length < 2) return null;
   return { ...entity, points };
 }

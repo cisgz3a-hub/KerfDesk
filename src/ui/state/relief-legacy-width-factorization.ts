@@ -7,6 +7,7 @@ import {
   type ReliefWidthCommonFactorFailure,
   type ReliefWidthCommonFactors,
 } from './relief-width-common-factor';
+import { isFinitePositive } from '../../core/util/finite';
 
 export type ReliefLegacyWidthFactorizationFailure =
   | ReliefWidthCommonFactorFailure
@@ -88,7 +89,8 @@ function dimensionsReverseExactly(
   return (
     after.length === before.length &&
     after.every(
-      (dimensionMm, index) => positiveFinite(dimensionMm) && dimensionMm * factor === before[index],
+      (dimensionMm, index) =>
+        isFinitePositive(dimensionMm) && dimensionMm * factor === before[index],
     )
   );
 }
@@ -111,8 +113,8 @@ function naturalAspectMatches(intended: MeshReliefObject, candidate: MeshReliefO
   const intendedAspect = intendedHeightMm / intendedWidthMm;
   const candidateAspect = candidateHeightMm / candidateWidthMm;
   return (
-    positiveFinite(intendedAspect) &&
-    positiveFinite(candidateAspect) &&
+    isFinitePositive(intendedAspect) &&
+    isFinitePositive(candidateAspect) &&
     intendedAspect === candidateAspect
   );
 }
@@ -126,8 +128,8 @@ function materializerDimensionsMatch(
   const before = nativeMaterializerDimensions(intended, aspect);
   const after = nativeMaterializerDimensions(candidate, aspect);
   return (
-    positiveFinite(before.widthMm) &&
-    positiveFinite(before.heightMm) &&
+    isFinitePositive(before.widthMm) &&
+    isFinitePositive(before.heightMm) &&
     before.widthMm === after.widthMm &&
     before.heightMm === after.heightMm
   );
@@ -138,9 +140,9 @@ function intrinsicMeshAspect(relief: MeshReliefObject): number | null {
   if (bounds === null || !Object.values(bounds).every(Number.isFinite)) return null;
   const xExtent = bounds.maxX - bounds.minX;
   const yExtent = bounds.maxY - bounds.minY;
-  if (!positiveFinite(xExtent) || !positiveFinite(yExtent)) return null;
+  if (!isFinitePositive(xExtent) || !isFinitePositive(yExtent)) return null;
   const aspect = yExtent / xExtent;
-  return positiveFinite(aspect) ? aspect : null;
+  return isFinitePositive(aspect) ? aspect : null;
 }
 
 function safelyReadMeshBounds(relief: MeshReliefObject): ReturnType<typeof meshBounds> {
@@ -194,8 +196,4 @@ function unavailable(
   reason: ReliefLegacyWidthFactorizationFailure,
 ): ReliefLegacyWidthFactorization {
   return { kind: 'unavailable', reason, relief };
-}
-
-function positiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }

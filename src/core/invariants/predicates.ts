@@ -194,7 +194,9 @@ function appendAxisBoundsIssue(
   if (value === null) return;
   const physical = value + offset;
   if (physical < min || physical > max) {
-    issues.push({ lineNumber, line, reason: `${axis} out of bed: ${physical}` });
+    // Bed position, unlike the G-code coordinates Job Review's size shows
+    // (UX audit U4-P3-7).
+    issues.push({ lineNumber, line, reason: `${axis} out of bed: ${physical} (bed position)` });
   }
 }
 

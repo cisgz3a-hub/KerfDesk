@@ -54,6 +54,21 @@ describe('Windows ending the session during a job (ADR-548)', () => {
     expect(log).not.toHaveBeenCalled();
   });
 
+  // Rolling audit v11 W3-P1-1: main's socket write needs no window.
+  it('has main stop a network machine only when the session really ends during work', () => {
+    const window = fakeWindow();
+    const activity = createDesktopJobActivity();
+    const stopMachine = vi.fn(async () => ({ sessions: 1, sent: 1 }));
+    installSessionEndGuard(window, activity, vi.fn(), stopMachine);
+    window.emit('session-end', sessionEvent('shutdown'));
+    activity.set({ busy: true });
+    window.emit('query-session-end', sessionEvent('shutdown'));
+    expect(stopMachine).not.toHaveBeenCalled();
+    window.emit('query-session-end', sessionEvent('critical'));
+    window.emit('session-end', sessionEvent('shutdown'));
+    expect(stopMachine).toHaveBeenCalledTimes(2);
+  });
+
   it('tries Abort at once when Windows cannot be asked to wait', () => {
     const { window } = guarded(true);
     const event = sessionEvent('critical', 'shutdown');

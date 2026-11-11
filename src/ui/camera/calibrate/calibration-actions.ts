@@ -26,7 +26,9 @@ import {
 } from '../../../core/camera/target/bed-target';
 import { generateCameraBedTarget } from '../../../core/job/camera-bed-target-pattern';
 import type { Project, Vec2 } from '../../../core/scene';
+import { rotaryAppliesTo } from '../../../core/job/rotary-job';
 import { useStore } from '../../state';
+import { jobAwareAlert } from '../../state/job-aware-dialogs';
 import { useLaserStore } from '../../state/laser-store';
 import { cameraBedFrameFor } from '../../state/native-bed-frame';
 import {
@@ -90,6 +92,9 @@ export function calibrationTargetArea(
   return { x: (bedWidthMm - size) / 2, y: (bedHeightMm - size) / 2, width: size, height: size };
 }
 
+export const CAMERA_TARGET_ROTARY_MESSAGE =
+  'The rotary is on. The camera target is engraved on a flat sheet on the bed, so switch Rotary off beside Start, then engrave the target.';
+
 /** Stream the target as a temporary job; true once it has started. */
 export async function engraveCalibrationTarget(
   settings: CalibrationSettings,
@@ -97,6 +102,13 @@ export async function engraveCalibrationTarget(
 ): Promise<boolean> {
   const { project } = useStore.getState();
   const { device } = project;
+  // The rings belong on the flat bed. With the rotary on they would be
+  // wrapped round a part, or rebased onto a Y rotary's turn (ADR-228
+  // Amendment 3), so the target asks for the rotary to be switched off.
+  if (rotaryAppliesTo(device, { kind: 'laser' })) {
+    jobAwareAlert(CAMERA_TARGET_ROTARY_MESSAGE);
+    return false;
+  }
   const bedFrame = cameraBedFrameFor(device, useLaserStore.getState());
   const area = calibrationTargetArea(device.bedWidth, device.bedHeight, settings);
   const pattern = targetPattern(area, settings);

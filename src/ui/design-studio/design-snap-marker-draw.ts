@@ -11,6 +11,8 @@
 //   center       circle + crosshair — the centre, which is not on the geometry
 //   quadrant     hollow diamond     — a compass point on a rim
 //   intersection X                  — a crossing
+//   tangent      circle + top bar   — where a line from the start touches a rim
+//   perpendicular right-angle mark  — the foot of a right angle (ADR-272 Amd 6)
 //   on-line      short bar          — anywhere along an edge
 
 import type { SnapTarget } from '../../core/design/snap';
@@ -64,10 +66,35 @@ function drawGlyph(ctx: CanvasRenderingContext2D, at: Vec2, kind: SnapTarget['ki
     case 'intersection':
       strokeCross(ctx, at);
       return;
+    case 'tangent':
+      strokeTangent(ctx, at);
+      return;
+    case 'perpendicular':
+      strokePerpendicular(ctx, at);
+      return;
     case 'on-line':
       strokeBar(ctx, at);
       return;
   }
+}
+
+function strokeTangent(ctx: CanvasRenderingContext2D, at: Vec2): void {
+  ctx.beginPath();
+  ctx.arc(at.x, at.y + SIZE_PX * 0.4, SIZE_PX * 0.8, 0, TAU);
+  ctx.moveTo(at.x - SIZE_PX * 1.4, at.y - SIZE_PX * 0.4);
+  ctx.lineTo(at.x + SIZE_PX * 1.4, at.y - SIZE_PX * 0.4);
+  ctx.stroke();
+}
+
+// The draughting symbol for a right angle: a base line with an upright from
+// its centre.
+function strokePerpendicular(ctx: CanvasRenderingContext2D, at: Vec2): void {
+  ctx.beginPath();
+  ctx.moveTo(at.x - SIZE_PX, at.y + SIZE_PX);
+  ctx.lineTo(at.x + SIZE_PX, at.y + SIZE_PX);
+  ctx.moveTo(at.x, at.y + SIZE_PX);
+  ctx.lineTo(at.x, at.y - SIZE_PX);
+  ctx.stroke();
 }
 
 function strokeTriangle(ctx: CanvasRenderingContext2D, at: Vec2): void {

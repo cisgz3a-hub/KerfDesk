@@ -193,6 +193,7 @@ function TraceArtwork(props: {
         // Safe WITHOUT sanitization (LU9): state.svg is built locally by
         // coloredPathsToSvg from numbers and hex colors. Imported markup must
         // never reach this string without first passing through sanitizeSvg.
+        // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: state.svg }}
         aria-label={`Trace preview (${state.width}x${state.height} px)`}
       />

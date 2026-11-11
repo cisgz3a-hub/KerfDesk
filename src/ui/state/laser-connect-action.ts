@@ -5,6 +5,7 @@ import {
   connectAttemptIsCurrent,
   connectAttemptWasForgotten,
   type ConnectAttempt,
+  type WindowStreamReason,
 } from './laser-connect-attempt';
 import { runConnectAfterPermissionCleanup } from './laser-connect-permission-cleanup';
 import { disconnectedControllerQualification } from './laser-controller-qualification';
@@ -303,14 +304,28 @@ function reportBackgroundStreaming(
   host: PlatformAdapter['id'],
   optedOut: boolean,
 ): void {
-  // Job Review warns about a lit stop only where the window refills the stream.
-  set({ jobStreamHost: connection.hostedStreaming === undefined ? 'window' : 'worker' });
-  if (connection.backgroundStreamingUnavailable !== true) {
+  // Job Review warns about a lit stop only where the window refills the stream,
+  // and names the route that can reach a worker from here (ADR-676 Amd 5).
+  set({
+    jobStreamHost: connection.hostedStreaming === undefined ? 'window' : 'worker',
+    windowStreamReason: windowStreamReason(connection, optedOut),
+    connectionHost: host,
+  });
+  if (connection.backgroundStreamingUnavailable === undefined) {
     if (optedOut) set((state) => ({ log: pushLog(state, BACKGROUND_STREAMING_OFF_LOG) }));
     return;
   }
   set((state) => ({ log: pushLog(state, BACKGROUND_STREAMING_FALLBACK_LOG) }));
   useToastStore.getState().pushToast(backgroundStreamingFallbackWarning(host), 'warning');
+}
+
+function windowStreamReason(
+  connection: LiveConnection,
+  optedOut: boolean,
+): WindowStreamReason | null {
+  if (connection.hostedStreaming !== undefined) return null;
+  if (optedOut) return 'opted-out';
+  return connection.backgroundStreamingUnavailable ?? 'no-worker';
 }
 
 function optedOutOfWorker(options: ConnectControllerOptions, driver: ControllerDriver): boolean {

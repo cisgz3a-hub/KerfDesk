@@ -18,6 +18,7 @@ import {
 import type { PngImportWorkerProgress } from '../import/png-import-worker-client';
 import { freezeGif, isGif } from '../import/freeze-gif';
 import { loadImageSamples, type LoadedImageSamples } from '../import/prepare-image-samples';
+import { isAbortError } from '../../core/util/error-message';
 
 /** Imports the file into the scene; resolves with the created object (null
  * when skipped or failed) so callers like Image Studio can chain onto it. */
@@ -217,8 +218,4 @@ function pngProgressMessage(name: string, progress: PngImportWorkerProgress): st
 
 function decodingMessage(name: string): string {
   return `${name}: decoding and sampling in worker. Press Esc to cancel.`;
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError';
 }

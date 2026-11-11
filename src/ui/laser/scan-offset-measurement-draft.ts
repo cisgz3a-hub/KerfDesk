@@ -12,6 +12,8 @@ import {
   type ScanOffsetSpeedUnit,
 } from '../../core/devices/scan-offset-measurement-format';
 import { scanOffsetMagnitudeLimitMm } from '../../core/devices/scan-offset-profile';
+import { maxOf } from '../../core/util';
+import { isFinitePositive } from '../../core/util/finite';
 
 export type DraftScanOffsetMeasurement = {
   readonly speed: string;
@@ -95,7 +97,7 @@ export function nextDraftScanOffsetRow(
   const speeds = rows.map((row) => numberFromInput(row.speed)).filter(isFinitePositive);
   const increment =
     format.speedUnit === 'mm-per-second' ? NEXT_SPEED_MM_PER_SECOND : NEXT_SPEED_MM_PER_MIN;
-  const nextSpeed = speeds.length === 0 ? increment : Math.max(...speeds) + increment;
+  const nextSpeed = speeds.length === 0 ? increment : maxOf(speeds) + increment;
   return { speed: String(nextSpeed), offset: '' };
 }
 
@@ -163,7 +165,7 @@ function appendValidatedMeasurement(context: ValidationContext): void {
   }
   if (Math.abs(offset) > context.offsetLimitMm) {
     context.errors.push(
-      `Measurement ${rowNumber}: converted LaserForge offset must be between -${context.offsetLimitMm} and ${context.offsetLimitMm} mm for this bed.`,
+      `Measurement ${rowNumber}: converted KerfDesk offset must be between -${context.offsetLimitMm} and ${context.offsetLimitMm} mm for this bed.`,
     );
     return;
   }
@@ -210,8 +212,4 @@ function displayNumber(value: number): string {
 function numberFromInput(value: string): number {
   if (value.trim() === '') return Number.NaN;
   return Number(value);
-}
-
-function isFinitePositive(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }

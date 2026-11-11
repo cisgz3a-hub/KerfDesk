@@ -1,10 +1,4 @@
-import {
-  combinedBBox,
-  type Project,
-  type SceneGroup,
-  type SceneObject,
-  type Layer,
-} from '../../core/scene';
+import { combinedBBox, type Project, type SceneObject, type Layer } from '../../core/scene';
 import { nestRotation } from '../../core/nesting/quick-nest';
 import { unitVectorForDegrees } from '../../core/scene/array-layout-math';
 import type { ProductionNestPlacement } from '../../core/nesting/production-nest';
@@ -170,11 +164,6 @@ export function mergeProductionRecipeApplications(
   }
   return [...grouped.values()];
 }
-export type ProductionPartClone = {
-  readonly objects: ReadonlyArray<SceneObject>;
-  readonly groups: ReadonlyArray<SceneGroup>;
-};
-
 function hasCopiedRecipeProjection(
   application: ProcessRecipeApplication,
   operations: ReadonlyMap<string, string>,

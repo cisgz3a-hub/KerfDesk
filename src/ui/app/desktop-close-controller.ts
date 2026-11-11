@@ -49,6 +49,8 @@ interface CloseAttempt {
   preparedControllerOwner: DesktopCloseSnapshot['controllerOwner'];
   stoppedOwners: DesktopCloseSnapshot;
   approved: boolean;
+  /** Main asked this attempt to Save, so its approval is not a Don't Save. */
+  saveAsked: boolean;
   updateOnly: boolean;
 }
 
@@ -60,6 +62,7 @@ export class DesktopCloseController {
   private shownWarning: DesktopCloseSnapshot | null = null;
   private readonly listeners = new Set<() => void>();
   private readonly handledEvents = new WeakSet<Event>();
+  private readonly discardingUnloads = new WeakSet<Event>();
 
   constructor(
     private readonly read: () => DesktopCloseSnapshot,
@@ -101,6 +104,7 @@ export class DesktopCloseController {
       preparedControllerOwner: null,
       stoppedOwners: snapshot,
       approved: false,
+      saveAsked: false,
       updateOnly,
     };
     this.attempt = attempt;
@@ -162,6 +166,7 @@ export class DesktopCloseController {
     if (this.attempt?.id !== id || this.attempt.preparedDocument === null) {
       return { status: 'cancelled' };
     }
+    this.attempt.saveAsked = true;
     try {
       return (await saveProject()) ? { status: 'saved' } : { status: 'cancelled' };
     } catch {
@@ -198,12 +203,28 @@ export class DesktopCloseController {
     if (this.attempt === null) return false;
     this.handledEvents.add(event);
     const approved = this.attempt.approved && this.matchesPreparedState(this.attempt);
+    // Main asks to approve unsaved work only after its close question was
+    // answered Don't Save, or Save, which this attempt was then asked to run.
+    if (approved && this.attempt.preparedDirty && !this.attempt.saveAsked) {
+      this.discardingUnloads.add(event);
+    }
     this.attempt.approved = false;
     if (!approved) {
       event.preventDefault();
       event.returnValue = '';
     }
     return true;
+  }
+
+  /**
+   * True when this unload is the desktop close the operator answered Don't
+   * Save to (ADR-688 Amendment 3). A browser's own leave prompt, a reload, a
+   * clean document and a close that is no longer approved all answer false.
+   * It settles the event as the unload hooks do, in whichever order they run.
+   */
+  unloadDiscardsUnsavedWork(event: BeforeUnloadEvent): boolean {
+    this.handleBeforeUnload(event);
+    return this.discardingUnloads.has(event);
   }
 
   /** Browser fallback also joins an outstanding close stop after Keep open. */

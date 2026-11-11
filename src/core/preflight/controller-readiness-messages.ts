@@ -10,6 +10,8 @@
 // `speed_map` (Spindle.cpp:150-156, Spindle.h:106), and M4 is refused by a
 // spindle that is neither a Laser nor reversible (GCode.cpp:654-658).
 
+import { LASER_POWER_SCALE_CEILING } from './converted-laser-profile';
+
 /** Where the controller keeps `$30`/`$32`: writable `$N=` settings, or
  *  FluidNC's YAML spindle configuration (the only read-only dump). */
 export type ReadinessSettingsSource = 'dollar-settings' | 'fluidnc-yaml';
@@ -91,6 +93,39 @@ export function laserPowerRangeEmptyMessage(
   }
 }
 
+const SPINDLE_FULL_SPEED_AT_S0 =
+  'drives full PWM for every S, so the spindle runs at full speed even at S0 while M3 or M4 is on';
+const GRBLHAL_SPINDLE_ON_OFF =
+  'switches to on/off spindle control, so S no longer sets the spindle RPM';
+
+/** The CNC counterpart of `laserPowerRangeEmptyMessage` (ADR-567 Amendment
+ *  3): the same firmware facts, said of a spindle. Stock GRBL's full-PWM
+ *  result runs the spindle at full speed for every S; grblHAL's not-variable
+ *  spindle is switched on and off only. A Job Review warning, never a Start
+ *  guard (ADR-565). */
+export function spindlePowerRangeEmptyMessage(
+  maxS: number,
+  minS: number | undefined,
+  spindleMaxRpm: number,
+  firmware: PowerRangeFirmware,
+): string {
+  const range =
+    minS === undefined
+      ? `Controller reports $30=${maxS}, so there is no S spindle speed range.`
+      : `Controller $30=${maxS} is not above $31=${minS}, so there is no S spindle speed range.`;
+  const advice = `Set $30=${spindleMaxRpm}, the spindle's max RPM, with $31 below it before cutting.`;
+  switch (firmware) {
+    case 'grbl':
+      return `${range} Stock GRBL then ${SPINDLE_FULL_SPEED_AT_S0}. ${advice}`;
+    case 'grblhal':
+      return `${range} grblHAL then ${GRBLHAL_SPINDLE_ON_OFF}. ${advice}`;
+    case 'fluidnc':
+      return `${range} FluidNC reports $30 from the top of the spindle's speed_map in its YAML config, so check speed_map before cutting.`;
+    case 'unknown':
+      return `${range} Stock GRBL then ${SPINDLE_FULL_SPEED_AT_S0}; grblHAL instead ${GRBLHAL_SPINDLE_ON_OFF}. ${advice}`;
+  }
+}
+
 /** `$31` above zero with `$30` above it (controller audit v4 E1-P3-2). Stock
  *  GRBL's `spindle_compute_pwm_value` maps S linearly from `$31` up to `$30`
  *  and gives any S > 0 at or below `$31` the lowest PWM step (1 of 255), so
@@ -130,9 +165,16 @@ export function spindleScaleMismatchMessage(
   source: ReadinessSettingsSource,
 ): string {
   const mismatch = `Controller $30 is ${controllerMaxPowerS} but this machine's spindle max RPM is ${spindleMaxRpm}.`;
-  return source === 'fluidnc-yaml'
-    ? `${mismatch} FluidNC reports $30 from the top of the spindle's speed_map in its YAML config: change speed_map there to reach ${spindleMaxRpm}, or update the machine profile, so S values map to real RPM.`
-    : `${mismatch} Set $30=${spindleMaxRpm} (or update the machine profile) so S values map to real RPM.`;
+  if (source === 'fluidnc-yaml') {
+    return `${mismatch} FluidNC reports $30 from the top of the spindle's speed_map in its YAML config: change speed_map there to reach ${spindleMaxRpm}, or update the machine profile, so S values map to real RPM.`;
+  }
+  // A `$30` at a laser's power scale may be a laser set up as a CNC (KerfDesk
+  // 1.0.29 did that at `$32=0`, ADR-637 Amendment 8). Raising `$30` would not
+  // make that safe, so the laser comes first.
+  if (controllerMaxPowerS <= LASER_POWER_SCALE_CEILING && spindleMaxRpm > controllerMaxPowerS) {
+    return `${mismatch} ${controllerMaxPowerS} is the scale lasers use: if this machine is a laser, it is set up as a CNC and this job fires the beam at full power, so do not start it; open Machine Setup and choose Laser. If it is a router, set $30=${spindleMaxRpm} (or update the machine profile) so S values map to real RPM.`;
+  }
+  return `${mismatch} Set $30=${spindleMaxRpm} (or update the machine profile) so S values map to real RPM.`;
 }
 
 // GRBL's laser mode passes zero spindle speed on every non-cutting motion and
@@ -150,3 +192,12 @@ export function routerLaserModeMessage(source: ReadinessSettingsSource): string 
     ? FLUIDNC_CNC_LASER_MODE_ENABLED_MESSAGE
     : CNC_LASER_MODE_ENABLED_MESSAGE;
 }
+
+// ADR-180 Amendment 8 (rolling audit v11 W2-P2-1): KerfDesk never lifts the
+// bit on FluidNC, and FluidNC's door resume waits only the spindle's YAML
+// spinup_ms (Spindle.cpp spindleDelay, "@default 0") before the paused line
+// goes on. The paused-job panel says so, but a job started and paused from a
+// phone never shows that panel, so Start says it once for every route.
+// Settings: http://wiki.fluidnc.com/en/config/config_spindles (spinup_ms).
+export const FLUIDNC_RESUME_SPINUP_MESSAGE =
+  "FluidNC: if this job is paused, KerfDesk does not lift the bit, and Resume waits only the spindle's spinup_ms from the FluidNC config (0 unless set) before the cut goes on, so the bit is fed through the cut while it is still speeding up. Set spinup_ms in the spindle's section of the FluidNC config to its time to full speed, or after a pause use ABORT JOB and recover from the Interrupted job card instead of Resume.";

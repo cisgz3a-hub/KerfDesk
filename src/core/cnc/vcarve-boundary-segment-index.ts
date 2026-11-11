@@ -4,6 +4,8 @@ import {
   segmentToSegmentDistance,
   type BoundarySegment,
 } from './vcarve-detail-geometry';
+import { segmentBox, boxesOverlap } from '../geometry/box-math';
+import { isFinitePoint } from '../geometry/point-math';
 
 const SPATIAL_LEAF_SIZE = 8;
 const PRUNING_EPSILON_SCALE = 64;
@@ -58,7 +60,7 @@ export function minimumVCarveBoundaryPointDistance(
   point: Vec2,
 ): number {
   const index = asVCarveBoundarySegmentIndex(source);
-  if (index.root === null || !finitePoint(point)) {
+  if (index.root === null || !isFinitePoint(point)) {
     return linearPointDistance(index.segments, point);
   }
   return nearestPointInNode(index.root, point, Number.POSITIVE_INFINITY);
@@ -71,10 +73,10 @@ export function minimumVCarveBoundaryChordDistance(
   b: Vec2,
 ): number {
   const index = asVCarveBoundarySegmentIndex(source);
-  if (index.root === null || !finitePoint(a) || !finitePoint(b)) {
+  if (index.root === null || !isFinitePoint(a) || !isFinitePoint(b)) {
     return linearChordDistance(index.segments, a, b);
   }
-  const bounds = boxForPoints(a, b);
+  const bounds = segmentBox(a, b);
   return nearestChordInNode(index.root, bounds, a, b, Number.POSITIVE_INFINITY);
 }
 
@@ -236,15 +238,6 @@ function combinedBounds(entries: ReadonlyArray<VCarveBoundaryBox>): VCarveBounda
   return { minX, minY, maxX, maxY };
 }
 
-function boxForPoints(a: Vec2, b: Vec2): VCarveBoundaryBox {
-  return {
-    minX: Math.min(a.x, b.x),
-    minY: Math.min(a.y, b.y),
-    maxX: Math.max(a.x, b.x),
-    maxY: Math.max(a.y, b.y),
-  };
-}
-
 function compareEntries(
   a: IndexedBoundarySegment,
   b: IndexedBoundarySegment,
@@ -257,16 +250,8 @@ function compareEntries(
   return aPrimary - bPrimary || aSecondary - bSecondary || a.sourceIndex - b.sourceIndex;
 }
 
-function boxesOverlap(a: VCarveBoundaryBox, b: VCarveBoundaryBox): boolean {
-  return a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
-}
-
 function hasFiniteBounds(box: VCarveBoundaryBox): boolean {
   return [box.minX, box.minY, box.maxX, box.maxY].every(Number.isFinite);
-}
-
-function finitePoint(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
 }
 
 function isBoundaryIndex(

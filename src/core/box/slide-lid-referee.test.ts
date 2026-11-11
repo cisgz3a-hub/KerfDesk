@@ -5,7 +5,8 @@ import { buildSlideLidParts } from './slide-lid-panels';
 import { checkSlideLidAssembly, type SlideLidRefereePart } from './slide-lid-referee';
 
 // Inner 80×50×30 T=3: outer 86×56×39 (H + 3T), channel band [33, 36],
-// channel end at 53, front top at 33, lid 86 × 53.
+// channel end (the posts) at 50, front top at 33, lid 86 wide to the posts
+// with an 80 wide tongue on to the back wall's inner face at 53.
 const SPEC: BoxSpec = {
   widthMm: 80,
   depthMm: 50,
@@ -82,7 +83,29 @@ describe('slide-lid builder + referee', () => {
     if (lid === undefined) return;
     const ys = lid.rings.outline.points.map((point) => point.y);
     expect(Math.min(...ys)).toBeGreaterThanOrEqual(0);
-    expect(Math.max(...ys)).toBeLessThanOrEqual(10);
+    // Shoulders at outer depth − 2T = 10, tongue to the back wall at 13.
+    expect(Math.max(...ys)).toBe(13);
+    const notch = lid.rings.outline.points.filter((point) => point.y > 0 && point.y < 10);
+    expect(notch.length).toBeGreaterThan(0);
+    expect(Math.max(...notch.map((point) => point.y))).toBeLessThanOrEqual(5);
+  });
+
+  it('closes the back of the lid band with a tongue between the posts (ADR-116 Amd 1)', () => {
+    const lid = buildSlideLidParts(SPEC).find((part) => part.panel === 'lid');
+    expect(lid).toBeDefined();
+    if (lid === undefined) return;
+    const t = SPEC.thicknessMm;
+    const outerW = SPEC.widthMm + 2 * t;
+    const outerD = SPEC.depthMm + 2 * t;
+    const tongue = lid.rings.outline.points.filter((point) => point.y === outerD - t);
+    expect(tongue.map((point) => point.x).sort((a, b) => a - b)).toEqual([t, outerW - t]);
+    const shoulders = lid.rings.outline.points.filter((point) => point.y === outerD - 2 * t);
+    expect(shoulders.map((point) => point.x).sort((a, b) => a - b)).toEqual([
+      0,
+      t,
+      outerW - t,
+      outerW,
+    ]);
   });
 
   it('composes with dividers (slots land in the short front too)', () => {
@@ -132,6 +155,28 @@ describe('slide-lid referee — negative controls', () => {
     expect(checkSlideLidAssembly(parts, SPEC).some((issue) => issue.includes('channel'))).toBe(
       true,
     );
+  });
+
+  it('catches the old lid that stopped at the posts and left a slit at the back', () => {
+    const parts = nominalParts().map((part) =>
+      part.panel === 'lid'
+        ? {
+            panel: part.panel,
+            outline: {
+              closed: true,
+              points: part.outline.points
+                .slice(0, -1)
+                .filter((p) => p.y < 50)
+                .concat([
+                  { x: 86, y: 50 },
+                  { x: 0, y: 50 },
+                  { x: 0, y: 0 },
+                ]),
+            },
+          }
+        : part,
+    );
+    expect(checkSlideLidAssembly(parts, SPEC).some((issue) => issue.includes('lid'))).toBe(true);
   });
 
   it('catches a lid long enough to jam against the back wall', () => {

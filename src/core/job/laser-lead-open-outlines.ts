@@ -39,6 +39,7 @@ import { polylineToCurveSubpath, type Vec2 } from '../scene';
 import { ContourBoxIndex } from '../trace/contour-box-index';
 import { openOutlines, type OpenOutline } from './laser-lead-open-gaps';
 import { CLOSE_OPEN_FILL_CONTOUR_TOLERANCE_MM } from './open-fill-contours';
+import { boxesOverlap, unionBox } from '../geometry/box-math';
 
 /** Open lines whose ends come this close close a region: the gap Fill
  * already offers to close for an open contour. */
@@ -97,13 +98,13 @@ function closingLineHolders(
   // The offset engine failed: any contour the lines reach may be held.
   if (rings === null) {
     const reach = grown(boxOf(strokes.flatMap((line) => line.points)), STROKE_RADIUS_MM);
-    return boxes.map((box) => (overlaps(box, reach) ? first.operationName : undefined));
+    return boxes.map((box) => (boxesOverlap(box, reach) ? first.operationName : undefined));
   }
   const holes = rings.filter((ring) => ring.hole);
   if (holes.length === 0) return contours.map(() => undefined);
   return contours.map((points, index) => {
     const box = boxes[index] as Box;
-    if (!holes.some((hole) => overlaps(hole.box, box))) return undefined;
+    if (!holes.some((hole) => boxesOverlap(hole.box, box))) return undefined;
     for (const point of points) {
       const hole = enclosingHole(point, rings);
       if (hole !== null) return nearestOperation(hole, strokes);
@@ -198,11 +199,11 @@ function reachingStrokes(
   reach.forEach((box, index) => {
     const root = cluster(index);
     const known = extent.get(root);
-    extent.set(root, known === undefined ? box : merged(known, box));
+    extent.set(root, known === undefined ? box : unionBox(known, box));
   });
   const kept = new Set<number>();
   for (const [root, box] of extent) {
-    if (contours.some((contour) => overlaps(contour, box))) kept.add(root);
+    if (contours.some((contour) => boxesOverlap(contour, box))) kept.add(root);
   }
   return strokes.filter((_, index) => kept.has(cluster(index)));
 }
@@ -341,19 +342,6 @@ function contains(box: Box, point: Vec2): boolean {
   return point.x >= box.minX && point.x <= box.maxX && point.y >= box.minY && point.y <= box.maxY;
 }
 
-function overlaps(a: Box, b: Box): boolean {
-  return a.minX <= b.maxX && b.minX <= a.maxX && a.minY <= b.maxY && b.minY <= a.maxY;
-}
-
 function grown(box: Box, by: number): Box {
   return { minX: box.minX - by, minY: box.minY - by, maxX: box.maxX + by, maxY: box.maxY + by };
-}
-
-function merged(a: Box, b: Box): Box {
-  return {
-    minX: Math.min(a.minX, b.minX),
-    minY: Math.min(a.minY, b.minY),
-    maxX: Math.max(a.maxX, b.maxX),
-    maxY: Math.max(a.maxY, b.maxY),
-  };
 }

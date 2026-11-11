@@ -9,8 +9,24 @@ const originalDirectoryPickerDescriptor = Object.getOwnPropertyDescriptor(
 );
 
 const saveRequest = { suggestedName: 'out.gcode', extensions: ['.gcode'] };
+const originalCreateObjectUrl = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
+const originalRevokeObjectUrl = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL');
+
+function setUrlMember(name: 'createObjectURL' | 'revokeObjectURL', value: unknown): void {
+  Object.defineProperty(URL, name, { configurable: true, writable: true, value });
+}
+
+function restoreUrlMember(
+  name: 'createObjectURL' | 'revokeObjectURL',
+  descriptor: PropertyDescriptor | undefined,
+): void {
+  if (descriptor === undefined) Reflect.deleteProperty(URL, name);
+  else Object.defineProperty(URL, name, descriptor);
+}
 
 afterEach(() => {
+  restoreUrlMember('createObjectURL', originalCreateObjectUrl);
+  restoreUrlMember('revokeObjectURL', originalRevokeObjectUrl);
   if (originalSavePickerDescriptor === undefined) {
     Reflect.deleteProperty(window, 'showSaveFilePicker');
   } else {
@@ -116,9 +132,36 @@ describe('webAdapter save target', () => {
     expect(isSameEntry).toHaveBeenCalledWith(secondHandle);
   });
 
-  it('reports unsupported browsers with a clear error that names a browser that can save (ADR-688)', async () => {
+  it('downloads instead where there is no save picker (ADR-688 Amendment 2)', async () => {
     Object.defineProperty(window, 'showSaveFilePicker', { configurable: true, value: undefined });
+    Object.defineProperty(window, 'showDirectoryPicker', { configurable: true, value: undefined });
+    setUrlMember(
+      'createObjectURL',
+      vi.fn(() => 'blob:kerfdesk/1'),
+    );
+    setUrlMember('revokeObjectURL', vi.fn());
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
 
+    expect(webAdapter.savesByDownload?.()).toBe(true);
+    const target = await webAdapter.pickFileForSave(saveRequest);
+    expect(target?.delivery).toBe('download');
+    expect(target?.displayName).toBe(saveRequest.suggestedName);
+    await target?.write('bytes');
+    expect(click).toHaveBeenCalledTimes(1);
+
+    // A multi-file export downloads each file of the set.
+    const folder = await webAdapter.reserveSaveDirectory?.();
+    expect(folder?.file('tile-1.nc').delivery).toBe('download');
+    await expect(folder?.exists?.('tile-1.nc')).resolves.toBe(false);
+  });
+
+  it('names a browser that can save where it can neither pick nor download (ADR-688)', async () => {
+    Object.defineProperty(window, 'showSaveFilePicker', { configurable: true, value: undefined });
+    setUrlMember('createObjectURL', undefined);
+
+    expect(webAdapter.savesByDownload?.()).toBe(false);
     await expect(webAdapter.pickFileForSave(saveRequest)).rejects.toThrow(
       BROWSER_CANNOT_SAVE_FILES,
     );

@@ -24,29 +24,42 @@ export async function tryOpenNativeSerialConnection(args: {
   readonly serial?: Pick<Serial, 'getPorts'>;
   readonly createWorker?: () => NativeWorker;
   readonly timeoutMs?: number;
+  /** Told why a null answer leaves the port to the window (ADR-676 Amd 5). */
+  readonly onFallback?: (
+    reason: NonNullable<SerialConnection['backgroundStreamingUnavailable']>,
+  ) => void;
 }): Promise<SerialConnection | null> {
   const serial = args.serial ?? navigator.serial;
   const timeoutMs = args.timeoutMs ?? WORKER_HANDSHAKE_TIMEOUT_MS;
+  const notUnique = (): null => {
+    args.onFallback?.('adapter-not-unique');
+    return null;
+  };
+  const workerUnavailable = (): null => {
+    args.onFallback?.('worker-unavailable');
+    return null;
+  };
   const identity = await uniqueSelectedIdentity(serial, args.port, timeoutMs);
-  if (identity === null) return null;
+  if (identity === null) return notUnique();
   let worker: NativeWorker;
   try {
     worker =
       args.createWorker?.() ??
       new Worker(new URL('./native-serial-stream-worker.ts', import.meta.url), { type: 'module' });
   } catch {
-    return null;
+    return workerUnavailable();
   }
   const bridge = createNativeBridge(worker);
   let openSent = false;
   try {
     const ready = await waitForReply(bridge, { kind: 'native-probe', id: 1, identity }, timeoutMs);
-    if (
-      ready.kind !== 'native-ready' ||
-      (await uniqueSelectedIdentity(serial, args.port, timeoutMs, identity)) === null
-    ) {
+    if (ready.kind !== 'native-ready') {
       bridge.terminate();
-      return null;
+      return workerUnavailable();
+    }
+    if ((await uniqueSelectedIdentity(serial, args.port, timeoutMs, identity)) === null) {
+      bridge.terminate();
+      return notUnique();
     }
     // From here a delayed reply cannot prove the worker did not open the port.
     // Never fall back to a second owner after requesting native ownership.
@@ -61,7 +74,7 @@ export async function tryOpenNativeSerialConnection(args: {
   } catch (error) {
     bridge.terminate();
     if (openSent) throw error;
-    return null;
+    return workerUnavailable();
   }
 }
 

@@ -48,20 +48,27 @@ const A_COLUMNS: ReadonlyArray<{ name: string; x0: number; x1: number }> = [
   { name: 'A3(2nd of AA)', x0: 625, x1: 672 },
 ];
 
-it('renders new-problem audit crops via merged app options', { timeout: 120000 }, () => {
-  if (process.env['TRACE_AUDIT'] !== '1') return;
-  const fixture = requiredArchHouseFixtureStatus();
-  if (fixture.path === null) throw new Error('arch-house fixture missing');
-  mkdirSync(OUT_DIR, { recursive: true });
-  const image = decodePngFile(fixture.path);
-  const polylines = traceImageToEdgePaths(image, mergedAppEdgeOptions()).flatMap(
-    (p) => p.polylines,
-  );
-  writeCropRenders(image, polylines);
-  writeSliverCensus(polylines);
-  writeLumaProbe(image);
-  writeCounterCensus(polylines);
-});
+// Skipped, not passed, when the switch is off: an early return would count as a
+// passing test with no assertion (code quality audit C1, C8-P3-1).
+const RUN_TRACE_AUDIT = process.env['TRACE_AUDIT'] === '1';
+
+it.skipIf(!RUN_TRACE_AUDIT)(
+  'renders new-problem audit crops via merged app options',
+  { timeout: 120000 },
+  () => {
+    const fixture = requiredArchHouseFixtureStatus();
+    if (fixture.path === null) throw new Error('arch-house fixture missing');
+    mkdirSync(OUT_DIR, { recursive: true });
+    const image = decodePngFile(fixture.path);
+    const polylines = traceImageToEdgePaths(image, mergedAppEdgeOptions()).flatMap(
+      (p) => p.polylines,
+    );
+    writeCropRenders(image, polylines);
+    writeSliverCensus(polylines);
+    writeLumaProbe(image);
+    writeCounterCensus(polylines);
+  },
+);
 
 function writeCropRenders(image: RawImageData, polylines: ReadonlyArray<Polyline>): void {
   for (const crop of CROPS) {

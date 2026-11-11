@@ -88,9 +88,26 @@ export function JobCard({ machine }: { machine: MachineStatus }) {
 }
 
 export function RunningCard({ machine }: { machine: MachineStatus }) {
+  const operation = useApp((state) => state.operation);
+  const [confirming, setConfirming] = useState(false);
   const job = machine.job;
   const percent = Math.round(job.progressPercent ?? 0);
   const paused = job.state === 'paused';
+  // The PC's Resume warning for a paused CNC job (W2-P2-1), shown while paused. Where
+  // the PC prefers ABORT (a confirmation is required), Resume first opens it in a sheet
+  // that needs a slide (ADR-585 Amendment 2).
+  const advisory = paused ? job.resumeAdvisory : undefined;
+  const confirmation = advisory?.confirmation;
+  const resume = (confirmation?: string) => {
+    setConfirming(false);
+    void controller.machineAction(
+      'resume_job',
+      confirmation === undefined ? {} : { confirmAdvisory: confirmation },
+      false,
+    );
+  };
+  const refused =
+    operation?.kind === 'resume' && operation.state === 'failed' ? operation.message : undefined;
   return (
     <div className="card">
       <div className="card-title">
@@ -115,14 +132,20 @@ export function RunningCard({ machine }: { machine: MachineStatus }) {
           </div>
         </div>
       </div>
+      {advisory === undefined ? null : (
+        <div style={{ marginTop: 12 }}>
+          <Banner tone="warning">{advisory.message}</Banner>
+        </div>
+      )}
+      {refused === undefined || advisory !== undefined ? null : <p className="note">{refused}</p>}
       <div className="btn-row" style={{ marginTop: 12 }}>
         {paused ? (
           <ActionButton
             icon="play"
             label="Resume"
-            primary
+            primary={confirmation === undefined}
             availability={machine.availability.resume}
-            onClick={() => void controller.machineAction('resume_job', {}, false)}
+            onClick={() => (confirmation === undefined ? resume() : setConfirming(true))}
           />
         ) : (
           <ActionButton
@@ -133,6 +156,26 @@ export function RunningCard({ machine }: { machine: MachineStatus }) {
           />
         )}
       </div>
+      {confirming && advisory !== undefined && confirmation !== undefined ? (
+        <Sheet
+          title="Resume this job?"
+          onClose={() => setConfirming(false)}
+          footer={
+            <SlideToConfirm
+              label="Slide to resume"
+              ariaLabel="Slide to resume the paused job"
+              disabled={machine.availability.resume?.available === false}
+              onConfirm={() => resume(confirmation)}
+            />
+          }
+        >
+          <Banner tone="warning">{advisory.message}</Banner>
+          <p className="note">
+            The PC recommends ABORT instead (the button at the bottom). Sliding resumes the job on
+            the machine.
+          </p>
+        </Sheet>
+      ) : null}
     </div>
   );
 }
@@ -155,7 +198,14 @@ export function ReviewSheet() {
     <Sheet
       title="Review this job"
       onClose={close}
-      footer={<SlideToStart disabled={!review.frame.complete} onConfirm={start} />}
+      footer={
+        <SlideToConfirm
+          label="Slide to start"
+          ariaLabel="Slide to start the job"
+          disabled={!review.frame.complete}
+          onConfirm={start}
+        />
+      }
     >
       {!review.frame.complete ? (
         <Banner tone="warning">Frame this job before starting.</Banner>
@@ -214,8 +264,18 @@ export function ReviewSheet() {
   );
 }
 
-/** A deliberate gesture for a physical action; it only confirms the reviewed program. */
-function SlideToStart({ onConfirm, disabled }: { onConfirm: () => void; disabled: boolean }) {
+/** A deliberate gesture for a physical action: the reviewed Start, or a warned Resume. */
+function SlideToConfirm({
+  label,
+  ariaLabel,
+  onConfirm,
+  disabled,
+}: {
+  label: string;
+  ariaLabel: string;
+  onConfirm: () => void;
+  disabled: boolean;
+}) {
   const track = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState(0);
   const start = useRef<number | null>(null);
@@ -226,7 +286,7 @@ function SlideToStart({ onConfirm, disabled }: { onConfirm: () => void; disabled
       className={`slide${disabled ? ' disabled' : ''}`}
       style={{ flex: 1 }}
       role="slider"
-      aria-label="Slide to start the job"
+      aria-label={ariaLabel}
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round((offset / max()) * 100)}
@@ -261,7 +321,7 @@ function SlideToStart({ onConfirm, disabled }: { onConfirm: () => void; disabled
       }}
     >
       <div className="slide-fill" style={{ width: offset + 56 }} />
-      <div className="slide-label">Slide to start</div>
+      <div className="slide-label">{label}</div>
       <div className="slide-knob" style={{ transform: `translateX(${offset}px)` }}>
         <Icon name="play" />
       </div>

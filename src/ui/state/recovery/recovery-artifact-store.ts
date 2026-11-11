@@ -30,6 +30,7 @@ import {
   type StoredRecoveryArtifact,
 } from './recovery-model';
 import { recoveryFailure as failure, recoveryOk as ok } from './recovery-result';
+import { noteValidatedExecutionArtifact } from './validated-execution-artifacts';
 
 type ArtifactStoreHost = {
   readonly backend: RecoveryStorageBackend;
@@ -82,6 +83,10 @@ export class RecoveryArtifactStore {
       }
       if (inserted) this.stagedRecords.set(artifact.runId, record);
       else if (priorStaged?.generation !== generation) this.stagedRecords.delete(artifact.runId);
+      // This identity passed full validation above, through `run`. The
+      // refresh that activates it, right after the job's first line, reuses
+      // that instead of repeating it in one task (ADR-337 Amendment 2).
+      noteValidatedExecutionArtifact(artifact);
       this.host.noteStaged(artifact.runId);
       return ok(artifact.runId);
     } catch (error) {

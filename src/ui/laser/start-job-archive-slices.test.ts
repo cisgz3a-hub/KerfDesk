@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { buildMotionManifest } from '../../core/job/motion-manifest';
-import { DEFAULT_OUTPUT_SCOPE, createProject } from '../../core/scene';
+import { DEFAULT_OUTPUT_SCOPE, PROJECT_SCHEMA_VERSION, createProject } from '../../core/scene';
 import type { WorkSteps, WorkStepsRunner } from '../../core/recovery/work-steps';
 import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
 import { initialLaserState } from '../state/laser-store-helpers';
@@ -12,9 +12,11 @@ import { RecoveryRepository } from '../state/recovery';
 import { MemoryRecoveryStorageBackend } from '../state/recovery/recovery-backend';
 import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-generation';
 import {
+  activateAcceptedFreshRun,
   stageFreshExecutionArtifact,
   untrackedLaserRunRecord,
 } from './start-job-execution-tracking';
+import { observeFreshExecutionRetention } from './start-job-retained-execution';
 
 // ADR-337 Amendment 1: the accepted run's archive is built in slices. These
 // tests hold it to the archive a single call stores, byte for byte, and count
@@ -60,8 +62,11 @@ const RUN_ID = 'run-archive-slices';
 const ARCHIVE_TEST_TIMEOUT_MS = 30_000;
 const NOW = new Date('2026-11-04T09:00:00.000Z');
 /** sha256 of the archive `stageFreshExecutionArtifact` stored for this fixture
- * on main ede14589b, before the archive was sliced. */
+ * on main ede14589b, before the archive was sliced. That build wrote project
+ * schema 21; schema 22 (ADR-694) only adds an optional rotary taper, so the
+ * digest reads the archived project's schema version as the one it wrote. */
 const GOLDEN_ARCHIVE_DIGEST = '58b026e93a5bac50f8c1b626599cf5981ea05d9ee11964d7e76d73f5213ff4a4';
+const GOLDEN_PROJECT_SCHEMA_VERSION = 21;
 
 function program(moves: number): string {
   const lines = ['G21', 'G90', '; café', 'M4 S0'];
@@ -136,7 +141,7 @@ async function fixture() {
       unverifiedAcknowledged: false,
     } as unknown as LaserModeStartEvidence,
   };
-  return { args, backend, gcode, laser };
+  return { args, backend, gcode, laser, repository };
 }
 
 type Hash = ReturnType<typeof createHash>;
@@ -181,7 +186,12 @@ function canonicalDigest(value: unknown): string {
     hash.update(`O${keys.length}`);
     for (const key of keys) {
       hash.update(`K${key}`);
-      visit(record[key]);
+      const entry = record[key];
+      visit(
+        key === 'schemaVersion' && entry === PROJECT_SCHEMA_VERSION
+          ? GOLDEN_PROJECT_SCHEMA_VERSION
+          : entry,
+      );
     }
   };
   visit(value);
@@ -274,6 +284,55 @@ describe('the accepted run archive in slices', () => {
       // through the runner.
       expect(gcode.length).toBeGreaterThan(16 * (1 << 16));
       expect(runner.steps()).toBeGreaterThan(6 * Math.floor(gcode.length / (1 << 16)));
+    },
+    ARCHIVE_TEST_TIMEOUT_MS,
+  );
+
+  // ADR-337 Amendment 2 (rolling audit v10 V1-P1-1): the refresh that
+  // activates the run right after the first line re-validated the new archive
+  // in one task, 110-156 ms on 0.84-1.0 M-line rasters. The guard above
+  // stopped at staging, so it never saw that pass.
+  it(
+    'activates the archived run without a whole-program pass in one task',
+    async () => {
+      const { args, backend, gcode, repository } = await fixture();
+      const runner = everyStepRunner();
+      sync.watching = true;
+      const staged = await stageFreshExecutionArtifact({ ...args, run: runner.run });
+      const retention = observeFreshExecutionRetention(RUN_ID, repository);
+      await activateAcceptedFreshRun(
+        RUN_ID,
+        staged,
+        repository,
+        retention,
+        args.prepared,
+        () => undefined,
+      );
+      retention.stop();
+      sync.watching = false;
+      expect(staged.staged).toBe(true);
+      expect(repository.getSnapshot().activeRun?.runId).toBe(RUN_ID);
+      expect(repository.getSnapshot().activeRun?.artifact.gcode).toBe(gcode);
+      // Activation ran synchronous drains, and none of them crossed even one
+      // checkpoint (64 Ki characters of program, or one manifest batch).
+      expect(sync.drains).toBeGreaterThan(0);
+      expect(sync.checkpointsCrossed).toBe(0);
+
+      // The archive read back from storage is a new identity: a window that
+      // reopens it (here as the interrupted run's recovery) validates it in full.
+      const reopened = new RecoveryRepository({
+        backend,
+        generationStore: new MemoryRecoveryGenerationStore(),
+        legacyStorage: { read: () => null, clear: () => undefined },
+      });
+      sync.watching = true;
+      await reopened.initialize();
+      sync.watching = false;
+      expect(reopened.getSnapshot().recoveryCapsule?.runId).toBe(RUN_ID);
+      expect(reopened.getSnapshot().recoveryCapsule?.artifact).not.toBe(
+        repository.getSnapshot().activeRun?.artifact,
+      );
+      expect(sync.checkpointsCrossed).toBeGreaterThan(Math.floor(gcode.length / (1 << 16)));
     },
     ARCHIVE_TEST_TIMEOUT_MS,
   );

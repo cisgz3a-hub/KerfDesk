@@ -9,6 +9,7 @@
 import type { Vec2 } from '../scene';
 import type { MinFeatureWorkMeter } from './feature-budget';
 import { StackedOutlines } from './stacked-outlines';
+import { isFinitePoint, samePoint } from '../geometry/point-math';
 
 export type MinFeaturePath = {
   readonly points: ReadonlyArray<Vec2>;
@@ -66,14 +67,6 @@ const MAX_GRID_CELLS = 1_000_000;
 const PIECE_LENGTH_PER_RADIUS = 2;
 
 type Segment = { readonly a: Vec2; readonly b: Vec2 };
-
-function isFinitePoint(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
-}
-
-function samePoint(a: Vec2, b: Vec2): boolean {
-  return a.x === b.x && a.y === b.y;
-}
 
 function pathSegments(path: MinFeaturePath): Segment[] {
   const out: Segment[] = [];

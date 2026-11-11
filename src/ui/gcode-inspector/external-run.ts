@@ -10,7 +10,7 @@
 
 import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import { streamingModeForController, type ControllerKind } from '../../core/devices';
-import type { ExternalProgramEnvelope } from '../../core/external-program';
+import type { ExternalProgramEnvelope, LitRapids } from '../../core/external-program';
 import type { KerfDeskBitFile } from '../../core/external-program/kerfdesk-bit-file';
 import { machineKindOf, type MachineKind, type Project } from '../../core/scene';
 import { confirmCncSetup } from '../laser/cnc-setup-acknowledgement';
@@ -20,6 +20,11 @@ import { prepareTransientFrameController } from '../laser/use-frame-action';
 import { startUntrackedRun } from '../laser/untracked-start-retirement';
 import { useStore } from '../state';
 import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
+import {
+  CONVERTED_LASER_HEADING,
+  CONVERTED_LASER_RISK,
+  convertedLaserQuestion,
+} from '../state/converted-laser-question';
 import type { FrameVerification } from '../state/frame-verification';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
@@ -37,6 +42,9 @@ export type ExternalRun = {
   readonly start: { readonly x: number; readonly y: number; readonly z: number };
   /** The bit its KerfDesk per-bit header names, read from the file as opened. */
   readonly bitFile?: KerfDeskBitFile;
+  /** The lit rapids the Inspector worker found in `gcode`, so Start's
+   * acknowledgement does not scan the program again (ADR-630 Amendment 9). */
+  readonly litRapids?: LitRapids | null;
 };
 
 /** A clean Frame of one external program, as the controller stood after it. */
@@ -55,6 +63,10 @@ export const EXTERNAL_MODE_CHANGED =
   'The machine mode changed after the Frame. Frame the program again.';
 export const EXTERNAL_HEAD_MOVED =
   'The head is not where the program was read from. It is read again from where the head stands; Frame again.';
+// A CNC that KerfDesk 1.0.29 may have made from a laser runs no program until
+// its owner says whether it is a laser (ADR-637 Amendment 11): on that machine
+// type the Run review's lit-rapid warning and laser-mode check do not apply.
+export const EXTERNAL_ASKS_IF_LASER = `${CONVERTED_LASER_HEADING} ${CONVERTED_LASER_RISK} Answer it first: on the canvas card or in Machine Setup, choose "It's a laser" or "This is a CNC router", then start the program.`;
 
 // Closer than this, two reported positions are the same spot (reports carry
 // three decimals of a millimetre).
@@ -185,10 +197,17 @@ export function externalStartIssue(
   laser: LaserState = useLaserStore.getState(),
   project: Project = useStore.getState().project,
 ): string | null {
+  // Asked before the Frame too, so the operator sees it before framing.
+  const asking = externalConvertedLaserIssue(laser, project);
+  if (asking !== null) return asking;
   if (frame === null || laser.frameVerification !== frame.verification) {
     return EXTERNAL_FRAME_FIRST;
   }
   return externalHandoffIssue(frame, laser, project);
+}
+
+function externalConvertedLaserIssue(laser: LaserState, project: Project): string | null {
+  return convertedLaserQuestion(project, laser) === null ? null : EXTERNAL_ASKS_IF_LASER;
 }
 
 /** The checks that must still hold at the final Start handoff, after the
@@ -202,6 +221,8 @@ function externalHandoffIssue(frame: ExternalFrame, laser: LaserState, project: 
     return EXTERNAL_FRAME_CHANGED;
   }
   if (machineKindOf(project.machine) !== frame.machineKind) return EXTERNAL_MODE_CHANGED;
+  const asking = externalConvertedLaserIssue(laser, project);
+  if (asking !== null) return asking;
   if (
     !controllerStartPreparationStillCurrent(frame.controller, laser, {
       ignoreAdvisoryControllerEvidence: true,
@@ -227,7 +248,7 @@ export async function startExternalProgram(frame: ExternalFrame): Promise<boolea
     captureLaserModeStartSnapshot(laser),
     jobAwareConfirm,
     gcode,
-    externalLaserModeStartPrompt(project, laser, gcode),
+    externalLaserModeStartPrompt(project, laser, gcode, frame.run.litRapids),
   );
   if (laserModeStartEvidence === null) return false;
   const cncSetupAttestation = confirmCncSetup(

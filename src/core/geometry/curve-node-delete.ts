@@ -21,6 +21,7 @@ import {
 import { ellipticalArcEndDirection } from '../scene/curve-path';
 import { evaluateCubic, fitCubicWithTangents, type CubicBezier } from './cubic-fit';
 import { fitCubicFree } from './cubic-fit-free';
+import { isFinitePoint, distance } from './point-math';
 
 // The polyline Delete's floors: an open run keeps one segment, a ring a triangle.
 const MIN_OPEN_NODES = 2;
@@ -134,7 +135,7 @@ function fittedCubic(
 }
 
 function finiteCubic(cubic: CubicBezier | null): CubicBezier | null {
-  return cubic !== null && finitePoint(cubic.p1) && finitePoint(cubic.p2) ? cubic : null;
+  return cubic !== null && isFinitePoint(cubic.p1) && isFinitePoint(cubic.p2) ? cubic : null;
 }
 
 // How far the fitted cubic and the removed segments' samples stray from each
@@ -259,12 +260,4 @@ function firstDirection(from: Vec2, targets: ReadonlyArray<Vec2>): Vec2 | null {
 function direction(from: Vec2, to: Vec2): Vec2 | null {
   const length = distance(from, to);
   return length <= EPSILON ? null : { x: (to.x - from.x) / length, y: (to.y - from.y) / length };
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(b.x - a.x, b.y - a.y);
-}
-
-function finitePoint(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
 }

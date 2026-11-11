@@ -112,6 +112,7 @@ export type CommandId =
   | 'tools.fill-selection'
   | 'tools.close-open-fill-contours'
   | 'tools.close-fill-contours-with-tolerance'
+  | 'tools.leave-white-unburned'
   | 'arrange.align-left'
   | 'arrange.align-center-x'
   | 'arrange.align-right'
@@ -142,9 +143,11 @@ export type CommandId =
   | 'window.fit-view'
   | 'window.project-notes'
   | 'window.undo-history'
+  | 'window.simple-view'
   | 'help.about'
   | 'help.find-command'
   | 'help.tutorials'
+  | 'help.first-job-guide'
   | 'help.keyboard-shortcuts'
   | 'help.connection'
   | 'help.safety'
@@ -213,6 +216,8 @@ export type AppCommandContext = CommandContextSlices & {
   readonly hasFillableSelection: boolean;
   readonly canCloseOpenFillContours: boolean;
   readonly canReviewCloseOpenFillContours: boolean;
+  // ADR-686 Amendment 2: an SVG import still burns solid white over a darker fill.
+  readonly canLeaveWhiteUnburned: boolean;
   readonly canApplyImageMask: boolean;
   readonly hasMaskedRasterSelection: boolean;
   readonly canPaste: boolean;
@@ -310,6 +315,7 @@ export type AppCommandContext = CommandContextSlices & {
   readonly fillSelectionSeparately: () => void;
   readonly closeSelectedOpenFillContours: () => void;
   readonly reviewCloseOpenFillContours: () => void;
+  readonly leaveWhiteUnburned: () => void;
   readonly applyImageMask: () => void;
   readonly cropImage: () => void;
   readonly removeImageMask: () => void;

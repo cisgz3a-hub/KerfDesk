@@ -25,6 +25,7 @@ import type { Vec2 } from '../scene';
 import { fieldLuma } from './contour-corner-field';
 import type { Leg } from './contour-corner-leg-runs';
 import type { CrackSubPixelField } from './saddle-connectivity';
+import { maxOf, minOf } from '../util';
 
 const LEG_FIT_SLACK_PX = 0.1;
 
@@ -51,10 +52,10 @@ export function apexContradictsInk(
   const legTriangle = [apex, footOn(legs.ahead, after), footOn(legs.back, before)];
   const slack = LEG_FIT_SLACK_PX * scale;
   const bounds = [...chords, ...legTriangle];
-  const minX = Math.min(...bounds.map((p) => p.x));
-  const maxX = Math.max(...bounds.map((p) => p.x));
-  const minY = Math.min(...bounds.map((p) => p.y));
-  const maxY = Math.max(...bounds.map((p) => p.y));
+  const minX = minOf(bounds.map((p) => p.x));
+  const maxX = maxOf(bounds.map((p) => p.x));
+  const minY = minOf(bounds.map((p) => p.y));
+  const maxY = maxOf(bounds.map((p) => p.y));
   // SOURCE pixel centres; on a supersampled mask the working pixel under each.
   for (let y = (Math.ceil(minY / scale - 0.5) + 0.5) * scale; y < maxY; y += scale) {
     for (let x = (Math.ceil(minX / scale - 0.5) + 0.5) * scale; x < maxX; x += scale) {
@@ -111,10 +112,10 @@ export function apexStandsInPaper(
   const near = [apex];
   for (let k = 0; k <= skip + 1; k += 1) near.push(cracks[(from + k) % n] as Vec2);
   const reach = LEVEL_REACH_PX * scale;
-  const x0 = Math.floor(Math.min(...near.map((p) => p.x)) - reach);
-  const x1 = Math.ceil(Math.max(...near.map((p) => p.x)) + reach);
-  const y0 = Math.floor(Math.min(...near.map((p) => p.y)) - reach);
-  const y1 = Math.ceil(Math.max(...near.map((p) => p.y)) + reach);
+  const x0 = Math.floor(minOf(near.map((p) => p.x)) - reach);
+  const x1 = Math.ceil(maxOf(near.map((p) => p.x)) + reach);
+  const y0 = Math.floor(minOf(near.map((p) => p.y)) - reach);
+  const y1 = Math.ceil(maxOf(near.map((p) => p.y)) + reach);
   let brightest = -Infinity;
   let ink = Infinity;
   const levels: number[] = [];

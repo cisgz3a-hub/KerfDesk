@@ -5,6 +5,7 @@ import { compiledFocusTestWarnings } from './focus-test-warnings';
 // compiled facts come from the prepared job.
 
 import type { OverrideValues } from '../../../core/controllers/grbl';
+import type { ConvertedLaserSuspicion } from '../../../core/preflight/converted-laser-profile';
 import type { JobOriginPlacement } from '../../../core/job';
 import {
   DEFAULT_OUTPUT_SCOPE,
@@ -40,10 +41,19 @@ import { detectConstantPowerFirmwareWarnings } from './constant-power-firmware-w
 import { detectManualAirAssistWarnings } from './manual-air-assist-warnings';
 import { detectMinFeatureWarnings } from './min-feature-warnings';
 import { oldProjectBurnReviewWarnings } from '../../state/old-project-burn-review';
+import { burningWhiteReviewWarnings } from '../../state/saved-white-notice';
 import { detectPresetCorrectionWarnings } from './preset-correction-warnings';
 import { detectStaleCatalogBitWarnings } from './stale-catalog-bit-warnings';
+import {
+  detectRotaryRowStepWarnings,
+  type RotaryAxisStepSettings,
+} from './rotary-row-step-warnings';
 import { detectParkOutsideFrameWarningsFromMetrics } from './park-outside-frame-warnings';
 import { detectRotaryRasterQualificationWarnings } from './rotary-raster-qualification-warnings';
+import {
+  detectRotarySurfaceSpeedWarnings,
+  type RotaryAxisRateSettings,
+} from './rotary-surface-speed-warnings';
 import {
   detectStreamThroughputWarnings,
   type StreamThroughputInput,
@@ -78,6 +88,9 @@ export interface JobReviewModel extends JobReviewOmissions, jig.ReviewFacts {
   readonly acknowledgement: JobReviewAcknowledgement;
   readonly outputQualityFacts: ReadonlyArray<JobReviewFact>;
   readonly effectiveOperations: ReturnType<typeof buildEffectiveOperationReview>;
+  /** A CNC that KerfDesk 1.0.29 may have made from a laser: Start waits until
+   * the operator says which it is (ADR-637 Amendment 8). Joined by the gate. */
+  readonly convertedLaser?: ConvertedLaserSuspicion;
 }
 
 export type JobReviewStreamThroughput = Pick<StreamThroughputInput, 'window' | 'controllerKind'>;
@@ -91,7 +104,20 @@ type JobReviewModelArgs = {
   /** Live streaming window for the connected controller (ADR-331); callers
    * without a live session omit it and get no throughput advisory. */
   readonly streamThroughput?: JobReviewStreamThroughput;
+  /** The live controller's $101/$102/$103, null when it reported no settings;
+   *  omitted without a live session (ADR-315 Amendment 1). Advisory only. */
+  readonly rotaryAxisSteps?: (RotaryAxisStepSettings & RotaryAxisRateSettings) | null;
 };
+
+/** The rotary disclosures (ADR-315 and its Amendment 1, ADR-127 Amendment 2). */
+function rotaryReviewWarnings(args: JobReviewModelArgs): ReadonlyArray<string> {
+  const { project, job } = args.prepared.prepared;
+  return [
+    ...detectRotaryRowStepWarnings(project, job, args.rotaryAxisSteps),
+    ...detectRotaryRasterQualificationWarnings(project, job),
+    ...detectRotarySurfaceSpeedWarnings(project, job, args.rotaryAxisSteps),
+  ];
+}
 
 export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
   if (args.prepared.laserSecondPassChain !== undefined) return buildSecondPassReviewModel(args);
@@ -126,6 +152,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
       ...detectManualAirAssistWarnings(args.prepared.prepared.job, args.project.device),
       ...detectPresetCorrectionWarnings(args.project.device),
       ...oldProjectBurnReviewWarnings(args.project),
+      ...burningWhiteReviewWarnings(args.project),
       ...detectStaleCatalogBitWarnings(args.project, args.prepared.cncToolPlan),
       ...jobReviewCncReachWarnings(args.prepared),
       ...detectAirAssistStartWarnings(
@@ -143,10 +170,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
         args.prepared.metrics.motionBounds,
         args.prepared.metrics.parkTarget,
       ),
-      ...detectRotaryRasterQualificationWarnings(
-        args.prepared.prepared.project,
-        args.prepared.prepared.job,
-      ),
+      ...rotaryReviewWarnings(args),
       ...detectArchiveCapacityWarnings(
         args.prepared,
         machineKind === 'laser',

@@ -4,6 +4,7 @@
 
 import type { Job } from '../../core/job';
 import { reliefProjectionOrderWarnings } from './cnc-relief-projection-order-warnings';
+import { reliefRoughingReachWarnings } from './cnc-relief-roughing-reach-warnings';
 import { DEFAULT_RELIEF_SCALLOP_MM, MAX_HEIGHTMAP_CELLS } from '../../core/relief';
 // Deep imports: core/relief's barrel is a ratcheted over-cap legacy barrel.
 import { reliefScallopBallRadiusMm } from '../../core/relief/relief-finishing';
@@ -22,6 +23,8 @@ import {
 } from '../../core/scene';
 // Deep import: core/cnc's barrel is a ratcheted over-cap legacy barrel.
 import { reliefMachineSpaceGeometry } from '../../core/cnc/relief-machine-space';
+import { maxOf, minOf } from '../../core/util';
+import { uniqueValues } from '../../core/util/unique';
 
 const RECOMMENDED_STEPOVER_MIN_PERCENT = 10;
 const RECOMMENDED_STEPOVER_MAX_PERCENT = 85;
@@ -45,13 +48,14 @@ export function detectCncReliefPlanningWarnings(
       stepoverOperations(project, compiled, sourceGeometryChecks),
     ),
     ...compiledReliefPlanningWarnings(project, compiled?.reliefPlans ?? []),
+    ...reliefRoughingReachWarnings(project, compiled?.reliefPlans ?? []),
     ...reliefProjectionOrderWarnings(project, compiledJob),
     ...sourceReliefPlanningWarnings(project, compiled, sourceGeometryChecks),
     ...(sourceGeometryChecks === 'full'
       ? [...mixedReliefLayerWarnings(project), ...overlappingReliefWarnings(project)]
       : []),
   ];
-  return unique(warnings);
+  return uniqueValues(warnings);
 }
 
 function stepoverOperations(
@@ -238,7 +242,7 @@ function projectedSpan(
   axis: Vec2,
 ): { readonly min: number; readonly max: number } {
   const along = polygon.map((point) => point.x * axis.x + point.y * axis.y);
-  return { min: Math.min(...along), max: Math.max(...along) };
+  return { min: minOf(along), max: maxOf(along) };
 }
 
 function oversizedReliefGridWarnings(project: Project, plan: CncReliefPlan): ReadonlyArray<string> {
@@ -398,10 +402,6 @@ function scallopWarning(
 
 function layerNameFor(project: Project, layerId: string): string {
   return project.scene.layers.find((layer) => layer.id === layerId)?.name ?? layerId;
-}
-
-function unique(warnings: ReadonlyArray<string>): ReadonlyArray<string> {
-  return [...new Set(warnings)];
 }
 
 function format(value: number): string {

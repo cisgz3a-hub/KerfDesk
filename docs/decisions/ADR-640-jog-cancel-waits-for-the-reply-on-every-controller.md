@@ -1,7 +1,10 @@
 ## ADR-640 - Jog cancel waits for the reply on every controller (2026-10-19)
 
 **Status:** Accepted. Amends ADR-375 finding 6 (M-6): the wait before the jog-cancel byte applies
-to every driver, not only grblHAL. | **Date:** 2026-10-19
+to every driver, not only grblHAL. Decision 2 amended by
+[ADR-696](ADR-696-a-dropped-motion-reply-is-proven-by-an-ordered-g.md): on a GRBL-family
+controller an ordered `$G` proves the missing reply was dropped and releases the owner in place;
+Disconnect remains the fallback. | **Date:** 2026-10-19
 
 ### Context
 

@@ -9,6 +9,7 @@ import {
   type Vec2,
 } from '../../../../core/scene';
 import { MIN_BOARD_DIMENSION_MM } from '../constants';
+import { distance } from '../../../../core/geometry/point-math';
 
 // A photo outline whose proportions differ from the typed size by more than this
 // was probably shot at an angle, or has width and height swapped.
@@ -179,8 +180,4 @@ function aspectNotice(
 
 function validSize(value: number): boolean {
   return Number.isFinite(value) && value >= MIN_BOARD_DIMENSION_MM && value <= 100_000;
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
 }

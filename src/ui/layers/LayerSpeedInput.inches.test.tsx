@@ -47,6 +47,7 @@ async function renderSpeed(speed: number, commit = vi.fn(), observe = vi.fn()) {
           selectedObjectCount: 1,
           reconcileKey: 'initial',
           commit,
+          owner: { operationId: layer.id },
         }}
       />,
     ),

@@ -280,7 +280,9 @@ describe('Frame transport and permit races', () => {
         useLaserStore
           .getState()
           .frame({ minX: 1, minY: 1, maxX: 11, maxY: 11 }, 1000, framedRunCandidate()),
-      ).rejects.toThrow(/operation is active|previous controller write and acknowledgement/i);
+      ).rejects.toThrow(
+        /jog or Frame is still running|previous controller write and acknowledgement/i,
+      );
       connection.emitLine('ok');
       await flush();
 
@@ -348,7 +350,9 @@ describe('Frame transport and permit races', () => {
       useLaserStore
         .getState()
         .frame({ minX: 1, minY: 1, maxX: 11, maxY: 11 }, 1000, framedRunCandidate()),
-    ).rejects.toThrow(/operation is active|previous controller write and acknowledgement/i);
+    ).rejects.toThrow(
+      /jog or Frame is still running|previous controller write and acknowledgement/i,
+    );
 
     connection.emitLine('ok');
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
@@ -379,7 +383,7 @@ describe('Frame transport and permit races', () => {
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
     expect(useLaserStore.getState().motionOperation).toMatchObject({ cancelRequested: true });
     await expect(useLaserStore.getState().jog({ dx: 1, feed: 500 })).rejects.toThrow(
-      /operation is active|previous controller write and acknowledgement/i,
+      /jog or Frame is still running|previous controller write and acknowledgement/i,
     );
     // Isolate the acknowledgement tombstone from the failed operation owner:
     // even if another recovery path retires that owner, Start remains fenced.

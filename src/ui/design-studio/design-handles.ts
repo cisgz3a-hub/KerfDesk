@@ -46,9 +46,6 @@ export type ResizeHandleId = ResizeHandleCorner | ResizeHandleEdge;
 // corner scale; 'x' and 'y' are the single-axis edge stretches.
 export type ResizeHandleAxis = 'both' | 'x' | 'y';
 
-// Grip size and grab radius in SCREEN pixels: a grip is a property of the hand
-// and the screen, so it keeps its size at any zoom or camera tilt.
-export const RESIZE_HANDLE_SIZE_PX = 9;
 export const RESIZE_HANDLE_GRAB_PX = 11;
 
 export type ResizeHandle = {

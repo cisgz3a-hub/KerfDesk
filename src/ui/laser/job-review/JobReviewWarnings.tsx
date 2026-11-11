@@ -7,8 +7,9 @@
 // their detail at once.
 // The router laser-mode-on row carries a one-click Send $32=0 (ADR-180
 // Amendment 6), its laser twin with laser mode off a Send $32=1 (ADR-637
-// Amendment 7), and a cut that runs before the engraving inside it a one-click
-// Cut last (ADR-480 Amendment 2).
+// Amendment 7), a cut that runs before the engraving inside it a one-click
+// Cut last (ADR-480 Amendment 2), and an imported logo that still burns its
+// white a one-click Leave white unburned (ADR-686 Amendment 2).
 // Never gates Confirm — these are the strings the start flow used to flash
 // in a toast, plus the job-intent set, held still and grouped. A beginner's
 // warnings lead, and motion-policy notes they cannot act on fold under
@@ -39,6 +40,8 @@ import { isControllerIdentityWarning } from '../controller-identity-warnings';
 import { isCutBeforeEngravingWarning } from '../cut-order-warnings';
 import { rankReviewNotes, technicalNotesLabel } from '../review-note-rank';
 import { CutLastButton } from './CutLastButton';
+import { LeaveWhiteUnburnedButton } from './LeaveWhiteUnburnedButton';
+import { isBurningWhiteWarning } from '../../state/saved-white-notice';
 import { splitReviewWarning } from './review-warning-headline';
 import { SendLaserModeButton } from './SendLaserModeButton';
 import { SendRouterModeButton } from './SendRouterModeButton';
@@ -119,6 +122,7 @@ function WarningItem(props: { readonly warning: string }): JSX.Element {
         {props.warning === CNC_LASER_MODE_ENABLED_MESSAGE ? <SendRouterModeButton /> : null}
         {props.warning === LASER_MODE_DISABLED_MESSAGE ? <SendLaserModeButton /> : null}
         {isCutBeforeEngravingWarning(props.warning) ? <CutLastButton /> : null}
+        {isBurningWhiteWarning(props.warning) ? <LeaveWhiteUnburnedButton /> : null}
       </div>
     </li>
   );
@@ -150,6 +154,7 @@ function opensWarningDetail(warning: string): boolean {
     isCncLaserModeMessage(warning) ||
     warning === LASER_MODE_DISABLED_MESSAGE ||
     isFocusTestMachineWarning(warning) ||
-    isCutBeforeEngravingWarning(warning)
+    isCutBeforeEngravingWarning(warning) ||
+    isBurningWhiteWarning(warning)
   );
 }

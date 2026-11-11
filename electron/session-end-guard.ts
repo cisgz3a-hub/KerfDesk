@@ -8,6 +8,12 @@
 // is reliable: once the session is ending, Windows can end the process before
 // the window's Abort leaves (ADR-548 Amendment 1). Each step goes to the
 // support log (ADR-546).
+//
+// A laser the controller reports on at Idle counts too: the window reports it
+// busy, as the ordinary close turns it off (rolling audit v11 W3-P2-1). When
+// the session ends anyway, main also writes a network session the whole stop
+// itself, synchronously: that needs no window, and Electron ends the process
+// as soon as `session-end` returns (W3-P1-1, ADR-548 Amendment 1).
 
 import { trustedAppRequest } from './app-route-guard.js';
 
@@ -20,7 +26,8 @@ export type DesktopJobProgress = {
   readonly state: 'running' | 'paused' | 'error';
 };
 
-/** The window's report: whether a job or a latched Fire runs, and the job's progress. */
+/** The window's report: whether a job, a latched Fire or a laser left on at Idle
+ *  would be cut off, and a streamed job's progress. */
 export type DesktopJobReport = {
   readonly busy: boolean;
   readonly job?: DesktopJobProgress;
@@ -82,7 +89,22 @@ export function installSessionEndGuard(
   window: SessionEndTarget,
   activity: DesktopJobActivity = DESKTOP_JOB_ACTIVITY,
   log: (message: string) => void = (message) => console.warn(message),
+  stopMachine: () => Promise<{ readonly sessions: number; readonly sent: number }> = () =>
+    Promise.resolve({ sessions: 0, sent: 0 }),
 ): void {
+  const ending = (reasons: ReadonlyArray<string>): void => {
+    log(`Windows is ending the session (${describe(reasons)}) during a job; ${TRYING_ABORT}`);
+    notify(window, 'ending', reasons);
+    // The writes leave before this returns; the log only follows if there is time.
+    void stopMachine().then(
+      ({ sessions, sent }) => {
+        if (sent > 0) log('Sent the network machine a reset, then M5 and M9.');
+        else if (sessions > 0)
+          log('Could not send the network machine a stop: its connection had failed.');
+      },
+      (error: unknown) => log(`Could not send the network machine a stop: ${String(error)}`),
+    );
+  };
   // A new or crashed page has no job; it reports one when a job starts.
   window.webContents.on('did-finish-load', () => activity.set(IDLE));
   window.webContents.on('render-process-gone', () => activity.set(IDLE));
@@ -91,8 +113,7 @@ export function installSessionEndGuard(
     const reasons = knownReasons(event.reasons);
     // A critical session end cannot be delayed; stop the job straight away.
     if (reasons.includes('critical')) {
-      log(`Windows is ending the session (${describe(reasons)}) during a job; ${TRYING_ABORT}`);
-      notify(window, 'ending', reasons);
+      ending(reasons);
       return;
     }
     event.preventDefault();
@@ -101,9 +122,7 @@ export function installSessionEndGuard(
   });
   window.on('session-end', (event) => {
     if (!activity.busy()) return;
-    const reasons = knownReasons(event.reasons);
-    log(`Windows is ending the session (${describe(reasons)}) during a job; ${TRYING_ABORT}`);
-    notify(window, 'ending', reasons);
+    ending(knownReasons(event.reasons));
   });
 }
 

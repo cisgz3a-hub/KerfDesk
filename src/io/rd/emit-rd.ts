@@ -3,7 +3,11 @@
 // the post-compile checks a G-code save runs over the moves the file commands.
 
 import { encodeRdJob, type RdEncodeError } from '../../core/controllers/ruida';
+import { rdFootprint, type RdFootprint } from '../../core/controllers/ruida/rd-frame-job';
+import { rdReferencePointFor } from '../../core/controllers/ruida/rd-encoder';
 import { machineSpaceJob, type JobOriginPlacement } from '../../core/job';
+import { rotaryOutputAxis } from '../../core/job/rotary-job';
+import { rotaryAxisUnsupportedMessage } from '../gcode/rotary-axis-emit';
 import type { PreflightIssue, PreflightOptions } from '../../core/preflight';
 import type { OutputScope, Project } from '../../core/scene';
 import { prepareOutput, type PreparedOutput, type PrepareOutputOptions } from '../gcode';
@@ -28,6 +32,8 @@ export type EmitRdResult =
       // findings plus the post-compile checks over the file's moves (audit
       // RU-7). handleSaveRd toasts them after the write.
       readonly advisories: ReadonlyArray<PreflightIssue>;
+      /** Where the job runs, for the Ruida network Frame and Start (ADR-697). */
+      readonly footprint: RdFootprint;
     }
   | { readonly ok: false; readonly messages: ReadonlyArray<string> };
 
@@ -52,6 +58,15 @@ export function emitPreparedRdFile(
   if (!prepared.ok) {
     return { ok: false, messages: prepared.preflight.issues.map((issue) => issue.message) };
   }
+  // A Ruida rotary turns on its own Y (ADR-695): a dedicated A or Z setup has
+  // no .rd form, so it gets no file rather than one that moves the gantry.
+  const rotaryAxis = rotaryOutputAxis(prepared.project.device, prepared.project.machine);
+  if (rotaryAxis !== null) {
+    return {
+      ok: false,
+      messages: [rotaryAxisUnsupportedMessage(prepared.project, rotaryAxis) ?? ''],
+    };
+  }
   // Ruida export is the twin of emitGcode: apply the same rotary machine-space
   // scaling so a saved .rd matches the streamed G-code (identity for
   // non-rotary; rotary raster is refused by the encoder below) — review R3.
@@ -67,9 +82,13 @@ export function emitPreparedRdFile(
   );
   if (!encoded.ok) return { ok: false, messages: [describeRdEncodeError(encoded.error)] };
   const checks = runRdPreflight(prepared.project, encoded.motion, preflightFrame(options));
+  const footprint = rdFootprint(encoded.motion, rdReferencePointFor(options.jobOrigin));
+  if (footprint === null)
+    return { ok: false, messages: [describeRdEncodeError({ kind: 'empty-job' })] };
   return {
     ok: true,
     bytes: encoded.bytes,
+    footprint,
     advisories: withoutRepeats([...(prepared.advisories ?? []), ...checks]),
   };
 }

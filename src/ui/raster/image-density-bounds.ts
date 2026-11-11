@@ -11,6 +11,7 @@ import {
   MAX_RASTER_LINES_PER_MM,
   MIN_RASTER_LINES_PER_MM,
 } from '../../core/raster';
+import { roundToDecimals } from '../../core/util/rounding';
 
 export type NumberBounds = { readonly min: number; readonly max: number };
 
@@ -21,8 +22,8 @@ export type ImageDensityBounds = {
 
 export function imageDensityBounds(storedLinesPerMm: number): ImageDensityBounds {
   // Rounded as the fields show them, so the shown stored value is in range.
-  const storedIntervalMm = roundTo(linesPerMmToLineIntervalMm(storedLinesPerMm), 4);
-  const storedDpi = roundTo(linesPerMmToDpi(storedLinesPerMm), 2);
+  const storedIntervalMm = roundToDecimals(linesPerMmToLineIntervalMm(storedLinesPerMm), 4);
+  const storedDpi = roundToDecimals(linesPerMmToDpi(storedLinesPerMm), 2);
   return {
     intervalMm: {
       min: Math.min(linesPerMmToLineIntervalMm(MAX_RASTER_LINES_PER_MM), storedIntervalMm),
@@ -33,8 +34,4 @@ export function imageDensityBounds(storedLinesPerMm: number): ImageDensityBounds
       max: Math.max(linesPerMmToDpi(MAX_RASTER_LINES_PER_MM), storedDpi),
     },
   };
-}
-
-function roundTo(value: number, decimals: number): number {
-  return Number(value.toFixed(decimals));
 }

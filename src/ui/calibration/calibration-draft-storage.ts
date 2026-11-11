@@ -1,3 +1,5 @@
+import { isRecord } from '../../core/util/is-record';
+
 type CalibrationDraftEnvelope<T extends object> = {
   readonly schemaVersion: 1;
   readonly draft: T;
@@ -57,10 +59,6 @@ function isDraftEnvelope(
 ): value is CalibrationDraftEnvelope<Record<string, unknown>> {
   if (!isRecord(value)) return false;
   return value['schemaVersion'] === 1 && isRecord(value['draft']);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function clearDraft(storage: Storage, key: string): void {

@@ -37,8 +37,3 @@ export interface ToolpathStepList extends Iterable<ToolpathStep> {
   slice(start?: number, end?: number): ToolpathStep[];
   entries(): IterableIterator<[number, ToolpathStep]>;
 }
-
-/** Materialize a route as a plain array. O(n) memory: only for bounded routes. */
-export function toolpathStepArray(steps: ToolpathStepList): ToolpathStep[] {
-  return Array.isArray(steps) ? (steps as ToolpathStep[]) : [...steps];
-}

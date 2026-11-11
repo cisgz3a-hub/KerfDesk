@@ -1,8 +1,10 @@
+import { projectJsonWithPublicCameraIdentities } from '../../io/project/public-camera-identity-json';
 import {
   nonemptyName,
   personalArtworkProject,
   type PersonalArtwork,
 } from './personal-artwork-model';
+import { isRecord } from '../../core/util/is-record';
 
 export function serializePersonalArtworkLibrary(entries: readonly PersonalArtwork[]): string {
   return `${JSON.stringify({ format: 'kerfdesk-artwork-library', version: 1, entries }, null, 2)}\n`;
@@ -41,13 +43,10 @@ export function parsePersonalArtwork(raw: unknown): PersonalArtwork {
     id: raw['id'],
     name: nonemptyName(raw['name']),
     category: raw['category'],
-    projectJson: raw['projectJson'],
+    // Entries saved by an older version keep no camera login (ADR-692).
+    projectJson: projectJsonWithPublicCameraIdentities(raw['projectJson']),
     selectedObjectIds: raw['selectedObjectIds'] as string[],
   };
   personalArtworkProject(entry);
   return entry;
-}
-
-function isRecord(raw: unknown): raw is Record<string, unknown> {
-  return typeof raw === 'object' && raw !== null && !Array.isArray(raw);
 }

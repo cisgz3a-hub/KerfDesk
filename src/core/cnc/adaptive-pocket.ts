@@ -2,12 +2,9 @@ import { isPositiveD } from 'clipper2-ts';
 import { adaptiveIslandSequences } from './adaptive-pocket-islands';
 import { orderAdaptivePocketSequences } from './adaptive-pocket-order';
 import type { Polyline } from '../scene';
-import {
-  canonicalAdaptivePocketPaths,
-  componentRegions,
-  toPolyline,
-} from './adaptive-pocket-geometry';
+import { canonicalAdaptivePocketPaths, componentRegions } from './adaptive-pocket-geometry';
 import { sequencesForComponent, type AdaptivePocketSequence } from './adaptive-pocket-sequences';
+import { isFinitePositive } from '../util/finite';
 
 export type { AdaptivePocketSequence } from './adaptive-pocket-sequences';
 
@@ -56,19 +53,12 @@ export function planAdaptivePocket(
     : { ok: true, sequences: orderAdaptivePocketSequences(contours, sequences), optimalLoadMm };
 }
 
-export function canonicalAdaptivePocketContours(
-  contours: ReadonlyArray<Polyline>,
-): ReadonlyArray<Polyline> | null {
-  const paths = canonicalAdaptivePocketPaths(contours);
-  return paths === null ? null : paths.map(toPolyline);
-}
-
 function requestIssue(
   contours: ReadonlyArray<Polyline>,
   toolDiameterMm: number,
   optimalLoadMm: number,
 ): string | null {
-  if (!positiveFinite(toolDiameterMm) || !positiveFinite(optimalLoadMm)) {
+  if (!isFinitePositive(toolDiameterMm) || !isFinitePositive(optimalLoadMm)) {
     return 'Adaptive bit diameter and optimal load must be positive and finite.';
   }
   if (optimalLoadMm > toolDiameterMm / 2) {
@@ -77,8 +67,4 @@ function requestIssue(
   return contours.some((contour) => !contour.closed || contour.points.length < MIN_POINTS)
     ? 'Adaptive clearing requires closed pocket contours.'
     : null;
-}
-
-function positiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }

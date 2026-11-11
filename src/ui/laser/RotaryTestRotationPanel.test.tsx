@@ -120,7 +120,9 @@ describe('Rotary Setup Test rotation', () => {
     act(() => button('Turn roller once').click());
     await settle();
     expect(jogCalls).toEqual([{ dy: 40, feed: 240 }]);
-    expect(status()).toContain('Turning one revolution: 40 machine mm at 240 mm/min, about 10 s.');
+    expect(status()).toContain(
+      'Turning one revolution on Y: 40 machine mm at 240 mm/min, about 10 s.',
+    );
     expect(button('Apply').disabled).toBe(true);
     expect(button('Generate test pattern').disabled).toBe(true);
 

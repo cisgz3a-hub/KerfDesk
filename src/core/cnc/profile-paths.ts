@@ -11,7 +11,8 @@
 // they outline comes out one cut width off (ADR-672).
 
 import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
-import type { Polyline, Vec2 } from '../scene';
+import type { Polyline } from '../scene';
+import { isFinitePoint } from '../geometry/point-math';
 
 export type ProfileSide = 'outside' | 'inside' | 'on-path';
 
@@ -23,10 +24,6 @@ const MIN_CLOSED_POINTS = 3;
 // draft shape) is unmachinable — drop it instead of forwarding the poison.
 export function hasFinitePoints(polyline: Polyline): boolean {
   return polyline.points.every(isFinitePoint);
-}
-
-function isFinitePoint(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
 }
 
 // allowanceMm is the finish allowance ("stock to leave"): the roughing pass is

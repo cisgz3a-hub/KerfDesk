@@ -2,6 +2,7 @@ import { frameBoundsSignature, machineSpaceJob, type JobBounds } from '../../cor
 import { computeFrameJobBounds, computeFrameJobMotionBounds } from '../../core/job/job-bounds';
 import type { PreparedOutput } from '../../io/gcode';
 import type { PreparedJobMetrics } from './prepared-job-metrics';
+import { isFiniteBox } from '../../core/geometry/box-math';
 
 /**
  * The rectangles a Frame traces, known as soon as the job is compiled and
@@ -46,7 +47,7 @@ export function traceableFrameBoundsPreview(
 ): TraceableFrameBoundsPreview | null {
   if (preview === null || preview.frameJobBounds === null) return null;
   const frameMotionBounds = preview.frameMotionBounds ?? preview.frameJobBounds;
-  if (!finiteBounds(preview.frameJobBounds) || !finiteBounds(frameMotionBounds)) return null;
+  if (!isFiniteBox(preview.frameJobBounds) || !isFiniteBox(frameMotionBounds)) return null;
   return { ...preview, frameJobBounds: preview.frameJobBounds, frameMotionBounds };
 }
 
@@ -70,13 +71,4 @@ export function frameBoundsPreviewMatches(
 function sameBounds(left: JobBounds | null, right: JobBounds | null): boolean {
   if (left === null || right === null) return left === right;
   return frameBoundsSignature(left) === frameBoundsSignature(right);
-}
-
-function finiteBounds(bounds: JobBounds): boolean {
-  return (
-    Number.isFinite(bounds.minX) &&
-    Number.isFinite(bounds.minY) &&
-    Number.isFinite(bounds.maxX) &&
-    Number.isFinite(bounds.maxY)
-  );
 }

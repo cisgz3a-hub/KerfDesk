@@ -1,6 +1,8 @@
 import type { Vec2 } from '../scene/scene-object';
 import type { ReliefVectorMask } from '../scene/relief/relief-authoring';
 import { reliefBoundaryContains } from './relief-vector-boundary';
+import { maxOf, minOf } from '../util';
+import { crossAbout } from '../geometry/point-math';
 
 type NormalizedFootprint = {
   readonly polygon: ReadonlyArray<Vec2>;
@@ -31,10 +33,10 @@ export function reliefVectorFootprintCovered(
 }
 
 function normalizedFootprint(corners: ReadonlyArray<Vec2>): NormalizedFootprint {
-  const minX = Math.min(...corners.map((p) => p.x)),
-    minY = Math.min(...corners.map((p) => p.y)),
-    width = Math.max(...corners.map((p) => p.x)) - minX,
-    height = Math.max(...corners.map((p) => p.y)) - minY;
+  const minX = minOf(corners.map((p) => p.x)),
+    minY = minOf(corners.map((p) => p.y)),
+    width = maxOf(corners.map((p) => p.x)) - minX,
+    height = maxOf(corners.map((p) => p.y)) - minY;
   if (!(width > 0 && height > 0) || !Number.isFinite(width) || !Number.isFinite(height))
     throw new Error('Relief cell footprint collapses or exceeds the finite coordinate range.');
   const normalize = (p: Vec2): Vec2 => ({ x: (p.x - minX) / width, y: (p.y - minY) / height });
@@ -43,7 +45,7 @@ function normalizedFootprint(corners: ReadonlyArray<Vec2>): NormalizedFootprint 
     x: minX + width * (polygon.reduce((sum, p) => sum + p.x, 0) / 4),
     y: minY + height * (polygon.reduce((sum, p) => sum + p.y, 0) / 4),
   };
-  const sign = Math.sign(cross(pointAt(polygon, 0), pointAt(polygon, 1), pointAt(polygon, 2)));
+  const sign = Math.sign(crossAbout(pointAt(polygon, 0), pointAt(polygon, 1), pointAt(polygon, 2)));
   return { polygon, centre, sign, normalize };
 }
 
@@ -53,10 +55,6 @@ function pointAt(points: ReadonlyArray<Vec2>, index: number): Vec2 {
   return point;
 }
 
-function cross(a: Vec2, b: Vec2, p: Vec2): number {
-  return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
-}
-
 /** Clip to a convex cell, then distinguish its interior from coincident edges. */
 function segmentVisitsInterior(a: Vec2, b: Vec2, cell: ReadonlyArray<Vec2>, sign: number): boolean {
   let low = 0,
@@ -64,8 +62,8 @@ function segmentVisitsInterior(a: Vec2, b: Vec2, cell: ReadonlyArray<Vec2>, sign
   for (let i = 0; i < cell.length; i += 1) {
     const start = pointAt(cell, i),
       end = pointAt(cell, (i + 1) % cell.length);
-    const atA = sign * cross(start, end, a),
-      atB = sign * cross(start, end, b);
+    const atA = sign * crossAbout(start, end, a),
+      atB = sign * crossAbout(start, end, b);
     if (!Number.isFinite(atA) || !Number.isFinite(atB))
       throw new Error('Relief boundary intersection exceeds the finite coordinate range.');
     if (atA < 0 && atB < 0) return false;
@@ -77,6 +75,6 @@ function segmentVisitsInterior(a: Vec2, b: Vec2, cell: ReadonlyArray<Vec2>, sign
   const p = { x: a.x * (1 - fraction) + b.x * fraction, y: a.y * (1 - fraction) + b.y * fraction };
   return cell.every(
     (start, i) =>
-      sign * cross(start, pointAt(cell, (i + 1) % cell.length), p) > 64 * Number.EPSILON,
+      sign * crossAbout(start, pointAt(cell, (i + 1) % cell.length), p) > 64 * Number.EPSILON,
   );
 }

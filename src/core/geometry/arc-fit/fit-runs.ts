@@ -48,6 +48,7 @@ import {
   ARC_FIT_MAX_CHORD_TANGENT_DEG,
   ARC_FIT_MAX_KINK_DEG,
 } from './arc-fit-limits';
+import { dot } from '../point-math';
 
 export type SmoothRun = {
   readonly points: ReadonlyArray<Vec2>;
@@ -297,8 +298,4 @@ function circumcenter(a: Vec2, b: Vec2, c: Vec2): Vec2 | null {
     x: (a2 * (b.y - c.y) + b2 * (c.y - a.y) + c2 * (a.y - b.y)) / d,
     y: (a2 * (c.x - b.x) + b2 * (a.x - c.x) + c2 * (b.x - a.x)) / d,
   };
-}
-
-function dot(a: Vec2, b: Vec2): number {
-  return a.x * b.x + a.y * b.y;
 }

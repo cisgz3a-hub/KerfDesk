@@ -2,6 +2,8 @@ import { areaD, FillRule, intersectD, type PathsD } from 'clipper2-ts';
 import { nestRotation, type NestPlacement, type NestRect } from './quick-nest';
 import { outlinesCloserThan } from './outline-clearance';
 import type { NestOutline, OutlineNestItem } from './outline-compact-nest';
+import { maxOf, minOf } from '../util';
+import { finiteNonNegative } from '../util/finite';
 const AREA_EPSILON = 1e-7;
 
 export type PlacedState = {
@@ -101,10 +103,10 @@ export function pathsBounds(paths: PathsD): NestRect | null {
   const points = paths.flat();
   if (points.length === 0) return null;
   return {
-    minX: Math.min(...points.map((point) => point.x)),
-    minY: Math.min(...points.map((point) => point.y)),
-    maxX: Math.max(...points.map((point) => point.x)),
-    maxY: Math.max(...points.map((point) => point.y)),
+    minX: minOf(points.map((point) => point.x)),
+    minY: minOf(points.map((point) => point.y)),
+    maxX: maxOf(points.map((point) => point.x)),
+    maxY: maxOf(points.map((point) => point.y)),
   };
 }
 
@@ -146,6 +148,4 @@ export function rectangleOutline(width: number, height: number): NestOutline {
   ];
 }
 
-export function finiteNonNegative(value: number): number {
-  return Number.isFinite(value) ? Math.max(0, value) : 0;
-}
+export { finiteNonNegative } from '../util/finite';

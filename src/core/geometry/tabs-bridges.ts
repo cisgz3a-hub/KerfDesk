@@ -1,5 +1,8 @@
 import type { Polyline, Vec2 } from '../scene';
 import { evenlyNestedShapes } from './tab-inner-shapes';
+import { distance } from './point-math';
+import { modulo } from '../math/wrap';
+import { withoutNegativeZero } from '../util/rounding';
 
 export type AutomaticTabsSettings = {
   readonly tabsEnabled: boolean;
@@ -279,7 +282,10 @@ function pointAtDistance(
     const edgeLength = edgeEnd - edgeStart;
     if (edgeLength <= EPS) return a;
     const t = Math.max(0, Math.min(1, (d - edgeStart) / edgeLength));
-    return { x: cleanCoord(a.x + (b.x - a.x) * t), y: cleanCoord(a.y + (b.y - a.y) * t) };
+    return {
+      x: withoutNegativeZero(a.x + (b.x - a.x) * t),
+      y: withoutNegativeZero(a.y + (b.y - a.y) * t),
+    };
   }
   return points[0] as Vec2;
 }
@@ -322,20 +328,8 @@ function dedupeConsecutive(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
   return out;
 }
 
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(b.x - a.x, b.y - a.y);
-}
-
-function modulo(value: number, divisor: number): number {
-  return ((value % divisor) + divisor) % divisor;
-}
-
 function pointsEqual(a: Vec2, b: Vec2): boolean {
   return Math.abs(a.x - b.x) <= EPS && Math.abs(a.y - b.y) <= EPS;
-}
-
-function cleanCoord(value: number): number {
-  return Object.is(value, -0) ? 0 : value;
 }
 
 // ADR-494 (LBG-C05): the laser Line tab layouts in tab-layout.ts (by spacing,

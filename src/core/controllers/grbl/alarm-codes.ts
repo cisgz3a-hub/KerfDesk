@@ -11,7 +11,9 @@
 // Alarms lock out G-code until the controller is unlocked (`$X`) or homed
 // (`$H`); hard and soft limit alarms (1, 2) first need a soft reset. Position
 // is "lost" — meaning the controller no longer trusts its work coordinates —
-// whenever motion stopped abruptly or homing did not finish.
+// whenever motion stopped abruptly or homing did not finish. Unlock keeps the
+// reported position only for a code marked false here, so false needs a
+// firmware source (alarm-position-kept.ts, ADR-367 Amendment 3).
 //
 // UI surfaces these messages on the F-B9 modal. F-A10 preflight does not
 // reference these (it runs before any streaming).
@@ -167,7 +169,12 @@ const GRBLHAL_ALARM_CODES: ReadonlyArray<AlarmDescription> = [
     code: 13,
     title: 'Probe protection triggered (grblHAL)',
     detail: 'The probe protection input tripped during motion.',
-    positionLost: false,
+    // Was false. A probe input that trips during a cycle or jog stops it at
+    // once, and grblHAL marks the position lost when the motors were still
+    // stepping (ADR-367 Amendment 3; probe-failure-alarm.ts):
+    // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/system.c#L137-L140
+    // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L568-L571
+    positionLost: true,
     action: 'Check the probe wiring, soft-reset, then $X to unlock.',
   },
   {

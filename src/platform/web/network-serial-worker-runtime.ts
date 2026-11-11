@@ -22,6 +22,7 @@ import {
   type NetworkSerialWorkerResponse,
   type NetworkSessionRoute,
 } from './network-serial-worker-protocol';
+import { errorMessage } from '../../core/util/error-message';
 
 type RuntimeDeps = {
   readonly post: (message: NetworkSerialWorkerResponse) => void;
@@ -131,7 +132,7 @@ async function attach(
   } catch (error) {
     if (state.phase !== 'attaching') return;
     state.phase = 'closed';
-    deps.post({ kind: 'network-unavailable', id: request.id, reason: describeError(error) });
+    deps.post({ kind: 'network-unavailable', id: request.id, reason: errorMessage(error) });
   }
 }
 
@@ -349,8 +350,4 @@ function encodeBase64(bytes: Uint8Array): string {
 
 function decodeBase64(encoded: string): Uint8Array {
   return Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
-}
-
-function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

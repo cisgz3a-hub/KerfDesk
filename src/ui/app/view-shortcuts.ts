@@ -3,7 +3,7 @@
 //   * P (preview toggle), F and 0 (fit), Shift+F (fit to selection), F12 (side panels)
 //   * + / = zoom in and - zoom out
 
-import { isEditableShortcutTarget } from '../common/keyboard-targets';
+import { focusedControlOwnsKey } from '../common/keyboard-targets';
 
 export type ViewCtx = {
   readonly togglePreview: () => void;
@@ -51,7 +51,7 @@ function tryZoomKey(e: KeyboardEvent, ctx: ViewCtx): boolean {
 }
 
 export function handleViewShortcut(e: KeyboardEvent, ctx: ViewCtx): boolean {
-  if (isEditableShortcutTarget(e.target)) return false;
+  if (focusedControlOwnsKey(e)) return false;
   if (tryToggleSidePanels(e, ctx)) return true;
   if (tryShiftFitToSelection(e, ctx)) return true;
   if (tryZoomKey(e, ctx)) return true;

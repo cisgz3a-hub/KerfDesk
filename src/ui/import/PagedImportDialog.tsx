@@ -6,6 +6,7 @@ import { pageArtworkObject } from './page-artwork-object';
 import type { PreparedArtworkPage } from './paged-artwork-source';
 import { usePagedImportStore, type PagedImportRequest } from './paged-import-store';
 import { PageImageSourceNote } from './PageImageSourceNote';
+import { errorMessage } from '../../core/util/error-message';
 
 export function PagedImportDialog(): JSX.Element | null {
   const request = usePagedImportStore((state) => state.request);
@@ -49,7 +50,7 @@ function usePageImport(request: PagedImportRequest) {
       );
     } catch (failure) {
       if (controller.signal.aborted || usePagedImportStore.getState().request !== request) return;
-      setError(errorText(failure));
+      setError(errorMessage(failure));
       setBusy(false);
     }
   };
@@ -173,7 +174,7 @@ function usePreparedPage(request: PagedImportRequest, number: number) {
           if (active) setLoaded({ request, number, page, error: null });
         })
         .catch((failure: unknown) => {
-          if (active) setLoaded({ request, number, page: null, error: errorText(failure) });
+          if (active) setLoaded({ request, number, page: null, error: errorMessage(failure) });
         });
     }
     return () => {
@@ -244,8 +245,4 @@ function PagePreview({
       ) : null}
     </>
   );
-}
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

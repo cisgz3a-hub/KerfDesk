@@ -6,30 +6,26 @@ import {
   RELIEF_AUTHORING_MAX_STROKES,
   RELIEF_AUTHORING_MAX_WORK,
 } from '../scene/relief/relief-authoring';
-import type {
-  ReliefAuthoringDocument,
-  ReliefSculptStroke,
-  ReliefVectorMask,
-} from '../scene/relief/relief-authoring';
+import type { ReliefSculptStroke, ReliefVectorMask } from '../scene/relief/relief-authoring';
 import { reliefBoundaryError } from './relief-vector-boundary';
 import { reliefStrokeDabs } from './relief-sculpt';
+import { isRecord } from '../util/is-record';
+import { isFiniteNumber } from '../util/finite';
 
 type RecordValue = Record<string, unknown>;
-const record = (v: unknown): v is RecordValue =>
-  typeof v === 'object' && v !== null && !Array.isArray(v);
-const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-const positive = (v: unknown): v is number => finite(v) && v > 0;
+const positive = (v: unknown): v is number => isFiniteNumber(v) && v > 0;
 const integer = (v: unknown): v is number => positive(v) && Number.isSafeInteger(v);
 const text = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 1024;
 const all = (values: readonly boolean[]): boolean => values.every(Boolean);
-const pointValid = (v: unknown): boolean => record(v) && all([finite(v['x']), finite(v['y'])]);
+const pointValid = (v: unknown): boolean =>
+  isRecord(v) && all([isFiniteNumber(v['x']), isFiniteNumber(v['y'])]);
 const firstError = (values: readonly (string | null)[]): string | null =>
   values.find((v) => v !== null) ?? null;
 const requirement = (valid: boolean, error: string): string | null => (valid ? null : error);
 
 /** Admission bounds field storage, geometry, stroke dabs and total raster work. */
 export function reliefAuthoringError(value: unknown): string | null {
-  if (!record(value)) return 'Missing retained relief document.';
+  if (!isRecord(value)) return 'Missing retained relief document.';
   const header = headerError(value);
   if (header !== null) return header;
   const levels = value['levels'],
@@ -64,7 +60,7 @@ function headerError(v: RecordValue): string | null {
       'Unsupported retained relief document.',
     ),
     requirement(
-      finite(v['revision']) && Number.isSafeInteger(v['revision']) && v['revision'] >= 0,
+      isFiniteNumber(v['revision']) && Number.isSafeInteger(v['revision']) && v['revision'] >= 0,
       'Invalid relief revision.',
     ),
     requirement(
@@ -76,7 +72,7 @@ function headerError(v: RecordValue): string | null {
         positive(v['physicalWidthMm']),
         positive(v['physicalHeightMm']),
         positive(v['maxDepthMm']),
-        finite(v['baselineHeightMm']),
+        isFiniteNumber(v['baselineHeightMm']),
       ]),
       'Relief dimensions, depth and baseline must be finite millimetres.',
     ),
@@ -123,7 +119,7 @@ function collectionError(
   ]);
 }
 function levelError(v: unknown, ids: Set<string>): string | null {
-  if (!record(v)) return 'Invalid relief level.';
+  if (!isRecord(v)) return 'Invalid relief level.';
   if (
     !all([
       text(v['id']),
@@ -142,7 +138,7 @@ function componentError(
   ids: Set<string>,
   algorithmRevision: unknown,
 ): string | null {
-  if (!record(v)) return 'Invalid relief component.';
+  if (!isRecord(v)) return 'Invalid relief component.';
   const meta = all([
     text(v['id']),
     !ids.has(String(v['id'])),
@@ -155,7 +151,7 @@ function componentError(
   ids.add(v['id'] as string);
   const parameters = all([
     ['add', 'subtract', 'max', 'min', 'replace'].includes(String(v['combineMode'])),
-    finite(v['baseHeightMm']),
+    isFiniteNumber(v['baseHeightMm']),
     positive(v['heightScale']),
     transformValid(v['transform']),
   ]);
@@ -166,7 +162,7 @@ function componentError(
   ]);
 }
 function sourceError(v: unknown, algorithmRevision: unknown): string | null {
-  if (!record(v)) return 'Missing relief component source.';
+  if (!isRecord(v)) return 'Missing relief component source.';
   if (v['kind'] === 'retained-field-v1') return retainedFieldSizeError(v['field']);
   if (v['kind'] === 'rail-profile-v1')
     return reliefRailProfileError(v, algorithmRevision === 'retained-relief-v1');
@@ -174,14 +170,14 @@ function sourceError(v: unknown, algorithmRevision: unknown): string | null {
   const valid = all([
     v['kind'] === 'vector-shape-v1',
     ['plane', 'dome', 'slope'].includes(String(v['profile'])),
-    finite(height) && height >= 0,
-    finite(v['angleDeg']),
+    isFiniteNumber(height) && height >= 0,
+    isFiniteNumber(v['angleDeg']),
   ]);
   if (!valid) return 'Unsupported single-valued relief generator.';
   return maskErrorFor(v['boundary'], false);
 }
 function retainedFieldSizeError(v: unknown): string | null {
-  if (!record(v) || !integer(v['width']) || !integer(v['height']))
+  if (!isRecord(v) || !integer(v['width']) || !integer(v['height']))
     return 'Invalid retained source field size.';
   return requirement(
     v['kind'] === 'heightfield-v1' && v['width'] * v['height'] <= RELIEF_AUTHORING_MAX_CELLS,
@@ -232,7 +228,7 @@ function strokeError(
   components: Set<string>,
   ids: Set<string>,
 ): string | null {
-  if (!record(v)) return 'Invalid relief sculpt stroke.';
+  if (!isRecord(v)) return 'Invalid relief sculpt stroke.';
   const meta = all([
     v['schemaVersion'] === 1,
     text(v['id']),
@@ -248,7 +244,7 @@ function strokeError(
     ['add', 'remove', 'smooth', 'flatten'].includes(String(v['mode'])),
     positive(v['diameterMm']),
     positive(strength),
-    finite(height) && height >= 0 && height <= depth,
+    isFiniteNumber(height) && height >= 0 && height <= depth,
     optionalPositive(v['metricScaleX']),
     optionalPositive(v['metricScaleY']),
   ]);
@@ -270,7 +266,7 @@ function optionalMaskError(v: unknown): string | null {
   return v === undefined ? null : maskErrorFor(v);
 }
 function maskErrorFor(v: unknown, allowEmpty = true): string | null {
-  if (!record(v) || !Array.isArray(v['rings'])) return 'Invalid relief vector mask.';
+  if (!isRecord(v) || !Array.isArray(v['rings'])) return 'Invalid relief vector mask.';
   if (
     !all([
       v['rings'].length <= 128,
@@ -284,7 +280,7 @@ function maskErrorFor(v: unknown, allowEmpty = true): string | null {
 }
 function ringValid(v: unknown): boolean {
   return (
-    record(v) &&
+    isRecord(v) &&
     typeof v['closed'] === 'boolean' &&
     Array.isArray(v['points']) &&
     v['points'].every(pointValid)
@@ -292,18 +288,15 @@ function ringValid(v: unknown): boolean {
 }
 function transformValid(v: unknown): boolean {
   return (
-    record(v) &&
+    isRecord(v) &&
     all([
-      finite(v['x']),
-      finite(v['y']),
+      isFiniteNumber(v['x']),
+      isFiniteNumber(v['y']),
       positive(v['scaleX']),
       positive(v['scaleY']),
-      finite(v['rotationDeg']),
+      isFiniteNumber(v['rotationDeg']),
       typeof v['mirrorX'] === 'boolean',
       typeof v['mirrorY'] === 'boolean',
     ])
   );
-}
-export function admittedReliefDocument(value: unknown): value is ReliefAuthoringDocument {
-  return reliefAuthoringError(value) === null;
 }

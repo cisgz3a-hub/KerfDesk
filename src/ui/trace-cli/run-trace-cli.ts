@@ -16,6 +16,7 @@ import { traceImageInThreadWithFallback } from '../trace/use-trace-worker-client
 import { traceCliHelp } from './trace-cli-help';
 import { parseTraceCliArgs, TraceCliUsageError, type TraceCliOptions } from './trace-cli-options';
 import { traceCliSource, type TraceCliSource } from './trace-cli-source';
+import { errorMessage } from '../../core/util/error-message';
 
 export type TraceCliIo = {
   /** The input file's bytes; `null` reads standard input. */
@@ -32,7 +33,7 @@ export async function runTraceCli(argv: ReadonlyArray<string>, io: TraceCliIo): 
   try {
     options = parseTraceCliArgs(argv);
   } catch (error) {
-    io.writeError(`kerfdesk-trace: ${message(error)}\n`);
+    io.writeError(`kerfdesk-trace: ${errorMessage(error)}\n`);
     return TRACE_CLI_EXIT.usage;
   }
   if (options.help) {
@@ -53,7 +54,7 @@ export async function runTraceCli(argv: ReadonlyArray<string>, io: TraceCliIo): 
     await io.writeOutput(options.output, text);
     return TRACE_CLI_EXIT.ok;
   } catch (error) {
-    io.writeError(`kerfdesk-trace: ${message(error)}\n`);
+    io.writeError(`kerfdesk-trace: ${errorMessage(error)}\n`);
     return error instanceof TraceCliUsageError ? TRACE_CLI_EXIT.usage : TRACE_CLI_EXIT.failed;
   }
 }
@@ -141,8 +142,4 @@ export function nativeGridOptions(
   const native = { width: grid.width, height: grid.height };
   const preview = scaleToCap(native.width, native.height, PREVIEW_MAX_EDGE_PX);
   return traceOptionsForCommitGrid(options, { grid: native, preview });
-}
-
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

@@ -52,6 +52,8 @@ User profile:
 ## Delivery targets
 
 - **Web app/PWA:** unchanged first-class delivery target on Chromium browsers (Chrome, Edge, Brave, Arc) on any OS. WebSerial provides machine connection; the File System Access API handles projects. It remains PWA-installable and fully offline (ADR-060).
+  - *Firefox and Safari:* no file pickers, so Open works only by dropping a file on the canvas, and Save, Save As and every export download the file instead (ADR-688 Amendment 2).
+  - *Keep-awake:* a browser keeps the computer awake only while the KerfDesk tab is visible, so a hidden or minimised tab can let it sleep mid-job. The app says so before a browser Start and while it happens (ADR-117 Amendment 1).
   - *Brave note:* WebSerial is shipped but Brave may gate it behind a Shields/flags toggle in some versions (upstream issue brave-browser#24404, status last re-verified 2026-05-28 — still open). Surface a one-line "Enable WebSerial in Brave settings" hint in the F-B1 connect error path.
 - **Windows desktop preview packaging:** the checked-in Preview workflow builds an unsigned KerfDesk NSIS package for Windows 10/11 x64. Publication still requires an authorized exact-version tag and recorded real-OS qualification.
 - **macOS desktop preview packaging:** the checked-in Preview workflow builds separate unsigned and unnotarized KerfDesk DMGs for macOS 13+ x64 and arm64. Publication still requires an authorized exact-version tag and recorded real-OS qualification.
@@ -273,14 +275,22 @@ Verified end-to-end against scripted firmware simulators
 - **I.4 — Smoothieware** (ADR-096, amended by ADR-322): realtime ? status,
   M999 halt recovery, native M221 power mode, fractional vector/raster S power,
   and queued host pause. Generic realtime hold/resume is unavailable. Simulator-verified only.
-- **I.5 — Ruida** (ADR-097): EXPERIMENTAL `.rd` export (encode→decode round-trip
-  proven; NOT accepted by real hardware yet); `transport: 'file-only'` — no live
-  link; pure UDP session state machine as groundwork.
+- **I.5 — Ruida** (ADR-097, ADR-697): EXPERIMENTAL `.rd` export (encode→decode round-trip
+  proven; NOT accepted by real hardware yet). The line-based controller store still treats Ruida as
+  `transport: 'file-only'`. On the desktop app an experimental UDP link (ADR-697) streams the
+  `.rd` job, frames it with a travel-only job, and sends Pause, Resume, Abort and status reads;
+  jog, home, console and settings stay off. Simulator-tested only; NOT qualified on a real
+  controller. Browsers have no UDP, so the web app stays export-only.
 - **I.6 — Controller/profile compatibility** (ADR-157): detected firmware,
   streaming mode, receive window, output dialect and active driver are reconciled.
   The buffered receive window is bounded by the capacity the controller reports
   (ADR-331). Policy findings are advisory in Job Review; completed Frame for the
   exact job remains the sole ordinary Start policy gate (ADRs 228/230/232/237).
+- **I.9 — Moshiboard** (ADR-705): EXPERIMENTAL live link over the CH341 USB bridge (ADR-702),
+  from MeerK40t's public Moshi module. Frame (a laser-off program), Start, Abort (estop) and Home
+  only; frame-first Start unchanged. No file export: no public Moshi file format exists. A
+  Moshiboard has no software power control, so layer power above 0 only switches the beam on.
+  Simulator-tested only; NOT qualified on hardware.
 
 **Qualification:** The 2026-09-19 audit found no reproducible physical evidence supporting
 the former Falcon hardware-verification claim. The catalogue now separates researched,
@@ -326,6 +336,12 @@ mandatory play). Every new junction type extends the assembly referee
 and the seeded benchmark — new categories must score 100% without
 regressing v1. Deferred with names in ADR-116: lip/hinged/living-hinge
 lids, polygon prisms, dovetails, CNC dado 2.5D, T-slot hardware joints.
+
+**K.3 — more box styles [Built; hardware fit CLAIMED].** ADR-693 adds
+`lift-lid` (open-top body, lid on the rim, glued locating lip with the
+full clearance as play) and `open-front` (cubby/shelf, back-only depth,
+dividers across the width ending flush at the opening). ADR-116 Amd 1
+gives the slide lid a tongue to the back wall: no slit, located sideways.
 
 ### Phase L — v0.11 "Image Studio" [In progress — IE-1 under construction]
 
@@ -393,13 +409,14 @@ byte-identical for unchanged input. Design + research:
 | DS-2 | Overlay shell: host + lazy chunk + session store + local undo + Esc ladder + two-rail palette + status bar + canvas with bed/grid/geometry paint, rAF coalescing, cursor-anchored zoom | Built |
 | DS-3 | Drawing tools: Line/Rect/Circle drag gestures with Shift/Alt modifiers; Polyline/Arc point sequences with phase guidance and shared 2D/3D preview; click/marquee selection, grid/object snap, ortho | Built |
 | DS-3b | Floating precision inspector: per-shape editable dimensions, derived measurements (area / perimeter / circumference / chord / arc length), and a draughting-style dimension call-out drawn on the shape while a field is touched | Built |
-| DS-3c | Typed numeric entry during a draw gesture, per-tool options bar | Planned |
+| DS-3c | Typed numeric entry during a draw gesture (length / angle / width / height / radius / diameter / sweep locks typed into the options bar; click-move-click drafts), per-tool options bar (ADR-272 Amendment 5) | Built |
 | DS-4 | Object-snap engine (`core/design/snap/`): endpoint / midpoint / centre / quadrant / intersection / on-edge, ranked so geometry always beats the grid, each with its own on-canvas glyph and a status-bar readout | Built |
-| DS-4b | Polar/angle tracking, tangent and perpendicular snaps, alignment guides between objects | Planned |
+| DS-4b | Polar/angle tracking, tangent and perpendicular snaps, alignment guides between objects — deferred snaps from the gesture start, polar step picker, point and moving-box alignment, drawn guides in 2D and 3D (ADR-272 Amendment 6) | Built |
 | DS-5 | Apply → commits designed geometry as one project undo entry; rect/circle land parametric, line/arc/path bake exact. **End-to-end slice closed** — verified from sketch through `compileJob` to emitted G-code | Built |
 | DS-6 | Corner ops in `core/design/ops/`: fillet (tangent arc at the shared chord tolerance) and chamfer (exact, no sampling), both refusing a size that will not fit rather than clamping | Built (core) |
-| DS-6b | Fillet and chamfer wired to the Modify rail with a context-sensitive options bar (trim/extend still planned) | Built |
-| DS-7 | Dimensions: infer-from-selection tool, driving vs driven, dimension-driven edit | Planned |
+| DS-6b | Fillet and chamfer wired to the Modify rail with a context-sensitive options bar (Extend shipped after; Trim is DS-6c) | Built |
+| DS-6c | Trim to boundary: quick trim of the hovered piece between its nearest crossings, exact for lines, polylines, square rectangles, circles and arcs (ADR-272 Amendment 8) | Built |
+| DS-7 | Dimensions: infer-from-selection tool, driving vs driven, dimension-driven edit — seven kinds (length, segment, width, height, diameter, radius, angle), local exact re-solve, driving values enforced on every Studio state, saved in the Studio document (ADR-272 Amendment 7) | Built |
 | DS-8 | Layered carve (ADR-272 Amendment 1): design layers with per-layer cut type / depth / bit, layers panel with assign-selection, per-bit simulate pass, Apply → one operation per layer feeding the existing multi-bit tool-change job | Built |
 | DS-8b | The canvas becomes the 3D design space (ADR-272 Amendment 2): stock on a grid, drawing on its top face through the shared gesture machine, carve live underneath, Fusion input mapping (left = tool, middle pan, Shift+middle/right orbit, wheel zoom-to-cursor), Top/Iso presets, Design/Bits tiers in the viewport toolbar, 2D canvas kept as fallback toggle | In progress |
 | DS-9 | `SketchShape` arm on `ShapeSpec` — parametric round-trip through `.lf2` | Planned |
@@ -411,8 +428,12 @@ Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, no
 - ~~Additional `OutputStrategy` implementations (Marlin et al).~~ **Built —
   see Phase I above (ADR-094..097).** Remaining follow-ups: hardware qualification (Falcon
   A1 Pro and Neotronics 4040, firmware builds unconfirmed; community Marlin/Smoothie/FluidNC verification), Ruida
-  real-controller validation then the Electron UDP transport, wizard
-  controller-family step polish. Trocen/TopWisdom/galvo stay out of scope.
+  real-controller validation of the export and of the Electron UDP transport (built first at the
+  maintainer's request, ADR-697), wizard
+  controller-family step polish. USB lasers (ADR-702): a WebUSB link for the CH341 K40 boards
+  and JCZ LMC galvo boards, which Phase I items I.7–I.9 drive; real-board validation of each is
+  owed. Trocen, TopWisdom, EZCad3 (DLC) and BSL galvo stay out of scope: no public protocol
+  source exists for them (ADR-702).
 - Phase J: Linux desktop build. Packaging, the `.lf2` file type, remembered serial ports and CI install checks shipped under ADR-607; publishing Linux and commercial Mac downloads is designed in ADR-613 and waits for the maintainer's switch; macOS Preview moved into the current ADR-247/248 Desktop Preview track. (Renumbered from Phase I — the multi-controller track took that slot at integration; ADR-104.)
 
 **Public source availability does not collapse the phase plan.** ADR-005, ADR-006, ADR-007 are discipline choices, not technical-impossibility choices. See ADR-017 for the dependency policy, ADR-247/248 for the preview-distribution posture and ADR-543 for the source licence.
@@ -480,7 +501,7 @@ phase; tracked here so they don't get lost.
 
 ### Maintainer authority
 
-21. **Frame is the only Start guard, and the physical Frame is the spatial source of truth** (ADR-565, amending ADR-228, ADR-230, ADR-232 and ADR-237). A clean completed Frame for the unchanged footprint and placement is the sole ordinary Start authorization on laser and CNC. Power/speed edits, a settled app-owned run and a verified positioning-light travel retaining the captured job placement (ADR-605 Amendment 1) preserve that spatial evidence; a changed prepared motion envelope, placement or coordinate identity requires another Frame. Each Start reviews and claims the current exact executable program once, plus unavoidable live transport/handoff facts. Job Review remains the single warning surface. Calculated bed overhang, configured no-go zones, and controller-setting policy may inform that review but may not refuse Frame or Start. Factual transport inability, an unconstructable executable artifact, and exact-handoff inconsistency remain refusals because no valid command or matching stream can exist. No policy finding may be relabeled as one of those factual categories. The Pro licence check (ADR-540, recorded under ADR-247 by its Amendment 1) is not a Start guard: it never gates Frame, Start, output or a running job.
+21. **Frame is the only Start guard, and the physical Frame is the spatial source of truth** (ADR-565, amending ADR-228, ADR-230, ADR-232 and ADR-237). A clean completed Frame for the unchanged footprint and placement is the sole ordinary Start authorization on laser and CNC. Power/speed edits, a settled app-owned run and a verified positioning-light travel retaining the captured job placement (ADR-605 Amendment 1) preserve that spatial evidence; a changed prepared motion envelope, placement or coordinate identity requires another Frame. Each Start reviews and claims the current exact executable program once, plus unavoidable live transport/handoff facts. The one exception is **Run again** of an unchanged laser job: when its freshly built review asks nothing and shows exactly the warnings the operator accepted for the repeated run in this app and controller session, that confirmation is carried, recorded as carried, and the dialog is not shown again (ADR-237 Amendment 3). Job Review remains the single warning surface. Calculated bed overhang, configured no-go zones, and controller-setting policy may inform that review but may not refuse Frame or Start. Factual transport inability, an unconstructable executable artifact, and exact-handoff inconsistency remain refusals because no valid command or matching stream can exist. No policy finding may be relabeled as one of those factual categories. The Pro licence check (ADR-540, recorded under ADR-247 by its Amendment 1) is not a Start guard: it never gates Frame, Start, output or a running job.
 
 ---
 
@@ -686,7 +707,10 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 
 - ~~Raster engrave (Fill, Image modes).~~ **Shipped in Phase F** (F.1 Fill, F.2 Image) — no longer out of scope.
 - ~~Marlin, Smoothieware, and Ruida export.~~ **Shipped under Phase I** with
-  simulator/evidence labels; Trocen and TopWisdom remain out of scope.
+  simulator/evidence labels. ~~K40 (Lihuiyu, Moshiboard) and EZCad2 galvo.~~ **In scope under
+  ADR-702** (USB link) and its family ADRs, simulator-tested only. Trocen, TopWisdom, EZCad3
+  and BSL remain out of scope until a public protocol source or a maintainer-supplied capture
+  exists.
 - ~~Linux desktop build.~~ **Packaged under ADR-607** (AppImage and `.deb`, x64); publishing Linux downloads is ADR-613. Windows and macOS Preview packaging is in scope under ADR-247/248.
 - ~~Node editing of imported paths.~~ **Shipped as bounded node/Bezier editing** with schema-v2 canonical-curve invalidation rules (ADR-159, ADR-164); a general geometry kernel remains out of scope.
 - Boolean ops.
@@ -704,7 +728,9 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 - Cloud, accounts, sharing, sync, subscriptions, and dormant monetization code. Activation, entitlement, trials, device binding and the Pro paywall exist only as the maintainer-approved commercial desktop channel (ADR-523, ADR-540, ADR-247 Amendment 1); anything beyond it needs its own ADR and the maintainer's explicit permission.
 - DXF, PDF/PDF-compatible AI, HPGL/PLT and BMP/GIF/TIFF import are in scope
   under ADR-098 and ADR-357. PDF uses explicit page selection and complete-path
-  conversion or a whole-page rendered image. Legacy non-PDF AI, unsupported
+  conversion or a whole-page rendered image. EPS/PostScript and Illustrator 3–8
+  (PostScript-based) AI import through a clean-room PostScript subset reader
+  (ADR-700); embedded images and unsupported operators in them, unsupported
   HPGL drawing commands and unsupported TIFF encodings remain explicit errors.
 - In-app AI depth inference and bundled model weights remain out of scope until P2R.5 receives its
   own model/license/runtime/privacy ADR. Externally produced relative-depth maps are accepted input
@@ -720,7 +746,10 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   CNC profile arc/line lead-in/out (`core/cnc/profile-lead.ts`, ADR-250;
   profile-outside/inside only), and laser Line lead-in/out on closed shapes,
   off by default, with the scrap side found per contour
-  (`core/job/apply-laser-leads.ts`, ADR-626, explicitly requested 2026-10-18);
+  (`core/job/apply-laser-leads.ts`, ADR-626, explicitly requested 2026-10-18),
+  and LightBurn-style depth engraving: the 3D Sliced image mode and the Fill Ramp for rubber
+  stamps (`core/raster/slice-3d.ts`, `core/raster/fill-ramp-grid.ts`, ADR-699, explicitly
+  requested 2026-11-10);
   a narrow ordered sub-layer "fill then line" operation stack is partially in
   place. **These landed without dedicated ADR headings** — the build plan
   reserved ADR-054..091 for its tickets, and the earlier citations here of

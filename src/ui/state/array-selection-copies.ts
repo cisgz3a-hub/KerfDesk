@@ -2,6 +2,7 @@ import type { ArrayPlacement, SceneObject } from '../../core/scene';
 import type { ArrayPlacementMirror } from '../../core/scene/array-layout-types';
 import { flipTransformAboutPoint } from '../../core/scene/selection-transform';
 import { remapSceneObjectCopyDependencies } from './scene-object-copy-dependencies';
+import { normalizeDegrees } from '../../core/math/wrap';
 
 export function copyObjectsAtArrayPlacement(
   sources: ReadonlyArray<SceneObject>,
@@ -98,9 +99,4 @@ function rotateAboutPivot(
   const dx = origin.x - pivot.x;
   const dy = origin.y - pivot.y;
   return { x: pivot.x + dx * cos - dy * sin, y: pivot.y + dx * sin + dy * cos };
-}
-
-function normalizeDegrees(value: number): number {
-  const normalized = value % 360;
-  return normalized < 0 ? normalized + 360 : normalized;
 }

@@ -41,7 +41,7 @@ export const FILE_COMMAND_HELP: Readonly<
   },
   'file.import': {
     family: 'file',
-    tooltip: 'Import SVG, DXF, PDF/compatible AI, HPGL/PLT, images or STL artwork.',
+    tooltip: 'Import SVG, DXF, PDF, AI, EPS, HPGL/PLT, images or STL artwork.',
   },
   'file.import-svg': {
     family: 'file',

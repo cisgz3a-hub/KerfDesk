@@ -96,7 +96,7 @@ export function assertActiveDriverAcceptsMachineKind(
 ): void {
   if (machineKind !== 'cnc' || driver.capabilities.cncJobs) return;
   throw new Error(
-    `${driver.label} cannot accept LaserForge CNC jobs. No controller or program bytes were sent.`,
+    `${driver.label} cannot accept KerfDesk CNC jobs. No controller or program bytes were sent.`,
   );
 }
 

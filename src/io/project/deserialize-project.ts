@@ -55,6 +55,7 @@ import { recoveredCncDevicePatch } from './project-cnc-sub-profile-recovery';
 import { normalizeProjectJobSetup } from './project-job-setup-normalizer';
 import { projectDeviceControllerCompatibleFields } from './project-device-controller-compatibility';
 import { normalizeControllerPatch } from './project-controller-normalization';
+import { isFiniteNumber } from '../../core/util/finite';
 
 export type DeserializeResult =
   | LoadedProject
@@ -381,10 +382,6 @@ function normalizeZTravelPatch(dev: Record<string, unknown>): Record<string, unk
 function hasCapability(dev: Record<string, unknown>, capability: string): boolean {
   const capabilities = dev['capabilities'];
   return Array.isArray(capabilities) && capabilities.includes(capability);
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
 }
 
 function numberOrDefault(value: unknown, fallback: number): number {

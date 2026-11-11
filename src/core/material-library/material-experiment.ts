@@ -1,6 +1,7 @@
 import type { Bounds, MachineKind, Vec2 } from '../scene';
 import { applyHomography, solveHomography } from '../camera/homography';
 import type { ProcessRecipe } from './process-recipe';
+import { maxOf, minOf } from '../util';
 
 /** Empirical notes are user observations, never controller-completion evidence. */
 export type ExperimentCell = {
@@ -49,10 +50,10 @@ export type MaterialExperiment = {
 
 export function experimentBounds(experiment: MaterialExperiment): Bounds {
   return {
-    minX: Math.min(...experiment.cells.map((cell) => cell.bounds.minX)),
-    minY: Math.min(...experiment.cells.map((cell) => cell.bounds.minY)),
-    maxX: Math.max(...experiment.cells.map((cell) => cell.bounds.maxX)),
-    maxY: Math.max(...experiment.cells.map((cell) => cell.bounds.maxY)),
+    minX: minOf(experiment.cells.map((cell) => cell.bounds.minX)),
+    minY: minOf(experiment.cells.map((cell) => cell.bounds.minY)),
+    maxX: maxOf(experiment.cells.map((cell) => cell.bounds.maxX)),
+    maxY: maxOf(experiment.cells.map((cell) => cell.bounds.maxY)),
   };
 }
 

@@ -1,6 +1,6 @@
 import { trustedAppRequest } from './app-route-guard.js';
 import type { ProtocolHandler } from './licensing-routes.js';
-import { MachineNetworkBridge } from './machine-network-bridge.js';
+import { MachineNetworkBridge, type MachineNetworkStop } from './machine-network-bridge.js';
 import { validateMachineNetworkProtocol } from './machine-network-protocol.js';
 import { app } from 'electron';
 
@@ -13,6 +13,12 @@ const HEADERS = {
 };
 export function closeDesktopMachineNetwork(): void {
   bridge.dispose();
+}
+/** Sends the stop on any network session the window can no longer reach and
+ *  releases it (rolling audit v11 W3-P1-1); `immediate` when the process is
+ *  about to end. The writes start before this returns. */
+export function stopDesktopMachineNetwork(immediate = false): Promise<MachineNetworkStop> {
+  return bridge.stopAll(immediate);
 }
 let quitRegistered = false;
 

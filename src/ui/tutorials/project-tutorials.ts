@@ -1,3 +1,4 @@
+import { FIRST_BURN_TUTORIAL } from './first-burn-tutorial';
 import type { Tutorial } from './tutorial-types';
 
 export const PROJECT_TUTORIALS: readonly Tutorial[] = [
@@ -40,7 +41,7 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Save your work',
         instruction:
-          'Choose File → Save As. Give the project a name and save it. Read Machine setup and Frame and Start before preparing a physical run.',
+          'Choose File → Save As. Give the project a name and save it. To burn it, follow Burn your first coaster next.',
         focus: 'Save As',
         result: 'You can reopen and edit your project later.',
         visual: 'project-file',
@@ -48,8 +49,9 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
     ],
     tip: 'You can draw and use Preview without a connected machine. Tutorial pictures are examples, not material settings.',
     keywords: ['beginner', 'first', 'start', 'new', 'workflow'],
-    related: ['import', 'operations', 'preview', 'frame-start'],
+    related: ['first-burn', 'import', 'operations', 'preview', 'frame-start'],
   },
+  FIRST_BURN_TUTORIAL,
   {
     // Plain meanings for the words the app and the other lessons use without
     // explaining them (UX audit U1-P3-7).

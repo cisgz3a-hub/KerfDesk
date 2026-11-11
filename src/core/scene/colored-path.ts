@@ -22,7 +22,14 @@ export type ColoredPath = {
   // (ADR-531). Optional and derived: readers use it only through
   // `carriedSubpathParents`, which ignores it once the geometry changes.
   readonly subpathNesting?: SubpathNesting;
+  // A white fill that burns as ink, not paper (ADR-686 Amendments 1 and 3):
+  // the file paints it see-through, with a gradient or under a mask, or the
+  // operator chose to burn it with Undo. Absent on every other path, so older
+  // builds, which ignore it, read the same project.
+  readonly whiteInk?: WhiteInk;
 };
+
+export type WhiteInk = 'translucent' | 'gradient' | 'masked' | 'kept';
 
 /** Parent of each subpath (-1 for an outer) plus the key of the geometry it
  *  was computed for (subpath-nesting.ts). A parent always precedes its child. */

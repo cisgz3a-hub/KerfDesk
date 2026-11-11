@@ -64,10 +64,14 @@ function updateDraftField(
   if (field === 'thickness') {
     return boxDraftWithMaterialThickness(current, value, lockedAutoFitFields);
   }
-  if (field === 'style' && value === 'slide-lid' && Number(current.clearance) === 0) {
+  if (field === 'style' && styleNeedsPlay(value) && Number(current.clearance) === 0) {
     return { ...current, style: value, clearance: SLIDE_LID_MIN_CLEARANCE_DRAFT };
   }
   return { ...current, [field]: value };
+}
+
+function styleNeedsPlay(style: string): boolean {
+  return style === 'slide-lid' || style === 'lift-lid';
 }
 
 function isAutoFitField(field: keyof BoxDraft): field is BoxAutoFitField {

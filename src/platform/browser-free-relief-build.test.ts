@@ -115,7 +115,10 @@ describe('moved relief browser-Free build boundaries', () => {
     const { relief, layer, settings, machine, map } = fixture();
     const calls = [
       () => free.rough([relief], layer, settings, DEFAULT_DEVICE_PROFILE, machine),
-      () => free.finishing([relief], layer, settings, DEFAULT_DEVICE_PROFILE, machine, []),
+      () =>
+        free.finishing([relief], layer, settings, DEFAULT_DEVICE_PROFILE, machine, {
+          finishedFlats: [],
+        }),
       () => free.rest([], layer, settings, DEFAULT_DEVICE_PROFILE, machine),
       () => free.projection([relief], layer, settings, DEFAULT_DEVICE_PROFILE, machine, []),
       () => free.projectionPlan(map, [], machine.tools[2]!, 0.2, 0.1),

@@ -80,8 +80,12 @@ import {
 } from '../../core/design/ops/transform-selection';
 import { findSketchExtension } from '../../core/design/ops/extend-sketch';
 import { extendSessionAt } from './design-extend';
+import { previewTrimSession, trimSessionAt } from './design-trim';
+import { deleteSessionDimension } from './design-dimension-session';
+import { dimensionActions, viewToggleActions } from './design-store-slices';
+import type { DesignTracking } from './design-tracking';
 
-type DesignStudioState = {
+export type DesignStudioState = {
   readonly documentEpoch: number;
   readonly session: DesignSession | null;
   // Retained across a close so reopening resumes the drawing in progress.
@@ -102,6 +106,9 @@ type DesignStudioState = {
     distanceToEndpoint?: (endpoint: Vec2) => number,
   ) => void;
   readonly setActiveSnap: (target: SnapTarget | null) => void;
+  // The Trim tool (ADR-272 Amendment 8): preview on hover, trim on click.
+  readonly previewTrim: (point: Vec2, toleranceMm: number) => void;
+  readonly trimAt: (point: Vec2, toleranceMm: number, newId: string) => void;
   readonly setSelection: (ids: ReadonlyArray<string>) => void;
   readonly selectAll: () => void;
   readonly duplicateSelection: () => void;
@@ -110,6 +117,9 @@ type DesignStudioState = {
   readonly transformSelection: (kind: DesignTransformKind) => void;
   readonly toggleSnap: () => void;
   readonly toggleOrtho: () => void;
+  readonly toggleTracking: () => void;
+  readonly setPolarStepDeg: (stepDeg: number) => void;
+  readonly setActiveTracking: (tracking: DesignTracking | null) => void;
   readonly toggleGrid: () => void;
   readonly setSketch: (sketch: Sketch) => void;
   readonly drawEntity: (entity: SketchEntity) => void;
@@ -157,6 +167,11 @@ type DesignStudioState = {
   readonly moveLayer: (layerId: string, direction: 'up' | 'down') => void;
   readonly assignSelectionToLayer: (layerId: string) => void;
   readonly toggleSurface3d: () => void;
+  // The Dimension tool (ADR-272 Amendment 7). Ids come from the caller.
+  readonly dimensionAt: (atMm: Vec2, toleranceMm: number, newId: string) => void;
+  readonly setActiveDimension: (id: string | null) => void;
+  readonly driveDimension: (id: string, value: number) => void;
+  readonly setDimensionDriving: (id: string, driving: boolean) => void;
 };
 
 export const useDesignStudioStore = create<DesignStudioState>((set) => ({
@@ -176,11 +191,8 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
   setActiveSnap: (activeSnap) => set(mapSession((session) => ({ ...session, activeSnap }))),
   ...selectionActions(set),
 
-  toggleSnap: () =>
-    set(mapSession((session) => ({ ...session, snapEnabled: !session.snapEnabled }))),
-  toggleOrtho: () =>
-    set(mapSession((session) => ({ ...session, orthoEnabled: !session.orthoEnabled }))),
-  toggleGrid: () => set(mapSession((session) => ({ ...session, showGrid: !session.showGrid }))),
+  ...viewToggleActions(set),
+  ...dimensionActions(set),
 
   setSketch: (sketch) => set(mapSession((session) => withSketch(session, sketch))),
   drawEntity: (entity) =>
@@ -223,12 +235,17 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
   commitMarquee: (additive) =>
     set(mapSession((session) => armLayerOfSelection(commitSessionMarquee(session, additive)))),
 
+  // A dimension being edited is what Delete removes; otherwise the selection.
   deleteSelected: () =>
     set(
-      mapSession((session) => ({
-        ...withSketch(session, removeEntities(sessionSketch(session), session.selectedIds)),
-        selectedIds: new Set<string>(),
-      })),
+      mapSession((session) =>
+        session.activeDimensionId !== null
+          ? deleteSessionDimension(session, session.activeDimensionId)
+          : {
+              ...withSketch(session, removeEntities(sessionSketch(session), session.selectedIds)),
+              selectedIds: new Set<string>(),
+            },
+      ),
     ),
   duplicateEntity: (id, newId, offsetMm) =>
     set(mapSession((session) => duplicateSessionEntity(session, id, newId, offsetMm))),
@@ -308,14 +325,17 @@ function selectionActions(
 
 function extendCursorActions(
   set: (change: (state: DesignStudioState) => Partial<DesignStudioState>) => void,
-): Pick<DesignStudioState, 'setCursorMm' | 'previewExtension' | 'extendAt'> {
+): Pick<
+  DesignStudioState,
+  'setCursorMm' | 'previewExtension' | 'extendAt' | 'previewTrim' | 'trimAt'
+> {
   return {
     setCursorMm: (cursorMm) =>
       set(
         mapSession((session) => ({
           ...session,
           cursorMm,
-          ...(cursorMm === null ? { extendPreview: null } : {}),
+          ...(cursorMm === null ? { extendPreview: null, trimPreview: null } : {}),
         })),
       ),
     previewExtension: (point, tolerance, distanceToEndpoint) =>
@@ -332,6 +352,10 @@ function extendCursorActions(
       ),
     extendAt: (point, tolerance, distanceToEndpoint) =>
       set(mapSession((session) => extendSessionAt(session, point, tolerance, distanceToEndpoint))),
+    previewTrim: (point, toleranceMm) =>
+      set(mapSession((session) => previewTrimSession(session, point, toleranceMm))),
+    trimAt: (point, toleranceMm, newId) =>
+      set(mapSession((session) => trimSessionAt(session, point, toleranceMm, newId))),
   };
 }
 

@@ -1,3 +1,5 @@
+import { isRecord } from '../util/is-record';
+
 export type GrblGcodeDialectId =
   | 'grbl-compatible'
   | 'grbl-dynamic'
@@ -190,8 +192,4 @@ export function isGrblGcodeDialectId(value: unknown): value is GrblGcodeDialectI
 
 export function isMarlinGcodeDialectId(value: unknown): value is MarlinGcodeDialectId {
   return MARLIN_GCODE_DIALECTS.some((dialect) => dialect.id === value);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

@@ -3,7 +3,6 @@ import type { CameraTracking, Viewer3dSceneHandle } from '../viewer3d';
 // Deep imports: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { Viewer3dView } from '../viewer3d/camera-presets';
 import type { Viewer3dDetail } from '../viewer3d/scene-detail';
-import { VIEWER3D_MOUSE_HINT } from '../viewer3d/viewer3d-controls';
 import { InspectorMoveTip, type MovePickProps } from './InspectorMoveTip';
 import { InspectorTopView, type TopViewSource } from './InspectorTopView';
 import { measureReadout } from './pick-readout';
@@ -98,6 +97,7 @@ export function InspectorViewport(props: InspectorViewportProps): JSX.Element {
           projection={projection}
           onProjectionChange={(next) => props.handleRef.current?.setProjection(next)}
           onCapture={() => capture(props.handleRef.current)}
+          measure={props.movePick !== undefined ? measure : null}
           disabled={!ready}
         />
       )}
@@ -115,10 +115,9 @@ export function InspectorViewport(props: InspectorViewportProps): JSX.Element {
       {props.children}
       <ViewHint
         keysFocused={keyboard.focused}
-        cameraMode={props.cameraMode}
         travelVisible={props.travelVisible}
         onTravelChange={props.onTravelChange}
-        measure={props.movePick !== undefined && ready ? measure : null}
+        measuring={props.movePick !== undefined && ready && measure.active}
       />
       <ViewportMessage state={props.state} reason={props.reason} topView={props.topView} />
     </div>
@@ -169,47 +168,33 @@ function useViewportKeyboard(options: {
   return { viewportRef, focused, setFocused, fit: options.fit };
 }
 
+// The travel switch, and a hint only while one helps: the measure tool's
+// steps, or the keys while the view has the keyboard (ADR-701). The mouse
+// hint lives in the canvas's tooltip instead of on screen all the time.
 function ViewHint(props: {
   readonly keysFocused: boolean;
-  readonly cameraMode: CameraTracking['mode'];
   readonly travelVisible: boolean;
   readonly onTravelChange: (visible: boolean) => void;
-  /** Null where the view has no toolpath to measure. */
-  readonly measure: MeasureTool | null;
+  readonly measuring: boolean;
 }): JSX.Element {
-  const { measure } = props;
+  const hint = props.measuring
+    ? 'Click two points on the toolpath; ends of moves snap'
+    : props.keysFocused
+      ? VIEWPORT_KEYS_HINT
+      : null;
   return (
     <div className="gcode-viewer-view-hint">
-      {measure !== null ? (
-        <button
-          type="button"
-          className="lf-btn gcode-viewer-button"
-          aria-pressed={measure.active}
-          title="Measure between two points on the toolpath"
-          onClick={measure.toggle}
-        >
-          Measure
-        </button>
-      ) : null}
-      <label>
+      <label className="gcode-viewer-switch" data-checked={props.travelVisible}>
         <input
           type="checkbox"
           checked={props.travelVisible}
           title="Show or hide non-cutting travel moves"
           onChange={(event) => props.onTravelChange(event.currentTarget.checked)}
-        />{' '}
+        />
+        <span className="gcode-viewer-travel-swatch" aria-hidden="true" />
         Travel
       </label>
-      <span>
-        {measure?.active === true
-          ? 'Click two points on the toolpath; ends of moves snap'
-          : props.keysFocused
-            ? VIEWPORT_KEYS_HINT
-            : props.cameraMode === 'manual'
-              ? VIEWER3D_MOUSE_HINT
-              : 'Following progress · Drag for manual view'}
-      </span>
-      <span>Faint path: program context</span>
+      {hint !== null ? <span className="gcode-viewer-hint-text">{hint}</span> : null}
     </div>
   );
 }

@@ -26,9 +26,16 @@ import {
   updatePointToolPointer,
 } from './design-point-pointer';
 import { useDesignStudioStore } from './design-studio-store';
-import { applyOrthoMm, snapPointMm } from './design-snap';
+import { applyOrthoMm, snapPointMm, type ResolvedSnap } from './design-snap';
+import {
+  alignMovePointer,
+  gestureAnchorMm,
+  trackingReferences,
+  TRACKING_RADIUS_PX,
+} from './design-tracking';
 import type { DesignSurface } from './design-surface';
 import { EXTEND_PICK_RADIUS_PX } from './design-extend';
+import { TRIM_PICK_RADIUS_PX } from './design-trim';
 import type { DesignToolKind } from './design-tool';
 
 export type DesignPointerHandlers = {
@@ -62,15 +69,7 @@ export function useDesignPointer(
         handlePointToolClick(at, session, surface.pxPerMm(), newEntityId);
         return;
       }
-      if (isDraftTool(session.tool)) {
-        store.setDraft({
-          tool: session.tool,
-          anchorMm: at,
-          pointerMm: at,
-          modifiers: modifiersOf(event),
-        });
-        return;
-      }
+      if (pressDraftTool(at, event, newEntityId)) return;
       const pxPerMm = surface.pxPerMm();
       if (runDesignClickTool(at, session.tool, surface, event)) return;
       // A grip beats everything under it: the grips sit ON the selection's
@@ -90,6 +89,10 @@ export function useDesignPointer(
       store.setCursorMm(at);
       if (session.tool === 'extend') {
         store.previewExtension(at, EXTEND_PICK_RADIUS_PX, endpointDistance(surface, event));
+        return;
+      }
+      if (session.tool === 'trim') {
+        store.previewTrim(at, trimToleranceMm(surface));
         return;
       }
       if (session.pointSequence !== null) {
@@ -117,6 +120,7 @@ export function useDesignPointer(
     const store = useDesignStudioStore.getState();
     store.setCursorMm(null);
     store.setActiveSnap(null);
+    store.setActiveTracking(null);
   }, []);
 
   return {
@@ -181,33 +185,75 @@ function resolvePointerMm(
   const store = useDesignStudioStore.getState();
   const session = store.session;
   const raw = surface.toMm(event);
-  if (raw === null && session?.tool === 'extend') {
-    store.setCursorMm(null);
-    store.setActiveSnap(null);
-  }
-  if (session === null || raw === null) return null;
-  if (session.tool === 'extend') {
-    store.setActiveSnap(null);
-    return raw;
-  }
-  const resolved = truthfulPointToolSnap(
+  if (session === null) return null;
+  // Extend and Trim pick what is under the pointer; snapping would move it.
+  if (session.tool === 'extend' || session.tool === 'trim') return unsnappedPick(raw);
+  if (raw === null) return null;
+  const pxPerMm = surface.pxPerMm();
+  const trackingMm = TRACKING_RADIUS_PX / (pxPerMm > 0 ? pxPerMm : 1);
+  const resolved = withMoveAlignment(
     session,
-    snapPointMm({
-      sketch: session.history.present,
-      rawMm: raw,
-      pxPerMm: surface.pxPerMm(),
-      snapEnabled: session.snapEnabled,
-      gridMm: session.gridMm,
-      // While dragging, the moving shapes must not be snap targets: they follow
-      // the cursor, so snapping to them makes the pointer chase geometry that is
-      // chasing the pointer — worst on a circle, whose centre and quadrants are
-      // all live targets travelling with it.
-      ...(session.move === null ? {} : { excludeEntityIds: session.move.ids }),
-    }),
-    raw,
+    truthfulPointToolSnap(
+      session,
+      snapPointMm({
+        sketch: session.history.present,
+        rawMm: raw,
+        pxPerMm,
+        snapEnabled: session.snapEnabled,
+        gridMm: session.gridMm,
+        fromMm: gestureAnchorMm(session),
+        tracking: {
+          // A moving selection tracks its BOX, below; its grab point does not.
+          enabled: session.trackEnabled && session.move === null,
+          polar: tracksDirection(session),
+          polarStepDeg: session.polarStepDeg,
+          toleranceMm: trackingMm,
+          references: trackingReferences(session),
+        },
+        // While dragging, the moving shapes must not be snap targets: they follow
+        // the cursor, so snapping to them makes the pointer chase geometry that is
+        // chasing the pointer — worst on a circle, whose centre and quadrants are
+        // all live targets travelling with it.
+        ...(session.move === null ? {} : { excludeEntityIds: session.move.ids }),
+      }),
+      raw,
+    ),
+    trackingMm,
   );
   store.setActiveSnap(resolved.target);
+  store.setActiveTracking(resolved.tracking ?? null);
   return resolved.pointMm;
+}
+
+// Polar tracking follows a DIRECTION from the start: a line, a polyline
+// segment, or an arc's radius to its start. Ortho supersedes it.
+function tracksDirection(
+  session: NonNullable<ReturnType<typeof useDesignStudioStore.getState>['session']>,
+): boolean {
+  if (session.orthoEnabled) return false;
+  return session.tool === 'line' || session.tool === 'path' || session.tool === 'arc';
+}
+
+function unsnappedPick(raw: Vec2 | null): Vec2 | null {
+  const store = useDesignStudioStore.getState();
+  if (raw === null) store.setCursorMm(null);
+  store.setActiveSnap(null);
+  store.setActiveTracking(null);
+  return raw;
+}
+
+// A dragged selection lines its box up with its neighbours (ADR-272 Amendment
+// 6) unless an object snap already put the grab point on something real.
+function withMoveAlignment(
+  session: NonNullable<ReturnType<typeof useDesignStudioStore.getState>['session']>,
+  resolved: ResolvedSnap,
+  toleranceMm: number,
+): ResolvedSnap {
+  if (!session.snapEnabled || !session.trackEnabled || resolved.target !== null) return resolved;
+  const aligned = alignMovePointer(session, resolved.pointMm, toleranceMm);
+  return aligned === null
+    ? resolved
+    : { pointMm: aligned.pointMm, target: null, tracking: aligned.tracking };
 }
 
 // One live gesture at a time, most specific first: a resize outranks a move,
@@ -227,6 +273,33 @@ function advanceGesture(at: Vec2, event: React.PointerEvent<HTMLCanvasElement>):
     });
   }
   if (session.marquee !== null) store.setMarquee({ ...session.marquee, pointerMm: at });
+}
+
+// A press with a drag tool armed starts its draft - or, when an earlier click
+// left the draft anchored (ADR-272 Amendment 5), is the second click of a
+// click-move-click draw: it lands the far point and commits, exactly as a
+// drag's release would have.
+function pressDraftTool(
+  at: Vec2,
+  event: React.PointerEvent<HTMLCanvasElement>,
+  newEntityId: () => string,
+): boolean {
+  const store = useDesignStudioStore.getState();
+  const session = store.session;
+  if (session === null) return false;
+  if (session.draft?.released === true) {
+    advanceGesture(at, event);
+    useDesignStudioStore.getState().commitDraft(newEntityId());
+    return true;
+  }
+  if (!isDraftTool(session.tool)) return false;
+  store.setDraft({
+    tool: session.tool,
+    anchorMm: at,
+    pointerMm: at,
+    modifiers: modifiersOf(event),
+  });
+  return true;
 }
 
 function finishGesture(
@@ -270,6 +343,11 @@ function applyCornerAt(at: Vec2, op: 'fillet' | 'chamfer', pxPerMm: number): voi
   store.applyCorner(pick, op);
 }
 
+function trimToleranceMm(surface: DesignSurface): number {
+  const pxPerMm = surface.pxPerMm();
+  return TRIM_PICK_RADIUS_PX / (pxPerMm > 0 ? pxPerMm : 1);
+}
+
 function endpointDistance(
   surface: DesignSurface,
   event: React.PointerEvent<HTMLCanvasElement>,
@@ -295,6 +373,17 @@ function runDesignClickTool(
   }
   if (tool === 'fillet' || tool === 'chamfer') {
     applyCornerAt(at, tool, surface.pxPerMm());
+    return true;
+  }
+  if (tool === 'trim') {
+    useDesignStudioStore.getState().trimAt(at, trimToleranceMm(surface), crypto.randomUUID());
+    return true;
+  }
+  if (tool === 'dimension') {
+    const pxPerMm = surface.pxPerMm();
+    useDesignStudioStore
+      .getState()
+      .dimensionAt(at, HIT_RADIUS_PX / (pxPerMm > 0 ? pxPerMm : 1), crypto.randomUUID());
     return true;
   }
   return false;

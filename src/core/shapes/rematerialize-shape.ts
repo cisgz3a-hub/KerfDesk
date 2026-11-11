@@ -5,6 +5,7 @@ import { createRectangle } from './primitives/create-rectangle';
 import { createStar } from './primitives/create-star';
 import { clampBulge } from './primitives/bulge-outline';
 import { clampAlternateRatio } from './primitives/star';
+import { isFinitePositive } from '../util/finite';
 
 // Barcodes re-encode their data rather than resize by field, so they are not
 // parametric in this sense (ADR-386).
@@ -23,7 +24,7 @@ export function sanitizeParametricShapeSpec(spec: ParametricShapeSpec): Parametr
     case 'rect':
       return sanitizeRectangle(spec);
     case 'ellipse':
-      return positiveFinite(spec.widthMm) && positiveFinite(spec.heightMm) ? spec : null;
+      return isFinitePositive(spec.widthMm) && isFinitePositive(spec.heightMm) ? spec : null;
     case 'polygon':
       return sanitizePolygon(spec);
     case 'star':
@@ -34,7 +35,7 @@ export function sanitizeParametricShapeSpec(spec: ParametricShapeSpec): Parametr
 function sanitizeRectangle(
   spec: Extract<ParametricShapeSpec, { readonly kind: 'rect' }>,
 ): ParametricShapeSpec | null {
-  if (!positiveFinite(spec.widthMm) || !positiveFinite(spec.heightMm)) return null;
+  if (!isFinitePositive(spec.widthMm) || !isFinitePositive(spec.heightMm)) return null;
   if (!nonNegativeFinite(spec.cornerRadiusMm)) return null;
   // The authored radius is kept: the outline clamps it to half the shorter
   // side, so narrowing a rectangle and widening it again brings the corner
@@ -45,7 +46,7 @@ function sanitizeRectangle(
 function sanitizePolygon(
   spec: Extract<ParametricShapeSpec, { readonly kind: 'polygon' }>,
 ): ParametricShapeSpec | null {
-  if (!positiveFinite(spec.radiusMm) || !Number.isFinite(spec.sides)) return null;
+  if (!isFinitePositive(spec.radiusMm) || !Number.isFinite(spec.sides)) return null;
   return {
     ...spec,
     sides: clampCount(spec.sides),
@@ -56,7 +57,7 @@ function sanitizePolygon(
 function sanitizeStar(
   spec: Extract<ParametricShapeSpec, { readonly kind: 'star' }>,
 ): ParametricShapeSpec | null {
-  if (!positiveFinite(spec.outerRadiusMm)) return null;
+  if (!isFinitePositive(spec.outerRadiusMm)) return null;
   if (!Number.isFinite(spec.points) || !Number.isFinite(spec.innerRadiusRatio)) return null;
   return {
     ...spec,
@@ -103,10 +104,6 @@ function createFromSpec(object: ShapeObject, spec: ParametricShapeSpec): ShapeOb
     case 'star':
       return createStar({ ...args, spec });
   }
-}
-
-function positiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }
 
 function nonNegativeFinite(value: number): boolean {

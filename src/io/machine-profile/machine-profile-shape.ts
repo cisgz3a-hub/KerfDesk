@@ -33,6 +33,9 @@ import { isScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-pr
 import { validateCameraProfileShape } from '../../core/camera';
 import { normalizeCameraModelRecord } from '../../core/camera/model/camera-model-record';
 import { normalizeOtherCameraModels } from '../../core/camera/model/saved-cameras';
+import { isRecord } from '../../core/util/is-record';
+import { isPositiveFiniteNumber, isNonNegativeFiniteNumber } from '../../core/util/finite';
+import { isNonEmptyString } from '../../core/util/text';
 
 const ORIGINS = ['front-left', 'front-right', 'rear-left', 'rear-right', 'center'] as const;
 const PROFILE_SOURCES = ['built-in', 'custom', 'imported', 'lightburn'] as const;
@@ -169,7 +172,7 @@ function validateProfileMachineFields(value: Record<string, unknown>): string | 
 function validateControlledLaserOffTravelFeed(value: Record<string, unknown>): string | null {
   const feed = value['controlledLaserOffTravelFeedMmPerMin'];
   if (feed === undefined) return null;
-  if (!isPositiveFinite(feed)) {
+  if (!isPositiveFiniteNumber(feed)) {
     return 'profile.controlledLaserOffTravelFeedMmPerMin must be positive';
   }
   return typeof value['maxFeed'] === 'number' && feed > value['maxFeed']
@@ -181,7 +184,7 @@ function validateProfileStreamingFields(value: Record<string, unknown>): string 
   if (!isGcodeDialectSelection(value['gcodeDialect'])) return 'profile.gcodeDialect is invalid';
   if (
     value['baudRate'] !== undefined &&
-    (!Number.isInteger(value['baudRate']) || !isPositiveFinite(value['baudRate']))
+    (!Number.isInteger(value['baudRate']) || !isPositiveFiniteNumber(value['baudRate']))
   ) {
     return 'profile.baudRate must be a positive integer';
   }
@@ -203,7 +206,7 @@ function validateProfilePositiveMachineFields(value: Record<string, unknown>): s
     'framingFeedMmPerMin',
     'accelMmPerSec2',
   ] as const) {
-    if (!isPositiveFinite(value[field])) return `profile.${field} must be positive`;
+    if (!isPositiveFiniteNumber(value[field])) return `profile.${field} must be positive`;
   }
   return null;
 }
@@ -224,8 +227,9 @@ function validateProfileKinematics(value: Record<string, unknown>): string | nul
 }
 
 function validateProfileScalarMachineFields(value: Record<string, unknown>): string | null {
-  if (!isNonNegativeFinite(value['minPowerS'])) return 'profile.minPowerS must be non-negative';
-  if (!isNonNegativeFinite(value['junctionDeviationMm'])) {
+  if (!isNonNegativeFiniteNumber(value['minPowerS']))
+    return 'profile.minPowerS must be non-negative';
+  if (!isNonNegativeFiniteNumber(value['junctionDeviationMm'])) {
     return 'profile.junctionDeviationMm must be non-negative';
   }
   for (const field of ['estimateCutTimeScale', 'estimateTravelTimeScale'] as const) {
@@ -253,7 +257,7 @@ function validateProfileHoming(value: unknown): string | null {
 }
 
 function validateProfileOptionalZ(value: Record<string, unknown>): string | null {
-  if (value['zTravelMm'] !== undefined && !isPositiveFinite(value['zTravelMm'])) {
+  if (value['zTravelMm'] !== undefined && !isPositiveFiniteNumber(value['zTravelMm'])) {
     return 'profile.zTravelMm must be positive';
   }
   for (const field of ['zTravelConfirmed', 'zProbePresent'] as const) {
@@ -339,7 +343,7 @@ function validateLaserSubProfileIdentity(value: Record<string, unknown>): string
 
 function validateLaserSubProfileNumbers(value: Record<string, unknown>): string | null {
   for (const field of ['opticalPowerW', 'wavelengthNm', 'focusLengthMm'] as const) {
-    if (value[field] !== undefined && !isPositiveFinite(value[field])) {
+    if (value[field] !== undefined && !isPositiveFiniteNumber(value[field])) {
       return 'profile.laserSubProfile is invalid';
     }
   }
@@ -355,26 +359,14 @@ function validateLaserSubProfileNotes(value: Record<string, unknown>): string | 
 
 function validateLaserSpotSize(value: unknown): string | null {
   if (value === undefined) return null;
-  if (!isRecord(value) || !isPositiveFinite(value['x']) || !isPositiveFinite(value['y'])) {
+  if (
+    !isRecord(value) ||
+    !isPositiveFiniteNumber(value['x']) ||
+    !isPositiveFiniteNumber(value['y'])
+  ) {
     return 'profile.laserSubProfile is invalid';
   }
   return null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function isPositiveFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
-}
-
-function isNonNegativeFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
 function isProfileSource(value: unknown): value is MachineProfileSource {

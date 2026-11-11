@@ -5,6 +5,7 @@
 
 import { dither } from '../../core/raster';
 import type { DitherAlgorithm } from '../../core/scene';
+import { roundToThousandth } from '../../core/util/rounding';
 
 export const DITHER_THUMBNAIL_COLUMNS = 22;
 export const DITHER_THUMBNAIL_ROWS = 11;
@@ -19,16 +20,18 @@ export type RampStop = { readonly offset: number; readonly opacity: number };
 
 const thumbnails = new Map<DitherAlgorithm, DitherThumbnail>();
 let rampLuma: Uint8Array | null = null;
+const THUMBNAIL_SLICES = 5;
 
 export function ditherThumbnail(algorithm: DitherAlgorithm): DitherThumbnail {
   const cached = thumbnails.get(algorithm);
   if (cached !== undefined) return cached;
   const power = dither(
     { luma: thumbnailRampLuma(), width: DITHER_THUMBNAIL_COLUMNS, height: DITHER_THUMBNAIL_ROWS },
-    { algorithm, sMax: S_MAX },
+    // ADR-699: 3D Sliced shows a few slices as steps of depth.
+    { algorithm, sMax: S_MAX, sliceCount: THUMBNAIL_SLICES },
   );
   const thumbnail: DitherThumbnail =
-    algorithm === 'grayscale'
+    algorithm === 'grayscale' || algorithm === '3d-sliced'
       ? { kind: 'ramp', stops: rampStops(power) }
       : { kind: 'dots', path: burnedRunsPath(power) };
   thumbnails.set(algorithm, thumbnail);
@@ -75,11 +78,7 @@ function burned(power: Float64Array, x: number, y: number): boolean {
 // Grayscale varies power along the ramp only, so the first row carries it.
 function rampStops(power: Float64Array): ReadonlyArray<RampStop> {
   return Array.from({ length: DITHER_THUMBNAIL_COLUMNS }, (_, x) => ({
-    offset: round3((x + 0.5) / DITHER_THUMBNAIL_COLUMNS),
-    opacity: round3((power[x] ?? 0) / S_MAX),
+    offset: roundToThousandth((x + 0.5) / DITHER_THUMBNAIL_COLUMNS),
+    opacity: roundToThousandth((power[x] ?? 0) / S_MAX),
   }));
-}
-
-function round3(value: number): number {
-  return Math.round(value * 1000) / 1000;
 }

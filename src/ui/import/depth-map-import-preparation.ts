@@ -10,6 +10,7 @@ import {
   decodeIncrementalPngToLuma,
   type IncrementalPngHeaderResult,
 } from './png-incremental-decoder';
+import { isFinitePositive } from '../../core/util/finite';
 
 /** Prepared durable depth-map samples, or the reason exact preparation was unavailable. */
 export type PreparedDepthMapImportResult =
@@ -78,7 +79,7 @@ export async function prepareReliefHeightfieldPng(
   blob: Blob,
   options: ReliefHeightfieldImportPreparationOptions,
 ): Promise<PreparedReliefHeightfieldImportResult> {
-  if (!positiveFinite(options.physicalWidthMm) || !positiveFinite(options.maxDepthMm)) {
+  if (!isFinitePositive(options.physicalWidthMm) || !isFinitePositive(options.maxDepthMm)) {
     return {
       kind: 'error',
       reason: 'Height-map physical width and maximum depth must be finite and positive.',
@@ -196,10 +197,6 @@ function abortError(): Error {
   const error = new Error('height-map preparation cancelled');
   error.name = 'AbortError';
   return error;
-}
-
-function positiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }
 
 function qualifiedHeightfieldBitDepth(value: number): 8 | 16 {

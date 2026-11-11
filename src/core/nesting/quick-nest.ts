@@ -1,3 +1,6 @@
+import { growBox, boxContains } from '../geometry/box-math';
+import { finiteNonNegative } from '../util/finite';
+
 export type NestRect = {
   readonly minX: number;
   readonly minY: number;
@@ -51,7 +54,7 @@ export function quickNest(
   let free = insetRect(bin, inset);
   if (free.length === 0) return { ok: false, unplacedIds: items.map((item) => item.id) };
   for (const obstacle of options.obstacles ?? []) {
-    free = subtractUsedFreeRects(free, expandRect(obstacle, inset));
+    free = subtractUsedFreeRects(free, growBox(obstacle, inset));
   }
   const ordered = orderNestItems(items, options.itemOrder);
   const placements: NestPlacement[] = [];
@@ -140,7 +143,7 @@ export function subtractUsedFreeRects(
   const dropped = new Set<number>();
   for (const index of pieces) {
     const piece = next[index] as NestRect;
-    if (next.some((other, otherIndex) => otherIndex !== index && contains(other, piece))) {
+    if (next.some((other, otherIndex) => otherIndex !== index && boxContains(other, piece))) {
       dropped.add(index);
     }
   }
@@ -215,15 +218,6 @@ function insetRect(rect: NestRect, amount: number): NestRect[] {
   return validRect(inset) ? [inset] : [];
 }
 
-function expandRect(rect: NestRect, amount: number): NestRect {
-  return {
-    minX: rect.minX - amount,
-    minY: rect.minY - amount,
-    maxX: rect.maxX + amount,
-    maxY: rect.maxY + amount,
-  };
-}
-
 function validRect(rect: NestRect): boolean {
   return (
     [rect.minX, rect.minY, rect.maxX, rect.maxY].every(Number.isFinite) &&
@@ -242,17 +236,4 @@ function height(rect: NestRect): number {
 
 function intersects(a: NestRect, b: NestRect): boolean {
   return a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY;
-}
-
-function contains(outer: NestRect, inner: NestRect): boolean {
-  return (
-    outer.minX <= inner.minX &&
-    outer.minY <= inner.minY &&
-    outer.maxX >= inner.maxX &&
-    outer.maxY >= inner.maxY
-  );
-}
-
-function finiteNonNegative(value: number): number {
-  return Number.isFinite(value) ? Math.max(0, value) : 0;
 }

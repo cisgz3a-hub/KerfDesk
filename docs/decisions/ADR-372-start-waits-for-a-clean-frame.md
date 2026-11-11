@@ -6,6 +6,10 @@
 Frame may remain valid for unchanged placement while each Start prepares, reviews and claims its
 own exact execution permit. Start still never runs a Frame itself.
 
+**Amended by [ADR-565 Amendment 1](ADR-565-amendment-1-a-clean-jog-keeps-a-fixed-placement-frame.md):**
+a clean app-owned X/Y jog no longer expires the Frame of a job placed by Absolute Coords, User
+Origin or Verified Origin. Every other jog still does.
+
 Amends the Start entry of ADR-237: a Start without a permit no longer runs the Frame. The
 Frame-only Start policy of ADR-228/230/232 is unchanged. A completed Frame of the exact job is
 still the only Start gate, and a permit still names exact bytes. Hardware qualification remains

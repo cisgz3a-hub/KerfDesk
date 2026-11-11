@@ -12,6 +12,7 @@
 
 import type { CurveSubpath, EllipticalArcPathSegment, PathSegment, Vec2 } from '../scene';
 import { contourSegments, segmentStart } from './trim-curve-split';
+import { dot, cross, vectorLength } from './point-math';
 
 export type FilletMode = 'round' | 'reverse';
 
@@ -84,7 +85,15 @@ function lineCorner(contour: Contour, node: number): LineCorner | null {
   if (u === null || v === null) return null;
   const theta = Math.acos(Math.max(-1, Math.min(1, dot(u, v))));
   if (theta < EPS || Math.PI - theta < 1e-6) return null;
-  return { corner, point: inSeg.to, u, v, theta, inLength: len(toPrev), outLength: len(toNext) };
+  return {
+    corner,
+    point: inSeg.to,
+    u,
+    v,
+    theta,
+    inLength: vectorLength(toPrev),
+    outLength: vectorLength(toNext),
+  };
 }
 
 // How far along each side a corner's arc reaches.
@@ -242,7 +251,7 @@ function tangentAt(segment: PathSegment, from: Vec2, to: Vec2, dIn: Vec2, dOut: 
   const turnOut = Math.atan2(cross(chord, dOut), dot(chord, dOut));
   if (Math.abs(turnIn - turnOut) > TANGENT_TOLERANCE_RAD * 2) return false;
   if (segment.sweep !== turnIn > 0) return false;
-  const expected = len(chordVector) / (2 * Math.abs(Math.sin(turnIn)));
+  const expected = vectorLength(chordVector) / (2 * Math.abs(Math.sin(turnIn)));
   return Math.abs(expected - radius) <= RADIUS_TOLERANCE * radius;
 }
 
@@ -268,11 +277,7 @@ function aligned(a: Vec2, b: Vec2): boolean {
 const sub = (a: Vec2, b: Vec2): Vec2 => ({ x: a.x - b.x, y: a.y - b.y });
 const add = (a: Vec2, b: Vec2): Vec2 => ({ x: a.x + b.x, y: a.y + b.y });
 const scale = (a: Vec2, k: number): Vec2 => ({ x: a.x * k, y: a.y * k });
-const dot = (a: Vec2, b: Vec2): number => a.x * b.x + a.y * b.y;
-const cross = (a: Vec2, b: Vec2): number => a.x * b.y - a.y * b.x;
-const len = (a: Vec2): number => Math.hypot(a.x, a.y);
-
 function unit(a: Vec2): Vec2 | null {
-  const length = len(a);
+  const length = vectorLength(a);
   return length < EPS ? null : { x: a.x / length, y: a.y / length };
 }

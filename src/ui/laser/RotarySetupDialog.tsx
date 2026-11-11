@@ -1,9 +1,15 @@
 import { useState } from 'react';
-import { rotaryMeasurementsValid, type RotarySetup } from '../../core/devices/rotary';
+import {
+  activeRotaryTaper,
+  rotaryMeasurementsValid,
+  rotaryTaperValid,
+  type RotaryAxis,
+  type RotarySetup,
+} from '../../core/devices/rotary';
 import type { RotaryPreset } from '../../core/devices/rotary-presets';
 import { Button, Dialog, DialogActions } from '../kit';
 import { errorStyle } from './rotary-setup-dialog.styles';
-import { NEW_ROTARY_SETUP, startRotaryEdit } from './rotary-setup-edit';
+import { editRotaryAxisConfirmed, NEW_ROTARY_SETUP, startRotaryEdit } from './rotary-setup-edit';
 import { RotarySetupFields } from './RotarySetupFields';
 import { RotaryTestRotationPanel } from './RotaryTestRotationPanel';
 import { useRotaryTestRotation } from './use-rotary-test-rotation';
@@ -17,6 +23,8 @@ export function RotarySetupDialog(props: {
   readonly onGenerateCalibration: (setup: RotarySetup) => void;
   /** Published rotaries for this machine (ADR-503). */
   readonly presets?: ReadonlyArray<RotaryPreset>;
+  /** The axes this controller can turn a rotary on (ADR-695). Absent: Y only. */
+  readonly axes?: ReadonlyArray<RotaryAxis>;
   readonly artwork?: RotaryArtworkExtent | null;
   readonly outputDescription?: string;
 }): JSX.Element {
@@ -30,6 +38,7 @@ export function RotarySetupDialog(props: {
         edit={edit}
         onEdit={setEdit}
         {...(props.presets === undefined ? {} : { presets: props.presets })}
+        {...(props.axes === undefined ? {} : { axes: props.axes })}
       />
       <RotaryWrapPreview
         setup={setup}
@@ -38,10 +47,13 @@ export function RotarySetupDialog(props: {
           ? {}
           : { outputDescription: props.outputDescription })}
       />
-      {!valid ? (
-        <p style={errorStyle}>Diameters and motion per turn must be greater than zero.</p>
-      ) : null}
-      <RotaryTestRotationPanel setup={setup} valid={valid} test={test} />
+      {!valid ? <p style={errorStyle}>{invalidRotaryMessage(setup)}</p> : null}
+      <RotaryTestRotationPanel
+        setup={setup}
+        valid={valid}
+        test={test}
+        onConfirmAxis={(axis) => setEdit((current) => editRotaryAxisConfirmed(current, axis))}
+      />
       <RotaryActions
         setup={setup}
         valid={valid}
@@ -52,6 +64,13 @@ export function RotarySetupDialog(props: {
       />
     </Dialog>
   );
+}
+
+function invalidRotaryMessage(setup: RotarySetup): string {
+  const taper = activeRotaryTaper(setup);
+  return taper !== null && !rotaryTaperValid(taper)
+    ? 'A tapered part needs positive diameters and length, ends no further apart in radius than its length, and a gap of zero or more.'
+    : 'Diameters and motion per turn must be greater than zero.';
 }
 
 function RotaryActions(props: {

@@ -16,7 +16,15 @@
 //
 // All collapse to: emitted-Y limit for one object revolution = scale · π · d.
 
+import { isDefinedFinitePositive } from '../util/finite';
+
 export type RotaryType = 'roller' | 'chuck';
+
+// Which controller axis turns the rotary (ADR-695, LightBurn's Rotary Axis):
+// Y when the rotary takes the Y motor's place, A or Z for a dedicated rotary
+// port. Rules and controller support live in rotary-axis.ts.
+export type RotaryAxis = 'Y' | 'A' | 'Z';
+export type DedicatedRotaryAxis = Exclude<RotaryAxis, 'Y'>;
 
 export type RotarySetup = {
   readonly enabled: boolean;
@@ -31,10 +39,40 @@ export type RotarySetup = {
   // ignores it; Rotary Setup never saves one on a chuck, but a hand-edited
   // file may carry one.
   readonly rollerDiameterMm?: number;
+  // The axis that turns the rotary. Absent is Y, so every earlier project
+  // keeps its output byte for byte (ADR-695). mmPerRotation is in this axis's
+  // own commanded units: degrees on A, millimetres on Y and Z.
+  readonly axis?: RotaryAxis;
+  // The dedicated axis the operator last saw a Test rotation turn the rotary
+  // on. A job on an A or Z rotary warns until it matches `axis`, because the
+  // wiring of a dedicated port is the one thing KerfDesk cannot read.
+  readonly axisConfirmed?: DedicatedRotaryAxis;
   // Spin the object the opposite way (mount reversed / inverting gearing).
   // Mirrors the engraving around the cylinder so text isn't backwards.
   // Absent/false = normal direction, byte-identical output.
   readonly reverseAxis?: boolean;
+  // Taper correction for a tumbler or glass that narrows along its length
+  // (ADR-694, LightBurn's Taper Warp). Absent or off keeps the single-diameter
+  // wrap, byte-identical.
+  readonly taper?: RotaryTaper;
+};
+
+// Which side of the bed the object's top (rim) points to, along X. LightBurn's
+// "Object Top"; its third choice, Top, has no place on a Y rotary, whose axis
+// lies along X.
+export type RotaryTaperTopSide = 'left' | 'right';
+
+export type RotaryTaper = {
+  readonly enabled: boolean;
+  readonly topDiameterMm: number;
+  readonly bottomDiameterMm: number;
+  // Top edge to bottom edge, measured along the side: the line the head runs
+  // along once the surface is level with the bed, as LightBurn asks.
+  readonly lengthMm: number;
+  readonly topSide: RotaryTaperTopSide;
+  // How far from the top edge the artwork's top-side edge sits, measured along
+  // the side. It fixes where on the cone each design X lies.
+  readonly artworkFromTopMm: number;
 };
 
 // Which part the test rotation turns once: the object (the wrap a job uses)
@@ -47,6 +85,25 @@ export const DEFAULT_ROTARY_SETUP: RotarySetup = {
   mmPerRotation: 360,
   objectDiameterMm: 60,
 };
+
+// The taper the output applies, or null when there is none or it is off.
+export function activeRotaryTaper(setup: RotarySetup): RotaryTaper | null {
+  const taper = setup.taper;
+  return taper !== undefined && taper.enabled ? taper : null;
+}
+
+// A cone the head can run along: positive ends and length, radii no further
+// apart than the side is long, and a gap that is not negative.
+export function rotaryTaperValid(taper: RotaryTaper): boolean {
+  return (
+    isDefinedFinitePositive(taper.topDiameterMm) &&
+    isDefinedFinitePositive(taper.bottomDiameterMm) &&
+    isDefinedFinitePositive(taper.lengthMm) &&
+    Math.abs(taper.topDiameterMm - taper.bottomDiameterMm) / 2 < taper.lengthMm &&
+    Number.isFinite(taper.artworkFromTopMm) &&
+    taper.artworkFromTopMm >= 0
+  );
+}
 
 export function rotaryCircumferenceMm(setup: RotarySetup): number {
   return Math.PI * setup.objectDiameterMm;
@@ -86,10 +143,12 @@ export function rotaryRevolutionTravelMm(
 
 // The measurements a rotary mapping needs, independent of `enabled`.
 export function rotaryMeasurementsValid(setup: RotarySetup): boolean {
+  const taper = activeRotaryTaper(setup);
   return (
-    isPositiveFinite(setup.objectDiameterMm) &&
-    isPositiveFinite(setup.mmPerRotation) &&
-    (!rotaryUsesRollerDiameter(setup) || isPositiveFinite(setup.rollerDiameterMm))
+    isDefinedFinitePositive(setup.objectDiameterMm) &&
+    isDefinedFinitePositive(setup.mmPerRotation) &&
+    (!rotaryUsesRollerDiameter(setup) || isDefinedFinitePositive(setup.rollerDiameterMm)) &&
+    (taper === null || rotaryTaperValid(taper))
   );
 }
 
@@ -114,8 +173,4 @@ export function rotaryDiameterFromWrapLengthMm(
 
 function perRevolutionScale(mmPerRotation: number, surfaceMmPerRevolution: number): number {
   return surfaceMmPerRevolution > 0 ? mmPerRotation / surfaceMmPerRevolution : 1;
-}
-
-function isPositiveFinite(value: number | undefined): boolean {
-  return value !== undefined && Number.isFinite(value) && value > 0;
 }

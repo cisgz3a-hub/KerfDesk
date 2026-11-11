@@ -8,6 +8,7 @@ import type {
   LibrarySourceKind,
 } from './design-library-types';
 import { activeLibraryFilterCount } from './design-library-view-model';
+import { uniqueValues } from '../../core/util/unique';
 
 export type UpdateLibraryFilter = <K extends keyof LibraryFilters>(
   key: K,
@@ -231,8 +232,4 @@ function FilterSelect(props: {
       </select>
     </label>
   );
-}
-
-function uniqueValues<T extends string>(values: ReadonlyArray<T>): T[] {
-  return [...new Set(values)];
 }

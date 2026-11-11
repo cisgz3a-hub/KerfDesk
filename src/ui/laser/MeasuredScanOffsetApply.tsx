@@ -92,8 +92,8 @@ export function MeasuredScanOffsetApply(props: {
         onMarkVerified={() => updateDeviceProfile({ scanOffsetCalibrationStatus: 'verified' })}
       />
       <p style={mutedStyle}>
-        Saved LaserForge safety limit: |offset| must be at most {offsetLimitMm} mm (1% of the
-        shorter bed axis, capped at 5 mm).
+        Saved KerfDesk safety limit: |offset| must be at most {offsetLimitMm} mm (1% of the shorter
+        bed axis, capped at 5 mm).
       </p>
     </div>
   );

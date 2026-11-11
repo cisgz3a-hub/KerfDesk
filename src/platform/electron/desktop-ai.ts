@@ -4,6 +4,7 @@ import {
   type AiRequest,
   type AiStatus,
 } from '../../core/ai/assistant';
+import { isRecord } from '../../core/util/is-record';
 
 type RouteFetch = (input: string, init: RequestInit) => Promise<Response>;
 export function createDesktopAiAssistant(fetchRoute: RouteFetch = fetch): AiAssistant {
@@ -52,7 +53,7 @@ export function createDesktopAiAssistant(fetchRoute: RouteFetch = fetch): AiAssi
 }
 function parseStatus(value: unknown): AiStatus {
   if (
-    !record(value) ||
+    !isRecord(value) ||
     typeof value['configured'] !== 'boolean' ||
     typeof value['secureStorage'] !== 'boolean' ||
     typeof value['model'] !== 'string' ||
@@ -66,10 +67,7 @@ function parseStatus(value: unknown): AiStatus {
   };
 }
 function failure(value: unknown): string {
-  return record(value) && typeof value['error'] === 'string' && value['error'].length <= 300
+  return isRecord(value) && typeof value['error'] === 'string' && value['error'].length <= 300
     ? value['error']
     : 'Assistant is unavailable in this app. No changes were applied.';
-}
-function record(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

@@ -61,12 +61,6 @@ export const calibrationTextStyle: CSSProperties = {
   lineHeight: 1.35,
 };
 
-export const splitRowStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '1fr 1fr',
-  gap: 6,
-};
-
 export const statusStyle: CSSProperties = {
   margin: 0,
   color: 'var(--lf-text-muted)',

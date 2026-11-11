@@ -24,6 +24,7 @@
 // valid MultiPolygon.
 
 import type { GridPoint } from './vector-artwork';
+import { boxContains } from '../../core/geometry/box-math';
 
 export type RegionFillRule = 'evenodd' | 'nonzero';
 
@@ -190,15 +191,6 @@ function ringInfo(points: ReadonlyArray<GridPoint>, index: number): RingInfo {
     maxY = Math.max(maxY, p.y);
   }
   return { index, points, twiceArea: twiceSignedArea(points), minX, minY, maxX, maxY };
-}
-
-function boxContains(outer: RingInfo, inner: RingInfo): boolean {
-  return (
-    outer.minX <= inner.minX &&
-    outer.minY <= inner.minY &&
-    outer.maxX >= inner.maxX &&
-    outer.maxY >= inner.maxY
-  );
 }
 
 /**

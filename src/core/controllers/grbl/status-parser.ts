@@ -76,11 +76,17 @@ export type OverrideValues = {
   readonly spindle: number;
 };
 
+/** A reported axis vector: X, Y, Z, and A when the controller has a fourth axis. */
+export type StatusAxes = { x: number; y: number; z: number; a?: number };
+
 export type StatusReport = {
   readonly state: GrblState;
   readonly subState: number | null;
-  readonly mPos: { x: number; y: number; z: number } | null;
-  readonly wPos: { x: number; y: number; z: number } | null;
+  readonly mPos: StatusAxes | null;
+  readonly wPos: StatusAxes | null;
+  /** Values in the report's MPos/WPos: one per configured axis on grblHAL
+   *  and FluidNC. Optional so hand-built mocks need not set it (ADR-695). */
+  readonly reportedAxisCount?: number | null;
   readonly feed: number | null;
   readonly spindle: number | null;
   /** Live laser output in percent of full power, from Smoothieware's `L:`
@@ -146,7 +152,7 @@ export type StatusReport = {
    * code must read `wcoCache` from the laser-store, NEVER this
    * field**, or the readout will flicker.
    */
-  readonly wco: { x: number; y: number; z: number } | null;
+  readonly wco: StatusAxes | null;
 };
 
 const STATE_VALUES: ReadonlyArray<GrblState> = [
@@ -180,6 +186,7 @@ export function parseStatusReport(line: string): StatusReport | null {
     subState: stateParsed.subState,
     mPos: pickAxisField(fields, 'MPos'),
     wPos: pickAxisField(fields, 'WPos'),
+    reportedAxisCount: pickReportedAxisCount(fields),
     feed: pickFsValue(fields, 0),
     spindle: pickFsValue(fields, 1),
     executingLineNumber: pickLineNumber(fields),
@@ -308,7 +315,7 @@ function parseState(token: string): { state: GrblState; subState: number | null 
 function pickAxisField(
   fields: ReadonlyArray<string>,
   label: 'MPos' | 'WPos' | 'WCO',
-): { x: number; y: number; z: number } | null {
+): StatusAxes | null {
   for (const f of fields) {
     if (!f.startsWith(`${label}:`)) continue;
     const parts = f.slice(label.length + 1).split(',');
@@ -322,9 +329,23 @@ function pickAxisField(
     const y = parseCanonicalStatusNumber(yToken);
     const z = parseCanonicalStatusNumber(zToken);
     if (x !== null && y !== null && z !== null) {
-      return { x, y, z };
+      // The fourth value is A on grblHAL and FluidNC, where a rotary can turn
+      // (ADR-695 Amendment 1); absent on three-axis reports.
+      const a = parts.length > 3 ? parseCanonicalStatusNumber(parts[3]) : null;
+      return a === null ? { x, y, z } : { x, y, z, a };
     }
     return null;
+  }
+  return null;
+}
+
+// How many axis values MPos/WPos carry: one per configured axis on grblHAL
+// and FluidNC, three on stock GRBL. A rotary on A needs a fourth (ADR-695).
+function pickReportedAxisCount(fields: ReadonlyArray<string>): number | null {
+  for (const f of fields) {
+    if (!f.startsWith('MPos:') && !f.startsWith('WPos:')) continue;
+    const parts = f.slice(f.indexOf(':') + 1).split(',');
+    return parts.every((token) => parseCanonicalStatusNumber(token) !== null) ? parts.length : null;
   }
   return null;
 }

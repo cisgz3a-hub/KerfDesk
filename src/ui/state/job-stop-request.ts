@@ -5,6 +5,7 @@
 // epoch, so it never describes a later run.
 
 import type { GrblState, StatusReport, StreamerStatus } from '../../core/controllers/grbl';
+import type { MachineKind } from '../../core/scene';
 import { cncPauseLiftMayBeMoving, type CncPauseLift } from './cnc-pause-lift-state';
 
 export type JobStopReason = 'operator' | 'app-closing';
@@ -17,6 +18,28 @@ export type JobStopRequest = {
    * clear it at that reset, so the Alarm 3 card offers it back (ADR-341
    * Amendment 11). Absent when no G92 origin was set. */
   readonly originAtStopMm?: { readonly x: number; readonly y: number };
+  /** The store's machineZeroEpoch when originAtStopMm was read: a later one
+   *  means machine zero may have moved since (ADR-341 Amendment 13). */
+  readonly originMachineZeroEpoch?: number;
+  /** A rotary on a dedicated A or Z axis: the machine turn the job started
+   *  from. Every such job opens with `G92 A0`, so it is that axis's work
+   *  offset (WCO) while the job runs. A re-run turns the part back to it
+   *  before zeroing again (ADR-695 Amendment 1). */
+  readonly rotaryStartTurn?: RotaryStartTurn;
+  /** Laser or CNC, as the stopped job started (`activeJobMachineKind`), read
+   *  before the stop clears it. Only a laser job's origin goes back by itself
+   *  after the operator's Abort (ADR-341 Amendment 14). */
+  readonly jobMachineKind?: MachineKind;
+};
+
+/** Where a dedicated-axis rotary job started, in machine units of its axis. */
+export type RotaryStartTurn = {
+  readonly axis: 'A' | 'Z';
+  readonly machine: number;
+  /** The store's machineZeroEpoch when the turn was read. A later one means a
+   *  power-up or port reopen cleared machine position, so the turn no longer
+   *  names a place on the part (rolling audit v14 Z2-P1-1, ADR-695 Amd 2). */
+  readonly machineZeroEpoch: number;
 };
 
 /** A soft reset KerfDesk sent against the stream of `streamerEpoch` (Abort,

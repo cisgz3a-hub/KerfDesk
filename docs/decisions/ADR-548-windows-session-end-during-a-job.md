@@ -1,6 +1,7 @@
 ## ADR-548 - Windows ending the session during a job: ask it to wait, or send Abort first (2026-09-29)
 
-**Status:** Accepted. Unit-tested; not yet tried on Windows with a machine attached. | **Date:**
+**Status:** Accepted; the notice by Amendment 1; a laser left on at Idle counts, and main writes a
+network machine its stop, by Amendment 2. Unit-tested; not yet tried on Windows with a machine attached. | **Date:**
 2026-09-29 | **Builds on:** ADR-117 (keep-awake during jobs), ADR-546 (the desktop support log)
 
 ### Context

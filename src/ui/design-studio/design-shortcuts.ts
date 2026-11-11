@@ -11,6 +11,8 @@
 import { isKeyboardActivationTarget } from '../common/keyboard-targets';
 import { designToolForShortcut } from './design-tool';
 import { useDesignStudioStore } from './design-studio-store';
+import { isEntrySeedKey, useDesignEntryFocus } from './design-entry-focus';
+import { isEntryGestureLive } from './design-typed-entry';
 
 export function handleDesignStudioKey(
   event: React.KeyboardEvent<HTMLDivElement>,
@@ -32,7 +34,9 @@ export function handleDesignStudioKey(
     event.preventDefault();
     return;
   }
-  if (handleArrowNudge(event)) return;
+  // A number typed mid-gesture goes into the options bar's first open box
+  // (ADR-272 Amendment 5) — no click on the box first.
+  if (seedTypedEntry(event) || handleArrowNudge(event)) return;
   if (event.key === 'Delete' || event.key === 'Backspace') {
     store.deleteSelected();
     event.preventDefault();
@@ -80,6 +84,14 @@ function handlePlainKey(event: React.KeyboardEvent<HTMLDivElement>, onFit: () =>
   }
 }
 
+function seedTypedEntry(event: React.KeyboardEvent<HTMLDivElement>): boolean {
+  const session = useDesignStudioStore.getState().session;
+  if (session === null || !isEntrySeedKey(event.key) || !isEntryGestureLive(session)) return false;
+  useDesignEntryFocus.getState().requestEntryFocus(event.key);
+  event.preventDefault();
+  return true;
+}
+
 // Arrow keys nudge the selection: one grid step, or 1 mm with Shift for fine work.
 // Every nudge is its own undo step, which is what makes keyboard positioning
 // trustworthy — you can always step back exactly one move.
@@ -115,6 +127,7 @@ function handleViewToggle(
     s: store.toggleSnap,
     o: store.toggleOrtho,
     g: store.toggleGrid,
+    t: store.toggleTracking,
   };
   const run = toggles[key];
   if (run === undefined) return;
@@ -144,8 +157,13 @@ function handleEscapeLadder(): void {
     store.setMarquee(null);
     return;
   }
-  // Extend is a click tool: one Escape always disarms it, retaining the selection.
-  if (session.tool === 'extend') {
+  // A waiting Dimension pick, or the dimension being edited, lets go first.
+  if (session.dimensionPendingLineId !== null || session.activeDimensionId !== null) {
+    store.setActiveDimension(null);
+    return;
+  }
+  // Extend and Trim are click tools: one Escape always disarms them, retaining the selection.
+  if (session.tool === 'extend' || session.tool === 'trim') {
     store.setTool('select');
     return;
   }

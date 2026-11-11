@@ -1,0 +1,251 @@
+// @vitest-environment node
+// TEMPORARY audit probe (never committed).
+import { writeFileSync } from 'node:fs';
+import { describe, it } from 'vitest';
+import { DEFAULT_DEVICE_PROFILE, toMachineCoords } from '../devices';
+import { cncGrblStrategy } from '../output';
+import {
+  createLayer,
+  DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_MACHINE_CONFIG,
+  IDENTITY_TRANSFORM,
+  type CncLayerSettings,
+  type CncTool,
+  type Polyline,
+  type Scene,
+} from '../scene';
+import { DEFAULT_CNC_TAPERED_INLAY, type CncTaperedInlaySettings } from '../scene/cnc-tapered-inlay';
+import { compileCncJob } from './compile-cnc-job';
+import {
+  auditMotion,
+  distanceToLoops,
+  emptyField,
+  insideEvenOdd,
+  parseProgram,
+  profileFor,
+  stampMoves,
+  type Field,
+  type Loop,
+  type Move,
+  type OracleTool,
+  type Profile,
+} from './zz-audit-oracle';
+
+const OUT =
+  process.env['AUDIT_OUT'] ?? '.';
+
+const poly = (pts: ReadonlyArray<readonly [number, number]>): Polyline => ({
+  closed: true,
+  points: pts.map(([x, y]) => ({ x, y })),
+});
+
+const DESIGN: ReadonlyArray<Polyline> = [
+  // asymmetric L
+  poly([
+    [40, 40],
+    [58, 40],
+    [58, 46],
+    [47, 46],
+    [47, 62],
+    [40, 62],
+  ]),
+  // star with reflex corners
+  poly(
+    Array.from({ length: 10 }, (_, i) => {
+      const r = i % 2 === 0 ? 9 : 3.6;
+      const a = (Math.PI * i) / 5 + 0.3;
+      return [72 + r * Math.cos(a), 52 + r * Math.sin(a)] as const;
+    }),
+  ),
+];
+
+const TOOLS: ReadonlyArray<CncTool> = [...DEFAULT_CNC_MACHINE_CONFIG.tools];
+
+function sample(field: Field, x: number, y: number): number {
+  // bilinear over cell centres
+  const fx = (x - field.x0) / field.cell - 0.5;
+  const fy = (y - field.y0) / field.cell - 0.5;
+  const i = Math.floor(fx);
+  const j = Math.floor(fy);
+  if (i < 0 || j < 0 || i >= field.nx - 1 || j >= field.ny - 1) return Number.NaN;
+  const tx = fx - i;
+  const ty = fy - j;
+  const at = (ii: number, jj: number) => field.depth[jj * field.nx + ii] ?? 0;
+  return (
+    at(i, j) * (1 - tx) * (1 - ty) +
+    at(i + 1, j) * tx * (1 - ty) +
+    at(i, j + 1) * (1 - tx) * ty +
+    at(i + 1, j + 1) * tx * ty
+  );
+}
+
+function compile(patch: Partial<CncLayerSettings>, tool: string) {
+  const scene: Scene = {
+    objects: [
+      {
+        kind: 'imported-svg',
+        id: 'source',
+        source: 'source.svg',
+        bounds: { minX: 0, minY: 0, maxX: 120, maxY: 100 },
+        transform: IDENTITY_TRANSFORM,
+        paths: [{ color: '#ff0000', polylines: DESIGN }],
+      },
+    ],
+    layers: [
+      {
+        ...createLayer({ id: 'inlay', color: '#ff0000' }),
+        cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'inlay-pair', toolId: tool, ...patch },
+      },
+    ],
+  };
+  const job = compileCncJob(scene, DEFAULT_DEVICE_PROFILE, {
+    ...DEFAULT_CNC_MACHINE_CONFIG,
+    tools: TOOLS,
+    toolId: tool,
+  });
+  return { job, program: cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE) };
+}
+
+function splitMovesByGroup(program: string): { female: Move[]; male: Move[]; headers: string[] } {
+  // The emitter writes one "; cnc layer-id" header per group; the pocket precedes the insert.
+  const parsed = parseProgram(program);
+  const headerLines: number[] = [];
+  const headers: string[] = [];
+  program.split('\n').forEach((line, index) => {
+    if (line.startsWith('; cnc operation:')) {
+      headerLines.push(index + 1);
+      headers.push(line);
+    }
+  });
+  const second = headerLines[1] ?? Number.POSITIVE_INFINITY;
+  return {
+    female: parsed.moves.filter((m) => m.line < second),
+    male: parsed.moves.filter((m) => m.line >= second),
+    headers,
+  };
+}
+
+describe('audit inlay fit', () => {
+  it.each([
+    { name: 'tapered-vb60-default', tool: 'vb-60', inlay: DEFAULT_CNC_TAPERED_INLAY },
+    { name: 'tapered-vb90-12-default', tool: 'vb-90', inlay: DEFAULT_CNC_TAPERED_INLAY },
+    {
+      name: 'tapered-vb30-fit02',
+      tool: 'vb-30',
+      inlay: { ...DEFAULT_CNC_TAPERED_INLAY, fitClearanceMm: 0.2 } satisfies CncTaperedInlaySettings,
+    },
+  ])(
+    '$name',
+    (c) => {
+      const { job, program } = compile({ taperedInlay: c.inlay, depthPerPassMm: 1.5 }, c.tool);
+      writeFileSync(`${OUT}/i-${c.name}.nc`, program);
+      const { female, male, headers } = splitMovesByGroup(program);
+      const profiles = new Map<string, Profile>();
+      for (const tool of TOOLS) profiles.set(tool.id, profileFor(tool as OracleTool));
+      const loops: Loop[] = DESIGN.map((p) => p.points.map((q) => toMachineCoords(q, DEFAULT_DEVICE_PROFILE)));
+      const xs = loops.flatMap((l) => l.map((p) => p.x));
+      const ys = loops.flatMap((l) => l.map((p) => p.y));
+      const fb = { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+      const border = c.inlay.plugBorderMm;
+      const pb = { minX: fb.minX - border, maxX: fb.maxX + border };
+      const shiftX = fb.maxX + c.inlay.pairSpacingMm - pb.minX;
+      const toMaleX = (x: number) => pb.minX + pb.maxX - x + shiftX;
+      const cell = 0.05;
+      const fField = emptyField(fb.minX - border - 3, fb.minY - border - 3, fb.maxX + border + 3, fb.maxY + border + 3, cell);
+      stampMoves(fField, female, profiles);
+      const mx0 = toMaleX(fb.maxX + border + 3);
+      const mx1 = toMaleX(fb.minX - border - 3);
+      const mField = emptyField(mx0, fb.minY - border - 3, mx1, fb.maxY + border + 3, cell);
+      stampMoves(mField, male, profiles);
+      const tool = TOOLS.find((t) => t.id === c.tool);
+      const s = Math.tan((((tool?.tipAngleDeg ?? 0) / 2) * Math.PI) / 180);
+      const E = c.inlay.engagementDepthMm;
+      const expectedSeat = E + c.inlay.fitClearanceMm / s;
+      // seat depth: the plug top plane goes down until the first contact
+      let seat = Number.POSITIVE_INFINITY;
+      let seatAt = { x: 0, y: 0 };
+      for (let j = 0; j < fField.ny; j += 1) {
+        const y = fField.y0 + (j + 0.5) * cell;
+        for (let i = 0; i < fField.nx; i += 1) {
+          const x = fField.x0 + (i + 0.5) * cell;
+          if (x < fb.minX - border + 1 || x > fb.maxX + border - 1) continue;
+          if (y < fb.minY - border + 1 || y > fb.maxY + border - 1) continue;
+          const f = fField.depth[j * fField.nx + i] ?? 0;
+          const m = sample(mField, toMaleX(x), y);
+          if (Number.isNaN(m)) continue;
+          if (f + m < seat) {
+            seat = f + m;
+            seatAt = { x, y };
+          }
+        }
+      }
+      // wall gap statistics and the visible seam at the pocket surface
+      let wallCells = 0;
+      let wallGapMax = 0;
+      let wallGapSum = 0;
+      let wallGapAt = { x: 0, y: 0, d: 0 };
+      let seamCells = 0;
+      let seamMaxInset = 0;
+      let seamAt = { x: 0, y: 0 };
+      let plugProudCells = 0; // plug solid standing where the design has no pocket at the surface
+      let maxPocket = 0;
+      let maxPlug = 0;
+      for (let j = 0; j < fField.ny; j += 1) {
+        const y = fField.y0 + (j + 0.5) * cell;
+        for (let i = 0; i < fField.nx; i += 1) {
+          const x = fField.x0 + (i + 0.5) * cell;
+          const f = fField.depth[j * fField.nx + i] ?? 0;
+          const m = sample(mField, toMaleX(x), y);
+          if (Number.isNaN(m)) continue;
+          maxPocket = Math.max(maxPocket, f);
+          maxPlug = Math.max(maxPlug, m);
+          const inside = insideEvenOdd(x, y, loops);
+          const d = distanceToLoops(x, y, loops);
+          if (inside && d > 0.15 && d < E * s - 0.15) {
+            const gap = f + m - seat;
+            wallCells += 1;
+            wallGapSum += gap;
+            if (gap > wallGapMax) {
+              wallGapMax = gap;
+              wallGapAt = { x, y, d };
+            }
+          }
+          if (inside && m > seat + 0.02) {
+            seamCells += 1;
+            if (d > seamMaxInset) {
+              seamMaxInset = d;
+              seamAt = { x, y };
+            }
+          }
+          if (!inside && d > 0.1 && d < border - 1 && m < seat - 0.02) plugProudCells += 1;
+        }
+      }
+      const motion = auditMotion(parseProgram(program), DEFAULT_CNC_MACHINE_CONFIG.params.safeZMm);
+      writeFileSync(
+        `${OUT}/i-${c.name}.json`,
+        JSON.stringify(
+          {
+            name: c.name,
+            headers,
+            groups: job.groups.map((g) => (g.kind === 'cnc' ? { cutType: g.cutType, toolId: g.toolId, passes: g.passes.length, depth: g.depthMm } : {})),
+            slope: s,
+            expectedSeat,
+            seat,
+            seatAt,
+            glueGapActual: maxPocket - seat,
+            sawGapActual: maxPlug - seat,
+            maxPocket,
+            maxPlug,
+            wall: { cells: wallCells, maxVerticalGap: wallGapMax, meanVerticalGap: wallGapSum / Math.max(1, wallCells), at: wallGapAt, maxHorizontalGap: wallGapMax * s },
+            seam: { cells: seamCells, maxInsetMm: seamMaxInset, at: seamAt },
+            plugProudCells,
+            motion,
+          },
+          null,
+          1,
+        ),
+      );
+    },
+    600_000,
+  );
+});

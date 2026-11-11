@@ -54,8 +54,34 @@ describe('rotary summary', () => {
   it('tells Job Review whether and how the next job maps Y', () => {
     expect(rotaryReviewSummary({ ...ROLLER, enabled: false })).toBe('Configured, disabled');
     expect(rotaryReviewSummary({ ...ROLLER, rollerDiameterMm: 25 })).toBe(
-      'Enabled · Roller, Ø60 mm (rollers Ø25 mm) · Y ×0.51, one revolution = 96 machine mm',
+      'Enabled · Roller, Ø60 mm (rollers Ø25 mm) · Y ×0.51, one revolution = 96 machine mm' +
+        " · each move's feed holds the layer speed on the part",
     );
     expect(rotaryReviewSummary({ ...ROLLER, objectDiameterMm: 0 })).toMatch(/not applied/);
+  });
+});
+
+describe('rotary summary with a taper (ADR-694)', () => {
+  const taper = {
+    enabled: true,
+    topDiameterMm: 80,
+    bottomDiameterMm: 70,
+    lengthMm: 100,
+    topSide: 'left' as const,
+    artworkFromTopMm: 0,
+  };
+
+  it('names both ends in Job Review, and only while the taper is on', () => {
+    const chuck: RotarySetup = { ...ROLLER, type: 'chuck', objectDiameterMm: 80, taper };
+    expect(rotaryReviewSummary(chuck)).toBe(
+      'Enabled · Chuck, taper Ø80 → Ø70 mm over 100 mm · Y ×0.16, one revolution = 40 machine mm' +
+        " · each move's feed holds the layer speed on the part",
+    );
+    expect(rotaryAttachmentSummary({ ...chuck, taper: { ...taper, enabled: false } })).toBe(
+      'Chuck, Ø80 mm',
+    );
+    expect(rotaryReviewSummary({ ...chuck, taper: { ...taper, lengthMm: 1 } })).toMatch(
+      /not applied/,
+    );
   });
 });

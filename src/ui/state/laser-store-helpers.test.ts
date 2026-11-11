@@ -306,8 +306,8 @@ describe('buildPortClosePatch safety notice', () => {
     const tcp = { serialPortInfo: { transport: 'tcp' } } as const;
     const job = buildPortClosePatch(idle({ ...tcp, streamer: streamingState() })).safetyNotice;
     expect(job).toEqual(disconnectDuringJobNotice('network'));
-    expect(job?.message).toMatch(/^Network connection was lost during an active job/);
-    expect(job?.message).toContain('Reconnect from the network connection form');
+    expect(job?.message).toMatch(/^Network connection was lost during the job/);
+    expect(job?.message).toContain('reconnect from the network connection form');
     const motion = buildPortClosePatch(
       idle({ ...tcp, motionOperation: startMotionOperation('jog') }),
     );

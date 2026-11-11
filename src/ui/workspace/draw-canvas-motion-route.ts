@@ -22,6 +22,7 @@ import {
 } from './motion-route-style';
 import { visitRouteRange } from './route-range-walk';
 import type { ViewTransform } from './view-transform';
+import { distance3, lerp3 } from '../../core/geometry/vec3';
 
 type CachedRoutePaths = {
   readonly process: Path2D;
@@ -211,14 +212,14 @@ function confirmedMotionPoints(
     const to = motion.pointsMm[index];
     if (from === undefined || to === undefined) continue;
     if (points.length === 0) points.push(from);
-    const length = distance(from, to);
+    const length = distance3(from, to);
     if (walked + length <= targetMm) {
       points.push(to);
       walked += length;
       continue;
     }
     const t = length <= Number.EPSILON ? 0 : (targetMm - walked) / length;
-    points.push(interpolate(from, to, Math.max(0, Math.min(1, t))));
+    points.push(lerp3(from, to, Math.max(0, Math.min(1, t))));
     break;
   }
   return points;
@@ -226,20 +227,4 @@ function confirmedMotionPoints(
 
 function isVertical(motion: CanvasPreviewMotion): boolean {
   return motion.intent === 'plunge' || motion.intent === 'retract';
-}
-
-function distance(a: ExecutablePlanPoint, b: ExecutablePlanPoint): number {
-  return Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
-}
-
-function interpolate(
-  a: ExecutablePlanPoint,
-  b: ExecutablePlanPoint,
-  t: number,
-): ExecutablePlanPoint {
-  return {
-    x: a.x + (b.x - a.x) * t,
-    y: a.y + (b.y - a.y) * t,
-    z: a.z + (b.z - a.z) * t,
-  };
 }

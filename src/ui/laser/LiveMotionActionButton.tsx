@@ -1,3 +1,4 @@
+import { useFreshKeyActivation } from '../common/use-fresh-key-activation';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 
 type Action = () => Promise<void>;
@@ -42,6 +43,9 @@ export function pendingCncLiftButton(props: {
 }
 
 export function LiveMotionActionButton(props: ActionButtonProps): JSX.Element {
+  // One focused button flips Pause → Resume, so a held Enter must not press
+  // what it became (rolling audit v10 V8-P2-1, ADR-207 Amendment 3).
+  const keys = useFreshKeyActivation(`${props.label}|${props.disabled === true ? 'off' : 'on'}`);
   return (
     <button
       type="button"
@@ -51,6 +55,7 @@ export function LiveMotionActionButton(props: ActionButtonProps): JSX.Element {
       // aria-disabled, not disabled: Pause becomes Pausing… then Resume in the
       // same button, and a disabled button drops its focus to the page.
       aria-disabled={props.disabled === true ? 'true' : undefined}
+      {...keys}
       onClick={() => {
         if (props.disabled === true) return;
         void props.onClick().catch(controllerActionFailureHandler(props.label));

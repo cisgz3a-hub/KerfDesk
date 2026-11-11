@@ -16,4 +16,7 @@ overrides:
   esbuild@<0.28.1: 0.28.1
   sharp@<0.35.5: 0.35.5
   ws@<8.21.0: 8.21.0
-  undici@>=7.0.0 <7.29.1: 7.29.1
+  # GHSA-4qv8-2p9j-2685, GHSA-xjj6-f33q-929c, GHSA-2m5v-pch6-74hx,
+  # GHSA-qrxm-fqhp-jwvm, GHSA-9fm3-97px-rjf6 and GHSA-4w7w-5xrc-9h26 (Wrangler's
+  # miniflare): 7.30.1 is the in-major patch.
+  undici@>=7.0.0 <7.30.1: 7.30.1

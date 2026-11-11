@@ -5,26 +5,97 @@
 // compares later pictures with it. Machine-local like the other camera
 // preferences: it describes this computer's camera, not the project.
 
+import { cameraSourceIdWithoutCredentials } from '../../../core/camera/camera-capture-binding';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import type { ViewThumbnail } from '../../../core/camera/model/view-shift';
 
 const KEY_PREFIX = 'laserforge.camera.viewReference.v1:';
 
+/**
+ * The camera a reference belongs to: its public address and, for a network
+ * camera, its keyed fingerprint, since several cameras can share one address
+ * (ADR-692 Amendment 1).
+ */
+function cameraName(record: CameraModelRecord): string {
+  const capture = record.capture;
+  if (capture === undefined) return 'unbound';
+  const fingerprint = capture.queryFingerprint;
+  return fingerprint === undefined ? capture.sourceId : `${capture.sourceId}#${fingerprint}`;
+}
+
 /** One reference per calibration: the camera it was fitted on, and when. */
 function keyFor(record: CameraModelRecord): string {
-  return `${KEY_PREFIX}${record.capture?.sourceId ?? 'unbound'}@${record.calibratedAt}`;
+  renameOlderKeys();
+  const key = `${KEY_PREFIX}${cameraName(record)}@${record.calibratedAt}`;
+  adoptUnnamedKey(record, key);
+  return key;
+}
+
+// A reference kept before the fingerprint was part of its key moves to it.
+function adoptUnnamedKey(record: CameraModelRecord, key: string): void {
+  const older = `${KEY_PREFIX}${record.capture?.sourceId ?? 'unbound'}@${record.calibratedAt}`;
+  if (older === key) return;
+  try {
+    const value = localStorage.getItem(older);
+    if (value === null) return;
+    localStorage.removeItem(older);
+    if (localStorage.getItem(key) === null) localStorage.setItem(key, value);
+  } catch {
+    // Storage unavailable: nothing is kept to move.
+  }
+}
+
+let olderKeysRenamed = false;
+
+// Older versions could name a network camera here by more than its public
+// address (ADR-692 and Amendment 1); such a reference moves to the key it has
+// now, once a run.
+function renameOlderKeys(): void {
+  if (olderKeysRenamed) return;
+  olderKeysRenamed = true;
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+      const key = localStorage.key(i);
+      const renamed = key === null ? null : publicKey(key);
+      if (key === null || renamed === null || renamed === key) continue;
+      const value = localStorage.getItem(key);
+      localStorage.removeItem(key);
+      if (value !== null && localStorage.getItem(renamed) === null) {
+        localStorage.setItem(renamed, value);
+      }
+    }
+  } catch {
+    // Storage unavailable: nothing is kept to rename.
+  }
+}
+
+// `key` with its camera named by its public address; null when it names no network camera.
+function publicKey(key: string): string | null {
+  if (!key.startsWith(KEY_PREFIX)) return null;
+  const at = key.lastIndexOf('@');
+  const name = key.slice(KEY_PREFIX.length, at);
+  if (at < KEY_PREFIX.length || !name.includes('://')) return null;
+  const hash = /#hmac-sha256:[0-9a-f]{64}$/.exec(name)?.[0] ?? '';
+  const sourceId = cameraSourceIdWithoutCredentials(name.slice(0, name.length - hash.length));
+  return `${KEY_PREFIX}${sourceId}${hash}${key.slice(at)}`;
+}
+
+/** Test seam: the next use renames older keys again. */
+export function resetViewReferenceKeyRenameForTests(): void {
+  olderKeysRenamed = false;
 }
 
 export function saveViewReference(record: CameraModelRecord, thumb: ViewThumbnail): void {
   try {
     // Keep one reference per camera: an older calibration's goes with it.
-    const prefix = `${KEY_PREFIX}${record.capture?.sourceId ?? 'unbound'}@`;
+    const key = keyFor(record);
+    const prefix = `${KEY_PREFIX}${cameraName(record)}@`;
     for (let i = localStorage.length - 1; i >= 0; i -= 1) {
-      const key = localStorage.key(i);
-      if (key !== null && key.startsWith(prefix)) localStorage.removeItem(key);
+      const stored = localStorage.key(i);
+      if (stored !== null && stored.startsWith(prefix)) localStorage.removeItem(stored);
     }
     localStorage.setItem(
-      keyFor(record),
+      key,
       JSON.stringify({ width: thumb.width, height: thumb.height, data: toBase64(thumb.data) }),
     );
   } catch {

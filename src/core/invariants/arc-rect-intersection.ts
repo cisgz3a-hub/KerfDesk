@@ -1,4 +1,5 @@
 import { isAngleOnArc } from './arc-bounds';
+import { pointInBox } from '../geometry/box-math';
 
 type Point = { readonly x: number; readonly y: number };
 type Rect = {
@@ -21,7 +22,7 @@ export function arcIntersectsRect(
   clockwise: boolean,
   rect: Rect,
 ): boolean {
-  if (pointInRect(start, rect) || pointInRect(end, rect)) return true;
+  if (pointInBox(start, rect) || pointInBox(end, rect)) return true;
   const center = { x: start.x + i, y: start.y + j };
   const radius = Math.hypot(i, j);
   if (radius <= EPSILON) return false;
@@ -76,10 +77,4 @@ function horizontalEdgeIntersects(
 function circleRoot(radius: number, delta: number): number | null {
   const squared = radius * radius - delta * delta;
   return squared < -EPSILON ? null : Math.sqrt(Math.max(0, squared));
-}
-
-function pointInRect(point: Point, rect: Rect): boolean {
-  return (
-    point.x >= rect.minX && point.x <= rect.maxX && point.y >= rect.minY && point.y <= rect.maxY
-  );
 }

@@ -8,6 +8,8 @@ import { usePlatformOptional } from '../../app/platform-context';
 import { Dialog, DialogActions } from '../../kit/Dialog';
 import { useLaserStore } from '../../state/laser-store';
 import { surfaceProbeBlockReason } from '../../state/laser-surface-probe-actions';
+import { maxOf, minOf } from '../../../core/util';
+import { ProbeCircuitLine } from '../ProbeCircuitLine';
 
 const INITIAL = {
   minX: 0,
@@ -134,6 +136,8 @@ export function SurfaceProbeDialog(props: { readonly onClose: () => void }): JSX
         />
         Current Z clears the entire region, the probe is connected, and the spindle is off.
       </label>
+      {/* Touch-off's live test-touch line (ADR-103 Amendment 4). */}
+      <ProbeCircuitLine testedNext="Measure grid once the region is clear." />
       {blocked !== null && !busy && <p>{blocked}</p>}
       {message !== '' && <p role="status">{message}</p>}
       {measurement !== null && <SurfaceProbeReview measurement={measurement} />}
@@ -226,8 +230,8 @@ function SurfaceProbeReview({
   readonly measurement: SurfaceGridMeasurement;
 }): JSX.Element {
   const heights = measurement.points.map((point) => point.z);
-  const minimum = heights.length === 0 ? null : Math.min(...heights);
-  const maximum = heights.length === 0 ? null : Math.max(...heights);
+  const minimum = heights.length === 0 ? null : minOf(heights);
+  const maximum = heights.length === 0 ? null : maxOf(heights);
   return (
     <section aria-label="Measured surface review">
       <p>

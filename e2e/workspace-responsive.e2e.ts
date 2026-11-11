@@ -88,7 +88,11 @@ for (const theme of ['light', 'dark'] as const) {
     await expectCompactToolbarCanvas(page, toolbar);
     await expect(toolbar.locator('.lf-workspace-layout-select > span')).toBeVisible();
     await page.context().setOffline(true);
-    await expect(toolbar.getByRole('status')).toHaveText('Offline');
+    // The toolbar has two live regions since ADR-561 Amd 7: the Offline chip and
+    // the Update button's hidden announcer. Name the one this checks.
+    await expect(toolbar.getByRole('status', { name: /No internet connection/ })).toHaveText(
+      'Offline',
+    );
     await page.evaluate(() => window.dispatchEvent(new Event('beforeinstallprompt')));
     await expect(toolbar.getByRole('button', { name: 'Install app', exact: true })).toBeVisible();
     for (const wideFont of [false, true]) {
@@ -111,7 +115,10 @@ for (const theme of ['light', 'dark'] as const) {
           }));
           expect(size.scrollWidth).toBeLessThanOrEqual(size.width + 1);
         }
-        await expectWithinViewport(page, toolbar.getByRole('status'));
+        await expectWithinViewport(
+          page,
+          toolbar.getByRole('status', { name: /No internet connection/ }),
+        );
         await expectNoPageOverflow(page);
         if (wideFont && width === 640) {
           await page.screenshot({ path: testInfo.outputPath(`toolbar-optional-${theme}.png`) });

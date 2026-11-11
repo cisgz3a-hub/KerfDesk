@@ -30,6 +30,7 @@ import type {
 import type { VectorSceneObject } from '../vector-path-tools';
 import { optimizeContour } from './optimize-contour';
 import type { ShapeOptimizeOptions } from './shape-optimize-options';
+import { samePoint } from '../point-math';
 
 export type ShapeOptimizeStats = {
   /** Points (curve nodes) the contours had. */
@@ -224,8 +225,4 @@ function curveEndsMeet(curve: CurveSubpath): boolean {
     Math.abs(end.x - curve.start.x) < CLOSURE_EPS_MM &&
     Math.abs(end.y - curve.start.y) < CLOSURE_EPS_MM
   );
-}
-
-function samePoint(a: Vec2, b: Vec2): boolean {
-  return a.x === b.x && a.y === b.y;
 }

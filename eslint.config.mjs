@@ -1,6 +1,7 @@
 // LaserForge 2.0 ESLint flat config.
 //
-// Enforces the discipline described in CLAUDE.md, ADR-010, and ADR-015:
+// Enforces the discipline described in ADR-010 and ADR-015 (AGENTS.md is the
+// agent guide; the rules themselves live here and in those ADRs):
 //   * File-size limits (≤ 400 lines hard, function ≤ 80, complexity ≤ 12)
 //   * Module isolation: core / io / platform / ui boundaries
 //   * Pure core: no platform globals, no clock, no randomness in src/core/
@@ -10,10 +11,17 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import boundariesPlugin from 'eslint-plugin-boundaries';
 import importPlugin from 'eslint-plugin-import';
+import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import prettierConfig from 'eslint-config-prettier';
 import globals from 'globals';
-import kerfdeskRules from './scripts/eslint/no-raw-project-set-state.mjs';
+import rawProjectSetStateRules from './scripts/eslint/no-raw-project-set-state.mjs';
+import spreadMathExtremumRules from './scripts/eslint/no-spread-math-extremum.mjs';
+
+// One plugin object: flat config refuses two different objects under one name.
+const kerfdeskRules = {
+  rules: { ...rawProjectSetStateRules.rules, ...spreadMathExtremumRules.rules },
+};
 
 const FILE_LINE_LIMIT = 400;
 const FUNCTION_LINE_LIMIT = 80;
@@ -38,6 +46,8 @@ const moduleBoundaries = {
     // patterns are considered. `mode: 'file'` pins it to one file path.
     { type: 'platform-types', pattern: 'src/platform/types.ts', mode: 'file' },
     { type: 'platform-types', pattern: 'src/platform/build-capabilities.ts', mode: 'file' },
+    { type: 'platform-types', pattern: 'src/platform/ruida-network-types.ts', mode: 'file' },
+    { type: 'platform-types', pattern: 'src/platform/usb-link-types.ts', mode: 'file' },
     { type: 'platform-web', pattern: 'src/platform/web', mode: 'folder' },
     { type: 'platform-electron', pattern: 'src/platform/electron', mode: 'folder' },
     { type: 'core', pattern: 'src/core', mode: 'folder' },
@@ -69,8 +79,9 @@ const boundaryRules = [
   { from: { type: 'core' }, allow: { to: { type: 'core' } } },
   // io may import core + io
   { from: { type: 'io' }, allow: { to: { type: ['core', 'io'] } } },
-  // platform/types may import core (interface uses core domain types)
-  { from: { type: 'platform-types' }, allow: { to: { type: 'core' } } },
+  // platform/types may import core (interface uses core domain types) and its
+  // sibling type files (ruida-network-types.ts, ADR-697)
+  { from: { type: 'platform-types' }, allow: { to: { type: ['core', 'platform-types'] } } },
   // platform implementations import core + the platform-types interface
   { from: { type: 'platform-web' }, allow: { to: { type: ['core', 'platform-types'] } } },
   { from: { type: 'platform-electron' }, allow: { to: { type: ['core', 'platform-types'] } } },
@@ -155,11 +166,11 @@ export default tseslint.config(
       ],
       complexity: ['error', COMPLEXITY_LIMIT],
 
-      // Module isolation (CLAUDE.md "Imports — boundaries enforced")
+      // Module isolation (ADR-010): core / io / platform / ui boundaries.
       'boundaries/dependencies': ['error', { default: 'disallow', rules: boundaryRules }],
       'boundaries/no-unknown': 'error',
       'boundaries/no-unknown-files': 'error',
-      // CLAUDE.md "No circular imports" — was documented as enforced long
+      // No circular imports — was documented as enforced long
       // before the rule existed (audit H14); now it actually is.
       'import/no-cycle': 'error',
 
@@ -200,7 +211,7 @@ export default tseslint.config(
         { name: 'prompt', message: 'Use jobAwarePrompt (H13).' },
       ],
 
-      // Type strictness (CLAUDE.md "Type strictness")
+      // Type strictness: no `any`, no `!`, type-only imports marked as such.
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-non-null-assertion': 'error',
       '@typescript-eslint/consistent-type-imports': [
@@ -221,7 +232,7 @@ export default tseslint.config(
       // A5 audit fix: enable the high-value type-aware rules the audit
       // specifically called out, without flipping the whole strictTypeChecked
       // preset (which contradicts project rules — e.g. it wants `!`
-      // assertions CLAUDE.md bans, and demands dot-notation that fights
+      // assertions this project bans, and demands dot-notation that fights
       // tsconfig's noUncheckedIndexedAccess strictness).
       //
       // no-floating-promises is the most important: a missed `await` on
@@ -253,7 +264,7 @@ export default tseslint.config(
       '@typescript-eslint/array-type': 'off',
     },
   },
-  // Pure core: no platform globals, no clock, no randomness (ADR-010, CLAUDE.md)
+  // Pure core: no platform globals, no clock, no randomness (ADR-010)
   {
     files: ['src/core/**/*.ts', 'src/core/**/*.tsx'],
     rules: {
@@ -268,7 +279,7 @@ export default tseslint.config(
         { name: 'atob', message: 'core/ must not depend on browser base64 globals.' },
         { name: 'btoa', message: 'core/ must not depend on browser base64 globals.' },
         // M29 (AUDIT-2026-06-10): these two were documented as restricted in
-        // CLAUDE.md but never configured — globals.node made `process` pass.
+        // the project rules but never configured — globals.node made `process` pass.
         { name: 'console', message: 'core/ must not log directly; use a logger passed in.' },
         { name: 'process', message: 'core/ is platform-agnostic. Move to ui/ or platform/.' },
         // This block REPLACES the src-wide no-restricted-globals for core
@@ -277,7 +288,7 @@ export default tseslint.config(
         { name: 'confirm', message: 'core/ is platform-agnostic (and H13 bans raw dialogs).' },
         { name: 'prompt', message: 'core/ is platform-agnostic (and H13 bans raw dialogs).' },
       ],
-      // M29: CLAUDE.md claims a no-restricted-imports gate for pure core;
+      // M29: the project rules claim a no-restricted-imports gate for pure core;
       // it never existed, so `import fs from "node:fs"` would have passed
       // lint AND typecheck (@types/node is installed).
       'no-restricted-imports': [
@@ -343,6 +354,23 @@ export default tseslint.config(
     plugins: { kerfdesk: kerfdeskRules },
     rules: { 'kerfdesk/no-raw-project-set-state': 'error' },
   },
+  // Audit S7-P2-3: no array spread into Math.min / Math.max in shipped code
+  // (scripts/eslint/no-spread-math-extremum.mjs). Tests and fixtures build
+  // small arrays and may keep the spread.
+  {
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ignores: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      'src/__fixtures__/**',
+      '**/*.test-support.ts',
+      '**/*.test-support.tsx',
+      '**/*test-helpers.ts',
+      ...UI_TEST_SUPPORT_FILES,
+    ],
+    plugins: { kerfdesk: kerfdeskRules },
+    rules: { 'kerfdesk/no-spread-math-extremum': 'error' },
+  },
   // H13: the job-aware wrapper module is the ONE place allowed to touch the
   // native blocking dialogs — everything else must go through it.
   {
@@ -363,6 +391,56 @@ export default tseslint.config(
       '@typescript-eslint/no-non-null-assertion': 'off',
       'boundaries/dependencies': 'off',
       'no-restricted-imports': 'off',
+    },
+  },
+  // React rules that catch defects, not style (code quality audit C1,
+  // C1-P3-3). `no-array-index-key` is left out on purpose: the index keys in
+  // this tree are positional lists (coordinates, recipe steps, rows of an
+  // array edited in place), where the index is the item's identity.
+  {
+    files: ['src/**/*.tsx'],
+    ignores: ['**/*.test.tsx'],
+    plugins: { react: reactPlugin },
+    settings: { react: { version: 'detect' } },
+    rules: {
+      'react/jsx-key': ['error', { checkFragmentShorthand: true, warnOnDuplicates: true }],
+      'react/jsx-no-duplicate-props': 'error',
+      'react/jsx-no-target-blank': 'error',
+      'react/jsx-no-script-url': 'error',
+      'react/jsx-no-comment-textnodes': 'error',
+      'react/jsx-no-constructed-context-values': 'error',
+      // A button with no type submits the form it sits in.
+      'react/button-has-type': 'error',
+      // Render props are fine; a component defined during render remounts every time.
+      'react/no-unstable-nested-components': ['error', { allowAsProps: true }],
+      'react/no-children-prop': 'error',
+      // Raw HTML needs a reviewed, commented exception each time.
+      'react/no-danger': 'error',
+      'react/no-danger-with-children': 'error',
+      'react/no-direct-mutation-state': 'error',
+      'react/no-access-state-in-setstate': 'error',
+      'react/no-unknown-property': 'error',
+      'react/no-invalid-html-attribute': 'error',
+      'react/no-object-type-as-default-prop': 'error',
+      'react/void-dom-elements-no-children': 'error',
+      'react/style-prop-object': 'error',
+      'react/iframe-missing-sandbox': 'error',
+    },
+  },
+  // Browser specs: a Playwright action or assertion without `await` passes
+  // silently, so the promise rules need type information here too (code
+  // quality audit C1, C1-P3-2). The other typed rules stay with `src`.
+  {
+    files: ['e2e/**/*.ts', 'e2e/**/*.tsx'],
+    languageOptions: {
+      parserOptions: {
+        project: './e2e/tsconfig.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: false }],
     },
   },
   {

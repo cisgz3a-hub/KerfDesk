@@ -14,11 +14,16 @@ import {
   type PlungingReliefStage,
 } from './job-review-detail-facts';
 import { tabSpanGroupLabel } from './job-review-laser-tabs';
+import {
+  compiledProjectionFactsByLayer,
+  type CompiledProjectionFacts,
+} from './job-review-projection-detail';
 import type { CncStrategyFallback } from '../../../core/job/cnc-compilation-sidecar-types';
 
 import { cncCuttingStageLabel } from '../../../core/scene/cnc-stage-recipe';
 import { nominalChiploadMm } from '../../../core/cnc/nominal-chipload';
 import { effectiveGcodeFeedMmPerMin } from '../../../core/gcode/feed-word';
+import { formatGroupedUpTo3Decimals } from '../../../core/util/number-format';
 
 export type JobReviewEffectiveOperation = {
   readonly layerId: string;
@@ -26,6 +31,8 @@ export type JobReviewEffectiveOperation = {
   readonly cncActualMaxDepthMm?: number;
   readonly plungingReliefStages?: ReadonlyArray<PlungingReliefStage>;
   readonly relief?: CompiledReliefFacts;
+  // A projected operation's compiled levels, depth and tabs (W6-P2-1).
+  readonly projection?: CompiledProjectionFacts;
   // Set when the operation asks for a ramp and compiled shapes other than
   // reliefs, none of whose groups records one (ADR-273 Amendment 2).
   readonly unrampedShapes?: true;
@@ -63,6 +70,7 @@ export function buildEffectiveOperationReview(
   }
   const plungingReliefByLayer = plungingReliefStagesByLayer(job);
   const reliefByLayer = compiledReliefFactsByLayer(job);
+  const projectionByLayer = compiledProjectionFactsByLayer(job);
   const unrampedShapeLayers = unrampedShapeLayerIds(job, scene?.layers ?? []);
   const tabbedLayers = tabbedProfileLayerIds(job);
   const fallbacks = new Map(
@@ -73,12 +81,14 @@ export function buildEffectiveOperationReview(
     const cncActualMaxDepth = vCarveDepthByLayer.get(layerId);
     const plungingReliefStages = plungingReliefByLayer.get(layerId);
     const relief = reliefByLayer.get(layerId);
+    const projection = projectionByLayer.get(layerId);
     return {
       layerId,
       summaries,
       ...(cncActualMaxDepth === undefined ? {} : { cncActualMaxDepthMm: cncActualMaxDepth.value }),
       ...(plungingReliefStages === undefined ? {} : { plungingReliefStages }),
       ...(relief === undefined ? {} : { relief }),
+      ...(projection === undefined ? {} : { projection }),
       ...(unrampedShapeLayers.has(layerId) ? { unrampedShapes: true as const } : {}),
       ...(tabbedLayers.has(layerId) ? { tabbedShapes: true as const } : {}),
       ...(strategyFallback === undefined ? {} : { strategyFallback }),
@@ -124,6 +134,7 @@ function compiledReliefFactsByLayer(job: Job): ReadonlyMap<string, CompiledRelie
     maxDepthByLayer.set(group.layerId, Math.max(maxDepthByLayer.get(group.layerId) ?? 0, depthMm));
   }
   const reliefCounts = compiledReliefCounts(job);
+  const reach = compiledRoughingReach(job);
   const facts = new Map<string, CompiledReliefFacts>();
   for (const [layerId, levels] of levelsByLayer) {
     facts.set(layerId, {
@@ -131,9 +142,32 @@ function compiledReliefFactsByLayer(job: Job): ReadonlyMap<string, CompiledRelie
       reliefCount: reliefCounts.get(layerId) ?? 0,
       maxDepthMm: maxDepthByLayer.get(layerId) ?? 0,
       cutsOtherShapes: otherShapeLayers.has(layerId),
+      ...reach.get(layerId),
     });
   }
   return facts;
+}
+
+// W6-P2-2: the area each operation's roughing missed and the step-down levels
+// its finishing cut there, from the job's relief planning evidence.
+function compiledRoughingReach(
+  job: Job,
+): ReadonlyMap<string, Pick<CompiledReliefFacts, 'roughingMissedAreaMm2' | 'finishingStepLevels'>> {
+  const out = new Map<string, { roughingMissedAreaMm2?: number; finishingStepLevels?: number }>();
+  for (const plan of job.cncCompilation?.reliefPlans ?? []) {
+    const entry = out.get(plan.layerId) ?? {};
+    if (plan.stage === 'roughing' && plan.roughingMissedAreaMm2 !== undefined) {
+      entry.roughingMissedAreaMm2 = (entry.roughingMissedAreaMm2 ?? 0) + plan.roughingMissedAreaMm2;
+    }
+    if (plan.stage === 'finishing' && plan.finishingStepLevels !== undefined) {
+      entry.finishingStepLevels = Math.max(
+        entry.finishingStepLevels ?? 0,
+        plan.finishingStepLevels,
+      );
+    }
+    out.set(plan.layerId, entry);
+  }
+  return out;
 }
 
 // The job's relief planning evidence holds one roughing entry per compiled
@@ -224,9 +258,9 @@ function cncGroupSummary(group: CncGroup): string {
     actualDepth +
     (group.cuttingStage === undefined ? '' : `${cncCuttingStageLabel(group.cuttingStage)} · `) +
     `${tool} · ${group.passes.length} ${plural(group.passes.length, 'pass', 'passes')}` +
-    ` · ${formatNumber(effectiveGcodeFeedMmPerMin(group.feedMmPerMin))} mm/min feed` +
-    ` · ${formatNumber(effectiveGcodeFeedMmPerMin(group.plungeMmPerMin))} mm/min plunge` +
-    ` · ${formatNumber(Math.max(0, Math.round(group.spindleRpm)))} RPM · ${coolant}` +
+    ` · ${formatGroupedUpTo3Decimals(effectiveGcodeFeedMmPerMin(group.feedMmPerMin))} mm/min feed` +
+    ` · ${formatGroupedUpTo3Decimals(effectiveGcodeFeedMmPerMin(group.plungeMmPerMin))} mm/min plunge` +
+    ` · ${formatGroupedUpTo3Decimals(Math.max(0, Math.round(group.spindleRpm)))} RPM · ${coolant}` +
     nominalChiploadSummary(group)
   );
 }
@@ -252,8 +286,8 @@ function laserGroupSummary(
     group.kind !== 'raster' && group.powerMode !== undefined ? ` · ${group.powerMode} power` : '';
   const speed =
     group.requestedSpeed === undefined
-      ? `${formatNumber(group.speed)} mm/min`
-      : `${formatNumber(group.speed)} mm/min effective (${formatNumber(group.requestedSpeed)} requested)`;
+      ? `${formatGroupedUpTo3Decimals(group.speed)} mm/min`
+      : `${formatGroupedUpTo3Decimals(group.speed)} mm/min effective (${formatGroupedUpTo3Decimals(group.requestedSpeed)} requested)`;
   const baseLayer = scene?.layers.find((layer) => layer.id === group.layerId);
   const overrideFacts =
     group.operationSettings === undefined
@@ -263,7 +297,7 @@ function laserGroupSummary(
         : ` · requested ${baseLayer?.name ?? group.layerId}; effective artwork override: ${laserOperationDetail(group.operationSettings)}`;
   const contourEntry = contourEntrySummary(group, entriesSkipped);
   return (
-    `${kind} · ${formatNumber(group.power)}% power` +
+    `${kind} · ${formatGroupedUpTo3Decimals(group.power)}% power` +
     ` · ${speed}` +
     ` · ${group.passes} ${plural(group.passes, 'pass', 'passes')}` +
     ` · air ${group.airAssist ? 'on' : 'off'}${powerMode}${contourEntry}${overrideFacts}`
@@ -272,7 +306,8 @@ function laserGroupSummary(
 
 function laserGroupKindLabel(group: Exclude<Group, CncGroup>): string {
   if (group.kind === 'fill') return 'Fill';
-  if (group.kind === 'raster') return 'Image';
+  // ADR-699: a ramped Fill burns as a raster but is still a Fill.
+  if (group.kind === 'raster') return group.fillRamp === true ? 'Fill' : 'Image';
   // ADR-494: the group that burns a Line operation's tab spans.
   return group.tabSpanPowerPercent === undefined
     ? 'Line'
@@ -293,13 +328,9 @@ function contourEntrySummary(group: Exclude<Group, CncGroup>, skipped: boolean):
     const runway = group.exitRunwayMm === undefined ? 'contour entry' : 'contour entry and exit';
     return skipped
       ? ` · ${runway} not added (bed position unknown)`
-      : ` · ${runway} ${formatNumber(group.entryRunwayMm)} mm effective (laser off)`;
+      : ` · ${runway} ${formatGroupedUpTo3Decimals(group.entryRunwayMm)} mm effective (laser off)`;
   }
   return '';
-}
-
-function formatNumber(value: number): string {
-  return value.toLocaleString('en-US', { maximumFractionDigits: 3 });
 }
 
 function formatCoordinateText(text: string): string {
@@ -308,7 +339,7 @@ function formatCoordinateText(text: string): string {
 
 function formatRequestedNumber(value: number): string {
   const text = requestedCncCoordinateText(value);
-  return text === String(value) ? text : formatNumber(Number(text));
+  return text === String(value) ? text : formatGroupedUpTo3Decimals(Number(text));
 }
 
 function plural(count: number, singular: string, pluralForm: string): string {

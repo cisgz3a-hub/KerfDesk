@@ -195,21 +195,22 @@ function controllerRebootMessage(link: ControllerLink): string {
   );
 }
 
-export const CONTROLLER_REBOOT_DURING_JOB_MESSAGE = controllerRebootMessage('usb');
-
 export function controllerRebootNotice(link: ControllerLink = 'usb'): LaserSafetyNotice {
   return { kind: 'controller-reboot', message: controllerRebootMessage(link) };
 }
 
+// Says the beam or bit may still be on, not only moving, and asks for Home only
+// where the machine has it (UX audit U4-P3-5: a simulator drained 16 moves at
+// S300 after the cable was pulled).
 function disconnectDuringJobMessage(link: ControllerLink): string {
+  const reconnect = RECONNECT[link].charAt(0).toLowerCase() + RECONNECT[link].slice(1);
   return (
-    `${LINK_LOST[link]} during an active job. The machine may still be moving from ` +
-    'buffered commands. Use physical E-stop or power cutoff now if unsafe. ' +
-    `${RECONNECT[link]} and home before continuing.`
+    `${LINK_LOST[link]} during the job. The machine may keep moving for a few seconds on ` +
+    'commands it already has, with the laser or spindle still on. If it does not stop, use the ' +
+    `physical E-stop or switch it off at its power switch. Then ${reconnect} and check the ` +
+    'origin (Home, if the machine has homing) before running the job again.'
   );
 }
-
-export const DISCONNECT_DURING_JOB_MESSAGE = disconnectDuringJobMessage('usb');
 
 export function disconnectDuringJobNotice(link: ControllerLink = 'usb'): LaserSafetyNotice {
   return { kind: 'disconnect-during-job', message: disconnectDuringJobMessage(link) };
@@ -239,8 +240,6 @@ function disconnectDuringMotionMessage(link: ControllerLink): string {
   );
 }
 
-export const DISCONNECT_DURING_MOTION_MESSAGE = disconnectDuringMotionMessage('usb');
-
 // The same kind as a job's notice, so every physical-stop and recovery rule
 // that reads it is unchanged; only the banner's title differs (ADR-639).
 export function disconnectDuringMotionNotice(link: ControllerLink = 'usb'): LaserSafetyNotice {
@@ -257,8 +256,6 @@ function disconnectDuringFireMessage(link: ControllerLink): string {
     'confirm M5 reached the controller. Use physical E-stop or power cutoff now.'
   );
 }
-
-export const DISCONNECT_DURING_FIRE_MESSAGE = disconnectDuringFireMessage('usb');
 
 export function disconnectDuringFireNotice(link: ControllerLink = 'usb'): LaserSafetyNotice {
   return { kind: 'disconnect-during-fire', message: disconnectDuringFireMessage(link) };

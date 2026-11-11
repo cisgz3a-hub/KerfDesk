@@ -4,6 +4,8 @@ import type {
   MotionManifest,
   MotionPoint,
 } from '../../../core/job/motion-manifest';
+import { isNonNegativeSafeInteger, isNonNegativeFiniteNumber } from '../../../core/util/finite';
+import { isRecord } from '../../../core/util/is-record';
 
 /**
  * The archive encoding before ADR-244 Amendment 3: 80 bytes per block and 24
@@ -90,8 +92,8 @@ export function hasValidSummary(
   sendableLines: number | undefined,
 ): value is Record<string, unknown> & Omit<MotionManifest, 'blocks'> {
   return (
-    isNonNegativeNumber(value['totalRouteMm']) &&
-    isIndex(value['sendableLineCount']) &&
+    isNonNegativeFiniteNumber(value['totalRouteMm']) &&
+    isNonNegativeSafeInteger(value['sendableLineCount']) &&
     (sendableLines === undefined || value['sendableLineCount'] === sendableLines) &&
     isNullablePoint(value['firstProcessPoint']) &&
     isNullablePoint(value['finalPoint'])
@@ -135,10 +137,10 @@ function validLineIndices(
   const raw = data[index];
   const sendable = data[index + 1];
   return (
-    isIndex(raw) &&
+    isNonNegativeSafeInteger(raw) &&
     raw > previousRaw &&
     raw < rawLines &&
-    isIndex(sendable) &&
+    isNonNegativeSafeInteger(sendable) &&
     sendable > previousSendable &&
     sendable < sendableLines &&
     sendable <= raw
@@ -149,10 +151,10 @@ function validPointReference(data: Float64Array, index: number, nextPoint: numbe
   const kind = data[index + 2];
   const count = data[index + 4];
   return (
-    isIndex(kind) &&
+    isNonNegativeSafeInteger(kind) &&
     kind < KINDS.length &&
     data[index + 3] === nextPoint &&
-    isIndex(count) &&
+    isNonNegativeSafeInteger(count) &&
     count >= 2
   );
 }
@@ -169,9 +171,9 @@ function validRouteRange(data: Float64Array, index: number, route: number): bool
   const length = data[index + 7];
   const end = data[index + 9];
   return (
-    isNonNegativeNumber(length) &&
+    isNonNegativeFiniteNumber(length) &&
     data[index + 8] === route &&
-    isNonNegativeNumber(end) &&
+    isNonNegativeFiniteNumber(end) &&
     end === route + length
   );
 }
@@ -221,21 +223,9 @@ function isFloat64Array(value: unknown): value is Float64Array {
   );
 }
 
-function isIndex(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
-}
-
-function isNonNegativeNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
-}
-
 function isNullablePoint(value: unknown): boolean {
   return (
     value === null ||
     (isRecord(value) && ['x', 'y', 'z'].every((axis) => Number.isFinite(value[axis])))
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

@@ -6,6 +6,8 @@
 
 import type { BedTargetLayout, BedTargetMark } from './bed-target';
 import type { RingMark } from './ring-detect';
+import { maxOf, minOf } from '../../util';
+import { distance, subtractPoints, scalePoint, cross } from '../../geometry/point-math';
 
 type Vec2 = { readonly x: number; readonly y: number };
 
@@ -84,10 +86,12 @@ export function matchBedTarget(
   // it is recognised.
   const grown: GrownGrid[] = candidates.map((anchors) => ({
     ...growGrid(rings, layout, anchors),
-    mirrored: cross(sub(anchors.x, anchors.origin), sub(anchors.y, anchors.origin)) < 0,
+    mirrored:
+      cross(subtractPoints(anchors.x, anchors.origin), subtractPoints(anchors.y, anchors.origin)) <
+      0,
   }));
   const needed = Math.max(MIN_MATCHED, Math.ceil(MIN_MATCHED_SHARE * layout.marks.length));
-  const largest = Math.max(...grown.map((g) => g.grid.size));
+  const largest = maxOf(grown.map((g) => g.grid.size));
   if (largest < needed) return { kind: 'failed', reason: 'too-few-marks' };
   const fitting = grown.filter((g) => g.outside === 0);
   const best = fitting.reduce<GrownGrid | null>(
@@ -147,18 +151,14 @@ function nearestDistance(rings: ReadonlyArray<RingMark>, from: Vec2): number {
   return best;
 }
 
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
 // How far the rings the arms predict are from where the arms put them, in
 // steps: the ring one short arm behind the origin and the ring halfway along
 // the long arm. Every target has both (bed-target.ts), and the prediction
 // holds at any camera tilt, where the arms' lengths and angle do not.
 function latticeScore(rings: ReadonlyArray<RingMark>, origin: Vec2, x: Vec2, y: Vec2): number {
-  const arm = sub(x, origin);
-  const half = scale(sub(y, origin), 0.5);
-  const behind = sub(origin, arm);
+  const arm = subtractPoints(x, origin);
+  const half = scalePoint(subtractPoints(y, origin), 0.5);
+  const behind = subtractPoints(origin, arm);
   const middle = { x: origin.x + half.x, y: origin.y + half.y };
   const armLength = Math.hypot(arm.x, arm.y);
   const halfLength = Math.hypot(half.x, half.y);
@@ -173,8 +173,8 @@ function latticeScore(rings: ReadonlyArray<RingMark>, origin: Vec2, x: Vec2, y: 
 // diagonals (a diagonal pair spans only every other ring). The test is on
 // lengths in the picture, so it holds under the perspective of a tilted camera.
 function armsAreGridSteps(marks: ReadonlyArray<RingMark>, origin: Vec2, x: Vec2, y: Vec2): boolean {
-  const arm = sub(x, origin);
-  const half = scale(sub(y, origin), 0.5);
+  const arm = subtractPoints(x, origin);
+  const half = scalePoint(subtractPoints(y, origin), 0.5);
   const armLength = Math.hypot(arm.x, arm.y);
   const halfLength = Math.hypot(half.x, half.y);
   if (armLength === 0 || halfLength === 0) return false;
@@ -190,10 +190,10 @@ function armsAreGridSteps(marks: ReadonlyArray<RingMark>, origin: Vec2, x: Vec2,
   }
   const reach = HALF_STEP_SHARE * Math.min(armLength, halfLength);
   const halfSteps = [
-    scale(arm, 0.5),
-    scale(half, 0.5),
-    scale({ x: arm.x + half.x, y: arm.y + half.y }, 0.5),
-    scale({ x: arm.x - half.x, y: arm.y - half.y }, 0.5),
+    scalePoint(arm, 0.5),
+    scalePoint(half, 0.5),
+    scalePoint({ x: arm.x + half.x, y: arm.y + half.y }, 0.5),
+    scalePoint({ x: arm.x - half.x, y: arm.y - half.y }, 0.5),
   ];
   return halfSteps.every(
     (step) => nearestDistance(marks, { x: origin.x + step.x, y: origin.y + step.y }) > reach,
@@ -224,8 +224,8 @@ function hasRival(grids: ReadonlyArray<GrownGrid>, best: GrownGrid): boolean {
 }
 
 function lScore(origin: Vec2, x: Vec2, y: Vec2): number {
-  const vx = sub(x, origin);
-  const vy = sub(y, origin);
+  const vx = subtractPoints(x, origin);
+  const vy = subtractPoints(y, origin);
   const lx = Math.hypot(vx.x, vx.y);
   const ly = Math.hypot(vy.x, vy.y);
   if (lx === 0 || ly === 0) return Number.POSITIVE_INFINITY;
@@ -243,10 +243,10 @@ function growGrid(
   const layoutCells = new Set(layout.marks.map((m) => key(m.col, m.row)));
   const cols = layout.marks.map((m) => m.col);
   const rows = layout.marks.map((m) => m.row);
-  const minCol = Math.min(...cols) - GROW_PAST_EDGE;
-  const maxCol = Math.max(...cols) + GROW_PAST_EDGE;
-  const minRow = Math.min(...rows) - GROW_PAST_EDGE;
-  const maxRow = Math.max(...rows) + GROW_PAST_EDGE;
+  const minCol = minOf(cols) - GROW_PAST_EDGE;
+  const maxCol = maxOf(cols) + GROW_PAST_EDGE;
+  const minRow = minOf(rows) - GROW_PAST_EDGE;
+  const maxRow = maxOf(rows) + GROW_PAST_EDGE;
   const reachable = (col: number, row: number): boolean =>
     col >= minCol && col <= maxCol && row >= minRow && row <= maxRow;
   const ringsOnly = rings.filter((ring) => !ring.anchor);
@@ -265,8 +265,8 @@ function growGrid(
     [0, 2],
   ];
   const fallback = {
-    x: sub(anchors.x, anchors.origin),
-    y: scale(sub(anchors.y, anchors.origin), 0.5),
+    x: subtractPoints(anchors.x, anchors.origin),
+    y: scalePoint(subtractPoints(anchors.y, anchors.origin), 0.5),
   };
   // The queue grows while it is walked: a breadth-first fill outward.
   for (const [col, row] of queue) {
@@ -332,30 +332,18 @@ function localStep(
 ): Vec2 {
   const here = grid.get(key(col, row)) as RingMark;
   const behind = grid.get(key(col - dc, row - dr));
-  if (behind !== undefined) return sub(here, behind);
+  if (behind !== undefined) return subtractPoints(here, behind);
   const ahead = grid.get(key(col + 2 * dc, row + 2 * dr));
-  if (ahead !== undefined) return scale(sub(ahead, here), 0.5);
+  if (ahead !== undefined) return scalePoint(subtractPoints(ahead, here), 0.5);
   for (const side of [-1, 1]) {
     const a = grid.get(key(col + side * dr, row + side * dc));
     const b = grid.get(key(col + side * dr + dc, row + side * dc + dr));
-    if (a !== undefined && b !== undefined) return sub(b, a);
+    if (a !== undefined && b !== undefined) return subtractPoints(b, a);
   }
   const unit = dc !== 0 ? fallback.x : fallback.y;
-  return scale(unit, dc !== 0 ? dc : dr);
+  return scalePoint(unit, dc !== 0 ? dc : dr);
 }
 
 function key(col: number, row: number): string {
   return `${col},${row}`;
-}
-
-function sub(a: Vec2, b: Vec2): Vec2 {
-  return { x: a.x - b.x, y: a.y - b.y };
-}
-
-function scale(a: Vec2, s: number): Vec2 {
-  return { x: a.x * s, y: a.y * s };
-}
-
-function cross(a: Vec2, b: Vec2): number {
-  return a.x * b.y - a.y * b.x;
 }

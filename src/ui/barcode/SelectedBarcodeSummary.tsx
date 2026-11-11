@@ -7,6 +7,7 @@ import type { CSSProperties } from 'react';
 import { BARCODE_SYMBOLOGY_LABELS, isBarcodeObject } from '../../core/barcode';
 import type { SceneObject } from '../../core/scene';
 import { useBarcodeDialogStore } from './barcode-dialog-store';
+import { formatRoundedTo2Decimals } from '../../core/util/number-format';
 
 export function SelectedBarcodeSummary(props: {
   readonly objects: ReadonlyArray<SceneObject>;
@@ -21,7 +22,8 @@ export function SelectedBarcodeSummary(props: {
   return (
     <div style={containerStyle}>
       <p style={titleStyle}>
-        {BARCODE_SYMBOLOGY_LABELS[spec.symbology]} · {mm(width)} × {mm(height)} mm
+        {BARCODE_SYMBOLOGY_LABELS[spec.symbology]} · {formatRoundedTo2Decimals(width)} ×{' '}
+        {formatRoundedTo2Decimals(height)} mm
         {spec.invert ? ' · inverted' : ''}
       </p>
       <p style={dataStyle} title={spec.data}>
@@ -37,10 +39,6 @@ export function SelectedBarcodeSummary(props: {
       </button>
     </div>
   );
-}
-
-function mm(value: number): string {
-  return String(Math.round(value * 100) / 100);
 }
 
 const containerStyle: CSSProperties = { display: 'grid', gap: 4, marginBottom: 8 };

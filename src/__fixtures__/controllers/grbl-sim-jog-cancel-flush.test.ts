@@ -84,6 +84,22 @@ describe('grbl simulator jog-cancel flush model (grblHAL)', () => {
     expect(sim.state().machine).toBe('Idle');
   });
 
+  it('a busy main loop leaves the jog unread for 0x85; a later $G is still answered in order', async () => {
+    // grblHAL's main loop answers each line before it reads the next, and a
+    // complete line that arrives after the flush is read normally (protocol.c
+    // protocol_main_loop; ADR-696).
+    const { sim, conn, lines } = await openSim({ ...GRBLHAL_FLUSH, lineParseDelayMs: 600 });
+    await conn.write(JOG);
+    await vi.advanceTimersByTimeAsync(550);
+    expect(lines).toEqual([]);
+    await conn.write('\x85');
+    await conn.write('$G\n');
+    await vi.advanceTimersByTimeAsync(700);
+    expect(lines).toEqual(['[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]', 'ok']);
+    expect(sim.state().machine).toBe('Idle');
+    expect(sim.state().mpos.x).toBe(0);
+  });
+
   it('refuses to combine with the planner back-pressure model', () => {
     expect(() => createGrblSimulator({ jogCancelFlushesInput: true, plannerBlocks: 16 })).toThrow(
       /plannerBlocks/,

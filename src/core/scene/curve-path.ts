@@ -10,6 +10,7 @@ import type {
   Vec2,
 } from './scene-object';
 import { flattenCubicChords, flattenEllipseChords } from './curve-flatten';
+import { finitePositiveOr } from '../util/finite';
 
 export const DEFAULT_MACHINE_CURVE_TOLERANCE_MM = 0.025;
 export const MAX_FLATTENED_CURVE_SEGMENTS = 200_000;
@@ -41,7 +42,7 @@ export function transformCurveSubpathUniform(
   path: CurveSubpath,
   transform: UniformCurveTransform,
 ): CurveSubpath {
-  const scale = finitePositive(transform.scale, 1);
+  const scale = finitePositiveOr(transform.scale, 1);
   const translateX = Number.isFinite(transform.translateX) ? (transform.translateX ?? 0) : 0;
   const translateY = Number.isFinite(transform.translateY) ? (transform.translateY ?? 0) : 0;
   const point = (value: Vec2): Vec2 => ({
@@ -138,7 +139,7 @@ export function flattenCurveSubpath(
   path: CurveSubpath,
   options: FlattenCurveOptions,
 ): FlattenCurveResult {
-  const tolerance = finitePositive(options.toleranceMm, DEFAULT_MACHINE_CURVE_TOLERANCE_MM);
+  const tolerance = finitePositiveOr(options.toleranceMm, DEFAULT_MACHINE_CURVE_TOLERANCE_MM);
   const budget = Math.max(1, Math.floor(options.segmentBudget ?? MAX_FLATTENED_CURVE_SEGMENTS));
   const points: Vec2[] = [path.start];
   let current = path.start;
@@ -386,8 +387,4 @@ function boundsOf(points: ReadonlyArray<Vec2>): Bounds {
 
 function samePoint(a: Vec2, b: Vec2): boolean {
   return Math.abs(a.x - b.x) <= 1e-12 && Math.abs(a.y - b.y) <= 1e-12;
-}
-
-function finitePositive(value: number, fallback: number): number {
-  return Number.isFinite(value) && value > 0 ? value : fallback;
 }

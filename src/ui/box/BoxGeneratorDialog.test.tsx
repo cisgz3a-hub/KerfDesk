@@ -107,6 +107,39 @@ describe('BoxGeneratorDialog', () => {
     }
   });
 
+  it('offers the lift-off lid and open-front styles (ADR-693)', async () => {
+    const { host, root, onGenerate } = await renderDialog();
+    const generatedNames = async (): Promise<ReadonlyArray<string>> => {
+      onGenerate.mockClear();
+      await act(async () => {
+        generateButton(host).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      const panels = onGenerate.mock.calls[0]?.[0] as ReadonlyArray<{ name: string }>;
+      return panels.map((panel) => panel.name);
+    };
+    try {
+      await setSelect(host, 'Style', 'lift-lid');
+      // The lip must drop in, so the laser press-fit 0 rises to 0.2 mm.
+      expect(input(host, 'Clearance (mm)').value).toBe('0.2');
+      expect(host.textContent).toContain('Outer 66 × 46 × 39 mm');
+      expect(await generatedNames()).toEqual([
+        'Bottom',
+        'Front',
+        'Back',
+        'Left',
+        'Right',
+        'Lid',
+        'Lid lip',
+      ]);
+
+      await setSelect(host, 'Style', 'open-front');
+      expect(host.textContent).toContain('Outer 66 × 43 × 36 mm');
+      expect(await generatedNames()).toEqual(['Bottom', 'Top', 'Back', 'Left', 'Right']);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
   it('asks for material thickness before dimensions', async () => {
     const { host, root } = await renderDialog();
     try {

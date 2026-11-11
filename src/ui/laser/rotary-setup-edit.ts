@@ -12,10 +12,19 @@ import {
   DEFAULT_ROTARY_SETUP,
   rotaryCircumferenceMm,
   rotaryDiameterFromCircumferenceMm,
+  type DedicatedRotaryAxis,
+  type RotaryAxis,
   type RotarySetup,
   type RotaryType,
 } from '../../core/devices/rotary';
-import type { RotaryPreset } from '../../core/devices/rotary-presets';
+import {
+  ROTARY_A_UNITS_PER_TURN,
+  rotaryAxisOf,
+  rotaryAxisUnit,
+} from '../../core/devices/rotary-axis';
+import type { DeviceProfile } from '../../core/devices/device-profile';
+import { rotaryConnectorAxisFor, type RotaryPreset } from '../../core/devices/rotary-presets';
+import { roundToThousandth } from '../../core/util/rounding';
 
 // Only the field's starting value, for the operator to replace with the
 // driven roller's measured diameter.
@@ -35,6 +44,9 @@ export type ParkedRoller = { readonly diameterMm: number; readonly scaled: boole
 export type RotaryEdit = {
   readonly setup: RotarySetup;
   readonly parkedRoller: ParkedRoller;
+  // Motion per turn in the units the axis is not using now, so switching
+  // between a millimetre axis (Y, Z) and degrees (A) and back restores it.
+  readonly parkedMotion?: { readonly mm?: number; readonly deg?: number };
 };
 
 export type RotaryFieldPatch = Partial<
@@ -72,13 +84,51 @@ export function editRotaryType(edit: RotaryEdit, type: RotaryType): RotaryEdit {
   };
 }
 
-/** A published rotary's type and motion per turn; the work and the toggles stay (ADR-503). */
+/** A published rotary's type, axis and motion per turn; the work and the
+ * toggles stay (ADR-503, ADR-695). A preset that names no axis keeps the
+ * operator's choice. */
 export function editRotaryPreset(
   edit: RotaryEdit,
   preset: Pick<RotaryPreset, 'setup'>,
 ): RotaryEdit {
   const typed = editRotaryType(edit, preset.setup.type);
-  return editRotaryFields(typed, { mmPerRotation: preset.setup.mmPerRotation });
+  const axis = preset.setup.axis;
+  const routed = axis === undefined ? typed : editRotaryAxis(typed, axis);
+  const { roller } = preset.setup;
+  const rolled =
+    roller === undefined || routed.setup.type !== 'roller'
+      ? routed
+      : editRollerDiameter(editRollerScaling(routed, true), roller.diameterMm);
+  return editRotaryFields(rolled, { mmPerRotation: preset.setup.mmPerRotation });
+}
+
+/**
+ * The rotary's axis (ADR-695). Motion per turn is in the axis's own units, so
+ * moving between millimetres (Y, Z) and degrees (A) parks the old value and
+ * brings back the last one used in the new units; a first switch to A starts
+ * at 360°, one turn of a degree-counting axis. Y is stored as no field, so a
+ * setup back on Y saves exactly as one that was never moved.
+ */
+export function editRotaryAxis(edit: RotaryEdit, axis: RotaryAxis): RotaryEdit {
+  const from = rotaryAxisOf(edit.setup);
+  if (from === axis) return edit;
+  const { axis: _old, ...rest } = edit.setup;
+  const setup: RotarySetup = axis === 'Y' ? rest : { ...rest, axis };
+  const fromUnit = rotaryAxisUnit(from);
+  const toUnit = rotaryAxisUnit(axis);
+  if (fromUnit === toUnit) return { ...edit, setup };
+  const parked = edit.parkedMotion ?? {};
+  const restored = parked[toUnit] ?? (toUnit === 'deg' ? ROTARY_A_UNITS_PER_TURN : undefined);
+  return {
+    ...edit,
+    setup: restored === undefined ? setup : { ...setup, mmPerRotation: restored },
+    parkedMotion: { ...parked, [fromUnit]: edit.setup.mmPerRotation },
+  };
+}
+
+/** The operator saw a Test rotation turn the rotary on this axis (ADR-695). */
+export function editRotaryAxisConfirmed(edit: RotaryEdit, axis: DedicatedRotaryAxis): RotaryEdit {
+  return { ...edit, setup: { ...edit.setup, axisConfirmed: axis } };
 }
 
 export function editRollerScaling(edit: RotaryEdit, scaled: boolean): RotaryEdit {
@@ -112,14 +162,10 @@ export function editObjectCircumference(edit: RotaryEdit, circumferenceMm: numbe
   });
 }
 
-// Field values are shown to three decimals (a micrometre). Rounding here keeps
-// a linked field from rewriting what the operator is typing with float noise.
-export function displayRotaryMm(value: number): number {
-  return Math.round(value * 1000) / 1000;
-}
+export { roundToThousandth as displayRotaryMm } from '../../core/util/rounding';
 
 export function displayObjectCircumferenceMm(setup: RotarySetup): number {
-  return displayRotaryMm(rotaryCircumferenceMm(setup));
+  return roundToThousandth(rotaryCircumferenceMm(setup));
 }
 
 function parkedFrom(edit: RotaryEdit): ParkedRoller {
@@ -133,4 +179,14 @@ function withoutRollerDiameter(setup: RotarySetup): RotarySetup {
   if (setup.rollerDiameterMm === undefined) return setup;
   const { rollerDiameterMm: _parked, ...rest } = setup;
   return rest;
+}
+
+/** A new rotary for this machine: on its rotary connector's axis when its
+ * maker's presets name one (the Falcon A1 Pro's A), else the Y default. */
+export function newRotarySetupFor(
+  device: Pick<DeviceProfile, 'machineFamily' | 'controllerCommandSet'>,
+): RotarySetup {
+  const connector = rotaryConnectorAxisFor(device);
+  if (connector === null) return NEW_ROTARY_SETUP;
+  return editRotaryAxis(startRotaryEdit(NEW_ROTARY_SETUP), connector).setup;
 }

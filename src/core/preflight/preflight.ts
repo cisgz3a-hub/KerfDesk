@@ -26,7 +26,7 @@ import {
 } from '../invariants';
 // Deep import: the invariants barrel is at its public-export ratchet.
 import { hasFeedMotion } from '../invariants/predicates';
-import { machineBoundsForDevice } from '../devices';
+import { machineBoundsForDevice, rotaryYScale } from '../devices';
 import { findLayerModeMismatchIssues } from './layer-mode-preflight';
 import {
   controlledLaserOffTravelFeedIssue,
@@ -119,6 +119,9 @@ export type PreflightCode =
   | 'non-finite-coordinate'
   | 'coordinate-unencodable'
   | 'fluidnc-line-unexecutable'
+  // ADR-695: the rotary's A or Z axis cannot be written for this controller,
+  // or the program already uses that letter for something else.
+  | 'rotary-axis-unexecutable'
   | 'cnc-tool-geometry-invalid'
   // Advisory-only: secondary CNC cutters share values established for the
   // layer's primary cutter and require explicit operator verification.
@@ -319,7 +322,12 @@ function appendBoundsIssues(
   const wrapMm = rotaryWrapLimit(options.boundsHeightOverrideMm);
   const bed = machineBoundsForDevice(project.device);
   const machineBounds = wrapMm === null ? bed : rotaryXOnlyBounds(bed);
-  const wrapIssue = wrapMm === null ? null : rotaryWrapIssue(gcode, wrapMm);
+  const rotary = project.device.rotary;
+  const surface =
+    rotary === undefined
+      ? undefined
+      : { yScale: rotaryYScale(rotary), objectDiameterMm: rotary.objectDiameterMm };
+  const wrapIssue = wrapMm === null ? null : rotaryWrapIssue(gcode, wrapMm, surface);
   if (wrapIssue !== null) issues.push({ code: 'out-of-bed', message: wrapIssue });
   if (options.coordinateMode === 'relative-origin' && options.motionOffset === undefined) {
     const envelopeIssues = findRelativeMotionEnvelopeIssues(gcode, {

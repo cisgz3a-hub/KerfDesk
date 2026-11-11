@@ -9,7 +9,13 @@ import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { FrameBounds } from '../../core/controllers/controller-driver';
 import { buildFramePerimeter } from '../../core/job/frame-perimeter';
+import { rotaryOutputAxis } from '../../core/job/rotary-job';
 import type { Project } from '../../core/scene';
+import {
+  reportedControllerAxes,
+  rotaryAxisBedFrameBounds,
+  rotaryAxisFramePlan,
+} from './rotary-axis-frame';
 
 const FRAME_RETURN_EPSILON_MM = 1e-3;
 
@@ -44,6 +50,20 @@ export function buildFrameDispatchPlan(
   // of a saved laser job must not pick up a CNC safe-Z wrap because the open
   // canvas has since been switched to CNC, or the reverse.
   const machine = project.machine;
+  const rotaryAxis = rotaryOutputAxis(project.device, machine);
+  if (rotaryAxis !== null) {
+    return rotaryAxisFramePlan({
+      project,
+      axis: rotaryAxis,
+      toolOffLines,
+      perimeter,
+      bounds: frameBounds,
+      returnTarget: frameReturnTarget(candidate, external),
+      feed: feeds.xyMmPerMin,
+      buildJog: refs.driver.commands.buildJog,
+      reported: reportedControllerAxes(state),
+    });
+  }
   if (machine?.kind !== 'cnc') {
     return {
       kind: 'ready',
@@ -88,8 +108,16 @@ export function frameRouteNoGoWarnings(
   external?: Parameters<LaserState['frame']>[5],
 ): ReadonlyArray<string> {
   const project = framedProject(candidate, jobProject);
-  const frameBounds = frameBoundsForProject(bounds, project);
   const returnTarget = frameReturnTarget(candidate, external);
+  // A dedicated rotary axis turns the part; the head stays at its own Y
+  // (ADR-695), so the bed and no-go checks see that Y, not the turn.
+  const dedicatedAxis = rotaryOutputAxis(project.device, project.machine) !== null;
+  if (dedicatedAxis && returnTarget === undefined) return [];
+  const projectBounds = frameBoundsForProject(bounds, project);
+  const frameBounds =
+    dedicatedAxis && returnTarget !== undefined
+      ? rotaryAxisBedFrameBounds(projectBounds, returnTarget.y)
+      : projectBounds;
   // grblHAL's homed-area warning already names the bed it runs past.
   const bedArea =
     frameHomedAreaWarning(state, project, frameBounds, returnTarget) ??

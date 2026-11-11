@@ -37,17 +37,22 @@ audit v7 (L7-P1-1), where the trigger was KerfDesk's own SVG round trip.
    (`#ffffff`, however it is written) is the material showing through. SVG paints in document
    order, so a white fill is cut out of every fill painted **before** it, and the white shape itself
    is left out of the artwork. A darker shape painted **after** it stays whole, and a white
-   background painted first cuts nothing and is simply left out.
+   background painted first cuts nothing and is simply left out. *Amended by Amendment 1: only flat,
+   opaque, unmasked white is paper; see-through, gradient and masked white burn as ink.*
 2. **Only beside a darker fill.** The rule applies only when the same import also has a fill that is
    not white. A design drawn entirely in white (for slate or anodised aluminium) keeps burning its
-   shapes as before.
+   shapes as before. *Amended by Amendment 1: a gradient counts as a darker fill; see-through white
+   does not.*
 3. **One Undo burns the white.** As the bed fit does (ADR-125 Amendment 1), the import as parsed is
    pushed to history first. The first Undo puts the white shapes back on their own operation, which
    burns, and the next removes the import. The import pushes no extra step when nothing is white.
+   *Amended by Amendment 3: that history copy marks the white `kept`, and an unchanged Re-import
+   keeps the operations and that choice.*
 4. **The import says so.** The toast reads, for example, "plate.svg: 2 white shapes will not burn,
    as in the file: they were cut out of the shapes under them. To burn the white too, Undo: it
    returns on its own operation." It comes last, after any bed-fit notice, so the toast stack keeps
-   it in view. The colour count no longer counts white.
+   it in view. The colour count no longer counts white. *Amended by Amendment 1: the toast says the
+   file shows bare material there, says "cut out" only when it cut something, and names ink white.*
 5. **The geometry.** Each darker fill loses the union of the white fills painted over it, computed
    with Clipper2 in the import's own coordinates (all vector parts of one import share one
    placement), on the 1 µm grid the vector tools use (`VECTOR_PATH_PRECISION_DECIMALS`). A fill a
@@ -58,6 +63,8 @@ audit v7 (L7-P1-1), where the trigger was KerfDesk's own SVG round trip.
 
 ### Consequences
 
+- *Amended by Amendment 2: a logo imported before this decision is named at open and in Job Review,
+  and Leave white unburned applies the knock-out as one Undo step.*
 - The beginner's logo burns as it looks, the canvas shows the hole (the white is no longer painted
   black), and Job Review has nothing white to warn about. CNC pockets follow the same artwork, so a
   white diamond in a black badge becomes an island.

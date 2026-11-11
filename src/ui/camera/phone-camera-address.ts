@@ -6,7 +6,10 @@
 // on the phone's screen into the address KerfDesk fetches. A stream (rtsp)
 // address belongs in the RTSP camera section, which already reads those.
 
-import { cameraSourceIdWithoutCredentials } from '../../core/camera/camera-capture-binding';
+import {
+  cameraAddressWithoutUserinfo,
+  publicCameraAddress,
+} from '../../core/camera/camera-address-login';
 
 export type PhoneCameraApp = 'ip-webcam' | 'other';
 
@@ -71,12 +74,24 @@ export function phoneSnapshotUrl(app: PhoneCameraApp, typed: string): string | n
   return address.kind === 'snapshot' ? address.url : null;
 }
 
-/** Remember only the public address, as for RTSP; query/fragment can hold secrets. */
+/**
+ * The address without its login, query or fragment (ADR-448): what the
+ * desktop's secure storage keeps to reconnect (ADR-692 Amendment 1).
+ */
 export function phoneCameraAddressWithoutLogin(typed: string): string {
+  return phoneAddressAs(typed, cameraAddressWithoutUserinfo);
+}
+
+/** Scheme, host and port only: what plain local storage keeps (ADR-692 Amendment 1). */
+export function phoneCameraPublicAddress(typed: string): string {
+  return phoneAddressAs(typed, publicCameraAddress);
+}
+
+function phoneAddressAs(typed: string, form: (address: string) => string): string {
   const text = typed.trim();
   const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(text);
   const input = hasScheme ? text : `http://${text}`;
-  let safe = cameraSourceIdWithoutCredentials(input);
+  let safe = form(input);
   // Retain an explicitly selected standard port across reconnects. Otherwise
   // URL normalization would turn :80 into an omitted port, selecting 8080.
   const defaultPort = /^http:\/\/[^/?#]*:80(?=[/?#]|$)/i.test(input)

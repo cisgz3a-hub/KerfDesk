@@ -19,6 +19,8 @@ export type TargetScene = {
   readonly noise?: number;
   /** Honeycomb cell pitch, mm (0 for a plain bed). */
   readonly honeycombPitchMm?: number;
+  /** Cast rays through another camera than `lens` (whose size is still the picture's). */
+  readonly toBed?: (pixel: Vec2, heightMm?: number) => Vec2 | null;
 };
 
 const SHEET_GREY = 196;
@@ -30,7 +32,7 @@ const SUPERSAMPLE = 2;
 export function renderTargetScene(scene: TargetScene): GrayImage {
   const { imageWidth: width, imageHeight: height } = scene.lens;
   const data = new Float32Array(width * height);
-  const toBed = bedMapper(scene.lens, scene.pose);
+  const toBed = scene.toBed ?? bedMapper(scene.lens, scene.pose);
   let seed = 12345;
   const random = () => {
     seed = (seed * 16807) % 2147483647;

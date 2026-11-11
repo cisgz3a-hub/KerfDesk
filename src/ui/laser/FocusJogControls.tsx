@@ -2,6 +2,7 @@ import { profileSupportsCapability, type DeviceProfile } from '../../core/device
 import type { MachineKind } from '../../core/scene';
 import { shortcutLabel } from '../common/shortcut-label';
 import { FOCUS_JOG_KEY_LABELS } from './use-jog-shortcuts';
+import { isPositiveFiniteNumber } from '../../core/util/finite';
 
 const FOCUS_STEPS_MM = [0.1, 0.5, 1, 2, 5] as const;
 
@@ -88,7 +89,7 @@ export function focusJogReady(device: DeviceProfile, machineKind: MachineKind): 
     machineKind === 'cnc' ||
     (profileSupportsCapability(device, 'z-axis') &&
       device.zTravelConfirmed === true &&
-      isPositive(device.zTravelMm))
+      isPositiveFiniteNumber(device.zTravelMm))
   );
 }
 
@@ -111,10 +112,6 @@ function FocusButton(props: {
       {props.glyph}
     </button>
   );
-}
-
-function isPositive(value: number | undefined): boolean {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 const panelStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3 };
