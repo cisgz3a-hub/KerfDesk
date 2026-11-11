@@ -8,6 +8,7 @@ import { fluidncDriver } from './fluidnc/driver';
 import { grblDriver } from './grbl/driver';
 import { grblHalDriver } from './grblhal/driver';
 import { marlinDriver } from './marlin/driver';
+import { moshiDriver } from './moshi/driver';
 import { ruidaDriver } from './ruida/driver';
 import { smoothiewareDriver } from './smoothieware/driver';
 import { withFalconCommandContract } from './falcon-command-contract';
@@ -37,5 +38,7 @@ export function selectControllerDriver(
       return smoothiewareDriver;
     case 'ruida':
       return ruidaDriver;
+    case 'moshi':
+      return moshiDriver;
   }
 }

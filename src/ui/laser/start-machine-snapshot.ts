@@ -83,6 +83,6 @@ function liveStatusQueryCapability(
   configured: StatusQueryCapability,
 ): StatusQueryCapability {
   if (controllerKind === 'marlin') return 'queued-poll';
-  if (controllerKind === 'ruida') return 'none';
+  if (controllerKind === 'ruida' || controllerKind === 'moshi') return 'none';
   return configured;
 }

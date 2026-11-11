@@ -60,6 +60,25 @@ export type DatagramNetworkCapabilities = {
   readonly overrides: false;
 };
 
+/** A live USB link outside the line-based controller store (ADR-702: the
+ *  shared USB link; ADR-705: Moshiboard over a CH341). Each control it offers
+ *  is listed; the UI mounts only those, and every other machine control stays
+ *  off. `start` and `frame` name how the job and the laser-off Frame go out. */
+export type UsbLinkCapabilities = {
+  readonly start: 'stream-programs';
+  readonly frame: 'travel-only-program';
+  readonly pause: boolean;
+  readonly resume: boolean;
+  readonly abort: boolean;
+  readonly home: boolean;
+  readonly status: 'ch341-status' | 'none';
+  readonly jog: false;
+  readonly console: false;
+  readonly settings: false;
+  readonly origin: false;
+  readonly overrides: false;
+};
+
 export type ControllerCapabilities = {
   // Compatibility class for live Start semantics. Controller labels may
   // differ while queue, status, realtime, and emitted-job contracts match.

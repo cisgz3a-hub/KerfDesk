@@ -74,7 +74,7 @@ export function deviceProgramTimingOptions(
       ? { controllerArcToleranceMm: GRBL_DEFAULT_ARC_TOLERANCE_MM }
       : {}),
     ...(laserPowerControl === undefined ? {} : { laserPowerControl }),
-    ...(controllerKind === 'ruida' ? {} : { baudRate }),
+    ...(controllerKind === 'ruida' || controllerKind === 'moshi' ? {} : { baudRate }),
     ...(plannerBlocks === undefined ? {} : { plannerBlocks }),
     ...laserModeTiming(device, machineKind, controllerKind),
   };

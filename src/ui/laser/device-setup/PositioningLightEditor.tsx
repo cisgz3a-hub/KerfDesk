@@ -28,6 +28,13 @@ export function PositioningLightEditor({
   readonly device: DeviceProfile;
   readonly onChange: LightChange;
 }): JSX.Element {
+  if (device.controllerKind === 'moshi') {
+    return (
+      <p>
+        A Moshiboard has no light or pointer command KerfDesk can send. Use the switch on the machine.
+      </p>
+    );
+  }
   if (device.controllerKind === 'ruida') {
     return (
       <p>
@@ -302,6 +309,8 @@ function commandHelp(kind: ControllerKind | undefined): string {
       return 'Stock GRBL has no standard pointer command. Use your machine vendor’s documented accessory commands. M7/M8/M9 are coolant controls unless your machine explicitly maps that output to the separate light.';
     case 'ruida':
       return 'Ruida uses file output; operate the light from the machine panel.';
+    case 'moshi':
+      return 'A Moshiboard has no light command; use the machine switch.';
   }
 }
 

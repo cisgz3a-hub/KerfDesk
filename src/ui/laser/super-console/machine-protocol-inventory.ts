@@ -56,7 +56,9 @@ export function machineProtocolInventory(device: DeviceProfile, laser: LaserStat
     {
       name: 'Offline execution',
       value:
-        driver.kind === 'ruida'
+        driver.kind === 'moshi'
+          ? 'None: a Moshiboard runs only what its USB link streams (experimental)'
+          : driver.kind === 'ruida'
           ? 'Experimental vector .rd export; run from the machine panel'
           : 'Save executable output and use a separately qualified controller/file workflow',
     },

@@ -229,9 +229,17 @@ export async function handleSaveGcode(
   // Ruida .rd today). Route on the driver capability, not `controllerKind ===
   // 'ruida'` — ADR-094 bans kind checks in ui/, and LaserWindow's sibling gate
   // already keys on transport. selectControllerDriver normalizes an unknown kind.
-  if (
-    selectControllerDriver(ctx.project.device.controllerKind).capabilities.transport === 'file-only'
-  ) {
+  const driver = selectControllerDriver(ctx.project.device.controllerKind);
+  // A USB-link controller with no public file format (ADR-705: Moshiboard)
+  // has nothing to save: its programs exist only on the link.
+  if (driver.usbLink !== undefined) {
+    ctx.pushToast(
+      `${driver.label} has no job file to save. Run the job from Machine details over its USB link.`,
+      'warning',
+    );
+    return;
+  }
+  if (driver.capabilities.transport === 'file-only') {
     const { handleSaveRd } = await import('./save-rd-action');
     await handleSaveRd(ctx, placement);
     return;

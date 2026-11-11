@@ -5,6 +5,7 @@ import {
   isBidirectionalScanPolicy,
   isControllerCommandSet,
   isKnownControllerKind,
+  KNOWN_CONTROLLER_KINDS,
   type DeviceProfile,
 } from './device-profile';
 import { isGcodeDialectSelection } from './gcode-dialects';
@@ -28,7 +29,7 @@ function controllerKindIssues(profile: DeviceProfile): ReadonlyArray<string> {
     return [];
   }
   return [
-    'controllerKind must be one of: grbl-v1.1, grblhal, fluidnc, marlin, smoothieware, ruida',
+    `controllerKind must be one of: ${KNOWN_CONTROLLER_KINDS.join(', ')}`,
   ];
 }
 
