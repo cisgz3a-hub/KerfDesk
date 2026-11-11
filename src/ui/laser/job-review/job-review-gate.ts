@@ -35,6 +35,7 @@ import {
   startMachineInputsKey,
   startPreparationIsTimeBound,
 } from '../start-job-source';
+import { shownProgramClock } from '../time-bound-start-inputs';
 import { controllerStartPreparationStillCurrent } from '../start-job-authorization';
 import { startPreparationCoordinateKey } from '../start-preparation-coordinate-key';
 import {
@@ -321,6 +322,8 @@ async function preparedForRebuild(
     // review can still refresh the review it is shown in.
     false,
     signal,
+    // Variable text keeps the clock of the program on screen (O5-P2-2).
+    shownProgramClock(previousBundle.prepared.gcode),
   );
 }
 
