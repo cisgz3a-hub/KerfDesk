@@ -76,8 +76,9 @@ is the half of the finding about thin line art being hard to click.
 3. **Picking rules** (`hitTestDetailed` in `src/core/scene/hit-test.ts`).
    - **Reach.** A click reaches a line within 5 canvas pixels at the live zoom
      (`STROKE_PICK_SCREEN_PX`, `src/ui/workspace/workspace-hit-test.ts`). The workspace converts
-     that to millimetres and passes it in, so `src/core` holds no pixels. A caller with no view
-     (the registration jig editor, Design Studio's photo pick) keeps 2 mm.
+     that to millimetres and passes it in, so `src/core` holds no pixels. A caller that passes
+     no reach keeps 2 mm: today that is the registration jig editor's own click, which was left
+     as it is. The trace-part tool already picked by its own pixel radius.
    - **Curves.** Hit polylines are flattened for the reach in use, on the bed, at an eighth of it.
      Chords cut for 2 mm lie up to 0.25 mm, times the object's scale, from the drawn curve; with a
      reach of a few hundredths of a millimetre a click on the line would have missed it.
@@ -140,6 +141,8 @@ is the half of the finding about thin line art being hard to click.
 - What LightBurn does was not checked. `LIGHTBURN-STUDY.md` has no note on selection and
   LightBurn's documentation could not be reached, so none of the numbers above claim parity.
 - Node, segment, guide and tab drags still start on the press.
+- The registration jig editor's click still reaches a line by 2 mm, and its drags have no
+  threshold: it has its own pointer code.
 - A resize by a handle still does not snap (B6-P3-6).
 
 ### Verification

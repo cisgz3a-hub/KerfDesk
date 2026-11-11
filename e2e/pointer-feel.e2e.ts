@@ -4,13 +4,15 @@
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 
 // Line squares: `a` and `b` side by side, and a large `frame` with a small
-// `inner` square at its middle.
+// `inner` square inside it.
 // On the top edge of a, clear of its corner and middle handles at both zooms.
 const A_TOP_EDGE = { x: 32, y: 20 };
-const FRAME_MIDDLE = { x: 200, y: 200 };
+const INNER_MIDDLE = { x: 245, y: 245 };
 
 for (const zoom of [0.6, 6]) {
   test(`a click, a drag and a right-click behave the same at ${zoom}x zoom`, async ({ page }) => {
+    // Some thirty round trips to the page: twice the default on a slow runner.
+    test.setTimeout(120_000);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.setViewportSize({ width: 1440, height: 960 });
@@ -93,9 +95,12 @@ for (const zoom of [0.6, 6]) {
     // Inside an outline that is not selected, a drag draws a selection box
     // and a click selects the outline. Neither moves it.
     await select(page, []);
-    await setView(page, zoom, FRAME_MIDDLE);
-    const from = await screen(page, { x: 188, y: 188 });
-    const to = await screen(page, { x: 212, y: 212 });
+    await setView(page, zoom, INNER_MIDDLE);
+    // From below and left of `inner`, dragging right so the box encloses: the
+    // Job start marker, a button drawn over the canvas, sits on its top-left corner.
+    const from = await screen(page, { x: 226, y: 264 });
+    const to = await screen(page, { x: 257, y: 233 });
+    await expectOnCanvas(page, from);
     await page.mouse.move(from.x, from.y);
     await page.mouse.down();
     await page.mouse.move(to.x, to.y, { steps: 8 });
@@ -118,14 +123,14 @@ for (const zoom of [0.6, 6]) {
   });
 }
 
-type CanvasState = {
-  readonly selected: ReadonlyArray<string>;
+interface CanvasState {
+  readonly selected: readonly string[];
   readonly positions: Readonly<Record<string, { readonly x: number; readonly y: number }>>;
   readonly undo: number;
   readonly dirty: boolean;
   readonly marquee: boolean;
   readonly menu: string | null;
-};
+}
 
 async function canvasState(page: Page): Promise<CanvasState> {
   return page.evaluate(async () => {
@@ -157,7 +162,7 @@ async function canvasState(page: Page): Promise<CanvasState> {
   });
 }
 
-async function select(page: Page, ids: ReadonlyArray<string>): Promise<void> {
+async function select(page: Page, ids: readonly string[]): Promise<void> {
   await page.evaluate(async (selection) => {
     const storeUrl = '/src/ui/state/index.ts';
     const { useStore } = (await import(
@@ -178,6 +183,18 @@ async function closeMenu(page: Page): Promise<void> {
   await expect(
     page.getByRole('menu', { name: 'Workspace quick actions', exact: true }),
   ).toHaveCount(0);
+}
+
+/** The press must reach the canvas, not a marker or readout drawn over it. */
+async function expectOnCanvas(
+  page: Page,
+  point: { readonly x: number; readonly y: number },
+): Promise<void> {
+  const label = await page.evaluate(
+    ({ x, y }) => document.elementFromPoint(x, y)?.getAttribute('aria-label') ?? null,
+    point,
+  );
+  expect(label).toBe('KerfDesk workspace');
 }
 
 /** Zooms and pans so the scene point sits at the middle of the canvas. */
@@ -313,7 +330,7 @@ async function seedScene(page: Page): Promise<void> {
             square('a', 20, 20, 40),
             square('b', 20, 80, 40),
             square('frame', 100, 100, 200),
-            square('inner', 195, 195, 10),
+            square('inner', 240, 240, 10),
           ],
           layers: [createLayer({ id: 'pointer-line', name: 'Pointer fixture', color: '#4269bb' })],
         },
