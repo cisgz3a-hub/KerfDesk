@@ -1,8 +1,9 @@
 import type { Polyline, Vec2 } from '../scene';
+import { runTraceSteps, type TraceSteps } from '../trace/trace-steps';
 import { exactSegmentContact } from './exact-segment-contact';
 import {
   contactPointCount,
-  polylineContactIndex,
+  polylineContactIndexSteps,
   visitContactCandidates,
   type ContactSegment,
 } from './polyline-contact-index';
@@ -21,10 +22,20 @@ export type PreparedPolylineContacts = {
 export function preparePolylineContacts(
   polylines: ReadonlyArray<Polyline>,
 ): PreparedPolylineContacts {
-  const index = polylineContactIndex(polylines);
+  return runTraceSteps(preparePolylineContactsSteps(polylines));
+}
+
+/** preparePolylineContacts as resumable steps, with a checkpoint after each
+ *  index node and each polyline's contacts. */
+export function* preparePolylineContactsSteps(
+  polylines: ReadonlyArray<Polyline>,
+): TraceSteps<PreparedPolylineContacts> {
+  const cooperate = yield;
+  const index = yield* polylineContactIndexSteps(polylines);
   const pinnedPoints = new Set<Vec2>(),
     insertions: Insertions = new Map();
-  polylines.forEach((polyline, owner) => {
+  for (const [owner, polyline] of polylines.entries()) {
+    if (cooperate) yield;
     const count = contactPointCount(polyline);
     polyline.points.slice(0, count).forEach((point, at) => {
       visitContactCandidates(point, index, (segment) => {
@@ -34,7 +45,7 @@ export function preparePolylineContacts(
         pinReceiver(point, segment, pinnedPoints, insertions);
       });
     });
-  });
+  }
   return {
     polylines: polylines.map((polyline, owner) => insertContacts(polyline, insertions.get(owner))),
     pinnedPoints,

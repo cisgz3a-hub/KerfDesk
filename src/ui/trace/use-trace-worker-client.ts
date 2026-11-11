@@ -40,6 +40,7 @@ import type { TraceReport } from '../../core/trace/trace-steps';
 import type { TraceNotice } from './trace-notices';
 import type { TraceProgress } from '../../core/trace/trace-progress';
 import { LAZY_LOAD_FAILURE_ADVICE } from '../common/lazy-load-failure';
+import { unpackTracePathsSteps } from './trace-result-transfer';
 
 export type TraceResult = {
   readonly paths: ColoredPath[];
@@ -102,6 +103,9 @@ let workerInstance: Worker | null = null;
 let nextRequestId = 0;
 let latestTraceEpoch = 0;
 const pendingByRequestId = new Map<number, Pending>();
+// Requests whose result has arrived and is being unpacked in slices. Their
+// worker is idle again, so superseding one rejects it without retiring it.
+const unpackingByRequestId = new Map<number, Pending>();
 const MAX_INLINE_TRACE_PIXELS = 160_000;
 // How long a request may go without a word from its worker before that worker
 // is treated as dead. It bounds SILENCE, not work: the worker heartbeats from
@@ -180,20 +184,56 @@ function handleWorkerMessage(worker: Worker, e: MessageEvent<TraceWorkerResponse
   }
   pendingByRequestId.delete(e.data.id);
   if (e.data.kind === 'ok') {
-    pending.resolve({
-      paths: e.data.paths,
-      bounds: e.data.bounds,
-      width: e.data.width,
-      height: e.data.height,
-      ...(e.data.sourceOptions === undefined ? {} : { sourceOptions: e.data.sourceOptions }),
-      ...(e.data.report === undefined ? {} : { report: e.data.report }),
-    });
+    settleTraceResult(e.data.id, pending, e.data);
     return;
   }
   // A kind:'error' response is scoped to this request. The worker
   // itself is still alive: retiring it here would make one bad trace
   // poison every later large-image trace for the whole app session.
   pending.reject(new Error(e.data.message));
+}
+
+type TraceWorkerResult = Extract<TraceWorkerResponse, { readonly kind: 'ok' }>;
+
+// A packed result is rebuilt in short slices, so a dense trace never holds the
+// UI thread for the whole result at once (trace-result-transfer.ts).
+function settleTraceResult(id: number, pending: Pending, data: TraceWorkerResult): void {
+  const resolve = (paths: ColoredPath[]): void =>
+    pending.resolve({
+      paths,
+      bounds: data.bounds,
+      width: data.width,
+      height: data.height,
+      ...(data.sourceOptions === undefined ? {} : { sourceOptions: data.sourceOptions }),
+      ...(data.report === undefined ? {} : { report: data.report }),
+    });
+  if (data.packedPaths === undefined) {
+    resolve(data.paths ?? []);
+    return;
+  }
+  unpackingByRequestId.set(id, pending);
+  const current = (): boolean => unpackingByRequestId.get(id) === pending;
+  const unpack = createCooperativeTraceRunner(() => {
+    if (!current()) throw new TraceRequestSupersededError();
+  });
+  void Promise.resolve(unpack(unpackTracePathsSteps(data.packedPaths))).then(
+    (paths) => {
+      if (!current()) return;
+      unpackingByRequestId.delete(id);
+      resolve(paths);
+    },
+    (error: unknown) => {
+      if (!current()) return;
+      unpackingByRequestId.delete(id);
+      pending.reject(error instanceof Error ? error : new Error(String(error)));
+    },
+  );
+}
+
+function rejectUnpacking(error: Error): void {
+  const pendings = Array.from(unpackingByRequestId.values());
+  unpackingByRequestId.clear();
+  for (const pending of pendings) pending.reject(error);
 }
 
 // Tear down the live worker after a fatal runtime error. All callers
@@ -245,6 +285,7 @@ export async function traceImage(
     // it. Only its own current computation can be cancelled by this signal.
     if (epoch !== latestTraceEpoch) return;
     latestTraceEpoch += 1;
+    rejectUnpacking(new TraceRequestSupersededError());
     if (workerInstance !== null && pendingByRequestId.size > 0) {
       rejectAllPendingAndRetireWorker(workerInstance, new TraceRequestSupersededError());
     }
@@ -272,6 +313,7 @@ async function traceImageForEpoch(
   progress: TraceProgress | undefined,
   flags: TraceRequestFlags,
 ): Promise<TraceResult> {
+  rejectUnpacking(new TraceRequestSupersededError());
   if (workerInstance !== null && pendingByRequestId.size > 0) {
     rejectAllPendingAndRetireWorker(workerInstance, new TraceRequestSupersededError());
   }

@@ -8,6 +8,7 @@ import {
   type Transform,
   type Vec2,
 } from '../../core/scene';
+import { fairToolpathPolylines } from '../../core/geometry';
 import { boundsFromColoredPaths, DEFAULT_TRACE_OPTIONS } from '../../core/trace';
 import { fairTracedImageForCnc } from './fair-traced-image-for-cnc';
 import {
@@ -117,6 +118,23 @@ describe('conditionTracedImageForMachine', () => {
     },
   );
 
+  // The CNC commit fairs one polyline per slice; that is the same computation
+  // only because fairing is a per-polyline map that shares nothing but options.
+  it('fairs polylines one at a time exactly as all at once', () => {
+    const polylines = denseTrace().paths.flatMap((path) => path.polylines);
+    const pinnedPoints = new Set<Vec2>([polylines[0]!.points[7]!, polylines[5]!.points[0]!]);
+    const options = {
+      mmPerPx: 0.1,
+      minSegmentMm: 0.4,
+      maxDeviationMm: 0.05,
+      cornerAngleDeg: 60,
+      pinnedPoints,
+    };
+    expect(polylines.flatMap((polyline) => fairToolpathPolylines([polyline], options))).toEqual(
+      fairToolpathPolylines(polylines, options),
+    );
+  });
+
   it('fairs CNC traces as before', () => {
     const traced = tracedRing();
     expect(conditionTracedImageForMachine(traced, PLACEMENT, 'cnc', VECTOR)).toEqual(
@@ -167,29 +185,33 @@ describe('conditionTracedImageForCommit', () => {
     }
   }
 
-  it('gives the browser turns on a dense laser trace and conditions it exactly as in one task', async () => {
-    const traced = denseTrace();
-    expect(vertexCount(traced)).toBeGreaterThan(10 * COMMIT_CONDITIONING_SYNC_VERTICES);
-    const inOneTask = conditionTracedImageForMachine(traced, PLACEMENT, 'laser', VECTOR);
-    expect(vertexCount(inOneTask)).toBeLessThan(vertexCount(traced) / 4);
+  // CNC fairing ran in one task after the laser conditioning was sliced.
+  it.each(['laser', 'cnc'] as const)(
+    'gives the browser turns on a dense %s trace and conditions it exactly as in one task',
+    async (machineKind) => {
+      const traced = denseTrace();
+      expect(vertexCount(traced)).toBeGreaterThan(10 * COMMIT_CONDITIONING_SYNC_VERTICES);
+      const inOneTask = conditionTracedImageForMachine(traced, PLACEMENT, machineKind, VECTOR);
+      expect(inOneTask.paths).not.toEqual(traced.paths);
 
-    const { value, turns } = await turnsDuring(() =>
-      conditionTracedImageForCommit(traced, PLACEMENT, 'laser', VECTOR),
-    );
+      const { value, turns } = await turnsDuring(() =>
+        conditionTracedImageForCommit(traced, PLACEMENT, machineKind, VECTOR),
+      );
 
-    // Hundreds of milliseconds of work, sliced every 8 ms.
-    expect(turns).toBeGreaterThan(0);
-    expect(value).toEqual(inOneTask);
-  });
+      // Hundreds of milliseconds of work, sliced every 8 ms.
+      expect(turns).toBeGreaterThan(0);
+      expect(value).toEqual(inOneTask);
+    },
+  );
 
-  it('stops when the commit is cancelled', async () => {
+  it.each(['laser', 'cnc'] as const)('stops a %s commit when it is cancelled', async (kind) => {
     const controller = new AbortController();
     setTimeout(() => controller.abort(), 0);
 
     const outcome = await conditionTracedImageForCommit(
       denseTrace(),
       PLACEMENT,
-      'laser',
+      kind,
       VECTOR,
       controller.signal,
     ).catch((error: unknown) => error);

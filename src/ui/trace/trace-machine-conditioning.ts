@@ -8,7 +8,10 @@ import { runTraceSteps, type TraceSteps } from '../../core/trace/trace-steps';
 import { createCooperativeTraceRunner } from './cooperative-trace-runner';
 import type { TraceOutput } from './dialog-parts';
 import { checkTraceSignal } from './trace-cancellation';
-import { fairTracedImageForCnc, shouldFairTracedImageForCnc } from './fair-traced-image-for-cnc';
+import {
+  fairTracedImageForCncSteps,
+  shouldFairTracedImageForCnc,
+} from './fair-traced-image-for-cnc';
 import { simplifyTracedPathsForLaserSteps } from './laser-trace-moves';
 
 export type TraceMachineRequest = {
@@ -69,7 +72,7 @@ export function* conditionTracedImageForMachineSteps(
   request: TraceMachineRequest,
 ): TraceSteps<TracedImage> {
   if (shouldFairTracedImageForCnc(machineKind, request.options)) {
-    return fairTracedImageForCnc(traced, placement);
+    return yield* fairTracedImageForCncSteps(traced, placement);
   }
   if (!shouldSimplifyTracedImageForLaser(machineKind, request)) return traced;
   const paths = yield* simplifyTracedPathsForLaserSteps(traced.paths, placement);
