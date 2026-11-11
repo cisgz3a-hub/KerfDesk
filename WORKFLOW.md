@@ -2810,6 +2810,23 @@ minimum target size.
    This software action does not prove that the command arrived or that physical energy stopped.
 4. A reset sent into motion leaves a GRBL controller in `Alarm` (ALARM:3); the user clears it with
    `$X` (F-B9). A reset after a completed hold or a cancelled jog raises no alarm.
+5. After the operator's own ABORT JOB, that ALARM:3 shows "You stopped the job" instead of the
+   ordinary alarm card. When the Abort saved a Set origin here origin it offers **Restore saved
+   origin** (**Home, then restore origin** on a profile with homing), **Set origin here** and
+   **$X — Unlock** (ADR-341 Amendment 11).
+6. On a laser without homing, Restore saved origin runs by itself, once: Unlock, then one `G92`,
+   with no motion. It waits until the controller has reported Alarm twice with nothing in flight,
+   and a toast says "Stopped. The laser is off and your origin is restored. Frame to check before
+   starting again." Start still needs a new Frame (ADR-341 Amendment 14).
+   - It applies only to stock GRBL and FluidNC, a laser job, a saved origin, no rotary, a machine
+     zero that has not moved, and no reset required, safety notice, door or E-stop input.
+   - A CNC job, a profile with homing, grblHAL, any other alarm and any stop that was not the
+     operator's Abort keep the card and its buttons.
+   - A press on a card button first keeps the recovery with the operator. A restore that fails is
+     told in a toast, and the card keeps its buttons while the alarm stands.
+7. The Pause button's tooltip on a laser job with a realtime hold adds that Pause, a wait for the
+   head to stop, then ABORT JOB stops without the controller losing its position (ADR-215
+   Amendment 1).
 
 ### F-B9. Alarm
 
