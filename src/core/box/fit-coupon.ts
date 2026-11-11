@@ -2,7 +2,9 @@
 // strip on a graduated clearance ladder. Rung i bakes the production fit
 // law analytically — tab width f − cᵢ/2, notch width f + cᵢ/2 — so the rung
 // that presses right on the bench IS the clearance to type into the Box
-// Generator. Rung order is read from the narrow-margin end (half a finger
+// Generator. The ladder may start below zero (ADR-119 Amendment 1): kerf is
+// compensated by the cutting layer, not here, so on a layer without a kerf
+// offset every rung is loose by the kerf and the press fit is negative. Rung order is read from the narrow-margin end (half a finger
 // at the start, two fingers at the end) — deliberately no cut index marks:
 // any small protrusion or notch has reflex junctions the CNC relief pass
 // would sliver. CNC mode runs both strips through the shared relief pass,
@@ -65,6 +67,16 @@ function validate(spec: FitCouponSpec): BoxSpecIssue[] {
       message: `The top rung (${round2(topMm)} mm) reaches half the smallest joint dimension (${round2(limitMm)} mm) — shorten the ladder.`,
     });
   }
+  // A negative rung is a press fit, the same |c| bound the Box Generator
+  // accepts (box-spec collectClearanceIssues). A layer that cuts without kerf
+  // compensation makes every rung loose by the kerf, so the ladder must be
+  // able to start below zero to find the fit that layer needs.
+  if (-spec.startClearanceMm >= limitMm) {
+    issues.push({
+      field: 'clearance',
+      message: `The first rung (${round2(spec.startClearanceMm)} mm) reaches half the smallest joint dimension (${round2(limitMm)} mm) — raise the ladder start.`,
+    });
+  }
   if (spec.relief.kind === 'corner-overcut' && spec.relief.toolDiameterMm >= spec.fingerWidthMm) {
     issues.push({
       field: 'reliefTool',
@@ -91,8 +103,8 @@ function collectFieldIssues(spec: FitCouponSpec): BoxSpecIssue[] {
       issues.push({ field, message: 'Must be greater than 0.' });
     }
   }
-  if (!Number.isFinite(spec.startClearanceMm) || spec.startClearanceMm < 0) {
-    issues.push({ field: 'clearance', message: 'Ladder start must be 0 or greater.' });
+  if (!Number.isFinite(spec.startClearanceMm)) {
+    issues.push({ field: 'clearance', message: 'Ladder start must be a number.' });
   }
   if (!Number.isInteger(spec.rungCount) || spec.rungCount < 2 || spec.rungCount > MAX_RUNGS) {
     issues.push({
@@ -118,8 +130,8 @@ function bodyMm(spec: FitCouponSpec): number {
   return Math.max(10, 2.5 * spec.thicknessMm);
 }
 
-// Comb: body with tabs protruding from the top edge (tab i narrowed cᵢ/2)
-// and index notches in the bottom edge.
+// Comb: body with tabs protruding from the top edge (tab i narrowed cᵢ/2;
+// a negative rung widens it). No index marks: the margins orient the strip.
 function combStrip(spec: FitCouponSpec, baseYMm: number): Polyline {
   const body = bodyMm(spec);
   const t = spec.thicknessMm;
@@ -140,7 +152,8 @@ function combStrip(spec: FitCouponSpec, baseYMm: number): Polyline {
   return { closed: true, points };
 }
 
-// Slot strip: notches cut into the top edge (notch i widened cᵢ/2).
+// Slot strip: notches cut into the top edge (notch i widened cᵢ/2; a
+// negative rung narrows it).
 function slotStrip(spec: FitCouponSpec, baseYMm: number): Polyline {
   const body = bodyMm(spec) + spec.thicknessMm;
   const t = spec.thicknessMm;
