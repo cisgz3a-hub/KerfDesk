@@ -25,6 +25,7 @@ import { clearCncLiveCaps } from './detected-settings-action';
 import { streamResetRecord } from './job-stop-request';
 import { advanceStream } from './laser-stream-ack';
 import { noteRefusedLine } from './laser-parser-rearm';
+import { withoutHeldJogFrame } from './laser-motion-operation';
 import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 
 /** What the controller answered instead of accepting a line. */
@@ -44,17 +45,21 @@ export type ControllerRejection = {
 // The rejected line's own Frame or jog stops. A stopped Marlin announces itself
 // as it reads each move (queue.cpp L523-L535), not in answer order, and skips
 // every later move as well, so it stops whichever Frame or jog is running.
+// Any rejection voids the Frame proof (frameProofReset below), and with it a
+// Frame held through a running jog, whoever owned the line (ADR-565 Amd 1).
 function rejectedMotionPatch(
   state: LaserState,
   rejection: ControllerRejection,
   ackSettlement: AckSettlement,
 ): Partial<Pick<LaserState, 'motionOperation'>> {
-  const operation = state.motionOperation;
+  const operation = withoutHeldJogFrame(state.motionOperation);
   if (operation === null) return {};
   const rejectedMotionId =
     ackSettlement.owner === 'untracked' ? ackSettlement.motionOperationId : null;
   const refusesEveryMove = rejection.motionRefusal?.reason === 'stopped';
-  if (!refusesEveryMove && operation.operationId !== rejectedMotionId) return {};
+  if (!refusesEveryMove && operation.operationId !== rejectedMotionId) {
+    return operation === state.motionOperation ? {} : { motionOperation: operation };
+  }
   return { motionOperation: { ...operation, cancelRequested: true } };
 }
 
@@ -128,7 +133,12 @@ export function handleResendLine(
     // owned candidate permanently ineligible for further dispatch/completion.
     ...(current.motionOperation === null
       ? {}
-      : { motionOperation: { ...current.motionOperation, cancelRequested: true } }),
+      : {
+          motionOperation: {
+            ...withoutHeldJogFrame(current.motionOperation),
+            cancelRequested: true,
+          },
+        }),
     ...errorNoticePatch(
       current,
       {

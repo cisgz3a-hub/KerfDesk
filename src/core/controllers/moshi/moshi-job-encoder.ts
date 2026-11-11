@@ -13,9 +13,11 @@
 
 import type { DeviceProfile } from '../../devices';
 import type { Group, Job } from '../../job';
+import { rotaryFeedMatchFor, type RotaryFeedMatch } from '../../output/rotary-surface-feed';
 import { MOSHI_VECTOR_SPEED_MAX_MM_S } from './moshi-program';
 import { writeHomeProgram, writeRasterProgram, writeVectorProgram } from './moshi-programs';
 import { planRasterGroupSteps } from './moshi-raster-plan';
+import { moshiSurfaceSpeedRuns } from './moshi-rotary-feed';
 import {
   isMoshiPosition,
   milsToMm,
@@ -65,7 +67,9 @@ export type MoshiEncodeResult =
     }
   | { readonly ok: false; readonly error: MoshiEncodeError };
 
-export function encodeMoshiJob(job: Job, _device: DeviceProfile): MoshiEncodeResult {
+export function encodeMoshiJob(job: Job, device: DeviceProfile): MoshiEncodeResult {
+  // A Y-port rotary needs the surface speed matched per move (ADR-705 Amd 1).
+  const rotaryFeed = rotaryFeedMatchFor(job, device.maxFeed);
   const programs: MoshiJobProgram[] = [];
   const motion: MoshiMotionPart[] = [];
   const notes = new Set<string>();
@@ -80,7 +84,7 @@ export function encodeMoshiJob(job: Job, _device: DeviceProfile): MoshiEncodeRes
     const outside = planned.find((step) => !isMoshiPosition(step.x) || !isMoshiPosition(step.y));
     if (outside !== undefined) return { ok: false, error: outOfRange(group.layerId, outside) };
     motion.push({ group, steps: planned, bounds });
-    programs.push(...groupPrograms(group, planned, bounds, notes));
+    programs.push(...groupPrograms(group, planned, bounds, notes, rotaryFeed));
   }
   const footprint = unionMoshiBounds(motion.map((part) => part.bounds));
   if (footprint === null || !motion.some((part) => part.steps.some((step) => step.cut)))
@@ -107,8 +111,11 @@ function groupPrograms(
   steps: ReadonlyArray<MoshiStep>,
   bounds: MoshiBounds,
   notes: Set<string>,
+  rotaryFeed: RotaryFeedMatch | undefined,
 ): MoshiJobProgram[] {
   const speedMmS = group.speed / 60;
+  if (group.kind !== 'raster' && rotaryFeed !== undefined)
+    return rotaryVectorPrograms(group, steps, rotaryFeed, notes);
   if (group.kind !== 'raster') {
     if (speedMmS > MOSHI_VECTOR_SPEED_MAX_MM_S)
       notes.add(
@@ -128,6 +135,33 @@ function groupPrograms(
     },
     { kind: 'home', layerId: group.layerId, bytes: writeHomeProgram() },
   ];
+}
+
+/** One program per run of moves that share a surface-matched speed. */
+function rotaryVectorPrograms(
+  group: Exclude<Group, { readonly kind: 'cnc' | 'raster' }>,
+  steps: ReadonlyArray<MoshiStep>,
+  rotaryFeed: RotaryFeedMatch,
+  notes: Set<string>,
+): MoshiJobProgram[] {
+  const { runs, minDose, maxDose } = moshiSurfaceSpeedRuns(steps, group.speed, rotaryFeed);
+  if (runs.length > 1)
+    notes.add(
+      `Layer ${group.layerId}: on the rotary it runs as ${runs.length} programs, one per surface speed, so the head pauses between them.`,
+    );
+  if (minDose < 0.95 || maxDose > 1.05)
+    notes.add(
+      `Layer ${group.layerId}: on the rotary, strokes burn between ${percent(minDose)} and ${percent(maxDose)} of the set dose: a Moshiboard runs whole mm/s from 1 to ${MOSHI_VECTOR_SPEED_MAX_MM_S}, within Max feed.`,
+    );
+  return runs.map((run) => ({
+    kind: 'vector',
+    layerId: group.layerId,
+    bytes: writeVectorProgram(run.steps, run.speedMmS),
+  }));
+}
+
+function percent(share: number): string {
+  return `${Math.round(share * 100)} %`;
 }
 
 function outOfRange(layerId: string, step: MoshiStep): MoshiEncodeError {

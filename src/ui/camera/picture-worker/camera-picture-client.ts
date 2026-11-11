@@ -62,7 +62,8 @@ function createPictureClient(): PictureClient {
         const id = nextId;
         nextId += 1;
         pending.set(id, resolve);
-        ensure().postMessage({ id, request }, [request.frame]);
+        // A frame is handed over; a blob or thumbnails are small or shared.
+        ensure().postMessage({ id, request }, 'frame' in request ? [request.frame] : []);
       }),
   };
 }

@@ -16,6 +16,7 @@ import { originUnknownAfterControllerReset } from './laser-status-line';
 import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import { advanceStream } from './laser-stream-ack';
+import { alarmRaisedPatch } from './position-kept-alarm';
 import { isProbeFailureAlarm } from './probe-failure-alarm';
 import { probeAlarmKeepsToolChangeHold } from './tool-change-probe-alarm';
 import { hasOwnedControllerReset } from './laser-reset-cleanup';
@@ -47,6 +48,9 @@ export function handleAlarmLine(
   const keepToolChangeHold = alarm.code !== null && probeAlarmKeepsToolChangeHold(prev, alarm.code);
   set({
     ...alarmRecordPatch(prev, alarm),
+    // Read before the report below is cleared: the Unlock that clears this
+    // alarm decides from it whether the position still stands.
+    ...alarmRaisedPatch(prev, alarm.code),
     ...alarmOwnershipPatch(prev, ownedReset, keepToolChangeHold),
     // ALARM:N supersedes any prior Run/Hold report. Clearing it lets the
     // numbered alarm itself be the exact recovery evidence for Home.

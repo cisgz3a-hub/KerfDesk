@@ -38,6 +38,32 @@ export function positionWithheldFrameMessage(homingEnabled: boolean): string {
     : 'Position is unknown after Unlock or Release motors. Move the head to where the job should start and use Set origin here, then Frame again.';
 }
 
+type WithheldEvidence = Pick<LaserState, 'positionEvidenceSuppressed' | 'reportUnitsUnconfirmed'>;
+
+/** The same remedy for a control that is not Frame: Move to position, the
+ *  origin row and Fire told the operator to wait for a report, or said nothing,
+ *  while the position stayed hidden (user annoyance audit A1, A3-P2-1; ADR-367
+ *  Amendment 3). Null when the position is not withheld, or when unconfirmed
+ *  report units withhold it, which a `$$` read restores. */
+export function positionWithheldMessage(
+  laser: WithheldEvidence,
+  homingEnabled: boolean,
+): string | null {
+  if (laser.positionEvidenceSuppressed !== true || laser.reportUnitsUnconfirmed === true) {
+    return null;
+  }
+  return homingEnabled
+    ? 'Position is unknown after Unlock or Release motors. Home the machine, or move the head to where the job should start and use Set origin here.'
+    : 'Position is unknown after Unlock or Release motors. Move the head to where the job should start and use Set origin here.';
+}
+
+/** The origin row's short form of it; the row's tooltip carries the sentence. */
+export function positionWithheldOriginLabel(homingEnabled: boolean): string {
+  return homingEnabled
+    ? 'unknown (Home, or jog to the start and Set origin here)'
+    : 'unknown (jog to the start and Set origin here)';
+}
+
 /** The Frame refusals, with each "wait for a report" one said as its remedy
  *  while the position is withheld. Unconfirmed report units keep theirs: a
  *  `$$` read, not Home, brings that position back. */

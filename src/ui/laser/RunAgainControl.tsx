@@ -15,6 +15,7 @@ import { currentReplayExecutionSignature } from './start-job-execution-tracking'
 import { currentCompletedFrame, framedRunReadinessIssue } from './framed-run-readiness';
 import { runCompletedJobAgainFlow } from './start-job-flow';
 import { useFramedRunLaserState } from './use-framed-run-laser-state';
+import { useFreshKeyActivation } from '../common/use-fresh-key-activation';
 
 export { currentReplayExecutionSignature } from './start-job-execution-tracking';
 
@@ -25,16 +26,25 @@ type Props = {
   readonly onRunAgain?: (receipt: LastCompletedReceipt) => Promise<void>;
 };
 
+const RUN_AGAIN_LABEL = 'Run same job again from start';
+
 /** Exact replay is deliberately separate from interrupted-job recovery. The
  * offer exists only while the open execution inputs still match the immutable
  * receipt. Like Start, it reuses clean spatial evidence for unchanged placement
- * and claims a newly reviewed exact permit; it never Frames itself (ADR-565). */
+ * and claims its own exact permit; it never Frames itself (ADR-565). An
+ * unchanged laser job reviewed in this session starts without showing Job
+ * Review again (ADR-237 Amendment 3), so one press can start the laser: a held
+ * Enter must never be that press. */
 export function RunAgainControl(props: Props): JSX.Element | null {
   const repository = props.repository ?? recoveryRepository;
   const receipt = useRecoveryRepositorySelection(selectLastCompletedReceipt, repository);
   const app = useExecutionSignatureAppState();
   const laser = useFramedRunLaserState();
   const [starting, setStarting] = useState(false);
+  const label = starting ? 'Checking completed job…' : RUN_AGAIN_LABEL;
+  // Focus can come back to this button when a job ends. An auto-repeated
+  // Enter, or one held since before the button meant this, is dropped.
+  const freshKeys = useFreshKeyActivation(label);
 
   // These stores participate in print-and-cut execution identity but are read
   // imperatively by currentPrintCutOutputRegistration. Subscribe explicitly so
@@ -70,14 +80,15 @@ export function RunAgainControl(props: Props): JSX.Element | null {
     <button
       type="button"
       onClick={() => void runAgain()}
+      {...freshKeys}
       disabled={props.disabled || props.busy || starting || !framedReady}
       title={
         framedReady
-          ? 'Run the same completed job from the beginning using its unchanged framed placement.'
+          ? 'Run the same completed job from the beginning using its unchanged framed placement. A laser job you reviewed in this session starts without showing Job Review again when nothing has changed.'
           : 'Run again needs a clean Frame of this footprint and placement, like Start. Press Frame job first.'
       }
     >
-      {starting ? 'Checking completed job…' : 'Run same job again from start'}
+      {label}
     </button>
   );
 }

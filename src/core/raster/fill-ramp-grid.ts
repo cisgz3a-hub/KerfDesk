@@ -47,7 +47,8 @@ export type FillRampGridInput = {
 export type FillRampGrid = {
   readonly width: number;
   readonly height: number;
-  /** Scan-frame placement: cell (0, 0) spans minX..minX+pitchX, minY..minY+pitchY. */
+  /** Scan-frame placement: cell (0, 0) spans minX..minX+pitchX, minY..minY+pitchY,
+   * from the artwork's lowest corner. */
   readonly bounds: {
     readonly minX: number;
     readonly minY: number;
@@ -78,17 +79,27 @@ export function fillRampGrid(input: FillRampGridInput): FillRampGridResult {
   const filledCells = markFilledCells(closed, cells, { width, height, minX, minY, ...input });
   if (filledCells === 0) return { kind: 'empty' };
   markOutside(cells, width, height);
-  const sValues = rampValues(cells, width, height, input);
+  const padded = rampValues(cells, width, height, input);
+  // ADR-699 Amd 1: the empty margin is for the distance field only. Cropped,
+  // the grid's bounds are the artwork's, so a rotary rebasing on the job's
+  // lowest Y does not move the other layers by a cell.
+  const cropWidth = width - 2;
+  const cropHeight = height - 2;
+  const sValues = new Float64Array(cropWidth * cropHeight);
+  for (let row = 0; row < cropHeight; row += 1) {
+    const from = (row + 1) * width + 1;
+    sValues.set(padded.subarray(from, from + cropWidth), row * cropWidth);
+  }
   return {
     kind: 'ok',
     grid: {
-      width,
-      height,
+      width: cropWidth,
+      height: cropHeight,
       bounds: {
-        minX,
-        minY,
-        maxX: minX + width * input.pitchXmm,
-        maxY: minY + height * input.pitchYmm,
+        minX: extent.minX,
+        minY: extent.minY,
+        maxX: extent.minX + cropWidth * input.pitchXmm,
+        maxY: extent.minY + cropHeight * input.pitchYmm,
       },
       sValues,
       filledCells,

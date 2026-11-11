@@ -190,7 +190,8 @@ describe('position loss on the recorded cause', () => {
   });
 
   // ADR-644 (protocol audit P-5): FluidNC numbers alarms its own way
-  // (FluidNC/src/Alarm.h). 13 is a hard stop there and probe protection on grblHAL.
+  // (FluidNC/src/Alarm.h). 17 is a G-code error there, which keeps position,
+  // and a motor fault on grblHAL, which does not.
   it('reads an alarm against the table of the firmware that raised it', () => {
     const fluidnc = { ...run, activeControllerKind: 'fluidnc' as const };
     for (const alarmCode of [1, 3, 6, 7, 8, 9, 13, 18]) {
@@ -200,10 +201,13 @@ describe('position loss on the recorded cause', () => {
       expect(runStopMayHaveLostPosition({ ...fluidnc, alarmCode })).toBe(false);
     }
     const grblhal = { ...run, activeControllerKind: 'grblhal' as const };
-    expect(runStopMayHaveLostPosition({ ...grblhal, alarmCode: 13 })).toBe(false);
-    // A FluidNC banner behind a GRBL profile: either table's loss counts.
+    expect(runStopMayHaveLostPosition({ ...grblhal, alarmCode: 17 })).toBe(true);
+    // grblHAL's probe protection (13) stops a moving cycle at once and marks the
+    // position lost. Its table said it kept it (ADR-367 Amendment 3).
+    expect(runStopMayHaveLostPosition({ ...grblhal, alarmCode: 13 })).toBe(true);
+    // A grblHAL banner behind a FluidNC profile: either table's loss counts.
     expect(
-      runStopMayHaveLostPosition({ ...grblhal, alarmCode: 13, detectedControllerKind: 'fluidnc' }),
+      runStopMayHaveLostPosition({ ...fluidnc, alarmCode: 17, detectedControllerKind: 'grblhal' }),
     ).toBe(true);
   });
 });

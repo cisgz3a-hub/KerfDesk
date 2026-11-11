@@ -3,6 +3,7 @@ import {
   waitForFreshControllerStatus,
 } from './laser-controller-status-wait';
 import { startControllerCommand } from './laser-interactive-command';
+import { heldFrameThroughCancel } from './jog-held-frame';
 import type { LaserMotionOperation, LaserMotionOperationId } from './laser-motion-operation';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { GetFn, SafeWriteFn, SetFn } from './laser-line-shared';
@@ -53,7 +54,9 @@ export async function runCancelJog(
   const operationId = context.operationId;
   // Cancel intent itself expires a completed Frame permit, even when no live
   // motion owner exists (for example a key/button release after a zero-length
-  // jog). Authorization never survives a realtime cancel attempt.
+  // jog). Live authorization never survives a realtime cancel attempt; a Frame
+  // a healthy jog set aside comes back only if this Cancel settles that jog
+  // cleanly (cancellingMotionOperation, ADR-565 Amendment 1).
   set((state) => ({
     manualMotionCancelEpoch: state.manualMotionCancelEpoch + 1,
     frameVerification: null,
@@ -146,12 +149,17 @@ function cancellingMotionOperation(
   attemptId: symbol,
   automaticRelease: boolean,
 ): LaserMotionOperation {
-  const { cancelStatusQueryAfterSequence: staleFence, ...unstamped } = operation;
+  const { cancelStatusQueryAfterSequence: staleFence, heldFrame: before, ...unstamped } = operation;
   void staleFence;
+  void before;
+  // A Frame held through the jog survives only the operator Cancel that stops
+  // a still-healthy move, and only if this attempt settles it (ADR-565 Amd 1).
+  const heldFrame = heldFrameThroughCancel(operation, attemptId, automaticRelease);
   return {
     ...unstamped,
     cancelRequested: true,
     cancelAttemptId: attemptId,
+    ...(heldFrame === undefined ? {} : { heldFrame }),
     ...(automaticRelease
       ? { automaticReleaseAttempts: (operation.automaticReleaseAttempts ?? 0) + 1 }
       : {}),

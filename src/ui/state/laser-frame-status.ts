@@ -14,6 +14,7 @@ import {
   takeNextMotionLine,
 } from './laser-motion-operation';
 import { cleanFramePopPatch } from './laser-frame-modal-restore';
+import { heldJogFrameCompletionPatch } from './jog-held-frame';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
 
@@ -63,6 +64,8 @@ export function frameCompletionPatch(args: {
   readonly frameFailureMessage: string | null;
 }): Partial<FrameCompletionFields> {
   if (args.positionInvalidated || args.frameFailureMessage !== null) return {};
+  // A jog that settles cleanly returns the Frame it set aside (ADR-565 Amd 1).
+  if (args.operation?.kind === 'jog') return heldJogFrameCompletionPatch(args);
   const completedFrame = cleanCompletedFrameOperation(
     args.operation,
     args.observedOperation,

@@ -127,6 +127,40 @@ describe('RunAgainControl', () => {
     expect(onRunAgain).not.toHaveBeenCalled();
   });
 
+  // ADR-237 Amendment 3: Run again can start an unchanged, reviewed laser job
+  // with no dialog in between, so a held key must never be the press.
+  it('drops an auto-repeated Enter and takes a fresh one', async () => {
+    render(
+      await completedRepository(),
+      vi.fn(async () => undefined),
+    );
+    const runAgain = button('Run same job again from start');
+    const press = (repeat: boolean): boolean => {
+      const event = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        repeat,
+        bubbles: true,
+        cancelable: true,
+      });
+      act(() => {
+        runAgain.dispatchEvent(event);
+      });
+      return event.defaultPrevented;
+    };
+
+    // Held since before this button had focus: every keydown is a repeat.
+    expect(press(true)).toBe(true);
+    expect(press(true)).toBe(true);
+
+    act(() => {
+      runAgain.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
+    });
+    expect(press(false)).toBe(false);
+    // The same key still down repeats: only the first press may click.
+    expect(press(true)).toBe(true);
+    expect(runAgain.title).toContain('without showing Job Review again');
+  });
+
   it('does not offer replay when there is no clean-completion receipt', async () => {
     const repository = createRepository();
     await repository.initialize();

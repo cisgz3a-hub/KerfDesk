@@ -13,7 +13,13 @@ import {
   rasterCompilationPowerScale,
   rescaleRasterValuesForVersion,
 } from '../raster/controller-power-scale';
-import { machineToScan, rasterScanFrame, type RasterScanFrame } from '../raster/raster-scan-frame';
+import {
+  machineToScan,
+  normalizedScanAngleDeg,
+  rasterScanFrame,
+  type RasterScanFrame,
+} from '../raster/raster-scan-frame';
+import { passAngleStepApplies } from './scan-pass-angles';
 import {
   CURRENT_LASER_POWER_SCALE_VERSION,
   type LaserPowerScaleVersion,
@@ -46,6 +52,28 @@ export function fillRampApplies(
     Number.isFinite(layer.fillRampLengthMm) &&
     layer.fillRampLengthMm > 0
   );
+}
+
+/**
+ * ADR-699 Amendment 1, after ADR-492 D9: a rotary keeps only scan rows along X
+ * straight, so a ramped Fill on a rotary scans every pass along X, as an image
+ * does. Its hatch angle, Cross-hatch and angle per pass are set aside, and
+ * `turnedAside` says whether any of them asked for something else. Null when
+ * the operation has no ramp or the rotary is off: those compile as before.
+ */
+export function rotaryRampLayer<T extends Layer>(
+  layer: T,
+  device: Pick<DeviceProfile, 'rotary'>,
+): { readonly layer: T; readonly turnedAside: boolean } | null {
+  if (!fillRampApplies(layer) || device.rotary?.enabled !== true) return null;
+  const turnedAside =
+    normalizedScanAngleDeg(layer.hatchAngleDeg) !== 0 ||
+    layer.fillCrossHatch ||
+    passAngleStepApplies(layer);
+  return {
+    layer: { ...layer, hatchAngleDeg: 0, fillCrossHatch: false, passAngleStepDeg: 0 },
+    turnedAside,
+  };
 }
 
 export function rampedFillGroups(args: {

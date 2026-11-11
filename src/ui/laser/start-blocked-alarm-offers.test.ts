@@ -12,6 +12,7 @@ import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 import { ALARM_ACTIVE_START_MESSAGE, machineNotIdleStartMessage } from './start-machine-refusals';
 import {
   offerAlarmFixForBlockedStart,
+  POSITION_KEPT_UNLOCK_OFFER_PROMPT,
   PROBE_UNLOCK_OFFER_PROMPT,
   UNLOCK_OFFER_PROMPT,
   UNLOCKED_NEXT_STEP_MESSAGE,
@@ -32,6 +33,21 @@ function idleStatus(): StatusReport {
   return { state: 'Idle' } as StatusReport;
 }
 
+function softLimitRecord() {
+  const connectionAttempt = useLaserStore.getState().connectionAttempt ?? 0;
+  return { code: 2, connectionAttempt, duringHold: false };
+}
+
+/** A soft limit (ALARM:2) seen raised on this connection, position still shown. */
+function softLimitAlarm() {
+  return {
+    alarmCode: 2,
+    alarmRaised: softLimitRecord(),
+    positionEvidenceSuppressed: false,
+    resetRequired: false,
+  };
+}
+
 beforeEach(() => {
   vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
   useLaserStore.setState({
@@ -49,6 +65,7 @@ afterEach(() => {
     ...original,
     statusReport: null,
     alarmCode: null,
+    alarmRaised: null,
     positionEvidenceSuppressed: false,
   });
   useStore.setState({ project: createProject() });
@@ -88,6 +105,57 @@ describe('alarm recovery offer', () => {
       capabilities: { ...original.capabilities, unlock: true },
       alarmCode: 5,
       positionEvidenceSuppressed: true,
+    });
+    await expect(offerAlarmFixForBlockedStart([STATUS_ALARM_START_MESSAGE])).resolves.toBe(
+      'handled',
+    );
+    expect(jobAwareConfirm).toHaveBeenCalledWith(UNLOCK_OFFER_PROMPT);
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe(UNLOCKED_NEXT_STEP_MESSAGE);
+  });
+
+  // User annoyance audit A1, A3-P2-1 (ADR-367 Amendment 3): a soft limit is
+  // raised after a controlled stop and keeps the machine position, so its
+  // Unlock lets the Frame go on, with a prompt that says nothing about probes.
+  it('unlocks after a soft limit and retries the Frame once Idle', async () => {
+    useLaserStore.setState({
+      capabilities: { ...original.capabilities, unlock: true },
+      ...softLimitAlarm(),
+      unlockAlarm: vi.fn(async () => useLaserStore.setState({ alarmCode: null })),
+    });
+    await expect(offerAlarmFixForBlockedStart([STATUS_ALARM_START_MESSAGE])).resolves.toBe('retry');
+    expect(jobAwareConfirm).toHaveBeenCalledWith(POSITION_KEPT_UNLOCK_OFFER_PROMPT);
+    expect(POSITION_KEPT_UNLOCK_OFFER_PROMPT).not.toMatch(/probe|touch plate/i);
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe('Alarm cleared.');
+  });
+
+  // The Unlock decides at its reply: a restart in between hides the position.
+  it('hands over to Set origin when the Unlock hid the position after all', async () => {
+    useLaserStore.setState({
+      capabilities: { ...original.capabilities, unlock: true },
+      ...softLimitAlarm(),
+      unlockAlarm: vi.fn(async () =>
+        useLaserStore.setState({ alarmCode: null, positionEvidenceSuppressed: true }),
+      ),
+    });
+    await expect(offerAlarmFixForBlockedStart([STATUS_ALARM_START_MESSAGE])).resolves.toBe(
+      'handled',
+    );
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe(UNLOCKED_NEXT_STEP_MESSAGE);
+  });
+
+  it.each([
+    ['an alarm that loses position', { alarmCode: 3 }],
+    ['a soft limit followed by a restart KerfDesk did not send', { alarmRaised: null }],
+    [
+      'a soft limit raised during a hold',
+      { alarmRaised: { ...softLimitRecord(), duringHold: true } },
+    ],
+    ['a position that was already untrusted', { positionEvidenceSuppressed: true }],
+  ])('asks for Set origin after %s', async (_name, overrides) => {
+    useLaserStore.setState({
+      capabilities: { ...original.capabilities, unlock: true },
+      ...softLimitAlarm(),
+      ...overrides,
     });
     await expect(offerAlarmFixForBlockedStart([STATUS_ALARM_START_MESSAGE])).resolves.toBe(
       'handled',

@@ -34,6 +34,24 @@ pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xre
 write('two-pages.pdf', pdf);
 write('compatible.ai', pdf);
 write('legacy.ai', '%!PS-Adobe-3.0\nshowpage\n');
+// An Illustrator 3 script (ADR-700): one closed 72 × 36 point rectangle drawn
+// with the AI operators, read as editable paths without its procset.
+write(
+  'illustrator-3.ai',
+  [
+    '%!PS-Adobe-2.0 EPSF-1.2',
+    '%%Creator:Adobe Illustrator(TM) 3.2',
+    '%%BoundingBox:0 0 72 36',
+    '%%EndComments',
+    '%%EndProlog',
+    '%%BeginSetup',
+    '%%EndSetup',
+    '0 G 1 w',
+    '0 0 m 72 0 L 72 36 L 0 36 L 0 0 L s',
+    '%%Trailer',
+    '',
+  ].join('\n'),
+);
 write(
   'ordered-pens.plt',
   'IN;SP1;PU0,0;PD1600,0,1600,800,0,800,0,0;PU;SP2;PU400,400;PD1200,400;PU;',

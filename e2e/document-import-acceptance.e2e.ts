@@ -147,16 +147,31 @@ test('document valid HPGL retains ordered pen geometry through import and persis
   await saveReopenDocument(page, kerfdesk, info);
 });
 
-test('document legacy Illustrator rejection keeps the document and history unchanged', async ({
+test('document legacy Illustrator 3 artwork imports as editable paths through Undo and reopen', async ({
+  page,
+  kerfdesk,
+}, info) => {
+  // PostScript-based .ai files run through the AI 3–8 reader (ADR-700).
+  await page.goto('/');
+  await importDocumentFile(page, kerfdesk, documentFile('illustrator-3.ai'));
+  await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible();
+  const state = await captureDocumentState(page, info, 'imported');
+  const object = state.project.scene.objects[0];
+  if (object?.kind !== 'imported-svg') throw new Error('Expected editable Illustrator paths');
+  expect(object.bounds.maxX - object.bounds.minX).toBeCloseTo(25.4, 1);
+  expect(object.bounds.maxY - object.bounds.minY).toBeCloseTo(12.7, 1);
+  await assertDocumentUndo(page, 1);
+  await saveReopenDocument(page, kerfdesk, info);
+});
+
+test('document PostScript with nothing drawn is rejected and keeps the document and history unchanged', async ({
   page,
   kerfdesk,
 }, info) => {
   await page.goto('/');
   const before = await composedSvgSnapshot(page);
   await importDocumentFile(page, kerfdesk, documentFile('legacy.ai'));
-  await expect(
-    page.getByText(/This Illustrator file has no PDF-compatible document/),
-  ).toBeVisible();
+  await expect(page.getByText(/legacy\.ai: No drawable paths were found/)).toBeVisible();
   expect(await composedSvgSnapshot(page)).toEqual(before);
   await page.screenshot({ path: info.outputPath('rejected.png') });
 });

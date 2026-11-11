@@ -189,6 +189,62 @@ describe('preparation controller position identity', () => {
   });
 });
 
+// ADR-565 Amendment 1: a Frame held through an app-owned XY jog compares
+// everything except the head's X and Y.
+describe('controller identity that ignores only the head XY', () => {
+  const afterXyMove = (before: LaserState, after: Partial<LaserState>) =>
+    controllerStartPreparationStillCurrent(
+      before,
+      { ...before, ...after },
+      { ...options, ignoreXyPosition: true },
+    );
+
+  it('accepts a moved X and Y, which the strict comparison rejects', () => {
+    const before = fresh();
+    const moved = { statusReport: report('<Idle|MPos:131.000,2.000,3.000>') };
+    expect(current(before, moved)).toBe(false);
+    expect(afterXyMove(before, moved)).toBe(true);
+  });
+
+  it('rejects any Z movement, in either reported position', () => {
+    const before = fresh({ wcoCache: OFFSET, workOriginActive: true, workOriginSource: 'g92' });
+    expect(afterXyMove(before, { statusReport: report('<Idle|MPos:131,2,3.001>') })).toBe(false);
+    // WPos Z 7 is MPos Z 3 under the -4 offset; 7.002 is a real Z move.
+    expect(afterXyMove(before, { statusReport: report('<Idle|WPos:121,-18,7>') })).toBe(true);
+    expect(afterXyMove(before, { statusReport: report('<Idle|WPos:121,-18,7.002>') })).toBe(false);
+    expect(
+      afterXyMove(before, { statusReport: report('<Idle|MPos:131,2,3|WPos:121,-18,8>') }),
+    ).toBe(false);
+  });
+
+  it('keeps the controller state, session, origin, units and CNC Z evidence bound', () => {
+    const before = fresh({
+      statusReport: report('<Idle|MPos:0,0,0>'),
+      wcoCache: ZERO,
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 0 },
+    });
+    const moved = report('<Idle|MPos:40,30,0>');
+    expect(afterXyMove(before, { statusReport: moved })).toBe(true);
+    for (const patch of [
+      { controllerSessionEpoch: before.controllerSessionEpoch + 1 },
+      { trustedPositionEpoch: (before.trustedPositionEpoch ?? 0) + 1 },
+      { workOriginActive: true },
+      { workOriginSource: 'unknown' as const },
+      { workZReferenceEpoch: before.workZReferenceEpoch + 1 },
+      { workZZeroEvidence: null },
+      { controllerSettings: { reportInches: true } },
+      { wcoCache: { x: 0.001, y: 0, z: 0 } },
+      { wcoCache: OFFSET },
+    ]) {
+      expect(afterXyMove(before, { statusReport: moved, ...patch })).toBe(false);
+    }
+    expect(afterXyMove(before, { statusReport: null })).toBe(false);
+    expect(afterXyMove(before, { statusReport: report('<Idle>') })).toBe(false);
+    expect(afterXyMove(before, { statusReport: report('<Jog|MPos:40,30,0>') })).toBe(false);
+    expect(afterXyMove(before, { statusReport: report('<Alarm|MPos:40,30,0>') })).toBe(false);
+  });
+});
+
 describe('equivalent position reports during owned background preparation', () => {
   const start = () => {
     vi.stubGlobal('Worker', ControlledWorker);

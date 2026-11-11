@@ -7,7 +7,7 @@
 
 import { useEffect } from 'react';
 import { warpDeformHandlesUnmoved } from '../../core/geometry/warp-deform-map';
-import { isEditableShortcutTarget } from '../common/keyboard-targets';
+import { focusedControlOwnsKey } from '../common/keyboard-targets';
 import { isModalOpen, useUiStore } from '../state/ui-store';
 import { useActiveWarpDeformSession } from './use-warp-deform-preview';
 import {
@@ -72,7 +72,7 @@ function useWarpDeformKeys(active: boolean): void {
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key !== 'Enter' && event.key !== 'Escape') return;
       if (event.ctrlKey || event.metaKey || event.altKey) return;
-      if (isModalOpen(useUiStore.getState()) || isEditableShortcutTarget(event.target)) return;
+      if (isModalOpen(useUiStore.getState()) || focusedControlOwnsKey(event)) return;
       // A focused hint button answers Enter itself.
       if (event.key === 'Enter' && insideHint(event.target)) return;
       event.preventDefault();

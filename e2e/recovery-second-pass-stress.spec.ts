@@ -281,15 +281,19 @@ test('offers darkening once per completion, closes on Escape, re-offers after Ru
 
   const runAgain = page.getByRole('button', { name: 'Run same job again from start', exact: true });
   // ADR-565: clean completion retains the unchanged physical footprint.
-  // Replay still reviews and claims its own exact executable program.
+  // Replay still claims its own exact executable program. The job is unchanged
+  // and was reviewed at its Start in this session, so the press starts it with
+  // no Job Review (ADR-237 Amendment 3): the helper presses Run again and then
+  // answers the Start handoff, which would never come behind an open dialog.
   await expect(runAgain).toBeEnabled();
   baselineLines = serialWriteLineCount(await kerfdesk.events());
-  await runAgain.click();
-  await confirmJobReview(
-    page,
-    kerfdesk,
-    page.getByRole('dialog', { name: /^Review/ }).getByRole('button', { name: /^Start/ }),
-  );
+  await confirmJobReview(page, kerfdesk, runAgain);
+  await expect(page.getByRole('dialog', { name: /^Review/ })).toHaveCount(0);
+  await expect(
+    page.getByRole('button', {
+      name: /^Dismiss info notification: Running the same reviewed job again/,
+    }),
+  ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   await expect(complete).toHaveCount(0);
   await drainHeldSerialWrites(page, kerfdesk, baselineLines, 400);
