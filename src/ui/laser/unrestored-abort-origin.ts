@@ -208,8 +208,8 @@ export function abortTurnOfferNote(
   if (rotaryStartTurnStale(useLaserStore.getState(), turn)) {
     return (
       '\n\nOn the rotary, the controller has restarted since the job you stopped, so KerfDesk ' +
-      'no longer knows the turn it started from. OK does not turn the part: turn it back to where ' +
-      'that job started by hand, or set it up again.'
+      `no longer knows the turn it started from. "${button}" does not turn the part: turn it ` +
+      'back to where that job started by hand, or set it up again.'
     );
   }
   const since = rotaryTurnSinceStart(useLaserStore.getState(), turn);

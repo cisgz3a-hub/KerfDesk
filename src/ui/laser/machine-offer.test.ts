@@ -229,7 +229,7 @@ describe('the offers’ wording', () => {
   // Other branches call this with the turn alone; that shape still works and
   // names the button this machine's offer shows.
   it('names the restore button in the rotary note, with or without being told it', () => {
-    const turn = { axis: 'A', machine: 0 } as const;
+    const turn = { axis: 'A', machine: 0, machineZeroEpoch: 0 } as const;
 
     expect(abortTurnOfferNote(undefined)).toBe('');
     expect(abortTurnOfferNote(turn)).toContain(
@@ -239,6 +239,10 @@ describe('the offers’ wording', () => {
       '"Home and restore origin" also turns it back to where the job started.',
     );
     expect(abortTurnOfferNote(turn)).not.toMatch(/\bOK\b/);
+    // After a controller restart the note names the button too (ADR-695 Amd 2).
+    const stale = { ...turn, machineZeroEpoch: -1 };
+    expect(abortTurnOfferNote(stale)).toContain('"Restore origin" does not turn the part');
+    expect(abortTurnOfferNote(stale)).not.toMatch(/\bOK\b/);
   });
 
   // ADR-367: the offers are deliberate. Their safety sentences are unchanged.
