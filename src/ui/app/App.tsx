@@ -4,7 +4,7 @@
 // thin layout shell.
 
 import { useMemo } from 'react';
-import { ConfirmSaveDialog, SaveFilenamePanel, StatusBar, Toasts } from '../common';
+import { AppDialogHost, ConfirmSaveDialog, SaveFilenamePanel, StatusBar, Toasts } from '../common';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { ArtworkCreationHost } from '../layers/ArtworkCreationHost';
 import { ProjectSheetsBar } from '../commands/ProjectSheetsBar';
@@ -142,6 +142,9 @@ function AppWorkspace(): JSX.Element {
       <TutorialHost />
       <FirstJobGuideHost />
       <RemotePairingHost />
+      {/* Last of the dialogs: a question asked from inside another dialog must
+          paint above it and be the topmost modal (ADR-707). */}
+      <AppDialogHost />
       <WorkspaceLifecycle />
     </div>
   );

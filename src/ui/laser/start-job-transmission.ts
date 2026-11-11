@@ -1,7 +1,6 @@
 import { streamingModeForController } from '../../core/devices';
 import type { WorkStepsRunner } from '../../core/recovery/work-steps';
 import type { MachineKind, OutputScope, Project } from '../../core/scene';
-import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { StartJobOptions, useLaserStore } from '../state/laser-store';
 import type { createRunId, LastCompletedReceipt, RecoveryRepository } from '../state/recovery';
 import type { CncSetupAttestation } from '../state/cnc-setup-attestation';
@@ -22,10 +21,10 @@ import {
   type StartAuthorizationRefusal,
 } from './start-job-authorization';
 import {
+  reportRefusedStart,
   reportStartAuthorizationRefusal,
   startAuthorizationRefusalMessage,
 } from './start-job-authorization-reporting';
-import { reportStartBlockers } from './start-blocker-invalidation';
 import type { FramedRunStartClaim } from './framed-run-start-claim';
 import { assertMachineExecutionOwner } from '../state/machine-execution-owner';
 import type { FramedStartOptions } from './framed-start-options';
@@ -128,8 +127,7 @@ export async function transmitPreparedStart(input: {
       return false;
     }
     const message = error instanceof Error ? error.message : String(error);
-    reportStartBlockers([message]);
-    jobAwareAlert(`Could not start job:\n\n${message}`);
+    reportRefusedStart('Could not start job', message);
     return false;
   } finally {
     retention.stop();

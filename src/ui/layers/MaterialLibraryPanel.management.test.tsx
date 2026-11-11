@@ -10,7 +10,11 @@ import {
   type MaterialPreset,
 } from '../../io/material-library';
 import { PlatformProvider } from '../app/platform-context';
+import { createStreamer, step } from '../../core/controllers/grbl';
 import { useStore } from '../state';
+import { answerAppDialogs, clearAppDialogs } from '../state/app-dialog-test-helpers';
+import { JOB_ACTIVE_CONFIRM_BLOCKED } from '../state/job-aware-dialogs';
+import { useLaserStore } from '../state/laser-store';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { MaterialLibraryPanel } from './MaterialLibraryPanel';
@@ -21,6 +25,7 @@ import { MaterialLibraryPanel } from './MaterialLibraryPanel';
 
 afterEach(() => {
   resetStore();
+  clearAppDialogs();
   useToastStore.setState({ toasts: [] });
   vi.restoreAllMocks();
 });
@@ -177,7 +182,8 @@ describe('MaterialLibraryPanel preset management', () => {
           preset({ id: 'walnut-2mm-engrave', materialName: 'Walnut', thicknessMm: 2 }),
         ]),
       );
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const native = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const answers = answerAppDialogs(() => true);
     const { host, root } = await renderPanel();
     try {
       await act(async () => {
@@ -188,26 +194,64 @@ describe('MaterialLibraryPanel preset management', () => {
         'walnut-2mm-engrave',
       ]);
       expect(useStore.getState().materialLibraryDirty).toBe(true);
-      expect(confirm).toHaveBeenCalledWith('Delete preset "Birch plywood - 3 mm"?');
+      expect(native).not.toHaveBeenCalled();
+      expect(answers.asked.map((request) => request.options)).toEqual([
+        {
+          title: 'Delete preset?',
+          message: 'Delete preset "Birch plywood - 3 mm" from this material library?',
+          confirmLabel: 'Delete',
+          tone: 'danger',
+        },
+      ]);
       expect(host.textContent).toContain('Preset deleted.');
     } finally {
+      answers.stop();
       await unmount(root, host);
     }
   });
 
-  it('keeps a selected material preset when delete confirmation is cancelled', async () => {
+  // Annoyance audit A1-P2-4: during a job this was refused with "A job is
+  // running — stop it before discarding or replacing work." and then
+  // "Delete cancelled.", though nobody had cancelled.
+  it('can delete a material preset while a job is running', async () => {
     useStore.getState().setMaterialLibrary(library([preset({ id: 'birch-3mm-cut' })]));
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    useLaserStore.setState({ streamer: step(createStreamer('G1 X1 S100')).state });
+    const answers = answerAppDialogs(() => true);
     const { host, root } = await renderPanel();
     try {
       await act(async () => {
         button(host, 'Delete selected material preset').click();
       });
 
+      expect(answers.asked).toHaveLength(1);
+      expect(useStore.getState().materialLibrary?.entries).toEqual([]);
+      expect(host.textContent).toContain('Preset deleted.');
+      expect(host.textContent).not.toContain('Delete cancelled.');
+      expect(useToastStore.getState().toasts.map((toast) => toast.message)).not.toContain(
+        JOB_ACTIVE_CONFIRM_BLOCKED,
+      );
+    } finally {
+      answers.stop();
+      useLaserStore.setState({ streamer: null });
+      await unmount(root, host);
+    }
+  });
+
+  it('keeps a selected material preset when delete confirmation is cancelled', async () => {
+    useStore.getState().setMaterialLibrary(library([preset({ id: 'birch-3mm-cut' })]));
+    const answers = answerAppDialogs(() => false);
+    const { host, root } = await renderPanel();
+    try {
+      await act(async () => {
+        button(host, 'Delete selected material preset').click();
+      });
+
+      expect(answers.asked).toHaveLength(1);
       expect(useStore.getState().materialLibrary?.entries).toHaveLength(1);
       expect(useStore.getState().materialLibraryDirty).toBe(false);
       expect(host.textContent).toContain('Delete cancelled.');
     } finally {
+      answers.stop();
       await unmount(root, host);
     }
   });

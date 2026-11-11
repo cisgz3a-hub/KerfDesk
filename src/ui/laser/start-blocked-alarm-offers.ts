@@ -7,12 +7,16 @@
 // those out). Frame job reaches it through frame-blocker-repair; Start and Run
 // again make no offers, since they only stream a Frame's permit (ADR-372 and
 // its Amendment 1).
+//
+// Each offer is an in-app question whose button names the action (ADR-707,
+// machine-offer.ts). The *_PROMPT texts are the safety wording the native
+// boxes carried, without the "OK: … Cancel: …" lines that explained them.
 
 import { useStore } from '../state';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { isProbeFailureAlarm } from '../state/probe-failure-alarm';
 import { useToastStore } from '../state/toast-store';
+import { askMachineOffer } from './machine-offer';
 import { repairFailed, settleThenRetry, type BlockedStartRepair } from './start-blocked-repair';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-input';
 import { ALARM_ACTIVE_START_MESSAGE, machineNotIdleStartMessage } from './start-machine-refusals';
@@ -21,9 +25,7 @@ export const UNLOCK_OFFER_PROMPT =
   'The controller is in Alarm.\n\n' +
   'Unlock clears the alarm WITHOUT re-establishing position — only continue if the head ' +
   'is safe where it is. Afterwards, jog the head to where the job should start and click ' +
-  '"Set origin here" before framing.\n\n' +
-  'OK: unlock now.\n' +
-  'Cancel: leave it blocked.';
+  '"Set origin here" before framing.';
 
 export const UNLOCKED_NEXT_STEP_MESSAGE =
   'Alarm cleared. Jog the head to where the job should start, click "Set origin here", then ' +
@@ -36,15 +38,13 @@ export const PROBE_UNLOCK_OFFER_PROMPT =
   'Unlock clears the alarm. A failed probe keeps the machine position and the work ' +
   'origin, so Frame can continue. Only continue if the head is safe where it is and the ' +
   'touch plate is out of the way.\n\n' +
-  'OK: unlock now and continue when the controller is Idle.\n' +
-  'Cancel: leave it blocked.';
+  'Frame continues when the controller is Idle.';
 
 export const HOME_OFFER_PROMPT =
   'The controller is in Alarm.\n\n' +
   'Home runs the homing cycle to re-establish machine position. Make sure the machine ' +
   'is clear before it moves.\n\n' +
-  'OK: home now and continue when the cycle finishes.\n' +
-  'Cancel: leave it blocked.';
+  'Frame continues when the cycle finishes.';
 
 // A job placed at the head's current position is anchored wherever the head is
 // when it is framed, and the homing cycle parks the head at the switches.
@@ -53,9 +53,12 @@ export const HOME_OFFER_CURRENT_POSITION_PROMPT =
   'Home runs the homing cycle to re-establish machine position. Make sure the machine ' +
   'is clear before it moves.\n\n' +
   'This job starts where the head is, and homing moves the head, so framing stops after ' +
-  'the cycle: jog the head back to where the job should start, then Frame again.\n\n' +
-  'OK: home now.\n' +
-  'Cancel: leave it blocked.';
+  'the cycle: jog the head back to where the job should start, then Frame again.';
+
+export const UNLOCK_OFFER_TITLE = 'Unlock the controller?';
+export const UNLOCK_OFFER_BUTTON = 'Unlock';
+export const HOME_OFFER_TITLE = 'Home the machine?';
+export const HOME_OFFER_BUTTON = 'Home now';
 
 export const HOMED_PLACE_HEAD_NEXT_STEP_MESSAGE =
   'Homed. This job starts where the head is: jog the head to where the job should start, ' +
@@ -112,9 +115,16 @@ async function offerUnlock(): Promise<BlockedStartRepair> {
   if (!laser.capabilities.unlock) return 'unrepaired';
   const keepsPosition =
     isProbeFailureAlarm(laser.alarmCode) && laser.positionEvidenceSuppressed !== true;
-  if (!jobAwareConfirm(keepsPosition ? PROBE_UNLOCK_OFFER_PROMPT : UNLOCK_OFFER_PROMPT)) {
-    return 'unrepaired';
-  }
+  const asked = alarmFacts(laser);
+  const accepted = await askMachineOffer(
+    {
+      title: UNLOCK_OFFER_TITLE,
+      message: keepsPosition ? PROBE_UNLOCK_OFFER_PROMPT : UNLOCK_OFFER_PROMPT,
+      confirmLabel: UNLOCK_OFFER_BUTTON,
+    },
+    (now) => sameAlarm(asked, now),
+  );
+  if (!accepted) return 'unrepaired';
   try {
     await useLaserStore.getState().unlockAlarm();
   } catch (cause) {
@@ -133,9 +143,18 @@ async function offerUnlock(): Promise<BlockedStartRepair> {
 
 async function offerHomeCycle(): Promise<BlockedStartRepair> {
   const placedAtHead = useStore.getState().jobPlacement.startFrom === 'current-position';
-  if (!jobAwareConfirm(placedAtHead ? HOME_OFFER_CURRENT_POSITION_PROMPT : HOME_OFFER_PROMPT)) {
-    return 'unrepaired';
-  }
+  const asked = alarmFacts(useLaserStore.getState());
+  const accepted = await askMachineOffer(
+    {
+      title: HOME_OFFER_TITLE,
+      message: placedAtHead ? HOME_OFFER_CURRENT_POSITION_PROMPT : HOME_OFFER_PROMPT,
+      confirmLabel: HOME_OFFER_BUTTON,
+    },
+    (now) =>
+      sameAlarm(asked, now) &&
+      (useStore.getState().jobPlacement.startFrom === 'current-position') === placedAtHead,
+  );
+  if (!accepted) return 'unrepaired';
   try {
     // GRBL acks $H only after the physical cycle completes, so this await
     // spans the whole homing run.
@@ -154,5 +173,30 @@ async function offerHomeCycle(): Promise<BlockedStartRepair> {
     (state) => state.alarmCode === null && state.statusReport?.state === 'Idle',
     'Homing complete.',
     'Homed. Try again once the controller reports Idle.',
+  );
+}
+
+// What an alarm offer described. The question stays open with the page live,
+// so its yes counts only while these still hold (machine-offer.ts).
+type AlarmFacts = {
+  readonly alarmCode: LaserState['alarmCode'];
+  readonly controllerState: string | null;
+  readonly positionEvidenceSuppressed: boolean;
+};
+
+function alarmFacts(laser: LaserState): AlarmFacts {
+  return {
+    alarmCode: laser.alarmCode,
+    controllerState: laser.statusReport?.state ?? null,
+    positionEvidenceSuppressed: laser.positionEvidenceSuppressed === true,
+  };
+}
+
+function sameAlarm(asked: AlarmFacts, now: LaserState): boolean {
+  const current = alarmFacts(now);
+  return (
+    current.alarmCode === asked.alarmCode &&
+    current.controllerState === asked.controllerState &&
+    current.positionEvidenceSuppressed === asked.positionEvidenceSuppressed
   );
 }
