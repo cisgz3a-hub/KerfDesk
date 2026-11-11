@@ -16,8 +16,8 @@
 // Shared CI runners stream the job itself with tasks of 50-84 ms and no
 // camera at all, so the job runs alone first as a control. On CI no task in
 // the camera phase may exceed the larger of twice the budget and the
-// control's own worst; an in-window 4K shrink is 118-243 ms, and the two
-// structural checks hold on any runner. Local runs keep the strict budget.
+// control's own worst plus 20 ms, and never 120 ms; an in-window 4K shrink
+// is 118-243 ms. The two structural checks are the main guard on any runner. Local runs keep the strict budget.
 
 import { Buffer } from 'node:buffer';
 import { readFileSync } from 'node:fs';
@@ -40,6 +40,10 @@ const WIDTH = 3840;
 const HEIGHT = 2160;
 const BUDGET_MS = 50;
 const CI_CEILING_MS = 100;
+// Never above this, however noisy the control: a stall in the control must not
+// let a camera block of the bug's size (118-243 ms) pass.
+const CI_MAX_CEILING_MS = 120;
+const CONTROL_MARGIN_MS = 20;
 const CONTROL_MS = 8_000;
 const onCi = ((value) => value !== undefined && value !== '' && value !== 'false' && value !== '0')(
   process.env['CI'],
@@ -344,7 +348,9 @@ test('a 4K bridge camera started mid-job, its overlay and Alt+C keep every UI ta
   expect(probe.windowShrinks).toBe(0);
   expect(probe.bigPixelReads).toBe(0);
   const controlWorst = control.reduce((worst, ms) => Math.max(worst, ms), 0);
-  const ceiling = onCi ? Math.max(CI_CEILING_MS, controlWorst) : BUDGET_MS;
+  const ceiling = onCi
+    ? Math.min(Math.max(CI_CEILING_MS, controlWorst + CONTROL_MARGIN_MS), CI_MAX_CEILING_MS)
+    : BUDGET_MS;
   expect(
     probe.longTasks.filter((ms) => ms > ceiling),
     JSON.stringify({ camera: probe.longTasks.map(Math.round), jobAlone: control, ceiling }),

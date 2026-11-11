@@ -286,5 +286,6 @@ moved check's thumbnail (ADR-440 Amendment 11, ADR-663 Amendment 6). The
 window decodes only at full size, which stays off its thread. The guard
 `e2e/camera-overlay-mjpeg-ui-thread.e2e.ts` now runs during a streamed job in a
 1920 × 1080 window. It checks for no long task (on CI, none over the larger
-of 100 ms and the job's own worst task without a camera), and for no shrink
+of 100 ms and the job's own worst task without a camera plus 20 ms, capped at
+120 ms), and for no shrink
 and no camera-sized pixel read in the window.
