@@ -286,6 +286,11 @@ Verified end-to-end against scripted firmware simulators
   The buffered receive window is bounded by the capacity the controller reports
   (ADR-331). Policy findings are advisory in Job Review; completed Frame for the
   exact job remains the sole ordinary Start policy gate (ADRs 228/230/232/237).
+- **I.9 — Moshiboard** (ADR-705): EXPERIMENTAL live link over the CH341 USB bridge (ADR-702),
+  from MeerK40t's public Moshi module. Frame (a laser-off program), Start, Abort (estop) and Home
+  only; frame-first Start unchanged. No file export: no public Moshi file format exists. A
+  Moshiboard has no software power control, so layer power above 0 only switches the beam on.
+  Simulator-tested only; NOT qualified on hardware.
 
 **Qualification:** The 2026-09-19 audit found no reproducible physical evidence supporting
 the former Falcon hardware-verification claim. The catalogue now separates researched,

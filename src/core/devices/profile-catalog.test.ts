@@ -30,6 +30,7 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
       'generic-marlin-laser',
       'generic-smoothieware',
       'generic-ruida-rd-export',
+      'generic-moshiboard-usb',
     ]);
     for (const entry of GRBL_MACHINE_PROFILE_CATALOG) {
       expect(validateMachineProfile(entry.profile)).toEqual([]);
