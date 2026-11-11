@@ -1,8 +1,9 @@
-/* global console, Request */
+/* global console, Request, URL */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import worker, { LicenseAuthority } from './worker.mjs';
 import { authorityRequest, json } from './http.mjs';
+import { logRequest } from './request-log.mjs';
 import {
   adminRequest,
   deviceId,
@@ -226,6 +227,29 @@ test('one log line per request with route, status, code and time, and never a se
     'no-such',
   ])
     assert.equal(logged.includes(secret), false, secret);
+});
+
+test('a refund or chargeback webhook logs what it did to the licence, never "fulfilled"', async (t) => {
+  // O3-P3-3: every adjustment answer was logged as a fulfilled payment.
+  const lines = captureLogs(t);
+  const started = Date.now();
+  const hook = new Request('https://licensing.example/v1/payments/webhook', { method: 'POST' });
+  const url = new URL(hook.url);
+  for (const adjustment of ['revoked', 'review', 'deferred', 'restored', 'none', 'Odd value'])
+    await logRequest(hook, url, json({ received: true, adjustment }), started);
+  await logRequest(hook, url, json({ received: true, duplicate: false }), started);
+  assert.deepEqual(
+    lines.map((line) => line.outcome),
+    [
+      'adjustment-revoked',
+      'adjustment-review',
+      'adjustment-deferred',
+      'adjustment-restored',
+      'adjustment-none',
+      'adjustment',
+      'fulfilled',
+    ],
+  );
 });
 
 test('an unexpected fault logs its type as an error and never reaches the caller', async (t) => {

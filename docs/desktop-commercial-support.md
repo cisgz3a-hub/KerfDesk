@@ -307,9 +307,12 @@ computers drop Pro at their next check, within about a day. A computer kept
 offline, or one that blocks the licence service, keeps Pro until it next reaches
 the service, as with LightBurn (ADR-623 Amendment 2), so do not promise that it
 loses Pro. Partial refunds (a tax refund, say) and refunds of a renewal are only
-recorded for review: the lookup shows them under `payment-adjustment`. Decide
-those by hand with `POST /v1/admin/licenses/status`; a status you set by hand
-replaces the automatic one, so a later chargeback reversal never undoes it.
+recorded for review: the lookup lists them under `paymentAdjustments` with
+`outcome: review`. Decide those by hand with `POST /v1/admin/licenses/status`;
+a status you set by hand replaces the automatic one, so a later chargeback
+reversal never undoes it. A refund or chargeback that arrives while you have
+revoked the licence by hand is recorded for review too: check that list before
+you restore a licence.
 
 ### A licence key leaked
 
