@@ -193,21 +193,37 @@ function ringInfo(points: ReadonlyArray<GridPoint>, index: number): RingInfo {
   return { index, points, twiceArea: twiceSignedArea(points), minX, minY, maxX, maxY };
 }
 
+// Containment probes per ring and pass, spread evenly along it.
+const CONTAINMENT_PROBES = 15;
+
 /**
- * Whether `inner` lies inside `outer`: decided by the first vertex (then edge
- * midpoint) not on `outer`'s boundary; null when every probe is on it.
+ * Whether `inner` lies inside `outer`: decided by most of up to
+ * CONTAINMENT_PROBES vertices (then edge midpoints) not on `outer`'s boundary;
+ * an even split falls back to the first such probe; null when every probe is
+ * on it. One probe is not enough: grid snapping can push a single vertex of a
+ * hole a fraction of a grid step across a slanted parent edge, and if that is
+ * the probe, the hole is written as a filled polygon (audit O2-P1-2).
  */
 function ringInside(inner: RingInfo, outer: RingInfo): boolean | null {
   const n = inner.points.length;
+  const stride = Math.max(1, Math.floor(n / CONTAINMENT_PROBES));
   for (let pass = 0; pass < 2; pass += 1) {
-    for (let i = 0; i < n; i += 1) {
+    let inside = 0;
+    let outside = 0;
+    let first: boolean | null = null;
+    for (let i = 0; i < n; i += stride) {
       const a = inner.points[i] as GridPoint;
       const b = inner.points[(i + 1) % n] as GridPoint;
       // Midpoints in doubled coordinates keep the test in integers.
       const probe = pass === 0 ? { x: 2 * a.x, y: 2 * a.y } : { x: a.x + b.x, y: a.y + b.y };
       const side = classify(probe, outer.points);
-      if (side !== 'boundary') return side === 'inside';
+      if (side === 'boundary') continue;
+      if (side === 'inside') inside += 1;
+      else outside += 1;
+      first ??= side === 'inside';
     }
+    if (inside !== outside) return inside > outside;
+    if (first !== null) return first;
   }
   return null;
 }
