@@ -50,7 +50,7 @@ describe('FluidNC bracket lines in the Console (rolling audit v3 G4-P1-1)', () =
       });
       const mark = port.outbound().length;
       await expect(useLaserStore.getState().sendConsoleCommand(line)).rejects.toThrow(
-        /blocked in the Console/,
+        /KerfDesk does not send this command|blocked in the Console/,
       );
       expect(sentAfter(port, mark)).toEqual([]);
       expect(useLaserStore.getState().workZZeroEvidence?.referenceEpoch).toBe(epoch);

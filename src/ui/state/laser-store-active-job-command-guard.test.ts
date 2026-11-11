@@ -152,10 +152,10 @@ describe('laser-store active-job command guard', () => {
       } as Partial<ReturnType<typeof useLaserStore.getState>>);
       writes.length = 0;
 
-      await expect(runCommand()).rejects.toThrow(/operation is active/i);
+      await expect(runCommand()).rejects.toThrow(/jog or Frame is still running/i);
 
       expect(writes.some((line) => line.startsWith('$J='))).toBe(false);
-      expect(useLaserStore.getState().lastWriteError).toMatch(/operation is active/i);
+      expect(useLaserStore.getState().lastWriteError).toMatch(/jog or Frame is still running/i);
       expect(getMotionOperation()).toMatchObject({ kind: 'jog' });
     },
   );
@@ -189,10 +189,10 @@ describe('laser-store active-job command guard', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     writes.length = 0;
 
-    await expect(runCommand()).rejects.toThrow(/operation is active/i);
+    await expect(runCommand()).rejects.toThrow(/jog or Frame is still running/i);
 
     expect(writes).toEqual([]);
-    expect(useLaserStore.getState().lastWriteError).toMatch(/operation is active/i);
+    expect(useLaserStore.getState().lastWriteError).toMatch(/jog or Frame is still running/i);
     expect(getMotionOperation()).toMatchObject({ kind: 'jog' });
   });
 

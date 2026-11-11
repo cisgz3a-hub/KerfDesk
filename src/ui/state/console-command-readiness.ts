@@ -6,13 +6,18 @@ import {
   ACTIVE_JOB_COMMAND_MESSAGE,
   FIRE_ACTIVE_COMMAND_MESSAGE,
   MOTION_OPERATION_ACTIVE_MESSAGE,
-  UNKNOWN_IDLE_STATUS_MESSAGE,
   isActiveJob,
   mpgCommandBlockMessage,
 } from './laser-store-helpers';
 
 const CONSOLE_RESET_COMMANDS = new Set<string>(['M112', 'M999']);
 const CONSOLE_FAIL_OFF_SEQUENCE_PATTERN = /^(?:M5|M9)(?:\s+(?:M5|M9))*$/;
+
+/** What the Console says before any status report. The jog pad's own message
+ *  talks about jogging and framing, which a typed line is not (A3-P2-4). */
+export function consoleStatusUnknownMessage(states: ReadonlyArray<string> = ['Idle']): string {
+  return `Waiting for the controller to report its status. This command can be sent once it reports ${states.join(' or ')}.`;
+}
 
 /** Returns the factual transport or operation precondition blocking a console command. */
 export function consoleCommandBlockReason(
@@ -52,7 +57,7 @@ function consoleStateBlockReason(
     return consoleAllowedStateReason(report, command.allowedStates);
   }
   if (!command.requiresIdle) return null;
-  if (report === null) return UNKNOWN_IDLE_STATUS_MESSAGE;
+  if (report === null) return consoleStatusUnknownMessage();
   return report.state === 'Idle'
     ? null
     : `Machine must be Idle before sending this console command (currently ${report.state}).`;
@@ -65,7 +70,7 @@ export function consoleAllowedStateReason(
   report: LaserState['statusReport'],
   allowedStates: ReadonlyArray<string>,
 ): string | null {
-  if (report === null) return UNKNOWN_IDLE_STATUS_MESSAGE;
+  if (report === null) return consoleStatusUnknownMessage(allowedStates);
   if (allowedStates.includes(report.state)) return null;
   return `The controller accepts this command only in ${allowedStates.join(' or ')} (currently ${report.state}).`;
 }

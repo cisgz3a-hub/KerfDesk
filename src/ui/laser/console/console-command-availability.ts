@@ -1,14 +1,16 @@
 import type { ControllerDriver } from '../../../core/controllers';
 import { prepareBoardConsoleCommand } from '../../../core/controllers/board-console-command';
 import { consoleOwnedExchangeWaitReason } from '../../state/console-command-ownership';
-import { consoleAllowedStateReason } from '../../state/console-command-readiness';
+import {
+  consoleAllowedStateReason,
+  consoleStatusUnknownMessage,
+} from '../../state/console-command-readiness';
 import { controllerOperationCommandBlockMessage } from '../../state/laser-controller-operation';
 import type { LaserState } from '../../state/laser-store';
 import {
   ACTIVE_JOB_COMMAND_MESSAGE,
   FIRE_ACTIVE_COMMAND_MESSAGE,
   MOTION_OPERATION_ACTIVE_MESSAGE,
-  UNKNOWN_IDLE_STATUS_MESSAGE,
   isActiveJob,
 } from '../../state/laser-store-helpers';
 
@@ -59,7 +61,7 @@ export function consoleCommandDisabledReason(
     return consoleAllowedStateReason(state.statusReport, prepared.command.allowedStates);
   }
   if (!prepared.command.requiresIdle) return null;
-  if (state.statusReport === null) return UNKNOWN_IDLE_STATUS_MESSAGE;
+  if (state.statusReport === null) return consoleStatusUnknownMessage();
   if (state.statusReport.state !== 'Idle') {
     return `Machine must be Idle before sending this console command (currently ${state.statusReport.state}).`;
   }
