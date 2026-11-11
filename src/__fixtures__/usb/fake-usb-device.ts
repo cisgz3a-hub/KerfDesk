@@ -49,7 +49,11 @@ export function createFakeUsbDevice(script: FakeUsbScript = {}): FakeUsbDevice {
     info: script.info ?? DEFAULT_INFO,
     controlTransferOut: async (setup, data) => {
       live();
-      calls.push({ kind: 'control-out', setup, ...(data === undefined ? {} : { data: data.slice() }) });
+      calls.push({
+        kind: 'control-out',
+        setup,
+        ...(data === undefined ? {} : { data: data.slice() }),
+      });
       await script.controlOut?.(setup, data);
     },
     controlTransferIn: async (setup, length) => {
@@ -83,8 +87,7 @@ export function createFakeUsbDevice(script: FakeUsbScript = {}): FakeUsbDevice {
   return {
     session,
     calls,
-    writes: () =>
-      calls.flatMap((call) => (call.kind === 'out' ? [call.data] : [])),
+    writes: () => calls.flatMap((call) => (call.kind === 'out' ? [call.data] : [])),
     unplug: () => {
       closed = true;
       for (const handler of [...handlers]) handler();

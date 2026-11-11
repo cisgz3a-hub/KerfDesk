@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createFakeUsbDevice } from '../../../__fixtures__/usb/fake-usb-device';
 import { ch341EppFrame, CH341_USB_FILTER, openCh341Epp } from './ch341-epp';
 
-const range = (n: number, from = 0): Uint8Array => Uint8Array.from({ length: n }, (_, i) => from + i);
+const range = (n: number, from = 0): Uint8Array =>
+  Uint8Array.from({ length: n }, (_, i) => from + i);
 
 /** MeerK40t's CH341EppWrite loop (ch341/libusb.py L425-446), for comparison. */
 function meerk40tFrame(command: number, bytes: Uint8Array): number[] {
@@ -27,7 +28,9 @@ describe('CH341 EPP framing (ADR-702)', () => {
 
   it('writes the same bytes as MeerK40t for every length up to 62', () => {
     for (let n = 1; n <= 62; n += 1)
-      expect([...ch341EppFrame(0xa6, range(n))], `length ${n}`).toEqual(meerk40tFrame(0xa6, range(n)));
+      expect([...ch341EppFrame(0xa6, range(n))], `length ${n}`).toEqual(
+        meerk40tFrame(0xa6, range(n)),
+      );
   });
 
   it('never leaves a 32-byte packet without its prefix', () => {
@@ -45,7 +48,13 @@ describe('openCh341Epp', () => {
     expect(device.calls.slice(0, 2)).toEqual([
       {
         kind: 'control-out',
-        setup: { requestType: 'vendor', recipient: 'device', request: 0xb1, value: 0x0102, index: 0 },
+        setup: {
+          requestType: 'vendor',
+          recipient: 'device',
+          request: 0xb1,
+          value: 0x0102,
+          index: 0,
+        },
       },
       {
         kind: 'control-in',
