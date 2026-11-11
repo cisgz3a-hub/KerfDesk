@@ -122,6 +122,8 @@ export type PreflightCode =
   // ADR-695: the rotary's A or Z axis cannot be written for this controller,
   // or the program already uses that letter for something else.
   | 'rotary-axis-unexecutable'
+  // ADR-127 Amd 5: a Ruida rotary layer's speed classes leave a dose spread (advisory).
+  | 'rotary-rd-speed-classes'
   | 'cnc-tool-geometry-invalid'
   // Advisory-only: secondary CNC cutters share values established for the
   // layer's primary cutter and require explicit operator verification.

@@ -12,7 +12,11 @@ import {
   type FillSweep,
 } from './fill-sweeps';
 import type { FillGroup, FillSegment } from './job';
-import { shiftFillRunAlongTravel } from './scan-offset';
+import {
+  fillRunsBothWays,
+  scanRowShiftAlongTravelMm,
+  shiftFillRunAlongTravel,
+} from './scan-offset';
 
 /** Laser-off motion mode used to enter and leave a planned fill sweep. */
 export type FillRunwayMotion = 'rapid' | 'feed-matched';
@@ -117,11 +121,20 @@ function segmentsWithScanOffset(
   scanOffsetMm: number,
 ): ReadonlyArray<FillSegment> {
   if (scanOffsetMm === 0) return segments;
-  return segments.map((segment) => {
-    if (!segment.reverse) return segment;
-    const shifted = shiftFillRunAlongTravel(segment.polyline, scanOffsetMm);
-    return shifted === null ? segment : { ...segment, polyline: shifted };
-  });
+  const shiftMm = scanRowShiftAlongTravelMm(scanOffsetMm, fillRunsBothWays(segments));
+  if (shiftMm === 0) return segments;
+  return segments.map((segment) => shiftedFillSegment(segment, shiftMm) ?? segment);
+}
+
+/**
+ * One fill row moved `shiftMm` along its own travel (ADR-052 Amendment 2), or
+ * null when it has fewer than two points. A curve a rotary taper warp made of a
+ * row (ADR-694 Amendment 1) moves as one, along its first-to-last travel.
+ */
+export function shiftedFillSegment(segment: FillSegment, shiftMm: number): FillSegment | null {
+  const shifted = shiftFillRunAlongTravel(segment.polyline, shiftMm);
+  if (shifted === null) return null;
+  return shifted === segment.polyline ? segment : { ...segment, polyline: shifted };
 }
 
 /** Returns whether a fill group owns feed-matched runway motion. */

@@ -27,7 +27,12 @@ import {
   scanRectMachineCorners,
   type ScanRect,
 } from '../raster/raster-scan-frame';
-import { offsetForEmittedFeed } from './scan-offset';
+import {
+  fillRunsBothWays,
+  offsetForEmittedFeed,
+  rasterRowShiftX,
+  scanRowShiftAlongTravelMm,
+} from './scan-offset';
 
 export type JobBounds = {
   readonly minX: number;
@@ -48,10 +53,9 @@ export function computeJobBounds(job: Job, device?: DeviceProfile): JobBounds | 
 }
 
 /** Job Origin anchor bounds (ADR-052 Amendment 1). Scan-offset compensation
- * moves commanded reverse rows so they burn on top of the forward rows, so
- * placement measures those rows at design: a table never moves the placed job,
- * its forward rows or its vector cuts. Motion, burn and Frame bounds keep the
- * commanded shift. A CNC group anchors on its artwork, not its cutter's reach
+ * moves commanded rows so they burn on the design (Amendment 2), so placement
+ * measures those rows at design: a table never moves the placed job or its
+ * vector cuts. Motion, burn and Frame bounds keep the commanded shift. A CNC group anchors on its artwork, not its cutter's reach
  * (ADR-327 Amendment 1); every other bound keeps the reach. */
 export function computeJobPlacementBounds(job: Job, device?: DeviceProfile): JobBounds | null {
   return computeBounds(job, false, device, false, 'design');
@@ -239,10 +243,12 @@ function extendBoundsForFill(
   let any = usesPlannedBurnBounds ? false : extendBoundsForPolylines(b, group);
   const scanOffsetMm = groupScanOffsetMm(group, device, reverseRows);
   const plans = planFillSweeps(group, scanOffsetMm);
+  // ADR-052 Amendment 2: every row of a two-way fill moves, not only reverse rows.
+  const rowsMove = scanRowShiftAlongTravelMm(scanOffsetMm, fillRunsBothWays(group.segments)) !== 0;
   for (const plan of plans) {
     const sweep = plan.sweep;
     const spans = sweep.spans;
-    if (usesPlannedBurnBounds || (sweep.reverse && scanOffsetMm !== 0)) {
+    if (usesPlannedBurnBounds || rowsMove) {
       for (const span of spans) {
         for (const point of fillSpanPoints(span)) extendBoundsForPoint(b, point);
         any = true;
@@ -273,13 +279,21 @@ function extendBoundsForRaster(
   reverseRows: ReverseRows,
 ): boolean {
   const scanOffsetMm = groupScanOffsetMm(group, device, reverseRows);
-  const reverseShiftX = hasActiveReverseRasterRow(group) ? -scanOffsetMm : 0;
+  const bidirectional = group.bidirectional ?? true;
+  const active = hasActiveRasterPixel(group);
+  // ADR-052 Amendment 2: forward rows move one way, reverse rows the other.
+  const rowShifts = [
+    ...(active ? [rasterRowShiftX(scanOffsetMm, false, bidirectional)] : []),
+    ...(hasActiveReverseRasterRow(group)
+      ? [rasterRowShiftX(scanOffsetMm, true, bidirectional)]
+      : []),
+  ].filter((shiftX) => shiftX !== 0);
   const rects: ScanRect[] = [group.bounds];
-  if (reverseShiftX !== 0) rects.push(shiftedScanRect(group.bounds, 0, reverseShiftX));
-  if (includeOverscanMotion && hasActiveRasterPixel(group)) {
+  for (const shiftX of rowShifts) rects.push(shiftedScanRect(group.bounds, 0, shiftX));
+  if (includeOverscanMotion && active) {
     rects.push(shiftedScanRect(group.bounds, group.overscanMm, 0));
-    if (reverseShiftX !== 0) {
-      rects.push(shiftedScanRect(group.bounds, group.overscanMm, reverseShiftX));
+    for (const shiftX of rowShifts) {
+      rects.push(shiftedScanRect(group.bounds, group.overscanMm, shiftX));
     }
   }
   const frame = rasterScanFrame(group.scanAngleDeg);

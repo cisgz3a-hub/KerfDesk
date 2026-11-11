@@ -105,6 +105,28 @@ describe('the rotary turn after an Abort', () => {
   );
 
   it(
+    'waits for a slow A axis held to its $113 rate (Z4-P3-1)',
+    async () => {
+      // 180° at $113=500 °/min takes 21.6 s; at the 1500 jog feed it would be 7.2 s.
+      const h = await harness({
+        simulator: { ...GRBLHAL_A, motionMs: 21_600, settings: [[113, '500']] },
+        project: square(A_ROTARY, 'grblhal'),
+      });
+      expect(useLaserStore.getState().controllerSettings?.maxRateA).toBe(500);
+      await drive(useLaserStore.getState().jog({ da: 180, feed: 1500 }), 30_000);
+      await tick(23_000);
+      expect(h.simulator.state().aAxis?.mpos).toBeCloseTo(180, 3);
+
+      await drive(
+        turnRotaryBackToJobStart({ axis: 'A', machine: 0, machineZeroEpoch: epoch() }),
+        40_000,
+      );
+      expect(h.simulator.state().aAxis?.mpos).toBeCloseTo(0, 3);
+    },
+    STRESS_TIMEOUT_MS,
+  );
+
+  it(
     'never jogs to a turn saved before a controller restart (Z2-P1-1)',
     async () => {
       const h = await harness({ simulator: GRBLHAL_A, project: square(A_ROTARY, 'grblhal') });

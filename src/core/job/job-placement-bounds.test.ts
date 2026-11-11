@@ -70,10 +70,9 @@ describe('computeJobPlacementBounds', () => {
 
     expect(computeJobPlacementBounds(rasterJob(), device)).toEqual(design);
     expect(computeJobPlacementBounds(rasterJob(offsetMm), DEFAULT_DEVICE_PROFILE)).toEqual(design);
-    // Burn bounds keep the commanded reverse row: -0.25 left, or +0.25 right.
-    expect(computeJobBounds(rasterJob(), device)).toEqual(
-      offsetMm > 0 ? { ...design, minX: -0.25 } : { ...design, maxX: 2.25 },
-    );
+    // Burn bounds keep the commanded rows, each half the table value off the
+    // design (ADR-052 Amendment 2): forward and reverse rows straddle it.
+    expect(computeJobBounds(rasterJob(), device)).toEqual({ ...design, minX: -0.125, maxX: 2.125 });
   });
 
   it.each([0.5, -0.5])('keeps fill sweeps at design with a %s mm table', (offsetMm) => {
@@ -82,9 +81,7 @@ describe('computeJobPlacementBounds', () => {
 
     expect(computeJobPlacementBounds(fillJob(), device)).toEqual(design);
     expect(computeJobPlacementBounds(fillJob(offsetMm), DEFAULT_DEVICE_PROFILE)).toEqual(design);
-    // The reverse sweep travels -X: +0.5 commands it 0.5 left, -0.5 0.5 right.
-    expect(computeJobBounds(fillJob(), device)).toEqual(
-      offsetMm > 0 ? { ...design, minX: 4.5 } : { ...design, maxX: 10.5 },
-    );
+    // Forward and reverse sweeps each move 0.25 mm, one each way (ADR-052 Amendment 2).
+    expect(computeJobBounds(fillJob(), device)).toEqual({ ...design, minX: 4.75, maxX: 10.25 });
   });
 });

@@ -131,7 +131,7 @@ export const CALIBRATION_TUTORIALS: readonly Tutorial[] = [
         result: 'The verification status records your physical check of the saved correction.',
       },
     ],
-    tip: 'KerfDesk full gap moves reverse rows while forward rows stay anchored. Check the measurement sign and absolute placement as well as the apparent gap.',
+    tip: 'KerfDesk full gap moves each row half the gap, forward rows one way and reverse rows the other, as LightBurn does. Check the measurement sign and absolute placement as well as the apparent gap.',
     keywords: [
       'scan offset',
       'bidirectional',

@@ -21,6 +21,7 @@ import { machineKindOf } from '../../core/scene';
 import { isEditableShortcutTarget } from '../common/keyboard-targets';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import { activeLinkMachineWork } from '../state/link-machine-work';
 import { unownedControllerMotion } from '../state/unowned-controller-motion';
 import { turnUnownedOutputOff, unownedControllerOutput } from '../state/unowned-controller-output';
 import { useStore } from '../state';
@@ -93,6 +94,10 @@ function stopShortcutAction(
   laser: LaserSnapshot,
 ): { readonly label: string; readonly run: () => Promise<void> } | null {
   if (isActiveJob(laser.streamer)) return { label: 'Abort', run: () => laser.stopJob() };
+  // A Moshi or Ruida link job: its own stop, as the Live Motion bar offers it
+  // (code quality audit C2 D1-P2-5; ADR-705 Amendment 3).
+  const link = activeLinkMachineWork();
+  if (link !== null) return { label: 'Abort', run: link.abort };
   if (laser.controllerOperation !== null) {
     return { label: 'Abort motion', run: () => laser.stopJob() };
   }

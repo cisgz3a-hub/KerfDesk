@@ -154,8 +154,8 @@ function CalibrationFeedback(props: {
       ) : (
         <p style={guidanceStyle}>
           After burning: measure the full signed forward-versus-reverse separation. Do not divide
-          the measurement in half. KerfDesk moves reverse rows only. Swatch labels show the emitted
-          speed after the profile ceiling and G-code rounding are applied.
+          the measurement in half. KerfDesk moves each row half of it, as LightBurn does. Swatch
+          labels show the emitted speed after the profile ceiling and G-code rounding are applied.
         </p>
       )}
     </>

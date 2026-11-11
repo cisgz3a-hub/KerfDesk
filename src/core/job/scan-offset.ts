@@ -102,11 +102,41 @@ export function offsetForEmittedFeed(
 }
 
 /**
+ * How far a scan row of a bidirectional sweep moves along its own travel
+ * (ADR-052 Amendment 2). Firing lag and drive slack displace every row along
+ * its own travel, forward rows one way and reverse rows the other, so the
+ * calibrated forward-to-reverse separation is twice each row's displacement.
+ * Moving every row half the separation puts both directions back on the
+ * design, as LightBurn does: "LightBurn moves each line by the amount you
+ * specify, so each pair of lines only needs to move half the distance". Moving
+ * reverse rows only (ADR-052 as first written) registered them on the forward
+ * rows, which stood half the separation off the design and off every vector cut.
+ * A unidirectional sweep is not moved.
+ */
+export function scanRowShiftAlongTravelMm(offsetMm: number, bidirectional: boolean): number {
+  return bidirectional && offsetMm !== 0 ? offsetMm / 2 : 0;
+}
+
+/** The same shift along the scan frame's X for one raster row. */
+export function rasterRowShiftX(
+  offsetMm: number,
+  reverse: boolean,
+  bidirectional: boolean,
+): number {
+  const along = scanRowShiftAlongTravelMm(offsetMm, bidirectional);
+  return reverse ? -along : along;
+}
+
+/** A fill runs both ways when its hatch carries any reverse row. */
+export function fillRunsBothWays(segments: ReadonlyArray<{ readonly reverse: boolean }>): boolean {
+  return segments.some((segment) => segment.reverse);
+}
+
+/**
  * Translate a sweep's endpoints by `offsetMm` along its own travel direction
- * (`from` -> `to`). Applied to reverse rows only, this slides the lagging row
- * back into registration with the forward rows; because the shift follows the
- * travel vector, it stays correct at any hatch angle. Returns the inputs
- * unchanged when there is nothing to do (zero offset or zero-length sweep).
+ * (`from` -> `to`); because the shift follows the travel vector, it stays
+ * correct at any hatch angle. Returns the inputs unchanged when there is
+ * nothing to do (zero offset or zero-length sweep).
  */
 export function shiftAlongTravel(
   from: Vec2,
@@ -138,6 +168,8 @@ export function shiftFillRunAlongTravel(
   if (from === undefined || to === undefined || points.length < 2) return null;
   if (offsetMm === 0) return points;
   const shifted = shiftAlongTravel(from, to, offsetMm);
+  // A straight row keeps exactly the ends shiftAlongTravel gives, byte for byte.
+  if (points.length === 2) return [shifted.from, shifted.to];
   const dx = shifted.from.x - from.x;
   const dy = shifted.from.y - from.y;
   return points.map((point) => ({ x: point.x + dx, y: point.y + dy }));

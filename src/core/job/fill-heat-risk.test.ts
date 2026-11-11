@@ -3,7 +3,8 @@ import { analyzeFillHeatRisk } from './fill-heat-risk';
 import type { FillGroup, FillSegment, Job } from './job';
 
 const BURN_FEED_MM_PER_MIN = 1500;
-const COLLAPSING_SCAN_OFFSET_MM = 0.0008;
+// Each row moves half the table value (ADR-052 Amendment 2).
+const COLLAPSING_SCAN_OFFSET_MM = 0.0016;
 
 function sweep(y: number, length: number): FillSegment {
   return {

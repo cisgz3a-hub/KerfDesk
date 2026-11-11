@@ -30,6 +30,8 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
       'generic-marlin-laser',
       'generic-smoothieware',
       'generic-ruida-rd-export',
+      'k40-lihuiyu-m2-nano',
+      'k40-lihuiyu-m3-nano-pwm',
       'generic-moshiboard-usb',
     ]);
     for (const entry of GRBL_MACHINE_PROFILE_CATALOG) {

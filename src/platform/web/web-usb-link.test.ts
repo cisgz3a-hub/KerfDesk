@@ -93,6 +93,17 @@ describe('WebUSB laser link (ADR-702)', () => {
     expect(device.close).toHaveBeenCalled();
   });
 
+  it('closes an opened device whose configuration cannot be selected (C2 D1-P3-1)', async () => {
+    const device = fakeDevice(K40, {
+      selectConfiguration: vi.fn(async () => Promise.reject(domError('NetworkError'))),
+    });
+    await expect(createWebUsbLink(fakeUsb([], device)).request([K40])).rejects.toBeInstanceOf(
+      UsbLinkOpenError,
+    );
+    expect(device.close).toHaveBeenCalled();
+    expect(device.claimInterface).not.toHaveBeenCalled();
+  });
+
   it('passes transfers through and rejects any status but ok', async () => {
     const device = fakeDevice(K40, {
       transferOut: vi.fn(async () => ({ status: 'stall' as const })),

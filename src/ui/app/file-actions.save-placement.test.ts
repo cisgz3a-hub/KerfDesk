@@ -87,17 +87,23 @@ describe('handleSaveGcode export placement', () => {
   it('still refuses a current-position export without a live machine position', async () => {
     const alert = vi.spyOn(window, 'alert').mockReturnValue(undefined);
     const save = vi.fn(async () => null);
+    const pushToast = vi.fn();
 
     await handleSaveGcode({
       platform: mockPlatform(save),
       project: projectWithLine(),
       savedName: null,
       jobPlacement: { startFrom: 'current-position', anchor: 'front-left' },
-      pushToast: () => undefined,
+      pushToast,
     });
 
-    expect(alert).toHaveBeenCalledTimes(1);
-    expect(alert.mock.calls[0]?.[0]).toContain('Current Position');
+    // One error toast, never a native alert (ADR-656 Amendment 4).
+    expect(alert).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledExactlyOnceWith(
+      expect.stringMatching(/^Cannot save G-code: .*Current Position/),
+      'error',
+      expect.objectContaining({ key: 'export-refused' }),
+    );
     expect(save).not.toHaveBeenCalled();
     vi.restoreAllMocks();
   });

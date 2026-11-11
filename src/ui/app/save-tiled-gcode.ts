@@ -14,7 +14,7 @@ import {
   BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE,
   prepareTiledOutputOffThread,
 } from '../laser/output-preparation-worker-client';
-import { jobAwareAlert } from '../state/job-aware-dialogs';
+import { pushExportRefusal } from './export-refusal';
 import {
   isOutputPreparationAbort,
   outputPreparationFailure,
@@ -39,6 +39,7 @@ import { outputTextRenderer } from '../text/output-text-renderer';
 import type { OutputSnapshotRequest } from '../laser/output-preparation-protocol';
 
 const GCODE_EXTENSIONS = ['.gcode', '.nc'];
+const TILES_REFUSED = 'Cannot export tiles';
 
 export type SaveTiledGcodeCtx = ExportVariableAdvancement & {
   readonly platform: PlatformAdapter;
@@ -70,13 +71,15 @@ async function saveConfiguredTiledGcode(ctx: SaveTiledGcodeCtx): Promise<true> {
   const directory = await reserveTileDirectory(ctx);
   if (directory === null) return true;
   const preparation = await prepareTiledOutput(ctx, options, snapshot);
+  // One error toast per refusal, reasons folded (ADR-656 Amendment 4).
   if (preparation === null) {
-    jobAwareAlert(`Cannot export tiles:\n\n• ${BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE}`);
+    pushExportRefusal(ctx.pushToast, TILES_REFUSED, [
+      BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE,
+    ]);
     return true;
   }
   if (preparation.kind === 'preparation-failed') {
-    const lines = preparation.messages.map((message) => `• ${message}`).join('\n');
-    jobAwareAlert(`Cannot export tiles:\n\n${lines}`);
+    pushExportRefusal(ctx.pushToast, TILES_REFUSED, preparation.messages);
     return true;
   }
   if (preparation.kind === 'empty') {
@@ -84,14 +87,15 @@ async function saveConfiguredTiledGcode(ctx: SaveTiledGcodeCtx): Promise<true> {
     return true;
   }
   if (preparation.kind === 'work-budget-exceeded') {
-    jobAwareAlert(tiledSaveWorkBudgetMessage(preparation.grid));
+    pushExportRefusal(ctx.pushToast, TILES_REFUSED, [tiledSaveWorkBudgetMessage(preparation.grid)]);
     return true;
   }
   if (preparation.kind === 'tile-preflight-failed') {
-    const lines = preparation.messages.map((message) => `• ${message}`).join('\n');
-    jobAwareAlert(
-      `Tile r${preparation.row + 1}-c${preparation.col + 1} failed preflight:\n\n${lines}\n\n` +
-        'No files were written.',
+    pushExportRefusal(
+      ctx.pushToast,
+      `${TILES_REFUSED}. No files were written, because tile ` +
+        `r${preparation.row + 1}-c${preparation.col + 1} failed preflight`,
+      preparation.messages,
     );
     return true;
   }

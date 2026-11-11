@@ -155,11 +155,13 @@ describe('split-sweep laser motion keeps acceleration outside the burn', () => {
           const base = index * 6;
           return [0, 1, 3, 4].map((axis) => represented(model.positions[base + axis] ?? 0));
         });
+        // ADR-052 Amendment 2: each row moves half the offset along its travel.
+        const half = offsetMm / 2;
         expect(poweredSegments(model).map((index) => emitted[index])).toEqual([
-          [10, 0.5, 11, 0.5],
-          [26, 0.5, 27, 0.5],
-          [27 - offsetMm, 1.5, 26 - offsetMm, 1.5],
-          [11 - offsetMm, 1.5, 10 - offsetMm, 1.5],
+          [10 + half, 0.5, 11 + half, 0.5],
+          [26 + half, 0.5, 27 + half, 0.5],
+          [27 - half, 1.5, 26 - half, 1.5],
+          [11 - half, 1.5, 10 - half, 1.5],
         ]);
 
         const preview = buildToolpath(job, { startPoint: { x: 0, y: 0 } });
@@ -179,13 +181,13 @@ describe('split-sweep laser motion keeps acceleration outside the burn', () => {
         if (bounds === null) throw new Error('Missing Frame motion bounds');
         // Splitting the internal gap differently must not grow the already
         // reviewed outer motion envelope. Image bounds include pixel height.
-        expect(bounds).toMatchObject({
-          minX: 5 - Math.max(offsetMm, 0),
-          maxX: 32 - Math.min(offsetMm, 0),
-        });
+        expect(bounds.minX).toBeCloseTo(5 - Math.abs(half), 9);
+        expect(bounds.maxX).toBeCloseTo(32 + Math.abs(half), 9);
+        // A half-offset sum such as 10 - 0.2 - 5 is not exact in binary.
+        const slack = 1e-9;
         for (const [, , x, y] of emitted) {
-          expect(x).toBeGreaterThanOrEqual(bounds.minX);
-          expect(x).toBeLessThanOrEqual(bounds.maxX);
+          expect(x).toBeGreaterThanOrEqual(bounds.minX - slack);
+          expect(x).toBeLessThanOrEqual(bounds.maxX + slack);
           expect(y).toBeGreaterThanOrEqual(bounds.minY);
           expect(y).toBeLessThanOrEqual(bounds.maxY);
         }

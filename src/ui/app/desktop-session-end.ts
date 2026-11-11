@@ -16,6 +16,7 @@ import type { StreamerState } from '../../core/controllers/grbl';
 import type { DesktopJobReport } from '../../platform/types';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import { activeLinkMachineWork, useLinkMachineWorkStore } from '../state/link-machine-work';
 import { unownedControllerOutput } from '../state/unowned-controller-output';
 import { machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
@@ -56,6 +57,7 @@ export const useSessionEndStore = create<SessionEndState>((set) => ({
 export function jobWouldBeCutOff(laser: LaserState): boolean {
   return (
     isActiveJob(laser.streamer) ||
+    activeLinkMachineWork() !== null ||
     laser.fireActive ||
     unownedControllerOutput(laser, machineKindOf(useStore.getState().project.machine)) !== null
   );
@@ -90,7 +92,17 @@ export function installDesktopSessionEnd(
     );
   });
   reports.consider(desktopJobReport(useLaserStore.getState()));
-  const unsubscribe = useLaserStore.subscribe((laser) => reports.consider(desktopJobReport(laser)));
+  const unsubscribeLaser = useLaserStore.subscribe((laser) =>
+    reports.consider(desktopJobReport(laser)),
+  );
+  // A Moshi or Ruida link job counts too (ADR-705 Amendment 3).
+  const unsubscribeLinks = useLinkMachineWorkStore.subscribe(() =>
+    reports.consider(desktopJobReport(useLaserStore.getState())),
+  );
+  const unsubscribe = (): void => {
+    unsubscribeLaser();
+    unsubscribeLinks();
+  };
   const receive = (event: Event): void => {
     const phase = sessionEndPhase(event);
     if (phase === null) return;
