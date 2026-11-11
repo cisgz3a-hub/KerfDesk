@@ -8,6 +8,7 @@ import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { hasCustomOrigin, hasCustomXyOrigin, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { actionGridStyle, gridFullRowStyle, sectionCaptionStyle } from './JobControls.styles';
+import { setupControlBlockReason, titleWhenDisabled } from './control-block-reason';
 import { clampJogFeed } from './jog-control-policy';
 import { useJogControlPreferences } from './jog-control-preferences';
 import { RELEASE_MOTORS_CONFIRM } from './hand-position-copy';
@@ -70,6 +71,8 @@ function SetOriginButton(props: {
   const ref = useFocusThroughDisable<HTMLButtonElement>(props.busy);
   // Focus comes back to it: a held Enter must not set the origin again.
   const keys = useFreshKeyActivation('Set origin here');
+  // While it is off, the tooltip says why (A3-P3-4).
+  const blockReason = useLaserStore(setupControlBlockReason);
   if (props.show === false) return null;
   return (
     <button
@@ -80,11 +83,13 @@ function SetOriginButton(props: {
       {...keys}
       data-search-target="set-origin"
       disabled={props.busy}
-      title={
+      title={titleWhenDisabled(
+        props.busy,
+        blockReason,
         props.needsAttention
           ? SET_ORIGIN_ATTENTION_TITLE
-          : 'Declare the current head position as work X0 Y0 without moving. Re-establish it after reset or loss of position.'
-      }
+          : 'Declare the current head position as work X0 Y0 without moving. Re-establish it after reset or loss of position.',
+      )}
     >
       Set origin here
     </button>

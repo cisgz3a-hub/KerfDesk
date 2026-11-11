@@ -40,7 +40,7 @@ type StatusAnswer = { readonly report: StatusReport; readonly stamp: ControllerS
 export const MANUAL_MOTION_STATUS_MAX_AGE_MS = 1_000;
 /** Operator guidance when a fresh status query cannot prove manual-motion readiness. */
 export const MANUAL_MOTION_STATUS_TIMEOUT_MESSAGE =
-  'Manual motion could not obtain a fresh same-session controller status after its status query. Check the connection and try again.';
+  'The controller did not answer a status check in time, so nothing was sent. Check the connection and try again.';
 /** The driver has no status query at all, so nothing was sent to wait for. */
 export const MANUAL_MOTION_STATUS_UNAVAILABLE_MESSAGE =
   'Manual motion needs a current controller status report, and this controller has no status query KerfDesk can send. Wait for its next position report and try again.';

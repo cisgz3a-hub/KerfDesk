@@ -93,7 +93,7 @@ describe('prepareConsoleCommand', () => {
       expect(prepareConsoleCommand(input)).toEqual({
         ok: false,
         reason:
-          'This persistent controller command is blocked in the Console. Back up settings and use Machine Settings in a later lane.',
+          'KerfDesk does not send this command. It erases or rewrites settings stored on the controller (a factory restore, a startup line or the build info), so the Console refuses it. To run it you need another sender.',
       });
     }
   });
@@ -283,7 +283,7 @@ describe('read-only report commands and $DWNGRD', () => {
       expect(prepareConsoleCommand(input)).toEqual({
         ok: false,
         reason:
-          'This persistent controller command is blocked in the Console. Back up settings and use Machine Settings in a later lane.',
+          'KerfDesk does not send this command. It erases or rewrites settings stored on the controller (a factory restore, a startup line or the build info), so the Console refuses it. To run it you need another sender.',
       });
     },
   );

@@ -222,7 +222,7 @@ describe('home command timeout', () => {
     rejectUnexpectedWrite = true;
     useLaserStore.setState({ statusReport: null, statusObservation: null, alarmCode: null });
 
-    await expect(useLaserStore.getState().home()).rejects.toThrow(/known Idle or Alarm/i);
+    await expect(useLaserStore.getState().home()).rejects.toThrow(/has not reported yet/i);
 
     expect(writes).toEqual([]);
     expect(useLaserStore.getState().controllerOperation).toBeNull();
@@ -305,7 +305,7 @@ describe('home command timeout', () => {
     connection.emitLine('Grbl 1.1h');
     await flush();
 
-    await expect(home).rejects.toThrow(/invalidated|reboot/i);
+    await expect(home).rejects.toThrow(/Homing was interrupted|reboot/i);
     expect(useLaserStore.getState().homingState).toBe('unknown');
     expect(useLaserStore.getState().homingProof).toBeNull();
     expect(useLaserStore.getState().positionEvidenceSuppressed).toBe(true);

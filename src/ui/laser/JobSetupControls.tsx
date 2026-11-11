@@ -3,6 +3,7 @@ import { Icon } from '../kit';
 import { useStore } from '../state';
 import { describeAutofocusResult, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { setupControlBlockReason, titleWhenDisabled } from './control-block-reason';
 import { gridFullRowStyle } from './JobControls.styles';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 
@@ -25,6 +26,8 @@ export function JobSetupControls(props: Props): JSX.Element {
   const homeCommand = useHomeCommand();
   const onAutofocus = useAutofocusAction();
   const busy = props.disabled || props.streaming;
+  // A disabled Home or Auto-focus says why in its tooltip (A3-P3-4).
+  const blockReason = useLaserStore(setupControlBlockReason);
   return (
     <>
       {props.actions !== 'autofocus' && (
@@ -32,6 +35,7 @@ export function JobSetupControls(props: Props): JSX.Element {
           onHome={() => void home().catch(controllerActionFailureHandler('Home'))}
           onConfigureHoming={props.onConfigureHoming}
           busy={busy}
+          blockReason={blockReason}
           streaming={props.streaming}
           homingEnabled={homingEnabled}
           command={homeCommand}
@@ -42,6 +46,7 @@ export function JobSetupControls(props: Props): JSX.Element {
         <AutofocusButton
           needsSetup={autofocusCommand.trim() === ''}
           busy={busy}
+          blockReason={blockReason}
           streaming={props.streaming}
           onConfigure={props.onConfigureAutofocus}
           onRun={onAutofocus}
@@ -68,6 +73,7 @@ function HomeButton(props: {
   readonly onHome: () => void;
   readonly onConfigureHoming: () => void;
   readonly busy: boolean;
+  readonly blockReason: string | null;
   readonly streaming: boolean;
   readonly homingEnabled: boolean;
   readonly command: string | null;
@@ -92,11 +98,13 @@ function HomeButton(props: {
       className={props.jog ? 'lf-btn lf-jog-home' : 'lf-btn'}
       onClick={props.onHome}
       disabled={props.busy}
-      title={
+      title={titleWhenDisabled(
+        props.busy,
+        props.blockReason,
         props.command === null
           ? 'This controller has no homing command.'
-          : `Run ${props.command.split(/\r?\n/).join(' then ')} to establish the machine reference. Set the workpiece origin separately.`
-      }
+          : `Run ${props.command.split(/\r?\n/).join(' then ')} to establish the machine reference. Set the workpiece origin separately.`,
+      )}
     >
       <HomeLabel jog={props.jog} label="Home" />
     </button>
@@ -119,6 +127,7 @@ function HomeLabel(props: {
 function AutofocusButton(props: {
   readonly needsSetup: boolean;
   readonly busy: boolean;
+  readonly blockReason: string | null;
   readonly streaming: boolean;
   readonly onConfigure: () => void;
   readonly onRun: () => void;
@@ -135,7 +144,11 @@ function AutofocusButton(props: {
       title={
         props.needsSetup
           ? 'Open Machine Setup at Auto-focus setup.'
-          : 'Run the auto-focus command configured in Machine Setup.'
+          : titleWhenDisabled(
+              props.busy,
+              props.blockReason,
+              'Run the auto-focus command configured in Machine Setup.',
+            )
       }
     >
       {props.needsSetup ? 'Set up auto-focus' : 'Auto-focus'}
