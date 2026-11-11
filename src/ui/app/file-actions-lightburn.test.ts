@@ -45,7 +45,10 @@ describe('LightBurn project open migration', () => {
       }),
     );
     expect(markLoaded).toHaveBeenCalledWith('sign.lf2', { dirty: true });
-    expect(pushToast).toHaveBeenCalledWith(expect.stringContaining('Save as .lf2'), 'success');
+    // The project's one notice slot (ADR-708).
+    expect(pushToast).toHaveBeenCalledWith(expect.stringContaining('Save as .lf2'), 'success', {
+      key: 'project-notices',
+    });
   });
 
   it('keeps the converted project dirty and clears any prior native save target', async () => {

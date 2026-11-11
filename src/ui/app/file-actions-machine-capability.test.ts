@@ -41,9 +41,12 @@ describe('project file machine capability disclosure', () => {
     });
 
     expect(markLoaded).toHaveBeenCalledWith('contradictory.lf2');
+    // On the "Opened" toast, on its own line (ADR-708).
     expect(pushToast).toHaveBeenCalledWith(
-      'This project remains in CNC mode even though its saved capability label does not include that mode. Review Machine Setup; no machine mode or saved settings were silently rewritten.',
+      'Opened contradictory.lf2\n' +
+        'This project remains in CNC mode even though its saved capability label does not include that mode. Review Machine Setup; no machine mode or saved settings were silently rewritten.',
       'warning',
+      { key: 'project-notices' },
     );
   });
 
