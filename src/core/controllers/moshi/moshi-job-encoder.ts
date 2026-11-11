@@ -78,7 +78,7 @@ export function encodeMoshiJob(job: Job, device: DeviceProfile): MoshiEncodeResu
       return { ok: false, error: { kind: 'cnc-unsupported', layerId: group.layerId } };
     if (group.kind === 'raster' && group.scanAngleDeg !== undefined)
       return { ok: false, error: { kind: 'angled-raster-unsupported', layerId: group.layerId } };
-    const planned = planGroup(group, notes);
+    const planned = planGroup(group, device, notes);
     const bounds = stepBounds(planned);
     if (bounds === null) continue;
     const outside = planned.find((step) => !isMoshiPosition(step.x) || !isMoshiPosition(step.y));
@@ -94,11 +94,12 @@ export function encodeMoshiJob(job: Job, device: DeviceProfile): MoshiEncodeResu
 
 function planGroup(
   group: Exclude<Group, { readonly kind: 'cnc' }>,
+  device: DeviceProfile,
   notes: Set<string>,
 ): MoshiStep[] {
   if (group.kind === 'cut') return planCutGroupSteps(group);
   if (group.kind === 'fill') return planFillGroupSteps(group);
-  const raster = planRasterGroupSteps(group);
+  const raster = planRasterGroupSteps(group, device);
   if (raster.greyLevels)
     notes.add(
       `Layer ${group.layerId}: a Moshiboard has no power control, so every grey pixel burns at the machine's dial power. Dither the image for shading.`,

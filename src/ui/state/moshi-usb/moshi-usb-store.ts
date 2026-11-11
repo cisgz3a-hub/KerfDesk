@@ -116,12 +116,15 @@ async function connect(
 ): Promise<void> {
   if (get().phase !== 'disconnected') return;
   set({ phase: 'connecting', message: 'Opening the Moshiboard over USB…', tone: 'info' });
-  let link: MoshiUsbConnection;
+  let link: MoshiUsbConnection | null = null;
   let code: number | null;
   try {
     link = await open();
     code = moshiStatusCode(await link.readStatus());
   } catch (error) {
+    // A device opened before the failure is released, so another program can
+    // take it (code quality audit C2 D1-P3-1).
+    await link?.close().catch(() => undefined);
     const message = error instanceof Error ? error.message : String(error);
     set({ ...DISCONNECTED, message, tone: 'error' });
     return;
