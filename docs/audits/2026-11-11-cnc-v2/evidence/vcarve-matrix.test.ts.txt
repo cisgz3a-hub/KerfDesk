@@ -1,0 +1,267 @@
+// @vitest-environment node
+// TEMPORARY audit probe (never committed).
+import { writeFileSync } from 'node:fs';
+import { describe, it } from 'vitest';
+import { DEFAULT_DEVICE_PROFILE, toMachineCoords } from '../devices';
+import { cncGrblStrategy } from '../output';
+import {
+  createLayer,
+  DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_MACHINE_CONFIG,
+  IDENTITY_TRANSFORM,
+  type CncLayerSettings,
+  type CncTool,
+  type Polyline,
+  type Scene,
+} from '../scene';
+import { compileCncJob } from './compile-cnc-job';
+import {
+  auditMotion,
+  compareField,
+  distanceToLoops,
+  emptyField,
+  insideEvenOdd,
+  parseProgram,
+  profileFor,
+  stampMoves,
+  type Loop,
+  type OracleTool,
+  type Profile,
+} from './zz-audit-oracle';
+
+const OUT =
+  process.env['AUDIT_OUT'] ?? '.';
+
+const poly = (pts: ReadonlyArray<readonly [number, number]>): Polyline => ({
+  closed: true,
+  points: pts.map(([x, y]) => ({ x, y })),
+});
+const rect = (x0: number, y0: number, x1: number, y1: number): Polyline =>
+  poly([
+    [x0, y0],
+    [x1, y0],
+    [x1, y1],
+    [x0, y1],
+  ]);
+const ngon = (cx: number, cy: number, rx: number, ry: number, n: number): Polyline =>
+  poly(
+    Array.from({ length: n }, (_, i) => [
+      cx + rx * Math.cos((2 * Math.PI * i) / n),
+      cy + ry * Math.sin((2 * Math.PI * i) / n),
+    ]),
+  );
+
+const SHAPES: Record<string, ReadonlyArray<Polyline>> = {
+  L8: [
+    poly([
+      [10, 10],
+      [26, 10],
+      [26, 26],
+      [18, 26],
+      [18, 18],
+      [10, 18],
+    ]),
+  ],
+  star: [
+    poly(
+      Array.from({ length: 10 }, (_, i) => {
+        const r = i % 2 === 0 ? 12 : 4.5;
+        const a = (Math.PI * i) / 5 + 0.1;
+        return [25 + r * Math.cos(a), 25 + r * Math.sin(a)] as const;
+      }),
+    ),
+  ],
+  thinRing: [ngon(22, 22, 10, 10, 180), ngon(22, 22, 9.6, 9.6, 180)],
+  slabIsland: [rect(10, 10, 40, 22), rect(20, 14, 23, 17), ngon(32, 16, 2, 2, 48)],
+  comb: [
+    poly([
+      [10, 10],
+      [30, 10],
+      [30, 14],
+      [28.6, 14],
+      [28.6, 24],
+      [28, 24],
+      [28, 14],
+      [24.4, 14],
+      [24.4, 24],
+      [24, 24],
+      [24, 14],
+      [20.25, 14],
+      [20.25, 24],
+      [20, 24],
+      [20, 14],
+      [16.12, 14],
+      [16.12, 24],
+      [16, 24],
+      [16, 14],
+      [10, 14],
+    ]),
+  ],
+  blob: [ngon(25, 20, 12, 5, 720), ngon(22, 20, 2.5, 1.2, 360)],
+  wide: [rect(10, 10, 40, 32), rect(22, 18, 27, 23)],
+  acute: [
+    poly([
+      [10, 10],
+      [40, 12],
+      [10, 14],
+    ]),
+    poly([
+      [10, 20],
+      [40, 20.4],
+      [10, 20.8],
+    ]),
+  ],
+};
+
+const EXTRA_TOOLS: ReadonlyArray<CncTool> = [
+  { id: 'e30', name: 'e30', kind: 'engraving', diameterMm: 3.175, tipAngleDeg: 30, tipDiameterMm: 0.5 },
+  { id: 'e60', name: 'e60', kind: 'engraving', diameterMm: 6.35, tipAngleDeg: 60, tipDiameterMm: 0.2 },
+  { id: 'v150', name: 'v150', kind: 'v-bit', diameterMm: 12.7, tipAngleDeg: 150 },
+  { id: 'v20', name: 'v20', kind: 'v-bit', diameterMm: 3.175, tipAngleDeg: 20 },
+  { id: 'v60big', name: 'v60big', kind: 'v-bit', diameterMm: 12.7, tipAngleDeg: 60 },
+  { id: 'v10', name: 'v10', kind: 'v-bit', diameterMm: 3.175, tipAngleDeg: 10 },
+];
+const TOOLS = [...DEFAULT_CNC_MACHINE_CONFIG.tools, ...EXTRA_TOOLS];
+
+type Case = {
+  readonly name: string;
+  readonly shape: keyof typeof SHAPES;
+  readonly tool: string;
+  readonly patch: Partial<CncLayerSettings>;
+};
+
+const flat = (depthMm: number, depthPerPassMm = 10): Partial<CncLayerSettings> => ({
+  vCarveFlatDepthEnabled: true,
+  depthMm,
+  depthPerPassMm,
+});
+const flow = (depthPerPassMm = 10): Partial<CncLayerSettings> => ({
+  vCarveFlatDepthEnabled: false,
+  depthPerPassMm,
+});
+
+const CASES: ReadonlyArray<Case> = [
+  { name: 'wide-vb90-flow', shape: 'wide', tool: 'vb-90', patch: flow() },
+  { name: 'wide-v60big-flow-dpp2', shape: 'wide', tool: 'v60big', patch: flow(2) },
+  { name: 'L8-vb60-flow', shape: 'L8', tool: 'vb-60', patch: flow() },
+  { name: 'star-vb60-flow-dpp07', shape: 'star', tool: 'vb-60', patch: flow(0.7) },
+  { name: 'thinRing-vb30-flow', shape: 'thinRing', tool: 'vb-30', patch: flow() },
+  { name: 'comb-vb30-flow', shape: 'comb', tool: 'vb-30', patch: flow() },
+  { name: 'comb-v10-flow', shape: 'comb', tool: 'v10', patch: flow() },
+  { name: 'acute-v20-flow', shape: 'acute', tool: 'v20', patch: flow() },
+  { name: 'blob-v20-flow', shape: 'blob', tool: 'v20', patch: flow() },
+  { name: 'slab-e30-flat12-dpp05', shape: 'slabIsland', tool: 'e30', patch: flat(1.2, 0.5) },
+  { name: 'L8-e60-flat1', shape: 'L8', tool: 'e60', patch: flat(1) },
+  { name: 'comb-e30-flow', shape: 'comb', tool: 'e30', patch: flow() },
+  { name: 'star-v150-flat08', shape: 'star', tool: 'v150', patch: flat(0.8) },
+  {
+    name: 'wide-vb60-flat2-clear-dpp075',
+    shape: 'wide',
+    tool: 'vb-60',
+    patch: { ...flat(2, 0.75), vClearToolId: 'em-3175' },
+  },
+  {
+    name: 'wide-vb60-flat10-overflank-clear',
+    shape: 'wide',
+    tool: 'vb-60',
+    patch: { ...flat(10, 2), vClearToolId: 'em-3175' },
+  },
+  {
+    name: 'slab-vb60-flat15-clear-em1588',
+    shape: 'slabIsland',
+    tool: 'vb-60',
+    patch: { ...flat(1.5, 1), vClearToolId: 'em-1588', stepoverPercent: 80 },
+  },
+  { name: 'L8-vb60-flow-ramp10', shape: 'L8', tool: 'vb-60', patch: { ...flow(), vCarveRampEntryDeg: 10 } },
+  { name: 'blob-vb90-3175-flat06-res002', shape: 'blob', tool: 'vb-90-3175', patch: { ...flat(0.6), vResolutionMm: 0.02 } },
+];
+
+function run(c: Case) {
+  const shape = SHAPES[c.shape] ?? [];
+  const scene: Scene = {
+    objects: [
+      {
+        kind: 'imported-svg',
+        id: 'source',
+        source: 'source.svg',
+        bounds: { minX: 0, minY: 0, maxX: 60, maxY: 60 },
+        transform: IDENTITY_TRANSFORM,
+        paths: [{ color: '#ff0000', polylines: shape }],
+      },
+    ],
+    layers: [
+      {
+        ...createLayer({ id: 'carve', color: '#ff0000' }),
+        cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'v-carve', toolId: c.tool, ...c.patch },
+      },
+    ],
+  };
+  const started = Date.now();
+  const job = compileCncJob(scene, DEFAULT_DEVICE_PROFILE, {
+    ...DEFAULT_CNC_MACHINE_CONFIG,
+    tools: TOOLS,
+    toolId: c.tool,
+  });
+  const program = cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
+  const compileMs = Date.now() - started;
+  console.log(c.name, "compiled", compileMs, "ms", program.length, "bytes");
+  writeFileSync(`${OUT}/v-${c.name}.nc`, program);
+  const parsed = parseProgram(program);
+  const profiles = new Map<string, Profile>();
+  for (const tool of TOOLS) profiles.set(tool.id, profileFor(tool as OracleTool));
+  const loops: Loop[] = shape.map((p) => p.points.map((q) => toMachineCoords(q, DEFAULT_DEVICE_PROFILE)));
+  const xs = loops.flatMap((l) => l.map((p) => p.x));
+  const ys = loops.flatMap((l) => l.map((p) => p.y));
+  const field = emptyField(Math.min(...xs) - 2, Math.min(...ys) - 2, Math.max(...xs) + 2, Math.max(...ys) + 2, 0.05);
+  stampMoves(field, parsed.moves, profiles);
+  const vTool = TOOLS.find((t) => t.id === c.tool);
+  if (vTool === undefined) throw new Error('tool');
+  const tanHalf = Math.tan((((vTool.tipAngleDeg ?? 0) / 2) * Math.PI) / 180);
+  const r0 = vTool.kind === 'engraving' ? (vTool.tipDiameterMm ?? 0) / 2 : 0;
+  const flank = (vTool.diameterMm / 2 - r0) / tanHalf;
+  const capMm = Math.min(c.patch.vCarveFlatDepthEnabled === true ? (c.patch.depthMm ?? 1) : Infinity, flank);
+  const target = (x: number, y: number): number => {
+    if (!insideEvenOdd(x, y, loops)) return 0;
+    const d = distanceToLoops(x, y, loops);
+    // Wall law: the edge of a tip flat traces the same wall as a point, d / tan.
+    return Math.min(capMm, d / tanHalf);
+  };
+  const compare = compareField(field, target, 0.02, 0.15);
+  const motion = auditMotion(parsed, DEFAULT_CNC_MACHINE_CONFIG.params.safeZMm);
+  const groups = job.groups.map((g) =>
+    g.kind === 'cnc'
+      ? {
+          cutType: g.cutType,
+          toolId: g.toolId,
+          passes: g.passes.length,
+          feed: g.feedMmPerMin,
+          plunge: g.plungeMmPerMin,
+          depth: g.depthMm,
+        }
+      : { kind: g.kind },
+  );
+  return {
+    name: c.name,
+    capMm,
+    flank,
+    compileMs,
+    lines: program.split('\n').length,
+    compare,
+    motion,
+    notes: parsed.notes.slice(0, 12),
+    toolOrder: parsed.toolOrder,
+    groups,
+    warnings: (job as unknown as { warnings?: unknown }).warnings ?? null,
+  };
+}
+
+describe('audit v-carve matrix', () => {
+  it.each(CASES)(
+    '$name',
+    (c) => {
+      const result = run(c);
+      writeFileSync(`${OUT}/v-${c.name}.json`, JSON.stringify(result, null, 1));
+    },
+    600_000,
+  );
+});
