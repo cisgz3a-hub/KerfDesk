@@ -21,6 +21,7 @@ import {
   SCULPFUN_S30_MANUAL_AIR_PROFILE,
   ORTUR_LASER_MASTER_3_PROFILES,
 } from './brand-laser-profiles';
+import { GENERIC_MOSHI_PROFILE } from './moshi-profile';
 
 export const PROFILE_CATALOG_VERSION = '2026-09-19';
 
@@ -220,6 +221,9 @@ export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEn
   ]),
   entry(GENERIC_RUIDA_PROFILE, [
     'Ruida: file-export only (.rd); encoder is EXPERIMENTAL and not accepted by real hardware yet.',
+  ]),
+  entry(GENERIC_MOSHI_PROFILE, [
+    'Moshiboard: USB link only (Frame, Start, Abort, Home); EXPERIMENTAL, simulator-tested only.',
   ]),
 ];
 

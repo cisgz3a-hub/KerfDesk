@@ -13,6 +13,7 @@ import { useLaserStore, type LaserState } from '../state/laser-store';
 import { framedRunStartHandoffIssue, type FramedRunPermit } from '../state/framed-run';
 import { selectedObjectIds } from '../state/scene-group-actions';
 import { useToastStore } from '../state/toast-store';
+import { isFileOnlyController } from './controller-reconnect';
 import { headFrameContext, HEAD_MOVE_UNVERIFIED_BED } from './head-move-dispatch';
 import { clampJogFeed } from './jog-control-policy';
 import { useJogControlPreferences } from './jog-control-preferences';
@@ -257,9 +258,9 @@ function assertCentreLightAvailable(framed = false): void {
   const issue = devicePositioningLightIssue(project.device);
   if (project.device.positioningLight === undefined || issue !== null)
     throw new Error(issue ?? 'Set up the separate positioning light in Machine Setup first.');
-  if (project.device.controllerKind === 'ruida')
+  if (isFileOnlyController(project.device.controllerKind))
     throw new Error(
-      'Ruida is file export only. Position the head and switch its light at the machine.',
+      'Ruida is file export only and a Moshiboard runs over its own USB link. Position the head and switch its light at the machine.',
     );
   if (machineKindOf(project.machine) !== 'laser')
     throw new Error('Centre & LED is available in Laser mode.');
