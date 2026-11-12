@@ -6,7 +6,11 @@ import {
   type SceneObject,
 } from '../scene';
 // Deep import: core/scene's barrel is ratcheted and may only shrink.
-import { withoutInactiveLaserLeadSettings, withoutLaserLeadSettings } from '../scene/layer';
+import {
+  withoutCalibrationCouponOverrides,
+  withoutInactiveLaserLeadSettings,
+  withoutLaserLeadSettings,
+} from '../scene/layer';
 import { cloneRecipeCnc, type ProcessRecipeStep } from './process-recipe';
 import { isRecord } from '../util/is-record';
 
@@ -16,12 +20,13 @@ export function recipeStepFromLayer(layer: Layer): ProcessRecipeStep {
     color: layer.color,
     output: layer.output,
     visible: layer.visible,
-    // Lead fields with both leads off change nothing (ADR-626).
-    settings: withoutInactiveLaserLeadSettings(captureLayerOperationSettings(layer)),
+    // Lead fields with both leads off change nothing (ADR-626). A calibration
+    // coupon's direction overrides and marker stay with the coupon (T04-P2-1).
+    settings: withoutCalibrationCouponOverrides(
+      layer,
+      withoutInactiveLaserLeadSettings(captureLayerOperationSettings(layer)),
+    ),
     ...(layer.cnc === undefined ? {} : { cnc: cloneRecipeCnc(layer.cnc) }),
-    ...(layer.scanOffsetCalibrationMode === undefined
-      ? {}
-      : { scanOffsetCalibrationMode: layer.scanOffsetCalibrationMode }),
   };
 }
 
@@ -32,11 +37,14 @@ export function templateOperation(
   current?: Layer,
 ): Layer {
   const seed = current ?? createArtworkOperation(scene, target, { name: step.name }).operation;
-  // A recipe step without leads means no leads (ADR-626).
+  // A recipe step without leads means no leads (ADR-626). A template operation
+  // is never a calibration coupon: neither the operation it replaces nor an
+  // older recipe step saved off a coupon passes on the coupon's marker or its
+  // direction overrides (T04-P2-1).
   const { cnc: _cnc, scanOffsetCalibrationMode: _mode, ...plain } = withoutLaserLeadSettings(seed);
   return {
-    ...plain,
-    ...step.settings,
+    ...withoutCalibrationCouponOverrides(seed, plain),
+    ...withoutCalibrationCouponOverrides(step, step.settings),
     name: step.name,
     color: scene.layers.some((layer) => layer.id !== seed.id && layer.color === step.color)
       ? seed.color
@@ -44,9 +52,6 @@ export function templateOperation(
     output: step.output,
     visible: step.visible,
     ...(step.cnc === undefined ? {} : { cnc: cloneRecipeCnc(step.cnc) }),
-    ...(step.scanOffsetCalibrationMode === undefined
-      ? {}
-      : { scanOffsetCalibrationMode: step.scanOffsetCalibrationMode }),
   };
 }
 

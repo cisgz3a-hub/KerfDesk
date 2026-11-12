@@ -7,6 +7,8 @@ import {
   type Project,
   type SceneObject,
 } from '../scene';
+// Deep imports: core/scene's barrel is ratcheted and may only shrink.
+import { withoutCalibrationCouponOverrides } from '../scene/layer';
 import { pruneSceneObjectOperationOverrides } from '../scene/operation-binding';
 import { type ProcessRecipe, type ProcessRecipeResult } from './process-recipe';
 import { installRecipeTools, remapRecipeTools } from './process-recipe-tools';
@@ -49,7 +51,9 @@ export function applyProcessRecipe(
       }).operation;
       const operation: Layer = {
         ...seed,
-        ...step.settings,
+        // A step from an older recipe saved off a calibration coupon keeps its
+        // settings but not the coupon's overrides or marker (T04-P2-1).
+        ...withoutCalibrationCouponOverrides(step, step.settings),
         name: step.name,
         color: layers.some((layer) => layer.color === step.color) ? seed.color : step.color,
         output: step.output,
@@ -57,9 +61,6 @@ export function applyProcessRecipe(
         ...(step.cnc === undefined
           ? {}
           : { cnc: remapRecipeTools(step.cnc, installed?.ids ?? new Map()) }),
-        ...(step.scanOffsetCalibrationMode === undefined
-          ? {}
-          : { scanOffsetCalibrationMode: step.scanOffsetCalibrationMode }),
       };
       layers.push(operation);
       return operation;

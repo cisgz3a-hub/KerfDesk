@@ -21,6 +21,13 @@ export function layerSettingsFrom(layer: Layer): LayerSettingsClipboard {
   // curve (ADR-670) turns them off on the target.
   const settings: Record<string, unknown> = {};
   for (const key of LAYER_OPERATION_SETTING_KEYS) settings[key] = layer[key];
+  // A Scan Offset Test coupon's explicit 0 mm offset and uncalibrated-scan
+  // switch describe the coupon, so pasting its settings turns them off on the
+  // target instead of letting ordinary artwork skip the offset rules (T04R-P3-1).
+  if (layer.scanOffsetCalibrationMode !== undefined) {
+    settings['allowUncalibratedBidirectionalScan'] = undefined;
+    settings['bidirectionalScanOffsetMm'] = undefined;
+  }
   return {
     ...(settings as LayerOperationSettings),
     visible: layer.visible,

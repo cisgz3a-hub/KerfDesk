@@ -98,8 +98,13 @@ export function captureMaterialRecipe(layer: Layer): MaterialRecipe {
     fillOverscanMm: layer.fillOverscanMm,
     fillStyle: layer.fillStyle,
     fillBidirectional: layer.fillBidirectional,
-    allowUncalibratedBidirectionalScan: layer.allowUncalibratedBidirectionalScan === true,
-    ...(layer.bidirectionalScanOffsetMm !== undefined
+    // A Scan Offset Test coupon's explicit 0 mm offset and uncalibrated-scan
+    // switch stay with the coupon (T04R-P3-1).
+    allowUncalibratedBidirectionalScan:
+      layer.scanOffsetCalibrationMode === undefined &&
+      layer.allowUncalibratedBidirectionalScan === true,
+    ...(layer.bidirectionalScanOffsetMm !== undefined &&
+    layer.scanOffsetCalibrationMode === undefined
       ? { bidirectionalScanOffsetMm: layer.bidirectionalScanOffsetMm }
       : {}),
     fillCrossHatch: layer.fillCrossHatch,
