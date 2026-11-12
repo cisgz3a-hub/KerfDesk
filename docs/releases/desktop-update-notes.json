@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "ffd9fe66b03a6f8c00488887e662c0dd367c276d",
+  "sinceSourceSha": "74191e0c7c922c71fb201f18e66f686fc0bc4f26",
   "highlights": [
-    "Rotary: line, cut and fill moves now run at the layer speed on the part, so text and outlines burn evenly all the way round. Rotary projects from 1.0.30 or earlier may burn darker or lighter; images are unchanged.",
-    "Rotary Setup adds Tapered part for tumblers and a choice of Y, A or Z axis. Job Review checks rotary image rows against the motor steps, and rotary camera placement advice now fits the axis that turns the part.",
-    "Camera: a picture at a new resolution is checked before it's placed, the calibration grade covers the whole bed, the moved-camera warning catches turns and tips, and the calibration target keeps Absolute Coordinates.",
-    "Camera Print and Cut checks which way round the printed sheet lies against the print. Camera logins now stay out of process lists, saved files and plain-text requests.",
-    "A glowing Update button at the top of the window downloads and installs a new version in two clicks, and waits while a job runs. The G-code Inspector's Run also asks if 1.0.29 set your laser up as a CNC.",
-    "CNC relief cut-outs report the real thickness of their holding tabs and warn when tabs are thin, roughed-only reliefs step down, and the box generator adds lift-off lid and open-front boxes."
+    "New experimental connections: stock K40 (M2/M3 Nano, with .egv export) and Moshiboard lasers over USB, and live Ruida control over the network. They are tested on simulators only, so air-cut on scrap first.",
+    "Import EPS and Illustrator 3–8 (.ai) files as editable paths, and DXF splines given only by fit points. Design Studio adds typed length and angle, tangent and perpendicular snaps, alignment guides, a Dimension tool and Trim.",
+    "A new 3D Sliced image mode and Fill Ramp for rubber stamps, and a dense trace no longer freezes the window. A recovered job advances its serial number once, and {{time}} jobs can now be confirmed in Job Review.",
+    "Fewer interruptions: questions appear inside the app instead of system pop-ups, Run again skips Job Review for an unchanged job you already reviewed, and autosave keeps going during a job. Beginners get a guided first job.",
+    "After Abort, a laser without homing gets its origin back by itself. Unlock keeps the position unless the alarm lost it, a Frame placed from a fixed origin survives a clean jog, and a jog stuck on a lost reply is released in place.",
+    "Rotary: a tapered Fill burns its whole hatch, Moshi and Ruida .rd jobs match the part's surface speed, and ramped Fills scan along X. Job Review warns when a move needs more than the rotary max rate ($112/$113)."
   ]
 }

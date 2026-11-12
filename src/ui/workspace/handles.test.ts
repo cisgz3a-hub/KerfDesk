@@ -144,10 +144,12 @@ describe('scaleObjectByHandleDrag — edge + center-out scaling', () => {
 describe('hitHandle', () => {
   it('picks the handle the cursor is on top of', () => {
     const o = obj({ bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 } });
-    // pxToMm = 0.5 means 8 px handle = 4 mm wide → halfMm = 2
-    expect(hitHandle(o, { x: 0.5, y: 0.5 }, 0.5)).toBe('nw');
-    expect(hitHandle(o, { x: 10, y: 0 }, 0.5)).toBe('ne');
-    expect(hitHandle(o, { x: 5, y: 5 }, 0.5)).toBeNull();
+    // pxToMm = 0.25 means the box is 40 px across and an 8 px handle is 2 mm
+    // wide → halfMm = 1. (At 0.5 the box is 20 px: too small for a handle to
+    // answer inside it, ADR-196 Amendment 1; see handle-layout.test.ts.)
+    expect(hitHandle(o, { x: 0.5, y: 0.5 }, 0.25)).toBe('nw');
+    expect(hitHandle(o, { x: 10, y: 0 }, 0.25)).toBe('ne');
+    expect(hitHandle(o, { x: 5, y: 5 }, 0.25)).toBeNull();
   });
 });
 

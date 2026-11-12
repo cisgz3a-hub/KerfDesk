@@ -57,8 +57,17 @@ describe('registration jig canvas overlay', () => {
     const { ctx, calls } = recordingContext();
     const overlay = { selectedIds: new Set(['art']), marquee: null, dropOutlineId: null };
     drawJigCanvasOverlay(ctx, jig(), overlay, VIEW);
-    expect(named(calls, 'fillRect')).toHaveLength(8);
+    // The artwork is 20 px across here: its sides are too short for middle
+    // handles, so only the four corners are drawn (ADR-196 Amendment 1).
+    expect(named(calls, 'fillRect')).toHaveLength(4);
     expect(named(calls, 'arc')).toHaveLength(1);
+  });
+
+  it('draws all eight resize handles on a selection with room for them', () => {
+    const { ctx, calls } = recordingContext();
+    const overlay = { selectedIds: new Set(['outline']), marquee: null, dropOutlineId: null };
+    drawJigCanvasOverlay(ctx, jig(), overlay, VIEW);
+    expect(named(calls, 'fillRect')).toHaveLength(8);
   });
 
   it('highlights the drop target outline across its bounds', () => {

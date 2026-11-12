@@ -6,7 +6,8 @@ Plan: [AREAS.md](AREAS.md). Severity: P1 harms a job, loses work or exposes a se
 |---|---|---|---|---|---|---|---|---|---|
 | D1 | Merge-train review (64 PRs since C1) | origin/main @ 6ce535a26 (auditor and refuter). The coordinator re-read 623551b31, where none of the cited files changed. Node scripts on the real modules and the repo's Moshi and Ruida simulators; the refuter used its own stroke trace, a wall-clock Ruida simulator and a fake WebUSB device | [D1-merge-train-review.md](D1-merge-train-review.md) | 8 | 0 | 3 | 4 | 1 | 0 |
 | D2 | Single choke points (36 rules × every output route) | origin/main @ dcca5b8c4 (auditor and refuter). The coordinator re-read 06d947672, where none of the cited files changed. The same small job through every route with the real modules; own G-code reader (M106-aware), own Ruida command parser, Moshi byte hashes and decoder; the refuter drove the real app store and Moshi store | [D2-single-choke-points.md](D2-single-choke-points.md) | 11 | 0 | 4 | 2 | 5 | 10 |
-| **Total** | | | | **19** | **0** | **7** | **6** | **6** | **10** |
+| D3 | Test strength (176 hand mutants in 12 safety-critical modules) | origin/main @ 8fd1b07c1 (auditor and refuter). The coordinator re-read 5c351a6b3: the gap sites are unchanged. Persistent and fresh-process Vitest runs per mutant; the refuter re-ran every P1 and the riskiest P2 survivors against 53–267-file lists, re-ran 5 kills, and built probes for R10, X01/X09 and J09 | [D3-test-strength.md](D3-test-strength.md) | 21 | 1 | 0 | 11 | 9 | 5 |
+| **Total** | | | | **40** | **1** | **7** | **17** | **15** | **15** |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
@@ -25,9 +26,21 @@ Plan: [AREAS.md](AREAS.md). Severity: P1 harms a job, loses work or exposes a se
 | D2-P2-1 (refuter: **P1**) | D2 | **The shared job warnings never reach Save `.rd`, Ruida network or Moshiboard.** Examples: "kerf closed up this slot, it will not be cut", "Fill failed", and the kerf-side warning ADR-486 Amd 3 relies on instead of guessing. In the refuter's case, a kerf-compensated hole comes out 0.8 mm oversize: G-code warns, and the other three routes say nothing. Rated P1: silent wrong scale (METHOD §3). | **READ** on main: `detectMachineJobWarnings` is called only from the Save G-code, tiled export and G-code Start paths; nothing in `io/rd`, `io/moshi` or the two network stores calls it. Auditor and refuter **REPRO**. | routed to the Moshiboard session, with #1753's "show before Start" work. Fix: a core `jobAdvisories(prepared, capabilities)` called inside every `emitPrepared*` |
 | D2-P2-2 | D2 | **On a Moshiboard, burned tabs and lighter layers burn at dial power, with no job-specific warning.** Tabs at 20 % burn all 160 of 160 mm lit, so the tabs are cut through. The generic "no power control" notes do not name tabs. | **READ** on main: `moshi-vector-plan.ts:16` (`fires = group.power > 0`); the encoder's power note covers grey raster levels only. Auditor and refuter **REPRO**. | routed to the Moshiboard session. Fix: one capability-driven "power this route cannot express" check that names tabs, layers of different power and grey rasters |
 | D2-P2-3 | D2 | **Variable text set to advance "After completed job" never advances after a Moshiboard or Ruida network job**, so the next tag repeats the serial. | **READ** on main: no `advanceVariablesAfter` or `armVariableStreamAdvancement` in either network store. Refuter **REPRO**: a real Moshi store job to completion leaves the serial at 7. | routed to the Moshiboard session. Fix: advance from the route-neutral "job completed" event of #1753's machine-work change |
+| D3 test gaps (11 × P2) | D3 | **The tests would not catch these regressions in beam, stop and motion code.** The code on main is correct today. Rated at most P2 under the refuter's rule, which follows C1: a check gap is P1 only after a defect has escaped through it.<br>• **D3-P1-2→P2 (R10):** photo rows after a controlled laser-off seek would burn at the travel feed on modal-F GRBL (3.75× the dose); "Controlled seek" is an ungated checkbox in Device Setup.<br>• **D3-P1-3→P2 (X01):** the Smoothieware Abort stream freeze; one job line can follow a pending Ctrl-X, with a misleading notice.<br>• **D3-P2-1 (R11):** a zero-length S0 move under M3 (a lit drain).<br>• **D3-P2-2:** five Abort ownership and ordering guards (X02, X05, X07, X11, X13).<br>• **D3-P2-3 (X10):** the Z-rotary start turn with inch reports.<br>• **D3-P2-4 (P06, P14):** the resume modal scan for imported programs (return to G54, M5).<br>• **D3-P2-5 (T14):** the taper surface feed sampling point.<br>• **D3-P2-6 (J01, J03–J06):** the Job Review "reuse the prepared bytes" shortcut.<br>• **D3-P2-7 (J08, J14):** the run-again replay guards.<br>• **D3-P2-8 (B03):** the arc-bulge bed check at max X under an offset.<br>• **D3R-P2-1 (J09, refuter):** a Cancel pressed during the Confirm re-prepare is guarded by one untested check. The refuter reproduced that without it the cancelled job starts. | **READ** on main `5c351a6b3`: `emit-raster-sweep.ts:134` (`feedPending`) and `job-review-gate.ts:162-167` (`reviewPreparationWasCancelled`) are as the mutants assume; the other cited sites are unchanged since 8fd1b07c1. Auditor and refuter **REPRO**: every listed mutant survived its module's tests, and the refuter re-ran R10, R11, T14, B03, P06, P14, J01, J03, J09, X01, X05, X09 and X10 against 53–267 files. | proposed as one test-hardening session (card); each gap has a named test in the report |
+| D3-P1-1 (G15) | D3 | Offset Fill passes. **Refuted:** `contour-entry-envelope.test.ts` kills it, so CI would catch it. | Refuter **REPRO** (fresh process, 267 files). | — |
 
-### P3s (6)
+### P3s (15)
 
+- **D3 (9):**
+  - D3-P1-4→P3 (X09): a failed Smoothieware reset write; the "use physical E-stop" notice stays.
+  - D3-P1-5→P3 (C12): the CNC max safe Z is equivalent today, because one machine-wide safe Z covers every group.
+  - D3-P3-1: header power-mode metadata.
+  - D3-P3-2: the quickstop log line.
+  - D3-P3-3: guards made safe by another layer (T13, C03).
+  - D3-P3-4: the relative-origin envelope.
+  - D3-P3-5: rules caught only by far-away tests (now 12, including G15).
+  - D3-P3-6: redundant guards. X14 is dead code; J12, W10 and W11 are near-equivalent.
+  - D3-P3-7: the simulators skip motion time, arcs and open-port write failures, so no Abort test can fail on a timing or transport fault.
 - **D1-P3-1:** a Moshi Connect whose status read fails or stalls, or a WebUSB `selectConfiguration` failure, leaves the device open and claimed until the page closes. It goes to the Moshiboard session with D1-P1-1, since it touches the same files.
 - **D2-P3-1:** the Moshi and Ruida Frame permits compare bounding boxes only, not the coordinate identity (NN 21).
 - **D2-P3-2:** rules copied per route: the preflight adapter, the wrap limit and the pass loops agree, but the Moshi Fill runway copy ignores `fillRunwayPolicy`.
@@ -50,6 +63,14 @@ Design Studio (#1706, #1709, #1710, #1713) and #1692 were read only.
 - Real Ruida busy and idle timing; real Moshiboard timing.
 - Browser runs (memory stayed under 2 GB for most of the run).
 - Design Studio and #1692 in depth.
+
+### D3 kill rates
+
+- **Overall:** 75 % by each module's own tests and 81 % including neighbours. 33 of 176 survived; about 6 are equivalent.
+- **Strong:** the GRBL streamer and the Frame/Start permit (14 of 14 each), and Fill emission (10 of 10).
+- **Weak:** Abort (`laser-job-stop.ts`, 4 of 14), the Job Review gate (5 of 14), and preflight (7 of 14 by its own tests).
+- **What carries the weight:** the oracle-style tests (the resume emitter oracle and the CNC motion property test) catch many mutants nobody wrote a direct test for.
+- **Rating rule (adopted):** no P1 for a test gap behind correct code. P2 if the gap is reachable and on a beam, stop or motion rule. P3 otherwise.
 
 ### D2 verified clean
 

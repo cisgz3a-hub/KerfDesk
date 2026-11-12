@@ -204,7 +204,8 @@ function applyFitSelectionToBoardToState(
 
 // The reference is the object last clicked into the selection, as in LightBurn.
 // A selection made at once (a marquee, Select All) has no click order, so it
-// falls back to the last selected id, which is the top-most in the stack.
+// falls back to the first selected object in draw order, the bottom of the
+// stack, as LightBurn 1.7 does (ADR-709).
 function applySelectionAlignToState(
   state: AppState,
   kind: SelectionAlignKind,
@@ -268,8 +269,14 @@ function referencedSelection(state: AppState): {
   const referenceId =
     clickedId !== null && objects.some((object) => object.id === clickedId)
       ? clickedId
-      : ids[ids.length - 1];
+      : firstInDrawOrder(state.project.scene, objects);
   return { objects, referenceId };
+}
+
+// The selected object lowest in the stack: the first one the job draws.
+function firstInDrawOrder(scene: Scene, objects: ReadonlyArray<SceneObject>): string | undefined {
+  const selected = new Set(objects.map((object) => object.id));
+  return scene.objects.find((object) => selected.has(object.id))?.id;
 }
 
 function applySelectionDistributeToState(

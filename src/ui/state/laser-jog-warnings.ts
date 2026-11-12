@@ -22,6 +22,7 @@ import { inferCurrentMachinePosition } from './infer-machine-position';
 import { resolveNativeBedFrame, selectNativeBedEvidence } from './native-bed-frame';
 import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
+import type { MachineExecutionOwner } from './machine-execution-owner';
 import { useStore } from './store';
 import { useToastStore } from './toast-store';
 
@@ -34,23 +35,47 @@ type Point = { readonly x: number; readonly y: number };
 type JogXyPath = { readonly start: Point; readonly target: Point };
 
 /** `start` overrides the reported position for a step queued behind running
- *  steps, which starts where they end (ADR-674); null there means unknown. */
+ *  steps, which starts where they end (ADR-674); null there means unknown.
+ *  Returns the warnings it published, in order, so a remote jog's receipt can
+ *  carry the text the PC showed (ADR-585 Amendment 3). */
 export function warnJogMotionPolicy(
   set: SetFn,
   get: GetFn,
   params: JogParams,
   start?: Point | null,
+): readonly string[] {
+  const warnings = jogMotionPolicyWarnings(get, params, start);
+  for (const warning of warnings) publishMotionPolicyWarning(set, get, warning);
+  return warnings;
+}
+
+/** An owned jog's warnings, also handed to its owner so a remote receipt
+ *  repeats them (ADR-585 Amendment 3). Published first, whoever owns the jog:
+ *  `owner?.f?.(warn())` would skip the PC's own warning when there is no owner. */
+export function warnJogAndReport(
+  set: SetFn,
+  get: GetFn,
+  params: JogParams,
+  owner?: MachineExecutionOwner,
 ): void {
+  const warnings = warnJogMotionPolicy(set, get, params);
+  owner?.onMotionWarnings?.(warnings);
+}
+
+function jogMotionPolicyWarnings(
+  get: GetFn,
+  params: JogParams,
+  start?: Point | null,
+): readonly string[] {
   const path = resolveJogXyPath(get, params, start);
-  if (path === null) {
-    warnUnresolvedJogXyPath(set, get, params);
-    return;
-  }
+  if (path === null) return unresolvedJogXyPathWarnings(params);
   const device = useStore.getState().project.device;
   const bedPath = bedJogPath(get(), device, path);
-  if (bedPath === null) return;
-  warnJogTargetOutsideConfiguredBounds(set, get, device, bedPath.target);
-  warnJogNoGoZoneCrossing(set, get, device, bedPath);
+  if (bedPath === null) return [];
+  return [
+    jogTargetOutsideConfiguredBoundsWarning(device, bedPath.target),
+    jogNoGoZoneCrossingWarning(device, bedPath),
+  ].filter((warning): warning is string => warning !== null);
 }
 
 // The path in bed coordinates, or null when no bed comparison is meaningful.
@@ -126,12 +151,10 @@ function resolveJogXyPath(
   return { start, target };
 }
 
-function warnJogTargetOutsideConfiguredBounds(
-  set: SetFn,
-  get: GetFn,
+function jogTargetOutsideConfiguredBoundsWarning(
   device: DeviceProfile,
   target: Point,
-): void {
+): string | null {
   const bounds = configuredMotionBounds(device);
   if (
     target.x >= bounds.minX &&
@@ -139,44 +162,33 @@ function warnJogTargetOutsideConfiguredBounds(
     target.y >= bounds.minY &&
     target.y <= bounds.maxY
   ) {
-    return;
+    return null;
   }
-  const message =
+  return (
     `Jog target X${target.x.toFixed(3)} Y${target.y.toFixed(3)} is outside the ` +
     `configured machine bounds X${bounds.minX.toFixed(3)}..${bounds.maxX.toFixed(3)}, ` +
-    `Y${bounds.minY.toFixed(3)}..${bounds.maxY.toFixed(3)}. Controller limits still apply.`;
-  publishMotionPolicyWarning(set, get, message);
+    `Y${bounds.minY.toFixed(3)}..${bounds.maxY.toFixed(3)}. Controller limits still apply.`
+  );
 }
 
-function warnUnresolvedJogXyPath(set: SetFn, get: GetFn, params: JogParams): void {
-  if (params.dx === undefined && params.dy === undefined) return;
-  publishMotionPolicyWarning(
-    set,
-    get,
+function unresolvedJogXyPathWarnings(params: JogParams): readonly string[] {
+  if (params.dx === undefined && params.dy === undefined) return [];
+  return [
     'The current machine XY position is unresolved, so KerfDesk cannot compare this jog path with configured bounds or no-go zones. The requested controller jog will be sent unchanged; monitor the move and use Cancel Jog or the physical E-stop if needed.',
-  );
+  ];
 }
 
 // DEV-04 / ADR-232: configured no-go zones are operator guidance. Frame is the
 // sole ordinary policy guard, so a direct jog crossing produces the same
 // prominent warning as other configured-envelope findings and never rewrites
 // or refuses the requested controller command.
-function warnJogNoGoZoneCrossing(
-  set: SetFn,
-  get: GetFn,
-  device: DeviceProfile,
-  path: JogXyPath,
-): void {
-  if (path.start.x === path.target.x && path.start.y === path.target.y) return;
+function jogNoGoZoneCrossingWarning(device: DeviceProfile, path: JogXyPath): string | null {
+  if (path.start.x === path.target.x && path.start.y === path.target.y) return null;
   const zones = device.noGoZones;
-  if (zones === undefined || zones.length === 0) return;
+  if (zones === undefined || zones.length === 0) return null;
   const zone = firstZoneCrossedBySegment(path.start, path.target, zones);
-  if (zone === null) return;
-  publishMotionPolicyWarning(
-    set,
-    get,
-    `This jog path crosses the configured no-go zone "${zone.name}". The requested controller jog will be sent unchanged; monitor the move and use Cancel Jog or the physical E-stop if needed.`,
-  );
+  if (zone === null) return null;
+  return `This jog path crosses the configured no-go zone "${zone.name}". The requested controller jog will be sent unchanged; monitor the move and use Cancel Jog or the physical E-stop if needed.`;
 }
 
 /** Warn-only motion guidance: a toast plus the console log (ADR-232). */
