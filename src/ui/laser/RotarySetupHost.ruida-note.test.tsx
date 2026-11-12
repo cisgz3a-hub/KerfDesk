@@ -4,7 +4,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { createProject } from '../../core/scene';
 import { useStore } from '../state';
-import { RotarySetupHost, RUIDA_ROTARY_NOTE, USB_LINK_ROTARY_NOTE } from './RotarySetupHost';
+import {
+  K40_ROTARY_NOTE,
+  MOSHI_ROTARY_NOTE,
+  RotarySetupHost,
+  RUIDA_ROTARY_NOTE,
+} from './RotarySetupHost';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -47,14 +52,21 @@ describe('Rotary Setup on a Ruida', () => {
 
   it('says nothing of the kind on a G-code controller', async () => {
     expect(await render('grbl-v1.1')).not.toContain('On a Ruida');
-    expect(document.body.textContent).not.toContain(USB_LINK_ROTARY_NOTE);
+    expect(document.body.textContent).not.toContain(K40_ROTARY_NOTE);
+    expect(document.body.textContent).not.toContain(MOSHI_ROTARY_NOTE);
   });
 });
 
-// ADR-703 Amendment 1 (code quality audit C2 D6-P1-2): a K40 or Moshiboard
-// sets each stroke's speed in whole mm/s, and a speed change stops the head.
+// ADR-703 Amendment 2 (C2 verification E2-P1-1): a K40 sets each stroke's
+// speed in classes 5 % apart; a Moshiboard in whole mm/s (ADR-705 Amd 1).
 describe('Rotary Setup on a K40 or Moshiboard', () => {
-  it.each(['lihuiyu', 'moshi'] as const)('says how a %s runs the rotary', async (kind) => {
-    expect(await render(kind)).toContain(USB_LINK_ROTARY_NOTE);
+  it('says how a K40 runs the rotary', async () => {
+    const text = await render('lihuiyu');
+    expect(text).toContain(K40_ROTARY_NOTE);
+    expect(text).not.toContain('whole mm/s');
+  });
+
+  it('says how a Moshiboard runs the rotary', async () => {
+    expect(await render('moshi')).toContain(MOSHI_ROTARY_NOTE);
   });
 });

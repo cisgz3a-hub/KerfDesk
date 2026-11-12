@@ -18,18 +18,24 @@ export const RUIDA_ROTARY_NOTE =
   'twice. This has not been checked on a Ruida machine yet, so run a test pattern first.';
 
 // A K40 (Lihuiyu) and a Moshiboard turn a Y-port rotary through their own
-// programs: KerfDesk splits each stroke's speed into whole mm/s for the
-// surface (ADR-703 Amendment 1, ADR-705 Amendment 1). Neither board can run a
-// rotary on A or Z.
-export const USB_LINK_ROTARY_NOTE =
-  "On a K40 or Moshiboard, KerfDesk scales Y and sets each stroke's speed for the part's surface in whole " +
-  'mm/s; a speed change stops the head briefly. Use the Y port. This has not been checked on a machine yet, so ' +
-  'run a test pattern first.';
+// programs, with each stroke's speed set for the surface. Neither board can run
+// a rotary on A or Z. A Moshiboard runs whole mm/s (ADR-705 Amendment 1); a
+// K40 runs speed classes 5 % apart, no slower than its slowest speed (ADR-703
+// Amendment 2). The export names any dose that leaves 95-105 %.
+export const MOSHI_ROTARY_NOTE =
+  "On a Moshiboard, KerfDesk scales Y and sets each stroke's speed for the part's surface in whole mm/s, so " +
+  'slow strokes can burn lighter or darker; the export says how much. Use the Y port. This has not been checked ' +
+  'on a machine yet, so run a test pattern first.';
+
+export const K40_ROTARY_NOTE =
+  "On a K40, KerfDesk scales Y and sets each stroke's speed for the part's surface, in steps 5 % apart; a " +
+  'speed change stops the head briefly, and nothing runs slower than 23.5 mm/min. Use the Y port. This has ' +
+  'not been checked on a machine yet, so run a test pattern first.';
 
 const CONTROLLER_ROTARY_NOTES: Partial<Record<string, string>> = {
   ruida: RUIDA_ROTARY_NOTE,
-  lihuiyu: USB_LINK_ROTARY_NOTE,
-  moshi: USB_LINK_ROTARY_NOTE,
+  lihuiyu: K40_ROTARY_NOTE,
+  moshi: MOSHI_ROTARY_NOTE,
 };
 
 export function RotarySetupHost(props: { readonly onClose: () => void }): JSX.Element {

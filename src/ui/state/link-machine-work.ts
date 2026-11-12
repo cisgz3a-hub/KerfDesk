@@ -1,6 +1,7 @@
 // Machine work running over a controller link outside the line-based laser
-// store (ADR-697 Ruida over UDP, ADR-705 Moshiboard over USB; ADR-705
-// Amendment 3). Those stores load lazily, so the app's always-mounted guards
+// store: every source in LINK_MACHINE_SOURCES (ADR-697 Ruida over UDP, ADR-705
+// Moshiboard over USB, ADR-703 K40 over USB; ADR-705 Amendments 3 and 6).
+// Those stores load lazily, so the app's always-mounted guards
 // cannot import them without pulling them into the boot bundle. Each one
 // reports its active work here instead, and Ctrl+., the Live Motion bar, the
 // close and update handoff, project replacement and Machine Setup Save read

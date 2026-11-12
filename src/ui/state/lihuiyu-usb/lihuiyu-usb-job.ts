@@ -62,7 +62,10 @@ export async function prepareLihuiyuUsbJob(
       absolute,
       board: lhyBoardSetting(project.device.lihuiyuBoard),
       framingMmPerMin: project.device.framingFeedMmPerMin,
-      advisories: [...result.advisories.map((issue) => issue.message), ...result.jobWarnings],
+      // Each line once: the panel and the job bar key their lists by the text.
+      advisories: [
+        ...new Set([...result.advisories.map((issue) => issue.message), ...result.jobWarnings]),
+      ],
       completed: request.completed,
     },
   };
