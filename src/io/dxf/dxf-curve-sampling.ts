@@ -78,35 +78,49 @@ export function isFullEllipseSweep(startParam: number, endParam: number): boolea
 const TURN_TOLERANCE = 1e-12;
 const INPUT_ULPS = 4 * Number.EPSILON;
 /**
- * How near a whole turn, as a fraction of it, printed angles still mean one:
- * 0.036° or 0.00063 rad. Angles written to 4 or more decimals (or 6 or more
- * significant digits) round well inside it.
+ * How near a whole turn, as a fraction of it, a sweep within one turn closes:
+ * 0.036° or 0.00063 rad, a gap of at most R × 6.3e-4.
  */
 export const WHOLE_TURN_SNAP = 1e-4;
+/**
+ * How near a whole turn angles at least a turn apart still mean one, per unit.
+ * Printed ARC degrees are off by at most 0.1° at 1 decimal or 4 significant
+ * digits (0.18° allowed); printed ELLIPSE radians by under 0.01 at 2 decimals
+ * or 4 significant digits (0.0097 rad allowed). Coarser printing is left as
+ * written (ADR-700 Amd 5).
+ */
+export const ARC_WRAP_SNAP = 5e-4;
+export const ELLIPSE_WRAP_SNAP = 1.55e-3;
 
 /**
  * The counter-clockwise sweep from `start` to `end` in (0, turn], the one
  * direction rule DXF ARC (degrees) and ELLIPSE (radians) share. Whole turns
  * between the two are dropped, so 0 → 450° is a quarter. Equal angles mean a
- * full turn. A sweep within WHOLE_TURN_SNAP of a whole turn is one, and so is a
- * remainder that near zero when the angles are at least a turn apart: a circle
- * written as s → s + 360 (or 0 → 6.28319) stays a circle whichever way its
- * printed angles round. Angles less than a turn apart keep a tiny sweep, so a
- * small arc across 0° (359.99° → 0.01°) stays small. Worked out in one step, so
- * any inputs end at once.
+ * full turn, and so does a sweep within WHOLE_TURN_SNAP of one. When the angles
+ * are at least a turn apart, a sweep within `wrapSnap` of a whole turn or of
+ * zero is one too: a circle written as s → s + 360 (or −3.142 → 3.142) stays a
+ * circle whichever way its printed angles round. Angles less than a turn apart
+ * keep a tiny sweep, so a small arc across 0° (359.99° → 0.01°) stays small.
+ * Worked out in one step, so any inputs end at once.
  */
-export function counterClockwiseSweep(start: number, end: number, turn: number): number {
+export function counterClockwiseSweep(
+  start: number,
+  end: number,
+  turn: number,
+  wrapSnap: number,
+): number {
   const difference = end - start;
   if (!Number.isFinite(difference)) return turn;
   const tolerance = TURN_TOLERANCE * turn + INPUT_ULPS * (Math.abs(start) + Math.abs(end));
   const remainder = difference % turn;
   const sweep = remainder < 0 ? remainder + turn : remainder;
-  const snap = WHOLE_TURN_SNAP * turn;
-  if (sweep <= tolerance || turn - sweep <= snap) return turn;
-  return sweep <= snap && Math.abs(difference) >= turn ? turn : sweep;
+  if (sweep <= tolerance || turn - sweep <= WHOLE_TURN_SNAP * turn) return turn;
+  if (Math.abs(difference) < turn) return sweep;
+  const snap = wrapSnap * turn;
+  return sweep <= snap || turn - sweep <= snap ? turn : sweep;
 }
 
 /** An ELLIPSE's parameter sweep, by the shared rule. */
 export function normalizedSweep(startParam: number, endParam: number): number {
-  return counterClockwiseSweep(startParam, endParam, FULL_TURN);
+  return counterClockwiseSweep(startParam, endParam, FULL_TURN, ELLIPSE_WRAP_SNAP);
 }

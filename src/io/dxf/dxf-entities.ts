@@ -22,6 +22,7 @@ import {
   type DxfExtrusion,
 } from './dxf-ocs';
 import {
+  ARC_WRAP_SNAP,
   bulgeSegment,
   counterClockwiseSweep,
   isFullEllipseSweep,
@@ -107,7 +108,7 @@ function arcInOcs(tags: ReadonlyArray<DxfTag>, scale: number): EntityConversion 
  * keeps its former value exactly.
  */
 export function arcSweep(startDeg: number, endDeg: number): number {
-  const sweepDeg = counterClockwiseSweep(startDeg, endDeg, 360);
+  const sweepDeg = counterClockwiseSweep(startDeg, endDeg, 360, ARC_WRAP_SNAP);
   if (sweepDeg === 360) return FULL_TURN;
   if (Math.abs(endDeg - startDeg) < 360) {
     // Within one turn the sweep keeps its former value bit for bit.
