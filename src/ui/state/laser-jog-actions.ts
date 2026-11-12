@@ -26,7 +26,7 @@ import { useStore } from './store';
 import { motionMachineKind, pointMoveSafeZMm } from './job-motion-machine';
 import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
 import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
-import { publishMotionPolicyWarning, warnJogMotionPolicy } from './laser-jog-warnings';
+import { publishMotionPolicyWarning, warnJogAndReport } from './laser-jog-warnings';
 import { firstStepJogQueue, queueStepJog } from './step-jog-queue';
 import {
   assertManualMotionNotCancelled,
@@ -117,7 +117,7 @@ async function runJogToMachinePosition(
   if (Math.abs(dx) < JOG_TO_POINT_EPSILON_MM && Math.abs(dy) < JOG_TO_POINT_EPSILON_MM) return;
   assertCncPointMoveWorkZReady(set, get);
   const params = { dx, dy, feed };
-  warnJogMotionPolicy(set, get, params);
+  warnJogAndReport(set, get, params);
   const operation = startSettledJogOperation(refs);
   assertManualMotionNotCancelled(refs, cancelGeneration);
   set(jogStartPatch(get(), operation, {}));
@@ -162,7 +162,7 @@ async function runJog(
   assertMotionQueueSettled(set, get, 'jogging');
   const cancelGeneration = await confirmUncancelledFreshIdle(context, 'jog');
   assertMachineExecutionOwner(owner);
-  warnJogMotionPolicy(set, get, params);
+  warnJogAndReport(set, get, params, owner);
   // Any deliberate head move takes the placement proof out of the store, even
   // if the head later returns to numerically identical coordinates. Only a
   // fixed-placement Frame rides on a clean XY jog and comes back when it

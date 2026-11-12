@@ -192,7 +192,11 @@ function numberToken(word: string): number | null {
   if (radix === null) return null;
   const base = Number(radix[1]);
   if (base < 2 || base > 36) return null;
-  const value = parseInt(radix[2] ?? '', base);
+  const digits = radix[2] ?? '';
+  // parseInt stops at the first digit too large for the base ("8#19" -> 1);
+  // PLRM 3.2.2 makes such a token not a number at all (O8-P3-3).
+  if (Array.from(digits).some((digit) => parseInt(digit, 36) >= base)) return null;
+  const value = parseInt(digits, base);
   return Number.isFinite(value) ? value : null;
 }
 

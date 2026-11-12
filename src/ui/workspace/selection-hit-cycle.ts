@@ -15,13 +15,15 @@ export function handleAltSelectionCycle(args: {
   readonly e: ReactMouseEvent<HTMLCanvasElement>;
   readonly project: Project;
   readonly point: Vec2;
+  /** Scene millimetres per canvas pixel. */
+  readonly pxToMm: number;
   readonly selectedObjectId: string | null;
   readonly onShiftClick: (id: string) => void;
   readonly onPlainClick: (id: string | null) => void;
 }): boolean {
   if (args.e.button !== 0 || !args.e.altKey) return false;
   const hitId = nextSelectionHit(
-    workspaceHitTestCandidates(args.project.scene, args.point),
+    workspaceHitTestCandidates(args.project.scene, args.point, args.pxToMm),
     args.selectedObjectId,
   );
   if (hitId === null) return true;

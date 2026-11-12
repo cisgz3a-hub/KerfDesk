@@ -17,18 +17,20 @@ type InteriorCandidate = {
 export function hitTestCandidates(
   scene: Scene,
   point: Vec2,
-  options: { readonly wireframe?: boolean } = {},
+  options: { readonly wireframe?: boolean; readonly strokeToleranceMm?: number } = {},
 ): ReadonlyArray<string> {
   const layerByColor = sceneLayerVisibilityLookup(scene.layers);
   const pools =
-    options.wireframe === true ? OUTLINES_ONLY : fillPoolParityAt(scene, layerByColor, point);
+    options.wireframe === true
+      ? OUTLINES_ONLY
+      : fillPoolParityAt(scene, layerByColor, point, options.strokeToleranceMm);
   const primary: string[] = [];
   const interiors: InteriorCandidate[] = [];
   let zRank = 0;
   for (let index = scene.objects.length - 1; index >= 0; index -= 1) {
     const object = scene.objects[index];
     if (object === undefined || !isSelectable(object, layerByColor)) continue;
-    const hit = hitTestObject(layerByColor, object, point, pools);
+    const hit = hitTestObject(layerByColor, object, point, pools, options.strokeToleranceMm);
     if (hit.kind === 'primary') primary.push(object.id);
     if (hit.kind === 'line-interior') interiors.push({ id: object.id, area: hit.area, zRank });
     zRank += 1;

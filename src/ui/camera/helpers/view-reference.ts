@@ -112,9 +112,32 @@ export function hasViewReference(record: CameraModelRecord): boolean {
   }
 }
 
+// The last reference read, by its stored text: the moved check reads it more
+// than once per check, and decoding it each time added to the UI thread's work
+// while a job ran (rolling audit v14 Z1 follow-up). Callers only read it.
+let lastRead: {
+  readonly key: string;
+  readonly text: string;
+  readonly view: ViewThumbnail | null;
+} | null = null;
+
 export function loadViewReference(record: CameraModelRecord): ViewThumbnail | null {
   try {
-    const stored: unknown = JSON.parse(localStorage.getItem(keyFor(record)) ?? 'null');
+    const key = keyFor(record);
+    const text = localStorage.getItem(key);
+    if (text === null) return null;
+    if (lastRead !== null && lastRead.key === key && lastRead.text === text) return lastRead.view;
+    const view = parseViewReference(text);
+    lastRead = { key, text, view };
+    return view;
+  } catch {
+    return null;
+  }
+}
+
+function parseViewReference(text: string): ViewThumbnail | null {
+  try {
+    const stored: unknown = JSON.parse(text);
     if (typeof stored !== 'object' || stored === null) return null;
     const { width, height, data } = stored as Record<string, unknown>;
     if (typeof width !== 'number' || typeof height !== 'number' || typeof data !== 'string') {

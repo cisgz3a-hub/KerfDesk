@@ -56,7 +56,7 @@ dimensions at most 100000 mm and positive font sizes at most 1000 mm.
 | `apply_edits` | `edits`: 1–40 `{command,args}` | All-or-nothing batch as one "Remote edits" Undo step. Allowed commands are the single edit tools above (without admission fields); `"$n"` in `artworkIds`/`operationId` refers to edit n's result. |
 | `get_machine_status` | None | Current connection, labelled work position, actual jog capabilities, Frame, job and action readiness. |
 | `get_control_operation` | `operationId` UUID | This client's bounded operation receipt; no movement or automatic retry. |
-| `jog_machine` | `axis` x/y/z, `direction` -1/1, `distanceMm` 0.01–100, optional `feedMmPerMin` 1–100000 | One canonical discrete jog, using the actual desktop's axis/direction/feed limits. |
+| `jog_machine` | `axis` x/y/z, `direction` -1/1, `distanceMm` 0.01–100, optional `feedMmPerMin` 1–100000 | One canonical discrete jog, using the actual desktop's axis/direction/feed limits. The completed operation's `message` repeats the PC's configured-bounds and no-go-zone warnings for that jog, word for word; the jog is still sent (ADR-232, ADR-585 Amendment 3). |
 | `frame_job` | Machine write admission | Canonical tool-off Frame, with asynchronous owned operation status. |
 | `review_machine_job` | Machine write admission | Prepare the ordinary exact Job Review with a one-use handle; does not confirm Start. |
 | `start_job` | Machine write admission, `reviewId` UUID | Explicitly confirm the owned current review; changed review facts require another confirmation. |

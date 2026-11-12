@@ -11,6 +11,7 @@ import {
 import type { PathTextAcrossAlign } from '../scene/scene-object';
 import type { TextRenderResult } from './text-to-polylines';
 import { coloredPathsBounds } from './colored-paths-bounds';
+import { subdivideColoredPathForWarp, type WarpGrid } from './warp-subdivision';
 
 export type PathTextResult =
   | { readonly kind: 'ok'; readonly rendered: TextRenderResult; readonly origin: Vec2 }
@@ -62,12 +63,26 @@ export function placeTextOnPath(
       y: sample.point.y + sample.normal.y * height,
     };
   };
-  const worldPaths = rendered.paths.map((path) => mapColoredPath(path, map));
+  const grid = guideWarpGrid(metric, start - rendered.bounds.minX);
+  const worldPaths = rendered.paths.map((path) =>
+    mapColoredPath(subdivideColoredPathForWarp(path, grid), map),
+  );
   const bounds = coloredPathsBounds(worldPaths);
   return {
     kind: 'ok',
     rendered: normalizePaths(worldPaths, bounds),
     origin: { x: bounds.minX, y: bounds.minY },
+  };
+}
+
+// The map is affine along each guide segment and turns at each guide vertex.
+// Straight strokes break where the guide turns, so they follow it exactly;
+// curves are cut into short pieces (O7-P2-2).
+const PATH_PIECE_MM = 0.5;
+function guideWarpGrid(metric: PathMetric, textToGuide: number): WarpGrid {
+  return {
+    maxStepX: PATH_PIECE_MM,
+    breaksX: metric.cumulative.map((distance) => distance - textToGuide),
   };
 }
 
