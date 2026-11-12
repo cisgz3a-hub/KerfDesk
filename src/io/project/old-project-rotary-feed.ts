@@ -22,6 +22,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { fillHatchPassRuns } from '../../core/job/scan-pass-angles';
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
 import { maxOf, minOf } from '../../core/util';
 
@@ -78,17 +79,18 @@ function doseRatio(angle: number, yScale: number, speed: number, maxFeed: number
   return Math.max(surface / machine, held);
 }
 
-/** The directions this operation burns the object in. A Fill burns along its
- *  hatch (and across it for a cross-hatch); an offset Fill and a Line follow
- *  the outline, read from an imported outline's own edges and assumed to run
- *  round the part for any other object. */
+/** The directions this operation burns the object in. A Fill burns along the
+ *  hatch of each pass, as the compiler runs them (fillHatchPassRuns), and for
+ *  a cross-hatch also at that angle plus 90° (fill-hatching-cache.ts); code
+ *  quality audit C2 D6 (ADR-127 Amd 6). An offset Fill and a Line follow the
+ *  outline, read from an imported outline's own edges and assumed to run round
+ *  the part for any other object. */
 function strokeAngles(operation: Layer, object: SceneObject): number[] {
   if (operation.mode === 'fill' && operation.fillStyle !== 'offset') {
-    const hatch = (operation.hatchAngleDeg * Math.PI) / 180;
-    const turnsBetweenPasses =
-      (operation.passAngleStepDeg ?? 0) % 180 !== 0 && operation.passes > 1;
-    if (operation.fillCrossHatch || turnsBetweenPasses) return [hatch, ROUND_THE_PART];
-    return [hatch];
+    return fillHatchPassRuns(operation).flatMap((run) => {
+      const hatch = (run.angleDeg * Math.PI) / 180;
+      return operation.fillCrossHatch ? [hatch, hatch + ROUND_THE_PART] : [hatch];
+    });
   }
   return outlineAngles(object);
 }

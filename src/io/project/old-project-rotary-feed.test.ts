@@ -128,6 +128,30 @@ describe('which old rotary projects changed (ADR-127 Amd 4)', () => {
     ).toEqual([]);
   });
 
+  // Code quality C2 D6 (ADR-127 Amd 6): a cross-hatch adds hatch + 90°, not a
+  // flat 90°, and turned passes run at their own angles. The change of a
+  // stroke at θ is 1 / hypot(cos θ, k sin θ), the worst over the angles burned.
+  it.each([
+    ['0° cross-hatch', { hatchAngleDeg: 0, fillCrossHatch: true }, [0, 90]],
+    ['45° cross-hatch', { hatchAngleDeg: 45, fillCrossHatch: true }, [45, 135]],
+    ['30° cross-hatch', { hatchAngleDeg: 30, fillCrossHatch: true }, [30, 120]],
+    [
+      '3 passes turned 30° from 15°',
+      { hatchAngleDeg: 15, passes: 3, passAngleStepDeg: 30 },
+      [15, 45, 75],
+    ],
+  ] as const)('names the real change for a %s', (_name, fill, angles) => {
+    const k = 40 / (Math.PI * 80);
+    const expected = Math.max(
+      ...angles.map((deg) => {
+        const a = (deg * Math.PI) / 180;
+        return 1 / Math.hypot(Math.cos(a), k * Math.sin(a));
+      }),
+    );
+    const [change] = rotaryFeedChange(project(CHUCK, { mode: 'fill', ...fill }, { x: 40, y: 40 }));
+    expect(change?.ratio).toBeCloseTo(expected, 6);
+  });
+
   it('names 6.28× for a stroke round the part in the chuck, and for a 90° Fill', () => {
     expect(rotaryFeedChange(project(CHUCK, {}, { x: 10, y: 40 }))[0]?.ratio).toBeCloseTo(
       2 * Math.PI,
