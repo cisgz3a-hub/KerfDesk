@@ -49,6 +49,9 @@ export type AdjustImageApply = {
 export function AdjustImageDialog(props: {
   readonly image: RasterImage;
   readonly layer: Layer;
+  /** Other images OK changes too: those on this operation when the image
+   * owns no override of its own (T14-P2-1). */
+  readonly sharedWith?: number;
   readonly onCancel: () => void;
   readonly onApply: (patch: AdjustImageApply) => void;
 }): JSX.Element {
@@ -83,6 +86,7 @@ export function AdjustImageDialog(props: {
       size="xl"
     >
       <DialogHeader source={props.image.source} />
+      <SharedOperationNote operationName={props.layer.name} others={props.sharedWith ?? 0} />
       <PreviewGrid sourceRef={sourceRef} processedRef={processedRef} />
       <AdjustFields
         draft={draft}
@@ -248,6 +252,23 @@ function patchFromDraft(draft: AdjustImageDraft): AdjustImageApply {
       passThrough: draft.passThrough,
     },
   };
+}
+
+// LightBurn groups these as Layer Settings and says changes affect any image on
+// the same layer; KerfDesk says so whenever another image would change.
+function SharedOperationNote(props: {
+  readonly operationName: string;
+  readonly others: number;
+}): JSX.Element | null {
+  if (props.others <= 0) return null;
+  const images = props.others === 1 ? '1 other image' : `${props.others} other images`;
+  return (
+    <p role="note" className="lf-subheading" style={styles.subheadingStyle}>
+      Dither, Min Power, Line Interval, DPI, Dot Width, Negative Image and Pass-through belong to
+      the operation “{props.operationName}”: OK also changes them for {images} on it. Brightness,
+      Contrast and Gamma change this image only.
+    </p>
+  );
 }
 
 function DialogHeader({ source }: { readonly source: string }): JSX.Element {
