@@ -16,10 +16,8 @@ import {
 } from '../../../core/scene';
 import type { LaserModeStartSnapshot } from '../../state/laser-mode-start-evidence';
 import { cncSetupAttestationPrompt } from '../cnc-setup-acknowledgement';
-import {
-  LASER_MODE_UNVERIFIED_START_PROMPT,
-  laserModeStartAcknowledgementRequired,
-} from '../laser-mode-start-acknowledgement';
+import { operatorStatedPowerScaleFact } from '../../../core/devices/power-scale-statement';
+import { laserModeStartReview } from '../laser-mode-start-acknowledgement';
 import type { prepareCurrentStartJob } from '../start-job-source';
 import {
   describeJobOrigin,
@@ -75,6 +73,9 @@ export type JobReviewStatTile = {
 export type JobReviewAcknowledgement =
   | { readonly kind: 'laser-verified' }
   | { readonly kind: 'laser-unverified'; readonly prompt: string }
+  // The operator's recorded word for a power scale the firmware does not
+  // report (ADR-095 Amendment 1): one fact line, no click, never "verified".
+  | { readonly kind: 'laser-operator-stated'; readonly statement: string }
   | { readonly kind: 'cnc'; readonly prompt: string };
 
 export interface JobReviewModel extends JobReviewOmissions, jig.ReviewFacts {
@@ -300,11 +301,9 @@ function buildAcknowledgement(
   if (machineKind === 'cnc') {
     return { kind: 'cnc', prompt: cncSetupAttestationPrompt(args.overrides) };
   }
-  return laserModeStartAcknowledgementRequired(
-    args.prepared.prepared.project,
-    args.laserModeStartSnapshot,
-    args.prepared.gcode,
-  )
-    ? { kind: 'laser-unverified', prompt: LASER_MODE_UNVERIFIED_START_PROMPT }
-    : { kind: 'laser-verified' };
+  const review = laserModeStartReview(args.prepared.prepared.project, args.laserModeStartSnapshot);
+  if (review === null || review.kind === 'verified') return { kind: 'laser-verified' };
+  return review.kind === 'unverified'
+    ? { kind: 'laser-unverified', prompt: review.prompt }
+    : { kind: 'laser-operator-stated', statement: operatorStatedPowerScaleFact(review.statement) };
 }

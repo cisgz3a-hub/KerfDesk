@@ -66,7 +66,7 @@ import { controllerIdentityWarnings } from './controller-identity-warnings';
 import { detectCompiledVCarveDepthWarningsForJob } from './cnc-compiled-depth-warnings';
 import { findMachineStartIssues, prepareStartInput } from './start-job-input';
 import { workOffsetAssumptionWarnings } from './work-offset-assumption';
-import { unknownNativeBedWarning } from './restored-origin-warning';
+import { startUnknownNativeBedWarning } from './restored-origin-warning';
 import type { LaserSecondPassChain } from '../state/recovery/laser-second-pass-lineage';
 import type { StatusReportFieldsOff } from '../state/status-report-fields';
 import { frameBoundsPreviewOf, type FrameBoundsPreview } from './frame-bounds-preview';
@@ -449,7 +449,7 @@ function coordinatePreflightContext(options: FinalizeStartPreparationOptions) {
   if (options.motionOffset === undefined)
     return {
       emitOptions: { preflightCoordinateMode: 'relative-origin' as const },
-      warnings: [unknownNativeBedWarning(options.placement.jobOrigin, options.machine)],
+      warnings: [startUnknownNativeBedWarning(options)],
     };
   return {
     emitOptions: {

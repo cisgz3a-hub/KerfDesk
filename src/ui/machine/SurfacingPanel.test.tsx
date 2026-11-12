@@ -336,7 +336,7 @@ describe('SurfacingPanel save path', () => {
       expect(write).toHaveBeenCalledOnce();
       expect(useToastStore.getState().toasts.slice(toastCount)).toContainEqual(
         expect.objectContaining({
-          message: expect.stringContaining('does not report GRBL $-settings'),
+          message: expect.stringContaining('does not report its spindle speed scale'),
           variant: 'warning',
         }),
       );

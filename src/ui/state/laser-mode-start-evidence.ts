@@ -1,5 +1,9 @@
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
+import {
+  isOperatorPowerScaleStatement,
+  type OperatorPowerScaleStatement,
+} from '../../core/devices/power-scale-statement';
 import { gcodeUsesM7 } from '../../core/preflight/m7-air-assist-readiness';
 import type { SessionObservationStamp } from './laser-controller-observation';
 
@@ -26,6 +30,10 @@ export type LaserModeStartEvidence = LaserModeStartSnapshot & {
   readonly expectedMaxPowerS: number;
   readonly m7Required: boolean;
   readonly unverifiedAcknowledged: boolean;
+  /** Present only when the operator's recorded statement stood in for a
+   * power scale the firmware does not report (ADR-095 Amendment 1). It is the
+   * operator's word, archived as such, and never a KerfDesk verification. */
+  readonly operatorStatedPowerScale?: OperatorPowerScaleStatement;
 };
 
 export const LASER_MODE_START_EVIDENCE_CHANGED_MESSAGE =
@@ -56,8 +64,28 @@ export function createLaserModeStartEvidence(
   expectedMaxPowerS: number,
   m7Required: boolean,
   unverifiedAcknowledged: boolean,
+  operatorStatedPowerScale?: OperatorPowerScaleStatement,
 ): LaserModeStartEvidence {
-  return { ...snapshot, expectedMaxPowerS, m7Required, unverifiedAcknowledged };
+  return {
+    ...snapshot,
+    expectedMaxPowerS,
+    m7Required,
+    unverifiedAcknowledged,
+    ...(operatorStatedPowerScale === undefined ? {} : { operatorStatedPowerScale }),
+  };
+}
+
+/** Whether the evidence carries an operator statement that covers it: made
+ * for the Full-power S this Start expects, on a firmware that reports no
+ * settings. A statement beside a settings report covers nothing. */
+export function operatorStatedPowerScaleCovers(evidence: LaserModeStartEvidence): boolean {
+  const statement = evidence.operatorStatedPowerScale;
+  return (
+    statement !== undefined &&
+    isOperatorPowerScaleStatement(statement) &&
+    evidence.settingsCapability === 'none' &&
+    statement.maxPowerS === evidence.expectedMaxPowerS
+  );
 }
 
 export function laserModeStartSnapshotIsVerified(
@@ -70,7 +98,8 @@ export function laserModeStartSnapshotIsVerified(
 /** Final wire-boundary handoff for UI-originated laser Starts. Live $30/$32 and
  * M7 support remain review advisories under Frame-first policy. The final
  * boundary therefore proves only that the exact program still has the reviewed
- * M7 shape and that unverified review evidence was explicitly acknowledged. */
+ * M7 shape and that unverified review evidence was explicitly acknowledged, or
+ * is covered by the operator's recorded power-scale statement. */
 export function laserModeStartEvidenceIssue(
   evidence: LaserModeStartEvidence | undefined,
   gcode: string,
@@ -81,7 +110,8 @@ export function laserModeStartEvidenceIssue(
   }
   if (
     !laserModeStartSnapshotIsVerified(evidence, evidence.expectedMaxPowerS) &&
-    !evidence.unverifiedAcknowledged
+    !evidence.unverifiedAcknowledged &&
+    !operatorStatedPowerScaleCovers(evidence)
   ) {
     return LASER_REQUIREMENTS_UNVERIFIED_AT_START_MESSAGE;
   }

@@ -6,6 +6,10 @@
 // review lists them as warnings; none refuses. A laser whose laser mode is off
 // or unconfirmed also names rapid commands (G0 and G28/G30 returns) the program makes with the beam on.
 
+import {
+  unreportedPowerScaleFirmware,
+  unreportedPowerScaleFirmwareName,
+} from '../../core/devices/power-scale-statement';
 import { findLitRapids, type LitRapids } from '../../core/external-program';
 import { runControllerReadiness } from '../../core/preflight';
 import { machineKindOf, type Project } from '../../core/scene';
@@ -62,9 +66,24 @@ export function externalLaserModeStartPrompt(
     machineKindOf(project.machine) === 'laser'
       ? litRapidWarning(project, laser, litRapids === undefined ? findLitRapids(gcode) : litRapids)
       : null;
-  return lit === null
-    ? EXTERNAL_LASER_MODE_UNVERIFIED_START_PROMPT
-    : `${lit}\n\n${EXTERNAL_LASER_MODE_UNVERIFIED_START_PROMPT}`;
+  const prompt = externalUnverifiedPrompt(project, laser);
+  return lit === null ? prompt : `${lit}\n\n${prompt}`;
+}
+
+// Marlin and Smoothieware report no power scale and have no dollar settings,
+// so their prompt names what can be checked instead (ADR-095 Amendment 1).
+function externalUnverifiedPrompt(project: Project, laser: ExternalReadinessSource): string {
+  const firmware = unreportedPowerScaleFirmware(project.device.controllerKind);
+  if (laser.capabilities.settings !== 'none' || firmware === null) {
+    return EXTERNAL_LASER_MODE_UNVERIFIED_START_PROMPT;
+  }
+  return (
+    "KerfDesk cannot check this controller's power scale.\n\n" +
+    `${unreportedPowerScaleFirmwareName(firmware)} does not report its laser power scale, and this program's S values come from the file, not from KerfDesk. ` +
+    "If the file was written for a different top S value than this firmware's, every power in it is wrong by that ratio. " +
+    'Confirm only if you have checked the file against the firmware.\n\n' +
+    'Start this laser program anyway?'
+  );
 }
 
 // Only a laser on a controller with `$` settings: Marlin and Smoothieware

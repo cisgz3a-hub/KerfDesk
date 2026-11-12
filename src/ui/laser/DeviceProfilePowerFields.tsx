@@ -17,6 +17,7 @@ import {
 } from '../../core/devices/smoothie-power-scale';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { numInputStyle, Row } from './device-settings-shared';
+import { PowerScaleStatementRow } from './PowerScaleStatementRow';
 import { PresetAirAssistOffer } from './PresetAirAssistOffer';
 
 const MAX_POWER_S = 100000;
@@ -57,6 +58,7 @@ export function LaserPowerRows(props: DeviceRowsProps): JSX.Element {
           />
         )}
       </Row>
+      <PowerScaleStatementRow device={device} update={update} />
       <Row label={labels.min}>
         <ClearableNumberField
           min={0}

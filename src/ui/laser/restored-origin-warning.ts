@@ -12,8 +12,10 @@
 // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/grbllib.c#L358
 // https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/main.c#L47
 
+import type { DeviceProfile } from '../../core/devices';
 import type { JobOriginPlacement } from '../../core/job';
-import { UNKNOWN_NATIVE_BED_MESSAGE } from '../state/native-bed-frame';
+import { UNKNOWN_NATIVE_BED_MESSAGE, type NativeBedEvidence } from '../state/native-bed-frame';
+import { nativeBedUnknownReviewNote } from '../state/native-bed-unknown-reason';
 import type { MachineStartSnapshot } from './start-job-readiness';
 
 type RestoredOriginEvidence = Pick<
@@ -35,19 +37,37 @@ const RESTORED_ORIGIN_ADVICE =
   'should run, or Set origin here again.';
 
 /** The warning for a job whose bed position the controller-to-bed mapping
- *  cannot verify, naming a restored origin the job runs from. */
+ *  cannot verify, naming a restored origin the job runs from. With `device`,
+ *  it also says why this firmware and session have no mapping (annoyance audit
+ *  A2 B3-P2-2). */
 export function unknownNativeBedWarning(
   jobOrigin: JobOriginPlacement | undefined,
-  machine: RestoredOriginEvidence,
+  machine: RestoredOriginEvidence & NativeBedEvidence,
+  device?: DeviceProfile,
 ): string {
-  if (!runsFromRestoredOrigin(jobOrigin, machine)) return UNKNOWN_NATIVE_BED_MESSAGE;
+  const why = device === undefined ? null : nativeBedUnknownReviewNote(device, machine);
+  const lead = why === null ? UNKNOWN_NATIVE_BED_MESSAGE : `${UNKNOWN_NATIVE_BED_MESSAGE} ${why}`;
+  if (!runsFromRestoredOrigin(jobOrigin, machine)) return lead;
   const note = restoredOriginFirmwareNote(machine);
   return [
-    UNKNOWN_NATIVE_BED_MESSAGE,
+    lead,
     RESTORED_ORIGIN_LEAD,
     ...(note === null ? [] : [note]),
     RESTORED_ORIGIN_ADVICE,
   ].join(' ');
+}
+
+/** The same warning from a Start preparation's own inputs. */
+export function startUnknownNativeBedWarning(options: {
+  readonly placement: { readonly jobOrigin?: JobOriginPlacement | undefined };
+  readonly machine: RestoredOriginEvidence & NativeBedEvidence;
+  readonly project: { readonly device: DeviceProfile };
+}): string {
+  return unknownNativeBedWarning(
+    options.placement.jobOrigin,
+    options.machine,
+    options.project.device,
+  );
 }
 
 // Absolute and Current Position jobs do not place from the work origin.

@@ -23,6 +23,7 @@ import {
   type DeviceProfile,
 } from '../../core/devices/device-profile';
 import { laserArcMovesEntry } from '../../core/devices/laser-arc-moves';
+import { operatorPowerScaleStatementEntry } from '../../core/devices/power-scale-statement';
 import { cncSubProfileIssues } from '../../core/devices/cnc-sub-profile-validation';
 import { positioningLightIssue } from '../../core/devices/positioning-light';
 import {
@@ -211,12 +212,20 @@ function validateProfilePositiveMachineFields(value: Record<string, unknown>): s
   return null;
 }
 
-type OptionalChoiceFields = Pick<DeviceProfile, 'laserArcMoves' | 'kinematics'>;
+type OptionalChoiceFields = Pick<
+  DeviceProfile,
+  'laserArcMoves' | 'kinematics' | 'operatorPowerScaleStatement'
+>;
 
 /** The optional choices a saved profile keeps only when they hold a known
- *  value: Arc moves (ADR-432) and the motion layout (ADR-675). */
+ *  value: Arc moves (ADR-432), the motion layout (ADR-675) and the operator's
+ *  power-scale statement (ADR-095 Amendment 1). */
 export function knownOptionalChoices(profile: OptionalChoiceFields): OptionalChoiceFields {
-  return { ...laserArcMovesEntry(profile.laserArcMoves), ...kinematicsEntry(profile.kinematics) };
+  return {
+    ...laserArcMovesEntry(profile.laserArcMoves),
+    ...kinematicsEntry(profile.kinematics),
+    ...operatorPowerScaleStatementEntry(profile.operatorPowerScaleStatement),
+  };
 }
 
 // ADR-675: absent is Cartesian.

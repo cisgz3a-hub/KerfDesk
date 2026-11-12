@@ -16,6 +16,7 @@ import { jogFrameCommandBlockMessage } from '../state/laser-store-helpers';
 import { useToastStore } from '../state/toast-store';
 import { resolveManualMotionLimits } from '../state/manual-motion-limits';
 import { resolveNativeBedFrame, type NativeBedEvidence } from '../state/native-bed-frame';
+import { positionLaserUnavailableMessage } from '../state/native-bed-unknown-reason';
 import {
   bedPointToNative,
   nativePointToBed,
@@ -62,12 +63,9 @@ export function dispatchPositionLaser(scenePoint: Vec2, device: DeviceProfile): 
   }
   const frame = resolveNativeBedFrame(device, laser);
   if (frame === null) {
-    useToastStore
-      .getState()
-      .pushToast(
-        'The controller-to-bed mapping is unverified. Home with a supported coordinate mapping before moving to a canvas point.',
-        'error',
-      );
+    // Names the real reason for this firmware and session (annoyance audit
+    // A2 B3-P2-2): on a family KerfDesk cannot map, no Home would help.
+    useToastStore.getState().pushToast(positionLaserUnavailableMessage(device, laser), 'error');
     return;
   }
   const target = positionLaserNativeTarget(scenePoint, device, frame, laser);

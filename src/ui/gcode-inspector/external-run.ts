@@ -248,7 +248,12 @@ export async function startExternalProgram(frame: ExternalFrame): Promise<boolea
     captureLaserModeStartSnapshot(laser),
     jobAwareConfirm,
     gcode,
-    externalLaserModeStartPrompt(project, laser, gcode, frame.run.litRapids),
+    // The operator's power-scale statement is about the profile's scale; a
+    // program KerfDesk did not build need not use it, so this run still asks.
+    {
+      prompt: externalLaserModeStartPrompt(project, laser, gcode, frame.run.litRapids),
+      operatorStatementApplies: false,
+    },
   );
   if (laserModeStartEvidence === null) return false;
   const cncSetupAttestation = confirmCncSetup(

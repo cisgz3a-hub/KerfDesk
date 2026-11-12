@@ -1,5 +1,6 @@
 import type { DeviceProfile } from './device-profile';
 import { positioningLightSupported } from './positioning-light';
+import { powerScaleStatementDescribes } from './power-scale-statement';
 import { isScanOffsetTableForProfile } from './scan-offset-profile';
 import { isFinitePositive } from '../util/finite';
 
@@ -10,7 +11,9 @@ export function deviceProfileWithInteractivePatch(
   current: DeviceProfile,
   patch: Partial<DeviceProfile>,
 ): DeviceProfile {
-  const patched = withoutUnsupportedLight({ ...current, ...patch });
+  const patched = withoutStalePowerScaleStatement(
+    withoutUnsupportedLight({ ...current, ...patch }),
+  );
   // A measured travel confirmation belongs to that value. Controller-detected
   // travel may replace it without going through the manual Z editor, so never
   // inherit the old confirmation for different travel. An explicit confirmation
@@ -45,6 +48,16 @@ function withoutUnsupportedLight(profile: DeviceProfile): DeviceProfile {
   if (profile.positioningLight === undefined) return profile;
   if (positioningLightSupported(profile.gcodeDialect.dialectId)) return profile;
   const { positioningLight: _removed, ...rest } = profile;
+  return rest;
+}
+
+// The operator's power-scale statement is about one Full-power S on one
+// controller family and output dialect (ADR-095 Amendment 1). An edit to any
+// of them removes it, so putting the old value back does not bring it back.
+function withoutStalePowerScaleStatement(profile: DeviceProfile): DeviceProfile {
+  const statement = profile.operatorPowerScaleStatement;
+  if (statement === undefined || powerScaleStatementDescribes(statement, profile)) return profile;
+  const { operatorPowerScaleStatement: _stale, ...rest } = profile;
   return rest;
 }
 

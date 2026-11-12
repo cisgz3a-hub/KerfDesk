@@ -174,7 +174,9 @@ function ordinaryWorkflowMatchesArtifact(artifact: ExecutionArtifactV1): boolean
   const acknowledgement = provenance.review.acknowledgement;
   return artifact.machineKind === 'cnc'
     ? acknowledgement.kind === 'cnc'
-    : acknowledgement.kind === 'laser-verified' || acknowledgement.kind === 'laser-unverified';
+    : acknowledgement.kind === 'laser-verified' ||
+        acknowledgement.kind === 'laser-unverified' ||
+        acknowledgement.kind === 'laser-operator-stated';
 }
 
 function laserRecoveryWorkflowMatchesArtifact(

@@ -131,11 +131,19 @@ function reviewNeedsNoClick(
   return (
     purpose === 'start' &&
     model.machineKind === 'laser' &&
-    model.acknowledgement.kind === 'laser-verified' &&
+    reviewAsksNothing(model.acknowledgement) &&
     model.convertedLaser === undefined &&
     sameWarningSet(model.warnings, approved.warnings) &&
     useJobReviewStore.getState().state.kind === 'idle' &&
     useLaserStore.getState().controllerSessionEpoch === approved.controllerSessionEpoch
+  );
+}
+
+// A verified laser, or one whose power scale the operator has recorded as
+// checked (ADR-237 Amendment 4): neither shows anything to confirm.
+function reviewAsksNothing(acknowledgement: JobReviewModel['acknowledgement']): boolean {
+  return (
+    acknowledgement.kind === 'laser-verified' || acknowledgement.kind === 'laser-operator-stated'
   );
 }
 
