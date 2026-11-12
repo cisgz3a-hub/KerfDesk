@@ -10,8 +10,12 @@
 //  - When none is left, it turns once and sweeps back the same way.
 //  - A piece that would start against the way the rotary last turned is
 //    reached past its start and back, so the rotary turns with the laser off
-//    and every burn starts the way it goes on.
+//    and the burn starts the way it goes on. Amendment 9: not for a piece
+//    that starts on its part's Y edge, since the approach never leaves the
+//    part's Y extent (past it may be past the machine's Y travel).
 // Pieces burn from either end; a vector stroke marks the same either way.
+// rd-rotary-feed.ts keeps a layer's pieces in path order instead when the
+// sweep would travel more than 5 % further (Amendment 9).
 
 import type { RdMotionStep } from './rd-motion-plan';
 
@@ -43,17 +47,23 @@ type Entry = {
 };
 type Choice = { readonly index: number; readonly entry: Entry };
 
-/** The pieces in burn order from `head`, each reached by laser-off moves. */
+/** The pieces in burn order from `head`, each reached by laser-off moves.
+ *  `inPathOrder` keeps the pieces' own order and direction, each still
+ *  reached past its start when it would start against the rotary (ADR-127
+ *  Amendment 9). */
 export function orderedPieceSteps(
   pieces: ReadonlyArray<Piece>,
   head: Head,
   yRange: YRange,
+  inPathOrder = false,
 ): { readonly steps: RdMotionStep[]; readonly head: Head } {
   const left = pieces.map(prepare);
   const steps: RdMotionStep[] = [];
   let current = head;
   while (left.length > 0) {
-    const { index, entry } = bestEntry(left, current, yRange);
+    const { index, entry } = inPathOrder
+      ? pathEntry(left, current, yRange)
+      : bestEntry(left, current, yRange);
     const [chosen] = left.splice(index, 1);
     if (chosen === undefined) break;
     const piece = entry.end.reversed ? reversedPiece(chosen.piece) : chosen.piece;
@@ -82,6 +92,26 @@ export function nextGroup(
   });
   if (pieces.length === 0) return 0;
   return owners[bestEntry(pieces, head, yRange).index] ?? 0;
+}
+
+/** Laser-off travel along `steps` from `from`, in µm. */
+export function laserOffTravelUm(
+  steps: ReadonlyArray<RdMotionStep>,
+  from: RdMotionStep | null,
+): number {
+  let travel = 0;
+  let at = from;
+  for (const step of steps) {
+    if (at !== null && !step.cut) travel += Math.hypot(step.xUm - at.xUm, step.yUm - at.yUm);
+    at = step;
+  }
+  return travel;
+}
+
+function pathEntry(pieces: ReadonlyArray<Prepared>, head: Head, yRange: YRange): Choice {
+  const [first] = pieces;
+  if (first === undefined) throw new Error('orderedPieceSteps: no piece left');
+  return { index: 0, entry: entryInto(first.ends[0], head, yRange) };
 }
 
 function bestEntry(pieces: ReadonlyArray<Prepared>, head: Head, yRange: YRange): Choice {
