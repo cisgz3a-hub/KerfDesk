@@ -79,4 +79,4 @@ Finding IDs are `O<area>-P<n>-<k>`. Three areas run at a time.
 - **Research:** primary sources only, cited by section or URL; at most one short quotation per source; never paste copyrighted text.
 - **Pushes:** `LICENSE` must say "All rights reserved" before any push. Grep for conflict markers before committing. Each report PR touches only its own file; the coordinator alone edits `LEDGER.md`.
 
-**Status:** all four batches (O1–O12) reported by 2026-11-12: 123 raised, 12 refuted, 15 outside facts contradicted by research, P1 4, P2 12, P3 87 ([LEDGER.md](LEDGER.md)). Fix pull requests that were open at the 1.0.32 release freeze merge after it.
+**Status: DONE 2026-11-12.** All twelve areas reported: 123 raised, 12 refuted, 15 outside facts contradicted by research, P1 4, P2 12, P3 87 ([LEDGER.md](LEDGER.md)). Every P1 and P2 fix pull request has merged except O1-P2-1's #1780, which was closed unmerged and is with the maintainer. The P3s each report lists for the maintainer stay open as decisions.
