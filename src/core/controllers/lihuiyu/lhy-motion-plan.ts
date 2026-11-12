@@ -5,15 +5,24 @@
 // Fill and Image groups stay in program mode and cross their gaps with the
 // beam off, as the board's rows are short and many.
 //
-// Image rows run as program-mode sweeps: each row's burn runs from its first
-// to its last lit pixel, the beam switching with the pixels, and two-way rows
-// alternate direction. MeerK40t's native raster mode (V…G step codes) is not
-// written by this build.
+// Fill sweeps and Image rows come from the planners the G-code route uses
+// (ADR-703 Amendment 1, code quality audit C2 D6-P1-3): planFillSweeps and
+// planRasterRowSweeps, with the bidirectional scan offset (the layer's value,
+// else the machine's speed table), the runway policy and overscan, and Dot
+// width correction. Each sweep runs in program mode: laser-off along the
+// runway to the first ink, burns across the ink, laser-off across gaps and the
+// exit runway. MeerK40t's native raster mode (V…G step codes) is not written
+// by this build.
 
 import { samePoint } from '../../geometry/point-math';
 import type { CutGroup, FillGroup, RasterGroup } from '../../job';
 import { cutSegmentsForPass, finalPassCutSegments } from '../../job/cut-pass-segments';
 import { rasterRowsInProviderOrder } from '../../job/raster-rows';
+import type { ScanOffsetPoint } from '../../devices/scan-offset-profile';
+import { expandFillHatchWithRunways } from '../../job/fill-runway';
+import { planFillSweeps } from '../../job/fill-sweep-plan';
+import { offsetForSpeed, rasterRowShiftX } from '../../job/scan-offset';
+import { planRasterRowSweeps, type RasterRowSweepPlan } from '../../raster/raster-sweep-plan';
 import type { Vec2 } from '../../scene';
 
 export const LHY_STEPS_PER_MM = 1000 / 25.4;
@@ -47,8 +56,23 @@ export function lhyPoint(point: Vec2): LhyPoint {
   return { x: mmToLhySteps(point.x), y: mmToLhySteps(point.y) };
 }
 
-export function planLhyPart(group: LhyGroup, part: number): LhyMotionPart | null {
-  const steps = group.kind === 'raster' ? rasterSteps(group) : vectorSteps(group);
+export function planLhyPart(
+  group: LhyGroup,
+  part: number,
+  scanningOffsets: ReadonlyArray<ScanOffsetPoint> = [],
+): LhyMotionPart | null {
+  // The scan offset a two-way Fill or Image moves each row by, resolved as on
+  // G-code: the layer's value, else the machine's speed table.
+  const offsetMm =
+    group.kind === 'cut'
+      ? 0
+      : (group.bidirectionalScanOffsetMm ?? offsetForSpeed(scanningOffsets, group.speed));
+  const steps =
+    group.kind === 'raster'
+      ? rasterSteps(group, offsetMm)
+      : group.kind === 'fill' && (group.fillStyle ?? 'scanline') !== 'offset'
+        ? fillSteps(group, offsetMm)
+        : vectorSteps(group);
   const bounds = burnBounds(steps);
   if (bounds === null) return null;
   return { part, group, travel: group.kind === 'cut' ? 'rapid' : 'program', steps, bounds };
@@ -79,44 +103,91 @@ function addPolyline(steps: LhyStep[], polyline: ReadonlyArray<Vec2>): void {
   for (const point of burns) steps.push({ ...point, burn: true });
 }
 
-function rasterSteps(group: RasterGroup): LhyStep[] {
+/** A Scan Line Fill's sweeps, as the G-code Fill runs them. */
+function fillSteps(group: FillGroup, offsetMm: number): LhyStep[] {
   const steps: LhyStep[] = [];
-  const { bounds, pixelWidth, pixelHeight } = group;
-  if (pixelWidth <= 0 || pixelHeight <= 0) return steps;
-  const pixelWidthMm = (bounds.maxX - bounds.minX) / pixelWidth;
-  const pixelHeightMm = (bounds.maxY - bounds.minY) / pixelHeight;
-  const xAt = (pixel: number): number => mmToLhySteps(bounds.minX + pixel * pixelWidthMm);
-  let emitted = 0;
+  const plans = planFillSweeps(group, offsetMm);
   for (let pass = 0; pass < Math.max(1, group.passes); pass += 1) {
-    for (const { rowIndex, row } of rasterRowsInProviderOrder(group)) {
-      const runs = litRuns(row);
-      if (runs.length === 0) continue;
-      const y = mmToLhySteps(bounds.minY + (rowIndex + 0.5) * pixelHeightMm);
-      const reverse = (group.bidirectional ?? true) && emitted % 2 === 1;
-      emitted += 1;
-      const ordered = reverse ? [...runs].reverse() : runs;
-      for (const [first, last] of ordered) {
-        const [from, to] = reverse ? [last + 1, first] : [first, last + 1];
-        steps.push({ x: xAt(from), y, burn: false }, { x: xAt(to), y, burn: true });
+    for (const plan of plans) {
+      const spans = plan.sweep.spans;
+      const first = spans[0];
+      const last = spans[spans.length - 1];
+      if (first === undefined || last === undefined) continue;
+      const run = expandFillHatchWithRunways([first.start, last.end], plan);
+      if (run === null) continue;
+      pushStep(steps, run.leadStart, false);
+      pushStep(steps, run.burnStart, false);
+      for (const span of spans) {
+        pushStep(steps, span.start, false);
+        pushStep(steps, span.end, true);
       }
+      pushStep(steps, run.leadEnd, false);
     }
   }
   return steps;
 }
 
-/** Inclusive [first, last] pixel ranges whose power is above zero. */
-function litRuns(row: ArrayLike<number>): Array<readonly [number, number]> {
-  const runs: Array<readonly [number, number]> = [];
-  let start = -1;
-  for (let i = 0; i <= row.length; i += 1) {
-    const lit = i < row.length && (row[i] ?? 0) > 0;
-    if (lit && start < 0) start = i;
-    if (!lit && start >= 0) {
-      runs.push([start, i - 1]);
-      start = -1;
+/** Image rows, as the G-code raster runs them (emit-raster-sweep.ts). */
+function rasterSteps(group: RasterGroup, offsetMm: number): LhyStep[] {
+  const steps: LhyStep[] = [];
+  const { bounds, pixelWidth, pixelHeight } = group;
+  if (pixelWidth <= 0 || pixelHeight <= 0) return steps;
+  const pixelWidthMm = (bounds.maxX - bounds.minX) / pixelWidth;
+  const pixelHeightMm = (bounds.maxY - bounds.minY) / pixelHeight;
+  const bidirectional = group.bidirectional ?? true;
+  for (let pass = 0; pass < Math.max(1, group.passes); pass += 1) {
+    let emitted = 0;
+    for (const { rowIndex, row } of rasterRowsInProviderOrder(group)) {
+      const reverse = bidirectional && emitted % 2 === 1;
+      const sweeps = planRasterRowSweeps({
+        row,
+        pixelWidthMm,
+        overscanMm: group.overscanMm,
+        reverse,
+        dotWidthCorrectionMm: Math.max(0, group.dotWidthCorrectionMm),
+        minXWorldMm: bounds.minX,
+      });
+      if (sweeps.length === 0) continue;
+      emitted += 1;
+      const y = bounds.minY + (rowIndex + 0.5) * pixelHeightMm;
+      const shift = rasterRowShiftX(offsetMm, reverse, bidirectional);
+      for (const sweep of sweeps)
+        rowSweepSteps(steps, sweep, { group, pixelWidthMm, y, shift, reverse });
     }
   }
-  return runs;
+  return steps;
+}
+
+type RowSweep = {
+  readonly group: RasterGroup;
+  readonly pixelWidthMm: number;
+  readonly y: number;
+  readonly shift: number;
+  readonly reverse: boolean;
+};
+
+function rowSweepSteps(steps: LhyStep[], sweep: RasterRowSweepPlan, row: RowSweep): void {
+  const { group, pixelWidthMm, y, shift, reverse } = row;
+  const activeStartX = group.bounds.minX + sweep.span.firstX * pixelWidthMm;
+  const activeEndX = group.bounds.minX + (sweep.span.lastX + 1) * pixelWidthMm;
+  const startX =
+    sweep.sharedLeadStartXWorldMm ??
+    (reverse ? activeEndX + sweep.leadInMm : activeStartX - sweep.leadInMm);
+  const endX =
+    sweep.sharedLeadEndXWorldMm ??
+    (reverse ? activeStartX - sweep.leadOutMm : activeEndX + sweep.leadOutMm);
+  pushStep(steps, { x: startX + shift, y }, false);
+  pushStep(steps, { x: (reverse ? activeEndX : activeStartX) + shift, y }, false);
+  for (const run of sweep.runs) pushStep(steps, { x: run.endXWorldMm + shift, y }, run.s > 0);
+  pushStep(steps, { x: endX + shift, y }, false);
+}
+
+/** Adds a step in board units unless the head is already there. */
+function pushStep(steps: LhyStep[], point: Vec2, burn: boolean): void {
+  const at = lhyPoint(point);
+  const previous = steps[steps.length - 1];
+  if (previous !== undefined && samePoint(previous, at)) return;
+  steps.push({ ...at, burn });
 }
 
 function burnBounds(steps: ReadonlyArray<LhyStep>): LhyBounds | null {

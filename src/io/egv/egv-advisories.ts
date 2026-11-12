@@ -28,6 +28,12 @@ export function egvAdvisories(
       });
     }
   }
+  for (const { layerId, count } of encoded.rotarySpeedChanges) {
+    issues.push({
+      code: 'power-out-of-range',
+      message: `Layer ${layerId}: on the rotary its strokes change speed ${count} times to keep the surface speed, and the head stops at each change.`,
+    });
+  }
   if (job.groups.some((group) => group.kind === 'raster')) {
     issues.push({
       code: 'power-out-of-range',

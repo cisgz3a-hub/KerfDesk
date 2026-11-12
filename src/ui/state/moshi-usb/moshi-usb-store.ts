@@ -31,7 +31,11 @@ import {
   moshiDisconnectedMessage,
 } from './moshi-usb-messages';
 import type { MoshiUsbConnection, MoshiUsbJob, MoshiUsbOpener } from './moshi-usb-types';
-import { reportLinkMachineWork, type LinkMachineWork } from '../link-machine-work';
+import {
+  reportLinkMachineStatus,
+  reportLinkMachineWork,
+  type LinkMachineWork,
+} from '../link-machine-work';
 
 export type MoshiUsbPhase =
   | 'disconnected'
@@ -291,6 +295,10 @@ const ACTIVE_WORK: Partial<Record<MoshiUsbPhase, LinkMachineWork['activity']>> =
 
 useMoshiUsbStore.subscribe((state) => {
   const activity = ACTIVE_WORK[state.phase];
+  reportLinkMachineStatus('moshi-usb', {
+    connected: state.phase !== 'disconnected' && state.phase !== 'connecting',
+    framed: state.framed !== null,
+  });
   reportLinkMachineWork(
     'moshi-usb',
     activity === undefined

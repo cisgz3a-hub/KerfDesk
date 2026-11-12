@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { LHY_STEPS_PER_MM } from '../../core/controllers/lihuiyu/lhy-motion-plan';
-import { useStore } from '../state';
+import { currentLinkJobRequest } from '../state/link-job-request';
 import { prepareLihuiyuUsbJob } from '../state/lihuiyu-usb/lihuiyu-usb-job';
 import {
   LIHUIYU_NOT_QUALIFIED,
@@ -38,6 +38,7 @@ export default function LihuiyuUsbDetails({
         <button
           type="button"
           title="Choose the board (USB2.0-Print, CH341) and read its status."
+          data-search-target="connect"
           disabled={board.phase === 'connecting'}
           onClick={() => void board.connect(open)}
         >
@@ -74,8 +75,9 @@ function LihuiyuControls({ board }: { readonly board: LihuiyuUsbState }): JSX.El
   const idle = board.phase === 'idle';
   const active = board.phase === 'framing' || board.phase === 'running' || board.phase === 'paused';
   const withJob = async (action: 'frame' | 'start'): Promise<void> => {
-    const { project, jobPlacement } = useStore.getState();
-    const prepared = await prepareLihuiyuUsbJob(project, jobPlacement, board.head);
+    // Placement, the output scope and the variable advance, as Save .egv and
+    // G-code Start take them (C2 D6-P1-1).
+    const prepared = await prepareLihuiyuUsbJob(currentLinkJobRequest(), board.head);
     if (!prepared.ok) {
       setCompileError(prepared.messages.join(' '));
       return;
