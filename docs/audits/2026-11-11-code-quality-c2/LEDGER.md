@@ -8,7 +8,8 @@ Plan: [AREAS.md](AREAS.md). Severity: P1 harms a job, loses work or exposes a se
 | D2 | Single choke points (36 rules × every output route) | origin/main @ dcca5b8c4 (auditor and refuter). The coordinator re-read 06d947672, where none of the cited files changed. The same small job through every route with the real modules; own G-code reader (M106-aware), own Ruida command parser, Moshi byte hashes and decoder; the refuter drove the real app store and Moshi store | [D2-single-choke-points.md](D2-single-choke-points.md) | 11 | 0 | 4 | 2 | 5 | 10 |
 | D3 | Test strength (176 hand mutants in 12 safety-critical modules) | origin/main @ 8fd1b07c1 (auditor and refuter). The coordinator re-read 5c351a6b3: the gap sites are unchanged. Persistent and fresh-process Vitest runs per mutant; the refuter re-ran every P1 and the riskiest P2 survivors against 53–267-file lists, re-ran 5 kills, and built probes for R10, X01/X09 and J09 | [D3-test-strength.md](D3-test-strength.md) | 21 | 1 | 0 | 11 | 9 | 5 |
 | D4 | Error paths and async | origin/main @ 5c351a6b3 (auditor and refuter). The coordinator re-read 420c5f547: the cited files are unchanged. Node scripts on the real modules with the repo's Lihuiyu and Moshi simulators behind the real CH341 driver and opener; fault injection (throwing USB transfers, slowed writes, failing workers, fake wake lock, failing storage and vault); 146 swallow sites triaged, 10 driven to failure | [D4-error-paths-and-async.md](D4-error-paths-and-async.md) | 7 | 0 | 1 | 3 | 3 | 7 |
-| **Total** | | | | **47** | **1** | **8** | **20** | **18** | **22** |
+| D5 | Input boundaries (trust boundary; security findings redacted) | origin/main @ 420c5f547 (auditor and refuter). The coordinator re-read a74e38540: the cited files are unchanged. About 566,000 generated cases through the real parsers and validators (auditor), plus 24,100 more (refuter: PDF, TIFF, PSD, Electron routes, deep LightBurn nesting). Node scripts on the real modules; jsdom and linkedom for XML | [D5-input-boundaries.md](D5-input-boundaries.md) | 11 | 0 | 2 | 0 | 9 | 1 |
+| **Total** | | | | **58** | **1** | **10** | **20** | **27** | **23** |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
@@ -33,9 +34,21 @@ Plan: [AREAS.md](AREAS.md). Severity: P1 harms a job, loses work or exposes a se
 | D4-P2-1 | D4 | **The job keep-awake (ADR-117) is never requested for Moshi, Ruida or K40 jobs.** In Chromium and Electron on Windows the screen wake lock also keeps the system awake while the page is visible, so the laser path is protected and the link paths are not. A K40 or Moshi job is streamed by the renderer, so a system sleep cuts it off part-way. A Ruida runs from its own memory, so only its upload is exposed. | **READ** on main: `use-active-job-wake-lock.ts:44-54` subscribes to `useLaserStore` only. Auditor and refuter **REPRO** (fake `navigator.wakeLock`: 0 requests for Moshi and K40 jobs; 1 for a laser job). | routed to the Moshiboard session. Fix: subscribe the keep-awake to `anyMachineJobActive()` |
 | D4-P2-2 | D4 | **The crash screen's software ABORT is hidden during a Moshi, Ruida or K40 job**, and pressing it would stop only the laser store. After a workspace crash, `Ctrl+.` is the only stop left for Moshi and Ruida, and none is left for the K40. After a root crash, nothing can stop the job. | **READ** on main: `crash-recovery.tsx:24-30` (`isMotionLive`) reads only `useLaserStore`, and `ErrorBoundary.tsx` renders ABORT only when it is live. Auditor and refuter **REPRO**. | routed to the Moshiboard session. Fix: `isMotionLive` and `trigger` consult `activeLinkMachineWork()` |
 | D4-P2-3 (refuter) | D4 | **In a browser tab, closing during a Moshi job with unsaved work estops the job first and then shows "Leave site?"**, so answering "Stay" keeps a job that has already stopped. The guard's own header says it is gated off during a job for exactly this reason. | **READ** on main: `use-unsaved-changes-guard.ts:42` computes `jobActive` from `useLaserStore` only, while `use-unload-stop.ts` stops link work. Refuter **REPRO** (both listeners on one `beforeunload`). | routed to the Moshiboard session. Fix: gate the prompt on `anyMachineJobActive()` |
+| D5-P1-1 | D5 | **SECURITY: denial of service from an imported file (CWE-835 / CWE-400).** Redacted until fixed. A crafted file of a few bytes freezes the window for good. During a job streamed by the window (K40, Moshi, window-route GRBL), the stream stops part-way; a worker-streamed GRBL or Marlin job runs to its end with Abort unreachable. No stop is sent, because a hang is not a crash. | **READ** on main `a74e38540` (location held privately) and auditor and refuter **REPRO** (details in the coordinator's scratchpad only). | routed to the EPS/AI import session (local_de13cd2d), with the private details |
+| D5-P1-2 | D5 | **A DXF ARC whose end angle is more than one turn past its start is drawn and burned as several turns.** 0°→450° burns 450° (157 mm instead of 31 mm at r 20), 0°→720° cuts the circle twice and 45°→1485° four times, with `preflight.ok` and no import note. The canvas shows the same wrong shape. Which exporters write such angles is unverified offline, but a DXF ARC is at most one turn under any reading. | **READ** on main: `dxf-entities.ts:84-98` (`arcInOcs`) only raises a sweep ≤ 0 and never reduces one over a full turn; the ELLIPSE path in the same file clamps. Auditor and refuter **REPRO** (real `parseDxf` → `emitGcode`). | routed to the EPS/AI import session. Fix: reduce the sweep to (0, 2π], as the ELLIPSE path does; add regression cases |
 
-### P3s (18)
+### P3s (27)
 
+- **D5 (9):**
+  - D5-P2-1→P3: a negative SVG viewBox gives inverted bounds and blocks Save, but only on the object route (the registration-jig import). The main import routes rebuild the bounds from the geometry. Two viewBox readers disagree.
+  - D5-P2-2→P3: a Fill far past the bed is hatched before any bed check (a 200 m square runs preparation out of memory). The import bed fit scales a mis-scaled import down, and the estimate runs in a worker, so this needs a deliberate size.
+  - D5-P3-1: `passes` and `linesPerMm` are unbounded in project files (the MCP schema caps them).
+  - D5-P3-2: zero scale, a huge radius or a huge bed loads, then compilation throws internal text.
+  - D5-P3-3: device metadata is unchecked on load; Machine Setup export can throw or write a file Import refuses.
+  - D5-P3-4: SECURITY (CWE-835), redacted; low impact, off the window thread, Esc cancels.
+  - D5-P3-5: overflowing G-code numbers become Infinity/NaN in the reader; the Inspector reviews an overflowing arc centre with no note.
+  - D5-P3-6: the PNG and JPEG decoders allocate from the header before checking the size and the data.
+  - D5-P3-7 (refuter): the LightBurn depth limit is measured recursively, so nesting of 5,000 levels or more overflows the stack first, and Open shows "Maximum call stack size exceeded".
 - **D4 (3):**
   - D4-P3-1: a K40 link whose USB transfer fails (at Connect, during Frame or mid-job) is never closed, so the board stays claimed and Disconnect releases nothing. This is the K40 twin of D1-P3-1, so it goes to the Moshiboard session with D4-P1-1.
   - D4-P3-2: the Inspector's carved-stock and burn workers have no error path. "Save as STL…" waits for ever, and the 3D stock view stops following playback.
@@ -72,6 +85,13 @@ Design Studio (#1706, #1709, #1710, #1713) and #1692 were read only.
 - Real Ruida busy and idle timing; real Moshiboard timing.
 - Browser runs (memory stayed under 2 GB for most of the run).
 - Design Studio and #1692 in depth.
+
+### D5 verified clean
+
+- **Project load and save:** 9,500 mutated projects; 0 throws, hangs or prototype pollution; every refusal named a reason; every loaded project saved and reloaded byte-identical; emitted G-code never held NaN, Infinity or exponent tokens.
+- **Controller replies:** 379,628 parser calls across GRBL, grblHAL, FluidNC, Falcon, Marlin and Smoothieware.
+- **Ruida, Moshi and K40 bytes**, **MCP and phone commands** (30,600, zod-checked), **licence and release signatures** (7,200) and the **`app://` project routes** (6,000 requests): all clean.
+- **Readers:** HP-GL, STL, machine profile, material library, LightBurn (up to the D5-P3-7 depth), PDF (2,100 files), TIFF and PSD (3,000 each). The other Electron routes took 16,000 requests with no guard bypass.
 
 ### D4 verified clean
 
