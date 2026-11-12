@@ -1,0 +1,101 @@
+// T03: a recorded calibration applied to a grey ramp photo through the real
+// prepareOutput -> G-code path. Expected S per step comes from my own oracle:
+// Grayscale S = round(sMin + (255 - lut[L]) / 255 * (sMax - sMin)), where lut is
+// computed independently (see t03-curve.test.ts oracleLut), and for Jarvis the
+// lit share of a step = (255 - lut[L]) / 255.
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { DEFAULT_DEVICE_PROFILE, emitProject, inset, litMoves, patchStats, projectForScene } from './harness';
+import { encodeBmp24 } from '../t01-main/src/core/raster/encode-bmp';
+import { encodeCanonicalBase64 } from '../t01-main/src/core/relief/depth-map-base64';
+import { createLayer, IDENTITY_TRANSFORM, type Layer, type RasterImage, type Scene } from '../t01-main/src/core/scene';
+import { fitPhotoToneCurve, photoToneCurveLut, IDENTITY_PHOTO_TONE_CURVE, type PhotoToneCurve } from '../t01-main/src/core/raster/photo-tone-curve';
+import { toneWedgeCommandedPercents } from '../t01-main/src/core/job/tone-calibration-wedge';
+
+const PX = 4; // px per mm
+const STEP_MM = 5;
+const LEVELS = Array.from({ length: 16 }, (_, i) => i * 17); // 0..255
+
+function ramp(negativeSource: boolean): RasterImage {
+  const w = LEVELS.length * STEP_MM * PX;
+  const h = STEP_MM * PX;
+  const luma = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const L = LEVELS[Math.floor(x / (STEP_MM * PX))]!;
+      luma[y * w + x] = negativeSource ? 255 - L : L;
+    }
+  const rgba = new Uint8Array(w * h * 4);
+  for (let i = 0; i < luma.length; i++) rgba.set([luma[i]!, luma[i]!, luma[i]!, 255], i * 4);
+  return {
+    kind: 'raster-image',
+    id: 'ramp',
+    source: 'ramp.png',
+    dataUrl: `data:image/bmp;base64,${encodeCanonicalBase64(encodeBmp24(rgba, w, h))}`,
+    lumaBase64: encodeCanonicalBase64(luma),
+    pixelWidth: w,
+    pixelHeight: h,
+    bounds: { minX: 0, minY: 0, maxX: w / PX, maxY: h / PX },
+    transform: { ...IDENTITY_TRANSFORM, x: 10, y: 10 },
+    color: '#000000',
+    operationIds: ['photo'],
+  } as RasterImage;
+}
+
+const gain = (c: number) => 100 * (1 - (1 - c / 100) ** 2);
+const CURVE: PhotoToneCurve = fitPhotoToneCurve(
+  toneWedgeCommandedPercents(11).map((c) => ({ commandedPercent: c, observedPercent: Math.round(gain(c)) })),
+  'Birch · test',
+);
+
+type Case = { title: string; layer: Partial<Layer>; objectCurve?: PhotoToneCurve; negSource?: boolean; expectCurve: PhotoToneCurve | undefined };
+
+it('apply curve to ramp', () => {
+  const log: string[] = [];
+  const lut = photoToneCurveLut(CURVE);
+  log.push(`curve points=${CURVE.points.length}; lut at ramp levels: ${LEVELS.map((L) => `${L}->${lut[L]}`).join(' ')}`);
+  const cases: Case[] = [
+    { title: 'grayscale, no curve', layer: { ditherAlgorithm: 'grayscale' }, expectCurve: undefined },
+    { title: 'grayscale, curve on operation', layer: { ditherAlgorithm: 'grayscale', photoToneCurve: CURVE }, expectCurve: CURVE },
+    { title: 'grayscale minPower 20, curve on operation', layer: { ditherAlgorithm: 'grayscale', minPower: 20, photoToneCurve: CURVE }, expectCurve: CURVE },
+    { title: 'grayscale, curve in photo override (byOperation)', layer: { ditherAlgorithm: 'grayscale' }, objectCurve: CURVE, expectCurve: CURVE },
+    { title: 'grayscale, op curve + override identity (None)', layer: { ditherAlgorithm: 'grayscale', photoToneCurve: CURVE }, objectCurve: IDENTITY_PHOTO_TONE_CURVE, expectCurve: undefined },
+    { title: 'grayscale, Negative (light marks), curve', layer: { ditherAlgorithm: 'grayscale', negativeImage: true, photoToneCurve: CURVE }, negSource: true, expectCurve: CURVE },
+    { title: 'grayscale, Pass-through, curve (must be ignored)', layer: { ditherAlgorithm: 'grayscale', passThrough: true, photoToneCurve: CURVE }, expectCurve: undefined },
+    { title: 'jarvis, no curve', layer: { ditherAlgorithm: 'jarvis' }, expectCurve: undefined },
+    { title: 'jarvis, curve on operation', layer: { ditherAlgorithm: 'jarvis', photoToneCurve: CURVE }, expectCurve: CURVE },
+  ];
+  for (const c of cases) {
+    const layer: Layer = { ...createLayer({ id: 'photo', color: '#000000', mode: 'image' }), power: 50, speed: 3000, linesPerMm: 10, minPower: 0, ...c.layer } as Layer;
+    let img = ramp(c.negSource === true);
+    if (c.objectCurve) img = { ...img, operationOverride: { byOperation: { photo: { photoToneCurve: c.objectCurve } } } } as RasterImage;
+    const scene: Scene = { objects: [img], layers: [layer] };
+    const device = DEFAULT_DEVICE_PROFILE;
+    const out = emitProject(projectForScene(scene, device));
+    const moves = litMoves(out.gcode, device).filter((m) => Math.abs(m.from.y - m.to.y) < 1e-6);
+    const sMax = Math.round((layer.power / 100) * device.maxPowerS);
+    const sMin = Math.round((layer.minPower / 100) * device.maxPowerS);
+    const useLut = c.expectCurve === undefined ? null : photoToneCurveLut(c.expectCurve);
+    let worst = 0;
+    const row: string[] = [];
+    for (const [i, L] of LEVELS.entries()) {
+      const box = inset({ minX: 10 + i * STEP_MM, minY: 10, maxX: 10 + (i + 1) * STEP_MM, maxY: 10 + STEP_MM }, 1);
+      const st = patchStats(moves, box, sMax, 0.1);
+      const burnL = useLut === null ? L : useLut[L]!;
+      const strength = (255 - burnL) / 255;
+      if (layer.ditherAlgorithm === 'grayscale') {
+        const expectS = strength <= 0 ? 0 : Math.round(sMin + strength * (sMax - sMin));
+        const got = st.sValues.length === 0 ? 0 : st.sValues.length === 1 ? st.sValues[0]! : NaN;
+        const err = Number.isNaN(got) ? 999 : Math.abs(got - expectS);
+        worst = Math.max(worst, err);
+        row.push(`${L}:${got}/${expectS}`);
+      } else {
+        const err = Math.abs(st.coverage - strength) * 100;
+        worst = Math.max(worst, err);
+        row.push(`${L}:${(st.coverage * 100).toFixed(1)}/${(strength * 100).toFixed(1)}`);
+      }
+    }
+    log.push(`\n## ${c.title} ok=${out.ok}\n got/expected per ramp level: ${row.join(' ')}\n worst ${layer.ditherAlgorithm === 'grayscale' ? '|S diff|' : 'coverage pp'} = ${worst.toFixed(2)}`);
+  }
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t03/t03-apply.log', log.join('\n'));
+});

@@ -1,0 +1,132 @@
+// T03: independent oracle for the fitted tone curve, plus edge records.
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  fitPhotoToneCurve,
+  isPhotoToneCurve,
+  photoToneCurveLut,
+  isIdentityPhotoToneCurve,
+  type PhotoToneSample,
+} from '../t01-main/src/core/raster/photo-tone-curve';
+import { toneWedgeCommandedPercents } from '../t01-main/src/core/job/tone-calibration-wedge';
+import { initialToneRecord } from '../t01-main/src/ui/calibration/ToneRecordStep';
+
+const log: string[] = [];
+
+// --- My oracle, written from ADR-670 item 4 only ---
+function pav(v: number[]): number[] {
+  // naive repeated pooling
+  const out = v.slice();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    // find first violation and pool the maximal block
+    for (let i = 0; i < out.length - 1; i++) {
+      if (out[i]! > out[i + 1]! + 1e-12) {
+        // pool left block of equal values + right block of equal values
+        let a = i;
+        while (a > 0 && Math.abs(out[a - 1]! - out[i]!) < 1e-12) a--;
+        let b = i + 1;
+        while (b < out.length - 1 && Math.abs(out[b + 1]! - out[i + 1]!) < 1e-12) b++;
+        const mean = out.slice(a, b + 1).reduce((s, x) => s + x, 0) / (b - a + 1);
+        for (let j = a; j <= b; j++) out[j] = mean;
+        changed = true;
+        break;
+      }
+    }
+  }
+  return out;
+}
+const clampP = (x: number) => (Number.isFinite(x) ? Math.min(100, Math.max(0, x)) : 0);
+function oracleLut(samples: PhotoToneSample[]): number[] {
+  const groups = new Map<number, number[]>();
+  for (const s of samples) {
+    const c = clampP(s.commandedPercent);
+    if (c <= 0 || c >= 100) continue;
+    groups.set(c, [...(groups.get(c) ?? []), clampP(s.observedPercent)]);
+  }
+  const cs = [...groups.keys()].sort((a, b) => a - b);
+  const os = pav(cs.map((c) => groups.get(c)!.reduce((a, b) => a + b, 0) / groups.get(c)!.length));
+  const resp = [{ c: 0, o: 0 }, ...cs.map((c, i) => ({ c, o: os[i]! })), { c: 100, o: 100 }];
+  // response in mark %, blended; invert: desired mark d -> commanded c
+  const pts = resp.map((r) => ({ o: 0.98 * r.o + 0.02 * r.c, c: r.c }));
+  const lut: number[] = [];
+  for (let L = 0; L <= 255; L++) {
+    const d = 100 * (1 - L / 255); // desired mark
+    let c = 100;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1]!, b = pts[i]!;
+      if (d <= b.o + 1e-12) {
+        const t = b.o === a.o ? 0 : (d - a.o) / (b.o - a.o);
+        c = a.c + t * (b.c - a.c);
+        break;
+      }
+    }
+    lut.push(Math.round(255 * (1 - c / 100)));
+  }
+  return lut;
+}
+
+function compare(title: string, samples: PhotoToneSample[]): { maxDiff: number } {
+  const curve = fitPhotoToneCurve(samples, title);
+  const lut = photoToneCurveLut(curve);
+  const ora = oracleLut(samples);
+  let maxDiff = 0;
+  let at = -1;
+  for (let i = 0; i < 256; i++) {
+    const d = Math.abs(lut[i]! - ora[i]!);
+    if (d > maxDiff) { maxDiff = d; at = i; }
+  }
+  let mono = true;
+  for (let i = 1; i < 256; i++) if (lut[i]! < lut[i - 1]!) mono = false;
+  log.push(`${title}: valid=${isPhotoToneCurve(curve)} points=${curve.points.length} identity=${isIdentityPhotoToneCurve(curve)} lut[0]=${lut[0]} lut[255]=${lut[255]} monotonic=${mono} maxDiff vs oracle=${maxDiff}${at >= 0 ? ` at L=${at} (code ${lut[at]} oracle ${ora[at]})` : ''}; lut[64,128,192]=${lut[64]},${lut[128]},${lut[192]}`);
+  return { maxDiff };
+}
+
+it('curve vs oracle', () => {
+  const cmd11 = toneWedgeCommandedPercents(11);
+  const mk = (obs: (c: number, i: number) => number, cmd = cmd11) => cmd.map((c, i) => ({ commandedPercent: c, observedPercent: obs(c, i) }));
+  compare('exact identity record', mk((c) => c));
+  compare('untouched sliders (initialToneRecord, rounded)', mk((_c, i) => initialToneRecord(11).observed[i]!));
+  compare('dot gain 1-(1-c)^2', mk((c) => 100 * (1 - (1 - c / 100) ** 2)));
+  compare('dot gain rounded to integers', mk((c) => Math.round(100 * (1 - (1 - c / 100) ** 2))));
+  compare('lighter than asked c^2', mk((c) => 100 * (c / 100) ** 2));
+  compare('flat run (saturate at 60)', mk((c) => Math.min(100, c * 1.7)));
+  compare('all zero interior', mk(() => 0));
+  compare('all 100 interior', mk(() => 100));
+  compare('reversed', mk((c) => 100 - c));
+  compare('one bump (non-monotone)', mk((c, i) => (i === 4 ? 80 : c)));
+  compare('duplicates', [...mk((c) => c + 5), ...mk((c) => c - 5)]);
+  compare('NaN observed', mk((c, i) => (i === 3 ? Number.NaN : c)));
+  compare('out of range -50/150', mk((c, i) => (i % 2 ? -50 : 150)));
+  compare('single interior reading', [{ commandedPercent: 50, observedPercent: 80 }]);
+  compare('empty', []);
+  compare('21 patches dot gain', mk((c) => 100 * (1 - (1 - c / 100) ** 3), toneWedgeCommandedPercents(21)));
+  compare('6 patches dot gain', mk((c) => 100 * (1 - (1 - c / 100) ** 3), toneWedgeCommandedPercents(6)));
+  // random fuzz
+  let worst = 0;
+  let seed = 12345;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  for (let n = 0; n < 2000; n++) {
+    const cnt = 6 + Math.floor(rnd() * 16);
+    const s = mk(() => Math.round(rnd() * 100), toneWedgeCommandedPercents(cnt));
+    const curve = fitPhotoToneCurve(s, 'f');
+    if (!isPhotoToneCurve(curve)) log.push(`FUZZ invalid curve n=${n}`);
+    const lut = photoToneCurveLut(curve);
+    const ora = oracleLut(s);
+    for (let i = 0; i < 256; i++) worst = Math.max(worst, Math.abs(lut[i]! - ora[i]!));
+  }
+  log.push(`fuzz 2000 random records: worst |code-oracle| LUT diff = ${worst}`);
+  // Round trip: does the curve undo the response? Model f(c)=1-(1-c)^2 (dot gain).
+  const f = (c: number) => 100 * (1 - (1 - c / 100) ** 2);
+  const curve = fitPhotoToneCurve(mk((c) => Math.round(f(c))), 'gain');
+  const lut = photoToneCurveLut(curve);
+  let rtWorst = 0;
+  for (let L = 0; L <= 255; L++) {
+    const desired = 100 * (1 - L / 255);
+    const commanded = 100 * (1 - lut[L]! / 255);
+    rtWorst = Math.max(rtWorst, Math.abs(f(commanded) - desired));
+  }
+  log.push(`round trip (gain model, 11 patches, integer sliders): worst |f(curve(d)) - d| = ${rtWorst.toFixed(2)} pp`);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t03/t03-curve.log', log.join('\n'));
+});

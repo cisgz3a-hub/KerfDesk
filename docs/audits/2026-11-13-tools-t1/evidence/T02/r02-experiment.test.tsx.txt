@@ -1,0 +1,80 @@
+// @vitest-environment jsdom
+// T02 refuter: does Generate capture a Material Library experiment
+// (docs/implementation/xtool-workflows-20261007.md KXS-01 says Material AND
+// Interval Test do)? Also: native browser constraint validation (jsdom
+// validity.stepMismatch) of the real Min interval input, an independent
+// oracle of what a real browser does on submit.
+import { describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { IntervalDialog, MaterialDialog } from '../t01-main/src/ui/commands/CalibrationGridDialogs';
+import { useStore } from '../t01-main/src/ui/state/store';
+import { resetStore } from '../t01-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t01-main/src/ui/state/toast-store';
+
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const out: string[] = [];
+
+function mount(el: JSX.Element): Root {
+  document.body.innerHTML = '';
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  act(() => root.render(el));
+  return root;
+}
+function generate(): void {
+  const b = [...document.querySelectorAll('button')].find((x) => x.textContent?.trim() === 'Generate');
+  if (!b) throw new Error('no Generate');
+  act(() => (b as HTMLButtonElement).click());
+}
+function experiments(): number {
+  return useStore.getState().materialLibrary?.experiments?.length ?? 0;
+}
+function toasts(): string {
+  return useToastStore
+    .getState()
+    .toasts.map((t: { message: string }) => t.message)
+    .join(' | ');
+}
+
+describe('T02 refuter experiment capture + native validity', () => {
+  it('runs', () => {
+    try {
+      localStorage.clear();
+    } catch {
+      /* node webstorage */
+    }
+    resetStore();
+    useToastStore.setState({ toasts: [] } as never);
+    let closed = 0;
+    let root = mount(<MaterialDialog onClose={() => (closed += 1)} />);
+    generate();
+    out.push(`Material Test Generate: closed=${closed}, experiments=${experiments()}, toasts: ${toasts()}`);
+    act(() => root.unmount());
+
+    resetStore();
+    useToastStore.setState({ toasts: [] } as never);
+    closed = 0;
+    root = mount(<IntervalDialog onClose={() => (closed += 1)} />);
+    const before = experiments();
+    generate();
+    out.push(
+      `Interval Test Generate: closed=${closed}, objects=${useStore.getState().project.scene.objects.length}, experiments before=${before} after=${experiments()}, library=${useStore.getState().materialLibrary === null ? 'null' : 'present'}, toasts: ${toasts()}`,
+    );
+    act(() => root.unmount());
+
+    // Native validity of the real rendered Min interval input.
+    root = mount(<IntervalDialog onClose={() => undefined} />);
+    const input = document.querySelector('input[aria-label="Min interval"]') as HTMLInputElement;
+    out.push(`Min interval input attrs: min=${input.min} step=${input.step} type=${input.type}`);
+    for (const v of ['0.07', '0.0635', '0.0847', '0.125', '0.127', '0.085']) {
+      input.value = v;
+      out.push(`native value ${v}: valid=${input.validity.valid} stepMismatch=${input.validity.stepMismatch}`);
+    }
+    act(() => root.unmount());
+    writeFileSync('C:/Users/stolk/kd-t1/zz-t02r/r02-experiment.log', out.join('\n'));
+    expect(out.length).toBeGreaterThan(0);
+  });
+});

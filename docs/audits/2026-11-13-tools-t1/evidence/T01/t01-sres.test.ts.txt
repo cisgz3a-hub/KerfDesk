@@ -1,0 +1,30 @@
+// T01: power columns finer than the controller's S resolution.
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { DEFAULT_DEVICE_PROFILE, emit, generateMaterialTestGrid, labels, litMoves, perCell, name } from './harness';
+
+it('S=255, power 10-12 over 10 columns', () => {
+  const out: string[] = [];
+  for (const maxPowerS of [255, 100, 1000]) {
+    const device = { ...DEFAULT_DEVICE_PROFILE, maxPowerS };
+    const grid = generateMaterialTestGrid({
+      rows: 1,
+      columns: 10,
+      speedMin: 2000,
+      speedMax: 2000,
+      powerMin: 10,
+      powerMax: 12,
+      cellWidthMm: 5,
+      cellHeightMm: 5,
+      maxFeedMmPerMin: 6000,
+      accelMmPerSec2: 500,
+    });
+    const g = emit(grid, device);
+    const { cells } = perCell(grid, litMoves(g.gcode, device));
+    const col = labels(grid).filter((l) => l.id.startsWith('material-test-power-c')).map((l) => l.text);
+    const s = grid.cells.map((c) => cells.get(name(c))!.sValues.join('/'));
+    const distinct = new Set(s).size;
+    out.push(`$30=${maxPowerS}: labels ${col.join(' ')} | S ${s.join(' ')} | ${distinct} distinct burns for ${col.length} labelled columns`);
+  }
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t01/t01-sres.log', out.join('\n'));
+});

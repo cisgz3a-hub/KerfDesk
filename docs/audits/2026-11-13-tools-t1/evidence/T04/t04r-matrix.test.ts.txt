@@ -1,0 +1,113 @@
+// T04 refuter: policy/IR-level matrix. Which entry point carries the coupon's
+// calibration marker and explicit 0 mm, and what each does on each profile state.
+import { describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, type DeviceProfile } from '../t01-main/src/core/devices/device-profile';
+import { generateScanOffsetCalibrationPattern } from '../t01-main/src/core/job/scan-offset-calibration-pattern';
+import { resolveFillScanDirection } from '../t01-main/src/core/job/scan-direction-policy';
+import { offsetForEmittedFeed } from '../t01-main/src/core/job/scan-offset';
+import { captureProcessRecipe } from '../t01-main/src/core/material-library/capture-process-recipe';
+import { applyProcessRecipe } from '../t01-main/src/core/material-library/apply-process-recipe';
+import { applyMaterialRecipe, captureMaterialRecipe } from '../t01-main/src/core/material-library/material-library';
+import { parseProcessRecipes } from '../t01-main/src/io/material-library/process-recipe-io';
+import { layerSettingsFrom, layerSettingsForPaste } from '../t01-main/src/ui/state/layer-settings-clipboard';
+import { applyLayerDefaultSettings, captureLayerDefaultSettings } from '../t01-main/src/ui/layers/layer-default-settings';
+import { createLayer, createProject, DEFAULT_PROJECT_OPTIMIZATION, IDENTITY_TRANSFORM, type ImportedSvg, type Layer, type Project } from '../t01-main/src/core/scene';
+import { prepareOutput } from '../t01-main/src/io/gcode/prepare-output';
+
+const TABLE = [
+  { speedMmPerMin: 1000, offsetMm: -0.2 },
+  { speedMmPerMin: 5000, offsetMm: -0.4 },
+];
+
+function devices(): Array<[string, DeviceProfile]> {
+  return [
+    ['4040 require-verified, table verified', { ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, scanningOffsets: TABLE, scanOffsetCalibrationStatus: 'verified' }],
+    ['4040 require-verified, table pending', { ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, scanningOffsets: TABLE, scanOffsetCalibrationStatus: 'pending' }],
+    ['4040 require-verified, no table', { ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, scanningOffsets: [], scanOffsetCalibrationStatus: undefined }],
+    ['default allow-requested, table pending', { ...DEFAULT_DEVICE_PROFILE, scanningOffsets: TABLE, scanOffsetCalibrationStatus: 'pending' }],
+  ];
+}
+
+function project(scene: Project['scene'], device: DeviceProfile): Project {
+  const base = createProject(device);
+  return { ...base, device, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, ...scene } };
+}
+
+const art: ImportedSvg = {
+  kind: 'imported-svg', id: 'art', source: 'art.svg', operationIds: ['job'],
+  bounds: { minX: 0, minY: 0, maxX: 30, maxY: 5 }, transform: { ...IDENTITY_TRANSFORM, x: 100, y: 100 },
+  paths: [{ color: '#ff0000', polylines: [{ closed: true, points: [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 5 }, { x: 0, y: 5 }, { x: 0, y: 0 }] }] }],
+} as ImportedSvg;
+
+function ordinaryLayer(): Layer {
+  return { ...createLayer({ id: 'job', name: 'Birch fill', color: '#ff0000', mode: 'fill' }), speed: 3000, power: 30, hatchAngleDeg: 0, hatchSpacingMm: 0.1, fillStyle: 'scanline', fillBidirectional: true, fillCrossHatch: false, fillOverscanMm: 5 };
+}
+
+function describeLayer(device: DeviceProfile, layer: Layer): string {
+  const dir = resolveFillScanDirection(device, layer);
+  const offset = layer.bidirectionalScanOffsetMm ?? offsetForEmittedFeed(device.scanningOffsets, layer.speed);
+  return `${dir.bidirectional ? 'two-way' : 'one-way'} (${dir.reason}), offset ${dir.bidirectional ? offset.toFixed(3) : 'n/a'}, mode=${layer.scanOffsetCalibrationMode ?? '-'}, local=${layer.bidirectionalScanOffsetMm ?? '-'}, allow=${layer.allowUncalibratedBidirectionalScan ?? '-'}, name="${layer.name}"`;
+}
+
+describe('T04 refuter matrix', () => {
+  it('runs', () => {
+    const log: string[] = [];
+    for (const couponMode of ['baseline', 'verification'] as const) {
+      for (const [label, device] of devices()) {
+        const coupon = generateScanOffsetCalibrationPattern({ mode: couponMode, steps: 3, speedMin: 1000, speedMax: 5000, power: 12, swatchWidthMm: 30, swatchHeightMm: 5 }, device);
+        const cell = coupon.cells[1]!; // 3000 mm/min swatch
+        const couponLayer = coupon.scene.layers.find((l) => l.id === cell.layerId)!;
+        const couponProject = project(coupon.scene, device);
+        const job = project({ objects: [art], layers: [ordinaryLayer()] } as never, device);
+        log.push(`\n== coupon ${couponMode} / ${label} (swatch ${cell.speed} mm/min)`);
+        log.push(`  ordinary layer             : ${describeLayer(device, ordinaryLayer())}`);
+        log.push(`  coupon swatch itself       : ${describeLayer(device, couponLayer)}`);
+
+        // 1. Process recipe, saved to the library JSON and read back (survives disk).
+        const captured = captureProcessRecipe(couponProject, cell.objectId, { id: 'p1', name: 'My fill', description: '', revision: '1' });
+        if (captured.kind !== 'ok') throw new Error(captured.reason);
+        const reread = parseProcessRecipes(JSON.parse(JSON.stringify([captured.value])));
+        if (reread.kind !== 'ok') throw new Error(reread.reason);
+        const recipe = reread.value[0]!;
+        const applied = applyProcessRecipe(job, ['art'], recipe);
+        if (applied.kind !== 'ok') throw new Error(applied.reason);
+        const recipeLayer = applied.value.scene.layers.find((l) => (applied.value.scene.objects[0] as ImportedSvg).operationIds.includes(l.id))!;
+        log.push(`  process recipe (via JSON)  : ${describeLayer(device, recipeLayer)}`);
+
+        // Control: same recipe with only the mode removed.
+        const { scanOffsetCalibrationMode: _m, ...stepNoMode } = recipe.steps[0]!;
+        const noMode = applyProcessRecipe(job, ['art'], { ...recipe, steps: [stepNoMode] });
+        if (noMode.kind !== 'ok') throw new Error(noMode.reason);
+        const noModeLayer = noMode.value.scene.layers.find((l) => (noMode.value.scene.objects[0] as ImportedSvg).operationIds.includes(l.id))!;
+        log.push(`  recipe, mode stripped      : ${describeLayer(device, noModeLayer)}`);
+
+        // 2. Copy settings -> Paste settings (ADR-670 Amd 1).
+        const target = ordinaryLayer();
+        const pasted: Layer = { ...target, ...layerSettingsForPaste(target, layerSettingsFrom(couponLayer)) };
+        log.push(`  copy/paste settings        : ${describeLayer(device, pasted)}`);
+
+        // 3. Make Default -> new layer.
+        const defaulted = applyLayerDefaultSettings(ordinaryLayer(), captureLayerDefaultSettings(couponLayer));
+        log.push(`  make default -> new layer  : ${describeLayer(device, defaulted)}`);
+
+        // 4. Material preset save -> apply.
+        const preset = applyMaterialRecipe(ordinaryLayer(), captureMaterialRecipe(couponLayer));
+        log.push(`  material preset            : ${describeLayer(device, preset)}`);
+
+        // Compiled job (planner IR, not G-code) for the recipe-applied project.
+        const prepared = prepareOutput(applied.value, {});
+        if (prepared.ok) {
+          const fills = prepared.job.groups.filter((g) => g.kind === 'fill') as Array<{ scanDirection?: { bidirectional: boolean; reason: string }; bidirectionalScanOffsetMm?: number; speed: number }>;
+          for (const g of fills) log.push(`  compiled job fill group    : ${g.scanDirection?.bidirectional ? 'two-way' : 'one-way'} (${g.scanDirection?.reason}), group local offset=${g.bidirectionalScanOffsetMm ?? '-'}, F=${g.speed}`);
+          const advisories = (prepared.advisories ?? []).map((a) => `${(a as { severity?: string }).severity ?? '?'}:${(a as { code?: string }).code ?? (a as { message?: string }).message}`);
+          log.push(`  preflight advisories       : ${advisories.length === 0 ? 'none' : advisories.join(' | ')}`);
+        } else {
+          log.push(`  prepareOutput refused: ${JSON.stringify(prepared.preflight).slice(0, 300)}`);
+        }
+      }
+    }
+    writeFileSync('C:/Users/stolk/kd-t1/zz-t04r/t04r-matrix.log', log.join('\n'));
+    expect(log.length).toBeGreaterThan(0);
+  });
+});

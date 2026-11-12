@@ -1,0 +1,138 @@
+// T02 refuter: (1) which DPI pitches can the Interval Test reach at all,
+// directly or by interpolation (steps landing on them), using the REAL
+// generator; (2) does the burn distinguish 0.0635 from its 0.01-grid
+// neighbours (own decoder: distinct lit Y rows per swatch).
+import { describe, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { generateIntervalTestGrid } from '../t01-main/src/core/job/interval-test-grid';
+import { calibrationDraftIssues } from '../t01-main/src/ui/calibration/calibration-draft-validation';
+import { DEFAULT_DEVICE_PROFILE } from '../t01-main/src/core/devices';
+import { createProject, DEFAULT_PROJECT_OPTIMIZATION } from '../t01-main/src/core/scene';
+import { prepareOutput } from '../t01-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t01-main/src/io/gcode/emit-gcode';
+
+const out: string[] = [];
+const log = (s: string): void => {
+  out.push(s);
+};
+
+// Copied verbatim from IntervalTestDialog.tsx:48-49 (not exported).
+const INTERVAL_FIELDS = [
+  { key: 'intervalMinMm', label: 'Min interval', min: 0.05, max: undefined, step: 0.01 },
+] as const;
+
+const DPIS = [100, 127, 150, 200, 250, 254, 300, 318, 333, 339, 350, 400, 423, 450, 500];
+
+describe('T02 refuter reachability', () => {
+  it('validator census, reachability census, burn', () => {
+    // 1. Direct entry census through the real validator.
+    log('## Direct entry (real calibrationDraftIssues, Min interval spec)');
+    for (const dpi of DPIS) {
+      const pitch = 25.4 / dpi;
+      const texts = [pitch.toFixed(4), pitch.toFixed(6), String(Number(pitch.toFixed(3)))];
+      const verdicts = texts.map((t) => {
+        const issues = calibrationDraftIssues({ intervalMinMm: t }, INTERVAL_FIELDS);
+        return `${t}=${issues.length === 0 ? 'ok' : 'REFUSED'}`;
+      });
+      log(`${dpi} DPI pitch ${pitch.toFixed(6)}: ${verdicts.join(', ')}`);
+    }
+    for (const t of ['400dpi', '0,0635', '1/400in', '0.0635mm', '63.5um']) {
+      log(`typed "${t}": ${calibrationDraftIssues({ intervalMinMm: t }, INTERVAL_FIELDS).join(' ') || 'ok'}`);
+    }
+
+    // 2. Reachability: every legal (min, max, steps) on the dialog's grid.
+    log('\n## Reachable by interpolation (real generateIntervalTestGrid, min/max 0.05..0.30 on 0.01 grid, steps 1..20)');
+    const grid: number[] = [];
+    for (let k = 5; k <= 30; k += 1) grid.push(k / 100);
+    const reached = new Map<string, string>();
+    const all = new Set<number>();
+    for (const lo of grid) {
+      for (const hi of grid) {
+        if (hi < lo) continue;
+        for (let steps = 1; steps <= 20; steps += 1) {
+          const g = generateIntervalTestGrid({
+            steps,
+            speed: 1500,
+            power: 30,
+            intervalMinMm: lo,
+            intervalMaxMm: hi,
+            swatchSizeMm: 8,
+            gapMm: 2,
+          });
+          for (const cell of g.cells) {
+            all.add(cell.intervalMm);
+            const key = cell.intervalMm.toFixed(6);
+            if (!reached.has(key)) reached.set(key, `min ${lo} max ${hi} steps ${steps}`);
+          }
+        }
+      }
+    }
+    log(`distinct burnable intervals reachable: ${all.size}`);
+    const sorted = [...all].sort((a, b) => a - b);
+    for (const dpi of DPIS) {
+      const pitch = 25.4 / dpi;
+      const six = Number(pitch.toFixed(6));
+      const four = Number(pitch.toFixed(4));
+      const exact6 = reached.get(six.toFixed(6));
+      const exact4 = reached.get(four.toFixed(6));
+      let nearest = sorted[0]!;
+      for (const v of sorted) if (Math.abs(v - pitch) < Math.abs(nearest - pitch)) nearest = v;
+      log(
+        `${dpi} DPI ${six}: six-decimal ${exact6 ?? 'UNREACHABLE'}; four-decimal ${four} ${exact4 ?? 'UNREACHABLE'}; nearest ${nearest} via ${reached.get(nearest.toFixed(6))} (off ${(nearest - pitch).toFixed(6)} mm, ${(((nearest - pitch) / pitch) * 100).toFixed(2)} %)`,
+      );
+    }
+
+    // 3. Burn: 0.06, 0.0635 (core only), 0.07 on one 8 mm swatch each.
+    log('\n## Burn (own decoder: distinct lit Y rows inside each swatch)');
+    for (const interval of [0.06, 0.0635, 0.07, 0.0847, 0.08, 0.09]) {
+      const g = generateIntervalTestGrid({
+        steps: 1,
+        speed: 1500,
+        power: 30,
+        intervalMinMm: interval,
+        intervalMaxMm: interval,
+        swatchSizeMm: 8,
+        gapMm: 2,
+      });
+      const base = createProject(DEFAULT_DEVICE_PROFILE);
+      const project = {
+        ...base,
+        optimization: { ...DEFAULT_PROJECT_OPTIMIZATION },
+        scene: { ...base.scene, ...g.scene },
+      };
+      const prepared = prepareOutput(project, {});
+      const gcode = emitPreparedGcode(prepared).gcode;
+      // Lit G1 moves with S>0 and constant Y (scan rows), long enough to be fill rows (>2 mm).
+      let x = 0;
+      let y = 0;
+      let s = 0;
+      let mode = 0;
+      const rows = new Set<string>();
+      for (const raw of gcode.split('\n')) {
+        const line = raw.replace(/;.*$/, '').toUpperCase();
+        const gm = /G0*([0-3])\b/.exec(line);
+        if (gm) mode = Number(gm[1]);
+        const sm = /S(-?[\d.]+)/.exec(line);
+        if (sm) s = Number(sm[1]);
+        const xm = /X(-?[\d.]+)/.exec(line);
+        const ym = /Y(-?[\d.]+)/.exec(line);
+        const nx = xm ? Number(xm[1]) : x;
+        const ny = ym ? Number(ym[1]) : y;
+        if (mode === 1 && s > 0 && ny === y && Math.abs(nx - x) > 2) rows.add(ny.toFixed(3));
+        x = nx;
+        y = ny;
+      }
+      const ys = [...rows].map(Number).sort((a, b) => a - b);
+      const span = ys[ys.length - 1]! - ys[0]!;
+      const mean = span / (ys.length - 1);
+      log(
+        `interval ${interval} (label ${g.cells[0]!.intervalMm}): rows ${ys.length}, mean step ${mean.toFixed(6)}, first steps ${ys
+          .slice(0, 6)
+          .map((v, i, a) => (i === 0 ? '' : (v - a[i - 1]!).toFixed(3)))
+          .filter(Boolean)
+          .join(' ')}`,
+      );
+    }
+    writeFileSync('C:/Users/stolk/kd-t1/zz-t02r/r02-reach.log', out.join('\n'));
+  });
+});

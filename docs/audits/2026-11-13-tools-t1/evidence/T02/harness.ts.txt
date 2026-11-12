@@ -1,0 +1,170 @@
+// T02 audit harness: decode emitted G-code per Interval Test swatch.
+import { DEFAULT_DEVICE_PROFILE, toSceneCoords, type DeviceProfile } from '../t01-main/src/core/devices';
+import {
+  generateIntervalTestGrid,
+  type IntervalTestGrid,
+  type IntervalTestGridOptions,
+} from '../t01-main/src/core/job/interval-test-grid';
+import { createProject, DEFAULT_PROJECT_OPTIMIZATION, type Project } from '../t01-main/src/core/scene';
+import { prepareOutput } from '../t01-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t01-main/src/io/gcode/emit-gcode';
+
+export type Vec = { x: number; y: number };
+export type LitMove = { from: Vec; to: Vec; f: number; s: number; fWord: string; len: number; g: number };
+
+export function projectFor(grid: IntervalTestGrid, device: DeviceProfile): Project {
+  const base = createProject(device);
+  return {
+    ...base,
+    device,
+    optimization: { ...DEFAULT_PROJECT_OPTIMIZATION },
+    scene: { ...base.scene, ...grid.scene },
+  };
+}
+
+export function emitProject(project: Project): { gcode: string; preflight: unknown; ok: boolean } {
+  const prepared = prepareOutput(project, {});
+  const out = emitPreparedGcode(prepared);
+  return { gcode: out.gcode, preflight: out.preflight, ok: prepared.ok };
+}
+
+export function emit(grid: IntervalTestGrid, device: DeviceProfile): { gcode: string; preflight: unknown; ok: boolean } {
+  return emitProject(projectFor(grid, device));
+}
+
+/** Every G1 move with the laser on and S>0, in scene coordinates. Y divided by yScale (rotary). */
+export function litMoves(gcode: string, device: DeviceProfile, yScale = 1): LitMove[] {
+  let x = 0;
+  let y = 0;
+  let s = 0;
+  let f = 0;
+  let fWord = '';
+  let g = 0;
+  let laserOn = false;
+  const moves: LitMove[] = [];
+  for (const raw of gcode.split('\n')) {
+    const line = raw.replace(/;.*$/, '').replace(/\(.*?\)/g, '').toUpperCase();
+    const words = [...line.matchAll(/([A-Z])\s*(-?\d*\.?\d+)/g)];
+    const map = new Map<string, string>();
+    const ms: number[] = [];
+    for (const [, letter, value] of words) {
+      if (letter === 'M') ms.push(Number(value));
+      else map.set(letter!, value!);
+    }
+    for (const m of ms) {
+      if (m === 3 || m === 4) laserOn = true;
+      if (m === 5) laserOn = false;
+    }
+    const gv = map.get('G');
+    if (gv !== undefined) {
+      const gn = Number(gv);
+      if (gn === 0 || gn === 1 || gn === 2 || gn === 3) g = gn;
+    }
+    if (map.has('F')) {
+      f = Number(map.get('F'));
+      fWord = map.get('F')!;
+    }
+    if (map.has('S')) s = Number(map.get('S'));
+    const nx = map.has('X') ? Number(map.get('X')) : x;
+    const ny = map.has('Y') ? Number(map.get('Y')) / yScale : y;
+    if ((map.has('X') || map.has('Y')) && g !== 0 && laserOn && s > 0) {
+      const from = toSceneCoords({ x, y }, device);
+      const to = toSceneCoords({ x: nx, y: ny }, device);
+      moves.push({ from, to, f, s, fWord, g, len: Math.hypot(to.x - from.x, to.y - from.y) });
+    }
+    x = nx;
+    y = ny;
+  }
+  return moves;
+}
+
+export type SwatchReport = {
+  step: number;
+  label: string;
+  layerName: string;
+  intervalMm: number;
+  lines: number;
+  expectedLines: number;
+  meanStep: number;
+  minStep: number;
+  maxStep: number;
+  maxPhaseErr: number;
+  firstGap: number;
+  lastGap: number;
+  fWords: string[];
+  sValues: number[];
+  nonHorizontal: number;
+  xOutside: number;
+};
+
+export function labelTexts(grid: IntervalTestGrid): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const o of grid.scene.objects) {
+    if (o.kind === 'imported-svg' && o.source?.startsWith('calibration-label:')) {
+      m.set(o.id, o.source.slice('calibration-label:'.length));
+    }
+  }
+  return m;
+}
+
+export function perSwatch(grid: IntervalTestGrid, moves: LitMove[]): { swatches: SwatchReport[]; outside: LitMove[] } {
+  const labels = labelTexts(grid);
+  const outside: LitMove[] = [];
+  const buckets = new Map<number, LitMove[]>();
+  for (const m of moves) {
+    const p = { x: (m.from.x + m.to.x) / 2, y: (m.from.y + m.to.y) / 2 };
+    const cell = grid.cells.find(
+      (c) => p.x >= c.bounds.minX - 0.01 && p.x <= c.bounds.maxX + 0.01 && p.y >= c.bounds.minY - 0.01 && p.y <= c.bounds.maxY + 0.01,
+    );
+    if (cell === undefined) {
+      outside.push(m);
+      continue;
+    }
+    const list = buckets.get(cell.step) ?? [];
+    list.push(m);
+    buckets.set(cell.step, list);
+  }
+  const swatches = grid.cells.map((c): SwatchReport => {
+    const ms = buckets.get(c.step) ?? [];
+    const ys = [...new Set(ms.filter((m) => Math.abs(m.to.y - m.from.y) < 1e-6).map((m) => Number(m.from.y.toFixed(4))))].sort((a, b) => a - b);
+    const diffs = ys.slice(1).map((y, i) => y - ys[i]!);
+    const mean = ys.length > 1 ? (ys[ys.length - 1]! - ys[0]!) / (ys.length - 1) : NaN;
+    // Phase error: distance of each line from the ideal grid y0 + k*interval.
+    let maxPhaseErr = 0;
+    for (let i = 0; i < ys.length; i += 1) {
+      const ideal = ys[0]! + i * c.intervalMm;
+      maxPhaseErr = Math.max(maxPhaseErr, Math.abs(ys[i]! - ideal));
+    }
+    const h = c.bounds.maxY - c.bounds.minY;
+    const layer = grid.scene.layers.find((l) => l.id === c.layerId)!;
+    return {
+      step: c.step,
+      label: labels.get(`interval-test-label-${c.step}`) ?? '?',
+      layerName: layer.name,
+      intervalMm: c.intervalMm,
+      lines: ys.length,
+      expectedLines: Math.ceil(h / c.intervalMm - 1e-9),
+      meanStep: mean,
+      minStep: diffs.length ? Math.min(...diffs) : NaN,
+      maxStep: diffs.length ? Math.max(...diffs) : NaN,
+      maxPhaseErr,
+      firstGap: ys.length ? ys[0]! - c.bounds.minY : NaN,
+      lastGap: ys.length ? c.bounds.maxY - ys[ys.length - 1]! : NaN,
+      fWords: [...new Set(ms.map((m) => m.fWord))],
+      sValues: [...new Set(ms.map((m) => m.s))],
+      nonHorizontal: ms.filter((m) => Math.abs(m.to.y - m.from.y) >= 1e-6).length,
+      xOutside: ms.filter(
+        (m) => Math.min(m.from.x, m.to.x) < c.bounds.minX - 0.002 || Math.max(m.from.x, m.to.x) > c.bounds.maxX + 0.002,
+      ).length,
+    };
+  });
+  return { swatches, outside };
+}
+
+export function fmt(r: SwatchReport): string {
+  const n = (v: number, d = 4): string => (Number.isFinite(v) ? v.toFixed(d) : String(v));
+  return `step ${r.step} label "${r.label}" interval ${r.intervalMm} | lines ${r.lines} (exp ${r.expectedLines}) mean ${n(r.meanStep, 6)} min ${n(r.minStep)} max ${n(r.maxStep)} phaseErr ${n(r.maxPhaseErr)} gaps ${n(r.firstGap)}/${n(r.lastGap)} | F ${r.fWords.join('/')} S ${r.sValues.join('/')} | nonHoriz ${r.nonHorizontal} xOut ${r.xOutside}`;
+}
+
+export { generateIntervalTestGrid, DEFAULT_DEVICE_PROFILE };
+export type { IntervalTestGridOptions, IntervalTestGrid, DeviceProfile };

@@ -1,0 +1,113 @@
+// T05 independent G-code reader for Focus Test output. Tracks modal state the
+// way GRBL does (G90/G91, G20/G21, motion mode, F, S, M3/M4/M5) and keeps Z in
+// integer micrometres so sums are exact.
+
+export type ZMove = { line: number; text: string; dz: number; f: number; laser: boolean; sWord: number | null; sModal: number; relative: boolean; inch: boolean };
+export type Burn = { line: number; x0: number; y0: number; x1: number; y1: number; z: number; f: number; s: number };
+export type Decoded = {
+  zMoves: ZMove[];
+  burns: Burn[];
+  xyInRelative: { line: number; text: string }[];
+  zInAbsolute: { line: number; text: string }[];
+  g20Lines: number[];
+  finalZ: number; // micrometres
+  finalRelative: boolean;
+  zAtSampleComment: { line: number; text: string; z: number; relative: boolean }[];
+  maxAbsZ: number;
+  lines: number;
+};
+
+const toUm = (v: string): number => {
+  // exact decimal → integer micrometres
+  const neg = v.startsWith('-');
+  const body = neg || v.startsWith('+') ? v.slice(1) : v;
+  const [ip = '0', fp = ''] = body.split('.');
+  const frac = (fp + '000').slice(0, 3);
+  const rest = fp.slice(3);
+  if (/[1-9]/.test(rest)) throw new Error(`Z has more than 3 decimals: ${v}`);
+  const um = Number(ip || '0') * 1000 + Number(frac);
+  return neg ? -um : um;
+};
+
+export function decode(gcode: string): Decoded {
+  let relative = false;
+  let inch = false;
+  let motion = 0;
+  let f = 0;
+  let s = 0;
+  let laser = false;
+  let x = 0;
+  let y = 0;
+  let zUm = 0;
+  let maxAbsZ = 0;
+  const out: Decoded = {
+    zMoves: [],
+    burns: [],
+    xyInRelative: [],
+    zInAbsolute: [],
+    g20Lines: [],
+    finalZ: 0,
+    finalRelative: false,
+    zAtSampleComment: [],
+    maxAbsZ: 0,
+    lines: 0,
+  };
+  const rows = gcode.split('\n');
+  out.lines = rows.length;
+  rows.forEach((raw, idx) => {
+    const n = idx + 1;
+    if (/;\s*Focus Test Z offset/.test(raw))
+      out.zAtSampleComment.push({ line: n, text: raw.trim(), z: zUm, relative });
+    const code = raw.replace(/\(.*?\)/g, '').replace(/;.*$/, '').toUpperCase();
+    if (code.trim() === '' || code.trim().startsWith('$')) return;
+    const words: [string, string][] = [];
+    for (const m of code.matchAll(/([A-Z])\s*([-+]?\d*\.?\d+)/g)) words.push([m[1]!, m[2]!]);
+    const values = new Map<string, string>();
+    for (const [letter, value] of words) {
+      if (letter === 'G') {
+        const g = Number(value);
+        if (g === 90) relative = false;
+        else if (g === 91) relative = true;
+        else if (g === 20) {
+          inch = true;
+          out.g20Lines.push(n);
+        } else if (g === 21) inch = false;
+        else if (g === 0 || g === 1 || g === 2 || g === 3) motion = g;
+      } else if (letter === 'M') {
+        const m = Number(value);
+        if (m === 3 || m === 4) laser = true;
+        else if (m === 5) laser = false;
+      } else values.set(letter, value);
+    }
+    if (values.has('F')) f = Number(values.get('F'));
+    const sWord = values.has('S') ? Number(values.get('S')) : null;
+    if (sWord !== null) s = sWord;
+    const hasXY = values.has('X') || values.has('Y');
+    const hasZ = values.has('Z');
+    if (hasXY && relative) out.xyInRelative.push({ line: n, text: raw.trim() });
+    if (hasZ) {
+      const v = values.get('Z')!;
+      if (!relative) {
+        out.zInAbsolute.push({ line: n, text: raw.trim() });
+        zUm = toUm(v);
+      } else {
+        const dz = toUm(v);
+        out.zMoves.push({ line: n, text: raw.trim(), dz, f, laser, sWord, sModal: s, relative, inch });
+        zUm += dz;
+      }
+      maxAbsZ = Math.max(maxAbsZ, Math.abs(zUm));
+    }
+    if (hasXY) {
+      const nx = values.has('X') ? Number(values.get('X')) * (inch ? 25.4 : 1) : x;
+      const ny = values.has('Y') ? Number(values.get('Y')) * (inch ? 25.4 : 1) : y;
+      if (!relative && motion === 1 && laser && s > 0 && (nx !== x || ny !== y))
+        out.burns.push({ line: n, x0: x, y0: y, x1: nx, y1: ny, z: zUm, f, s });
+      x = nx;
+      y = ny;
+    }
+  });
+  out.finalZ = zUm;
+  out.finalRelative = relative;
+  out.maxAbsZ = maxAbsZ;
+  return out;
+}

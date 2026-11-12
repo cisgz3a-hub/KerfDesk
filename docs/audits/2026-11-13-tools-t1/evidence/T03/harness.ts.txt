@@ -1,0 +1,117 @@
+// T03 audit harness: decode emitted raster G-code per tone-wedge patch.
+import { DEFAULT_DEVICE_PROFILE, toSceneCoords, type DeviceProfile } from '../t01-main/src/core/devices';
+import { createProject, DEFAULT_PROJECT_OPTIMIZATION, type Project, type Scene } from '../t01-main/src/core/scene';
+import { prepareOutput } from '../t01-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t01-main/src/io/gcode/emit-gcode';
+
+export { DEFAULT_DEVICE_PROFILE };
+export type Vec = { x: number; y: number };
+export type LitMove = { from: Vec; to: Vec; f: number; s: number; len: number };
+export type Box = { minX: number; minY: number; maxX: number; maxY: number };
+
+export function projectForScene(scene: Scene, device: DeviceProfile): Project {
+  const base = createProject(device);
+  return {
+    ...base,
+    device,
+    optimization: { ...DEFAULT_PROJECT_OPTIMIZATION },
+    scene: { ...base.scene, ...scene },
+  };
+}
+
+export function emitProject(project: Project, laserMaxPowerS?: number): { gcode: string; ok: boolean; prepared: ReturnType<typeof prepareOutput> } {
+  const prepared = prepareOutput(project, laserMaxPowerS === undefined ? {} : { laserMaxPowerS });
+  const out = emitPreparedGcode(prepared);
+  return { gcode: out.gcode, ok: prepared.ok, prepared };
+}
+
+/** Every G1 move with the laser on, S > 0, in scene coordinates. */
+export function litMoves(gcode: string, device: DeviceProfile, yScale = 1): LitMove[] {
+  let x = 0;
+  let y = 0;
+  let s = 0;
+  let f = 0;
+  let g = 0;
+  let laserOn = false;
+  const moves: LitMove[] = [];
+  for (const raw of gcode.split('\n')) {
+    const line = raw.replace(/;.*$/, '').replace(/\(.*?\)/g, '').toUpperCase();
+    const words = [...line.matchAll(/([A-Z])\s*(-?\d*\.?\d+)/g)];
+    const map = new Map<string, string>();
+    const ms: number[] = [];
+    for (const [, letter, value] of words) {
+      if (letter === 'M') ms.push(Number(value));
+      else map.set(letter!, value!);
+    }
+    for (const m of ms) {
+      if (m === 3 || m === 4) laserOn = true;
+      if (m === 5) laserOn = false;
+    }
+    const gv = map.get('G');
+    if (gv !== undefined) {
+      const gn = Number(gv);
+      if (gn === 0 || gn === 1 || gn === 2 || gn === 3) g = gn;
+    }
+    if (map.has('F')) f = Number(map.get('F'));
+    if (map.has('S')) s = Number(map.get('S'));
+    const nx = map.has('X') ? Number(map.get('X')) : x;
+    const ny = map.has('Y') ? Number(map.get('Y')) / yScale : y;
+    if ((map.has('X') || map.has('Y')) && g === 1 && laserOn && s > 0) {
+      const from = toSceneCoords({ x, y }, device);
+      const to = toSceneCoords({ x: nx, y: ny }, device);
+      moves.push({ from, to, f, s, len: Math.hypot(to.x - from.x, to.y - from.y) });
+    }
+    x = nx;
+    y = ny;
+  }
+  return moves;
+}
+
+/** Length of a horizontal move clipped to an x range, when its y is inside the y range. */
+function clippedLen(m: LitMove, b: Box): number {
+  const y = (m.from.y + m.to.y) / 2;
+  if (y < b.minY || y > b.maxY) return 0;
+  const lo = Math.max(Math.min(m.from.x, m.to.x), b.minX);
+  const hi = Math.min(Math.max(m.from.x, m.to.x), b.maxX);
+  return Math.max(0, hi - lo);
+}
+
+export type PatchStats = {
+  /** sum(len * S) / (sMaxRef * box width * scan rows): mean energy fraction. */
+  energy: number;
+  /** lit share of the scan length (any S > 0). */
+  coverage: number;
+  sValues: number[];
+  rows: number;
+};
+
+export function patchStats(moves: LitMove[], box: Box, sRef: number, intervalMm: number): PatchStats {
+  let lit = 0;
+  let energy = 0;
+  const sSet = new Set<number>();
+  const rows = new Set<number>();
+  for (const m of moves) {
+    const len = clippedLen(m, box);
+    if (len <= 0) continue;
+    lit += len;
+    energy += len * m.s;
+    sSet.add(m.s);
+    rows.add(Number(((m.from.y + m.to.y) / 2).toFixed(3)));
+  }
+  const nRows = Math.max(1, Math.round((box.maxY - box.minY) / intervalMm));
+  const total = (box.maxX - box.minX) * nRows;
+  return {
+    energy: energy / (sRef * total),
+    coverage: lit / total,
+    sValues: [...sSet].sort((a, b) => a - b),
+    rows: rows.size,
+  };
+}
+
+export function inset(b: Box, d: number): Box {
+  return { minX: b.minX + d, minY: b.minY + d, maxX: b.maxX - d, maxY: b.maxY - d };
+}
+
+export function fmt(n: number, d = 4): string {
+  return Number.isFinite(n) ? n.toFixed(d) : String(n);
+}

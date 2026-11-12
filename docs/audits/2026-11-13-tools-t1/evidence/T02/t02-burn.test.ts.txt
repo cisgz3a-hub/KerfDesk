@@ -1,0 +1,127 @@
+// T02 Interval Test: decode each swatch's scan lines from emitted G-code and
+// compare the measured Y step, F and S with the burned labels.
+import { describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  DEFAULT_DEVICE_PROFILE,
+  emit,
+  emitProject,
+  fmt,
+  generateIntervalTestGrid,
+  labelTexts,
+  litMoves,
+  perSwatch,
+  projectFor,
+  type DeviceProfile,
+  type IntervalTestGridOptions,
+} from './harness';
+import { rotaryYScale } from '../t01-main/src/core/devices/rotary';
+
+const log: string[] = [];
+const BASE: IntervalTestGridOptions = {
+  steps: 10,
+  speed: 1500,
+  power: 30,
+  intervalMinMm: 0.08,
+  intervalMaxMm: 0.2,
+  swatchSizeMm: 8,
+  gapMm: 2,
+};
+
+type Case = { title: string; options: IntervalTestGridOptions; device?: Partial<DeviceProfile>; layerPatch?: Record<string, unknown> };
+
+const CASES: Case[] = [
+  { title: 'default dialog values', options: BASE },
+  { title: 'fine 0.05-0.12 x 20 steps', options: { ...BASE, steps: 20, intervalMinMm: 0.05, intervalMaxMm: 0.12, swatchSizeMm: 5 } },
+  { title: 'reversed range 0.2..0.08', options: { ...BASE, intervalMinMm: 0.2, intervalMaxMm: 0.08 } },
+  { title: 'equal range 0.1..0.1 x 5', options: { ...BASE, steps: 5, intervalMinMm: 0.1, intervalMaxMm: 0.1 } },
+  { title: '1 step 0.13', options: { ...BASE, steps: 1, intervalMinMm: 0.13, intervalMaxMm: 0.13 } },
+  { title: '1 step min 0.08 max 0.2', options: { ...BASE, steps: 1 } },
+  { title: '20 steps', options: { ...BASE, steps: 20 } },
+  { title: '21 steps (clamped)', options: { ...BASE, steps: 21 } },
+  { title: 'interval below floor 0.01..0.1', options: { ...BASE, steps: 4, intervalMinMm: 0.01, intervalMaxMm: 0.1 } },
+  { title: 'huge interval 2..6 on 8 mm', options: { ...BASE, steps: 3, intervalMinMm: 2, intervalMaxMm: 6 } },
+  { title: 'interval larger than swatch 3..10 on 2 mm', options: { ...BASE, steps: 3, intervalMinMm: 3, intervalMaxMm: 10, swatchSizeMm: 2 } },
+  { title: 'swatch 1 mm, 0.3..0.9', options: { ...BASE, steps: 3, intervalMinMm: 0.3, intervalMaxMm: 0.9, swatchSizeMm: 1 } },
+  { title: 'non-finite steps NaN', options: { ...BASE, steps: Number.NaN } },
+  { title: 'non-finite intervals', options: { ...BASE, steps: 3, intervalMinMm: Number.NaN, intervalMaxMm: Number.POSITIVE_INFINITY } },
+  { title: 'speed capped 9000 on maxFeed 6000', options: { ...BASE, steps: 3, speed: 9000 } },
+  { title: 'fractional speed 1234.5', options: { ...BASE, steps: 3, speed: 1234.5 } },
+  { title: 'power 0', options: { ...BASE, steps: 3, power: 0 } },
+  { title: 'power 100', options: { ...BASE, steps: 3, power: 100 } },
+  { title: 'power 33.3 S=255', options: { ...BASE, steps: 3, power: 33.3 }, device: { maxPowerS: 255 } },
+  { title: 'origin rear-right', options: BASE, device: { origin: 'rear-right' } },
+  { title: 'origin rear-left', options: BASE, device: { origin: 'rear-left' } },
+  { title: 'unidirectional fill', options: BASE, layerPatch: { fillBidirectional: false } },
+  { title: 'scan offset table 0.15 mm @1500', options: BASE, device: { scanningOffsets: [{ speedMmPerMin: 1500, offsetMm: 0.15 }] } as Partial<DeviceProfile> },
+  { title: 'layer scan offset 0.3', options: BASE, layerPatch: { bidirectionalScanOffsetMm: 0.3 } },
+  { title: 'overscan 0', options: BASE, layerPatch: { fillOverscanMm: 0 } },
+  { title: 'auto overscan', options: BASE, layerPatch: { autoOverscan: true } },
+  { title: 'grid origin 3.3, 7.7', options: { ...BASE, origin: { x: 3.3, y: 7.7 } } },
+];
+
+function runCase(c: Case, yScale = 1, deviceOverride?: DeviceProfile): void {
+  const device: DeviceProfile = deviceOverride ?? { ...DEFAULT_DEVICE_PROFILE, ...(c.device ?? {}) };
+  const grid = generateIntervalTestGrid({ ...c.options, maxFeedMmPerMin: device.maxFeed });
+  const project = projectFor(grid, device);
+  const patched = c.layerPatch
+    ? {
+        ...project,
+        scene: {
+          ...project.scene,
+          layers: project.scene.layers.map((l) => (l.id.startsWith('interval-test-step-') ? { ...l, ...c.layerPatch } : l)),
+        },
+      }
+    : project;
+  const out = emitProject(patched);
+  log.push(`\n## ${c.title} ok=${out.ok} cells=${grid.cells.length}`);
+  if (!out.ok) {
+    log.push(`preflight: ${JSON.stringify(out.preflight).slice(0, 600)}`);
+    return;
+  }
+  const texts = [...labelTexts(grid).values()];
+  log.push(`labels: ${texts.join(' | ')}`);
+  const moves = litMoves(out.gcode, device, yScale);
+  const { swatches, outside } = perSwatch(grid, moves);
+  for (const s of swatches) {
+    const flags: string[] = [];
+    if (s.label !== String(s.label)) flags.push('label?');
+    if (Number(s.label) !== s.intervalMm) flags.push(`LABEL!=interval(${s.label} vs ${s.intervalMm})`);
+    if (!s.layerName.includes(`Interval ${s.label} mm`)) flags.push('LAYERNAME');
+    if (s.lines > 1 && Math.abs(s.meanStep - s.intervalMm) > 0.0006) flags.push('MEANSTEP');
+    if (s.lines > 1 && s.maxPhaseErr > 0.0011) flags.push('PHASE');
+    if (s.lines !== s.expectedLines) flags.push('COUNT');
+    if (s.nonHorizontal > 0 || s.xOutside > 0) flags.push('GEOM');
+    log.push(`${fmt(s)}${flags.length ? '  <<' + flags.join(',') : ''}`);
+  }
+  const labelHits = outside.length;
+  log.push(`lit moves outside swatches (labels + strays): ${labelHits}`);
+  expect(true).toBe(true);
+}
+
+describe('interval test burns', () => {
+  for (const c of CASES) it(c.title, () => runCase(c));
+  it('chuck rotary', () => {
+    const device: DeviceProfile = {
+      ...DEFAULT_DEVICE_PROFILE,
+      rotary: { enabled: true, type: 'chuck', mmPerRotation: 20, objectDiameterMm: 60 },
+    } as DeviceProfile;
+    const k = rotaryYScale(device.rotary!);
+    log.push(`\n(rotary k=${k})`);
+    runCase({ title: 'chuck rotary k decoded', options: BASE }, k, device);
+  });
+  it('roller rotary', () => {
+    const device: DeviceProfile = {
+      ...DEFAULT_DEVICE_PROFILE,
+      rotary: { enabled: true, type: 'roller', mmPerRotation: 40, objectDiameterMm: 80, rollerDiameterMm: 20 },
+    } as DeviceProfile;
+    const k = rotaryYScale(device.rotary!);
+    log.push(`\n(roller k=${k})`);
+    runCase({ title: 'roller rotary k decoded', options: BASE }, k, device);
+  });
+  it('dump default gcode', () => {
+    const grid = generateIntervalTestGrid({ ...BASE, maxFeedMmPerMin: 6000 });
+    writeFileSync('C:/Users/stolk/kd-t1/zz-t02/default.gcode', emit(grid, DEFAULT_DEVICE_PROFILE).gcode);
+  });
+  it('log', () => writeFileSync('C:/Users/stolk/kd-t1/zz-t02/t02-burn.log', log.join('\n')));
+});

@@ -1,0 +1,218 @@
+// @vitest-environment jsdom
+// T04: dialog, Generate/Undo/Redo/Cancel, measured-offset Apply, then a real job
+// compiled with the applied table, and a save/reopen round trip.
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
+afterAll(() => writeFileSync('C:/Users/stolk/kd-t1/zz-t04/t04-apply.log', log.join(String.fromCharCode(10))));
+import { writeFileSync } from 'node:fs';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { Simulate } from 'react-dom/test-utils';
+import { ScanOffsetCommandDialog } from '../t01-main/src/ui/commands/ScanOffsetCommandDialog';
+import { MeasuredScanOffsetApply } from '../t01-main/src/ui/laser/MeasuredScanOffsetApply';
+import { useStore } from '../t01-main/src/ui/state/store';
+import { resetStore, svgObj } from '../t01-main/src/ui/state/test-helpers';
+import { serializeProject } from '../t01-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t01-main/src/io/project/deserialize-project';
+import { decodeSwatch, emitProject, generateScanOffsetCalibrationPattern, litMoves, oracleOffset, type Project } from './harness';
+
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const log: string[] = [];
+let roots: Root[] = [];
+afterEach(() => {
+  for (const r of roots) act(() => r.unmount());
+  roots = [];
+  document.body.innerHTML = '';
+  resetStore();
+});
+function render(el: JSX.Element): HTMLDivElement {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  roots.push(root);
+  act(() => root.render(el));
+  return host;
+}
+function button(host: HTMLElement, name: string): HTMLButtonElement {
+  const b = [...host.querySelectorAll('button')].find((x) => x.textContent?.trim().includes(name));
+  if (!b) throw new Error(`no button ${name}`);
+  return b as HTMLButtonElement;
+}
+function inputByLabel(host: HTMLElement, label: string): HTMLInputElement {
+  const el = host.querySelector(`input[aria-label="${label}"]`);
+  if (!(el instanceof HTMLInputElement)) throw new Error(`no input ${label}`);
+  return el;
+}
+function setInput(el: HTMLInputElement, value: string): void {
+  act(() => {
+    el.value = value;
+    Simulate.change(el);
+  });
+}
+function setSelect(host: HTMLElement, label: string, value: string): void {
+  const el = host.querySelector(`select[aria-label="${label}"]`) as HTMLSelectElement;
+  act(() => {
+    el.value = value;
+    Simulate.change(el);
+  });
+}
+
+/** A "real job": the coupon geometry on ordinary fill layers (no calibration flags). */
+function realJob(project: Project, speeds: number[]): { project: Project; cells: { speed: number; bounds: { minX: number; minY: number; maxX: number; maxY: number } }[] } {
+  const p = generateScanOffsetCalibrationPattern({ mode: 'baseline', steps: speeds.length, speedMin: 1, speedMax: 1, power: 12, swatchWidthMm: 30, swatchHeightMm: 5, hatchSpacingMm: 0.5 }, project.device);
+  const layers = p.scene.layers.map((l, i) => {
+    if (!l.id.startsWith('scan-offset-calibration-step-')) return l;
+    const { scanOffsetCalibrationMode: _m, allowUncalibratedBidirectionalScan: _a, bidirectionalScanOffsetMm: _b, ...plain } = l as typeof l & Record<string, unknown>;
+    return { ...plain, speed: speeds[i]!, name: `job ${speeds[i]}` };
+  });
+  const objects = p.scene.objects.filter((o) => !o.id.startsWith('scan-offset-calibration-label-'));
+  return {
+    project: { ...project, scene: { ...project.scene, objects, layers: layers.filter((l) => l.id.startsWith('scan-offset-calibration-step-')) } },
+    cells: p.cells.map((c, i) => ({ speed: speeds[i]!, bounds: c.bounds })),
+  };
+}
+
+function measure(project: Project, speeds: number[]): { lines: string[]; worst: number } {
+  const job = realJob(project, speeds);
+  const out = emitProject(job.project);
+  const lines: string[] = [];
+  let worst = 0;
+  if (!out.ok) return { lines: [`not ok ${JSON.stringify(out.preflight).slice(0, 300)}`], worst: NaN };
+  const moves = litMoves(out.gcode, project.device);
+  for (const c of job.cells) {
+    const r = decodeSwatch(c.bounds, moves);
+    const expected = oracleOffset(project.device.scanningOffsets, c.speed, project.device.maxFeed);
+    const err = Math.max(Math.abs(r.alongMeanFwd - expected / 2), Math.abs(r.alongMeanRev - expected / 2));
+    worst = Math.max(worst, Number.isFinite(err) ? err : 99);
+    lines.push(`speed ${c.speed} F ${r.fWords.join(',')} rows fwd ${r.rows.filter((x) => x.dir === 1).length} rev ${r.rows.filter((x) => x.dir === -1).length} sep ${r.separation.toFixed(4)} along fwd ${r.alongMeanFwd.toFixed(4)} rev ${r.alongMeanRev.toFixed(4)} | oracle table ${expected.toFixed(4)} -> row ${(expected / 2).toFixed(4)} err ${err.toFixed(5)}`);
+  }
+  return { lines, worst };
+}
+
+describe('T04 dialog and apply', () => {
+  it('Cancel leaves nothing; Generate, Undo, Redo', () => {
+    useStore.setState((s) => ({ project: { ...s.project, scene: { ...s.project.scene, objects: [svgObj('art', ['#000000'])] } } }));
+    const before = useStore.getState().project;
+    const undoDepth = useStore.getState().undoStack.length;
+    let closed = 0;
+    const host = render(<ScanOffsetCommandDialog onClose={() => (closed += 1)} />);
+    act(() => button(host, 'Cancel').click());
+    log.push(`cancel: closed=${closed} sameProject=${useStore.getState().project === before} undoDepth ${undoDepth}->${useStore.getState().undoStack.length} dirty=${useStore.getState().dirty}`);
+    expect(useStore.getState().project).toBe(before);
+
+    // validation probes
+    const probes: [string, string][] = [
+      ['Power', ''],
+      ['Power', 'abc'],
+      ['Overscan', ''],
+      ['Gap', ''],
+      ['Steps', '2.5'],
+      ['Steps', '11'],
+      ['Min speed (mm/min)', '0'],
+      ['Max speed (mm/min)', '1e9'],
+      ['Line interval', '0.01'],
+      ['Swatch width', '0.5'],
+      ['Swatch height', '1e9'],
+    ];
+    for (const [label, value] of probes) {
+      const el = inputByLabel(host, label);
+      const prior = el.value;
+      setInput(el, value);
+      const alert = host.querySelector('[role="alert"]')?.textContent ?? '';
+      const status = host.querySelector('[role="status"]')?.textContent ?? '';
+      log.push(`probe ${label}='${value}': alert="${alert}" warn="${status.slice(0, 200)}"`);
+      setInput(el, prior);
+    }
+    // Generate defaults
+    act(() => button(host, 'Generate uncorrected baseline').click());
+    const after = useStore.getState().project;
+    log.push(`generate: objects ${after.scene.objects.length} layers ${after.scene.layers.length} closed=${closed} undoDepth ${useStore.getState().undoStack.length}`);
+    const generated = after.scene;
+    act(() => useStore.getState().undo());
+    const undone = useStore.getState().project;
+    log.push(`undo: sceneEqualBefore=${JSON.stringify(undone.scene) === JSON.stringify(before.scene)} deviceEqual=${JSON.stringify(undone.device) === JSON.stringify(before.device)}`);
+    act(() => useStore.getState().redo());
+    log.push(`redo: sceneEqualGenerated=${JSON.stringify(useStore.getState().project.scene) === JSON.stringify(generated)}`);
+  });
+
+  it('Apply measured offsets lands in the table and the next real job shifts by it', () => {
+    const host = render(<MeasuredScanOffsetApply />);
+    // operator reads coupon labels 5000..1000 (defaults rows are 1000..5000)
+    const entered: [string, string][] = [
+      ['1', '-0.08'],
+      ['2', '-0.15'],
+      ['3', '-0.2'],
+      ['4', ''],
+      ['5', '-0.3'],
+    ];
+    for (const [row, off] of entered) setInput(inputByLabel(host, `Measured offset ${row}`), off);
+    const rowsSpeeds = [1, 2, 3, 4, 5].map((i) => inputByLabel(host, `Measured speed ${i}`).value);
+    log.push(`\napply rows speeds ${rowsSpeeds.join(',')}`);
+    const depth = useStore.getState().undoStack.length;
+    act(() => button(host, 'Apply measured offsets').click());
+    const dev = useStore.getState().project.device;
+    log.push(`applied table ${JSON.stringify(dev.scanningOffsets)} status ${dev.scanOffsetCalibrationStatus} undo ${depth}->${useStore.getState().undoStack.length}`);
+    const job = measure(useStore.getState().project, [500, 1000, 1500, 3500, 4000, 5000, 6000]);
+    log.push(...job.lines, `worst err ${job.worst}`);
+
+    // Undo/Redo of Apply
+    act(() => useStore.getState().undo());
+    log.push(`undo apply: table ${JSON.stringify(useStore.getState().project.device.scanningOffsets)} status ${useStore.getState().project.device.scanOffsetCalibrationStatus}`);
+    act(() => useStore.getState().redo());
+    log.push(`redo apply: table ${JSON.stringify(useStore.getState().project.device.scanningOffsets)} status ${useStore.getState().project.device.scanOffsetCalibrationStatus}`);
+
+    // Save / reopen
+    const text = serializeProject(useStore.getState().project);
+    const re = deserializeProject(text);
+    if (re.kind !== 'ok') throw new Error(`reopen ${re.kind}`);
+    log.push(`reopen: table ${JSON.stringify(re.project.device.scanningOffsets)} status ${re.project.device.scanOffsetCalibrationStatus}`);
+    const a = emitProject(realJob(useStore.getState().project, [2500]).project).gcode;
+    const b = emitProject(realJob(re.project, [2500]).project).gcode;
+    log.push(`reopen gcode identical: ${a === b} (${a.length} bytes)`);
+
+    // Delete an entry: blank row 2 and re-apply
+    setInput(inputByLabel(host, 'Measured offset 2'), '');
+    act(() => button(host, 'Apply measured offsets').click());
+    log.push(`after blanking row 2: ${JSON.stringify(useStore.getState().project.device.scanningOffsets)}`);
+    // Blank all -> apply disabled?
+    const n = host.querySelectorAll('input[aria-label^="Measured offset"]').length; log.push(`rows now ${n}`); for (let i = 1; i <= n; i += 1) setInput(inputByLabel(host, `Measured offset ${i}`), '');
+    log.push(`all blank: apply disabled=${button(host, 'Apply measured offsets').disabled} summary="${host.textContent?.match(/Enter at least one[^.]*\./)?.[0] ?? ''}"`);
+    // zero, non-finite, too large, duplicate, above max
+    const cases: [string, string, string][] = [
+      ['1000', '0', 'zero'],
+      ['1000', 'Infinity', 'inf'],
+      ['1000', '9', 'too large'],
+      ['6001', '0.1', 'above max feed'],
+      ['0', '0.1', 'zero speed'],
+      ['-500', '0.1', 'neg speed'],
+    ];
+    for (const [sp, off, name] of cases) {
+      setInput(inputByLabel(host, 'Measured speed 1'), sp);
+      setInput(inputByLabel(host, 'Measured offset 1'), off);
+      const alert = host.querySelector('ul[role="alert"]')?.textContent ?? '';
+      log.push(`row case ${name}: speed ${sp} offset ${off} -> applyDisabled=${button(host, 'Apply measured offsets').disabled} alert="${alert}"`);
+    }
+    setInput(inputByLabel(host, 'Measured speed 1'), '2000');
+    setInput(inputByLabel(host, 'Measured offset 1'), '0.1');
+    setInput(inputByLabel(host, 'Measured speed 2'), '2000');
+    setInput(inputByLabel(host, 'Measured offset 2'), '0.2');
+    log.push(`duplicate: applyDisabled=${button(host, 'Apply measured offsets').disabled} alert="${host.querySelector('ul[role="alert"]')?.textContent ?? ''}"`);
+  });
+
+  it('LightBurn Line Shift mm/s entry moves each row by the Line Shift', () => {
+    const host = render(<MeasuredScanOffsetApply />);
+    setSelect(host, 'Scan-offset input convention', 'lightburn-half-both-directions');
+    setSelect(host, 'Scan-offset speed unit', 'mm-per-second');
+    const speeds = [1, 2, 3, 4, 5].map((i) => inputByLabel(host, `Measured speed ${i}`).value);
+    setInput(inputByLabel(host, 'Measured speed 1'), '25');
+    setInput(inputByLabel(host, 'Measured offset 1'), '0.05');
+    setInput(inputByLabel(host, 'Measured speed 2'), '75');
+    setInput(inputByLabel(host, 'Measured offset 2'), '0.12');
+    for (const i of [3, 4, 5]) setInput(inputByLabel(host, `Measured offset ${i}`), '');
+    act(() => button(host, 'Apply measured offsets').click());
+    const dev = useStore.getState().project.device;
+    log.push(`\nLB rows after switch (mm/s) ${speeds.join(',')}; table ${JSON.stringify(dev.scanningOffsets)}`);
+    const job = measure(useStore.getState().project, [1500, 3000, 4500, 6000]);
+    log.push(...job.lines, `LB worst err ${job.worst}`);
+    writeFileSync('C:/Users/stolk/kd-t1/zz-t04/t04-apply.log', log.join('\n'));
+  });
+});

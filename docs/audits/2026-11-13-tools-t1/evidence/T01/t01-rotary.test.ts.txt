@@ -1,0 +1,89 @@
+// T01: Material Test on a rotary (chuck, Y axis). Surface speed of every lit
+// move compared with the burned speed labels.
+import { describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { DEFAULT_DEVICE_PROFILE, emit, generateMaterialTestGrid, labels, type DeviceProfile } from './harness';
+import { rotaryYScale } from '../t01-main/src/core/devices/rotary';
+
+const log: string[] = [];
+
+function surfaceSpeeds(gcode: string, k: number): { speeds: Map<string, number>; lit: number } {
+  let x = 0;
+  let y = 0;
+  let f = 0;
+  let s = 0;
+  let g = 0;
+  let on = false;
+  const speeds = new Map<string, number>();
+  let lit = 0;
+  for (const raw of gcode.split('\n')) {
+    const line = raw.replace(/;.*$/, '').toUpperCase();
+    const w = new Map<string, number>();
+    for (const m of line.matchAll(/([A-Z])\s*(-?\d*\.?\d+)/g)) {
+      if (m[1] === 'M') {
+        const v = Number(m[2]);
+        if (v === 3 || v === 4) on = true;
+        if (v === 5) on = false;
+      } else w.set(m[1]!, Number(m[2]));
+    }
+    if (w.has('G') && [0, 1, 2, 3].includes(w.get('G')!)) g = w.get('G')!;
+    if (w.has('F')) f = w.get('F')!;
+    if (w.has('S')) s = w.get('S')!;
+    const nx = w.get('X') ?? x;
+    const ny = w.get('Y') ?? y;
+    if ((w.has('X') || w.has('Y')) && g === 1 && on && s > 0) {
+      const dx = nx - x;
+      const dy = ny - y;
+      const dm = Math.hypot(dx, dy);
+      const ds = Math.hypot(dx, dy / k);
+      if (dm > 1e-6) {
+        lit++;
+        const surf = (f * ds) / dm;
+        const key = `F${f} dir=${Math.abs(dy) < 1e-9 ? 'X' : Math.abs(dx) < 1e-9 ? 'Y' : 'XY'}`;
+        const prev = speeds.get(key);
+        speeds.set(key, prev === undefined ? surf : Math.max(prev, surf));
+      }
+    }
+    x = nx;
+    y = ny;
+  }
+  return { speeds, lit };
+}
+
+describe('rotary material test', () => {
+  for (const mode of ['line', 'fill'] as const) {
+    it(`chuck rotary ${mode}`, () => {
+      const device: DeviceProfile = {
+        ...DEFAULT_DEVICE_PROFILE,
+        rotary: { enabled: true, type: 'chuck', mmPerRotation: 20, objectDiameterMm: 60 },
+      };
+      const k = rotaryYScale(device.rotary!);
+      const grid = generateMaterialTestGrid({
+        mode,
+        rowParameter: 'speed',
+        columnParameter: 'power',
+        rows: 3,
+        columns: 3,
+        speedMin: 600,
+        speedMax: 1800,
+        powerMin: 10,
+        powerMax: 40,
+        cellWidthMm: 5,
+        cellHeightMm: 5,
+        gapMm: 1,
+        maxFeedMmPerMin: device.maxFeed,
+        accelMmPerSec2: device.accelMmPerSec2,
+      });
+      const out = emit(grid, device);
+      log.push(`\n## ${mode} k=${k.toFixed(5)} ok=${out.ok}`);
+      if (!out.ok) log.push(JSON.stringify(out.preflight).slice(0, 800));
+      log.push(`labels: ${labels(grid).map((l) => l.text).join('|')}`);
+      const { speeds, lit } = surfaceSpeeds(out.gcode, k);
+      log.push(`lit moves ${lit}`);
+      for (const [key, v] of speeds) log.push(`${key}: max surface ${v.toFixed(2)} mm/min`);
+      writeFileSync(`C:/Users/stolk/kd-t1/zz-t01/rotary-${mode}.gcode`, out.gcode);
+      expect(true).toBe(true);
+    });
+  }
+  it('log', () => writeFileSync('C:/Users/stolk/kd-t1/zz-t01/t01-rotary.log', log.join('\n')));
+});
