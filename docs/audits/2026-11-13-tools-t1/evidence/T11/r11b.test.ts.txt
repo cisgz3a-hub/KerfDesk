@@ -1,0 +1,68 @@
+// T11 refuter part 2: traced and hand-drawn (SVG C/Q) tapered tips.
+import { it } from 'vitest';
+import { appendFileSync } from 'node:fs';
+import type { CurveSubpath } from '../t06-main/src/core/scene';
+import { removeCurveFillets } from '../t06-main/src/core/geometry/curve-fillet';
+import { render, trace } from '../t06-main/src/core/trace/colour-layer-trace.test-support';
+import { TRACE_PRESETS } from '../t06-main/src/core/trace/trace-presets';
+import { parseSvg } from '../t06-main/src/io/svg/parse-svg';
+import { bbox, sample, type Curve } from './geo';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t11r/r11.log';
+const out = (s: string) => appendFileSync(LOG, '\n' + s);
+const f = (n: number, d = 2) => n.toFixed(d);
+const kinds = (c: CurveSubpath) => c.segments.map((s) => (s.kind === 'line' ? 'l' : s.kind === 'cubic' ? 'C' : 'A')).join('');
+
+function inSlot(x: number, y: number, cx: number, cy: number, Rb: number, Rs: number, L: number): boolean {
+  // union of the two discs and the hull between them (convex hull of two circles)
+  if ((x - cx) ** 2 + (y - cy) ** 2 <= Rb * Rb) return true;
+  if ((x - cx - L) ** 2 + (y - cy) ** 2 <= Rs * Rs) return true;
+  const t = Math.max(0, Math.min(1, (x - cx) / L));
+  // hull half-width at axial position: tangent lines; approximate by distance to segment with linearly varying radius
+  const sinA = (Rb - Rs) / L;
+  const cosA = Math.sqrt(1 - sinA * sinA);
+  // signed distance to upper tangent line through tangent points
+  const nx = sinA, ny = cosA;
+  const d = Math.abs(y - cy) * ny + (x - cx) * nx - Rb; // line: n.(p-c) = Rb
+  return t > 0 && t < 1 && d <= 0;
+}
+
+it('traced tapered slot: are tips single cubics between lines?', () => {
+  out('== P2-2 traced raster tapered slots (Line Art preset) ==');
+  for (const [halfDeg, Rb, Rs] of [[1, 40, 35], [3, 40, 25], [8, 40, 15]] as const) {
+    const L = (Rb - Rs) / Math.sin((halfDeg * Math.PI) / 180);
+    const W = Math.ceil(L + Rb + Rs + 40), H = 2 * Rb + 40;
+    const cx = Rb + 20, cy = H / 2;
+    const img = render(W, H, (x, y) => (inSlot(x, y, cx, cy, Rb, Rs, L) ? [0, 0, 0] : [255, 255, 255]));
+    const paths = trace(img, TRACE_PRESETS['Line Art'] as any);
+    for (const p of paths) {
+      for (const c of p.curves ?? []) {
+        const bb0 = bbox(sample(c as Curve, 0.5));
+        if (bb0.maxX - bb0.minX < 20) continue;
+        const rem = removeCurveFillets(c);
+        const bb1 = rem ? bbox(sample(rem.curve as Curve, 0.5)) : bb0;
+        out(`half ${halfDeg} deg Rb ${Rb} Rs ${Rs} (img ${W}x${H}) colour ${p.color}: segs ${kinds(c)}; Remove ${rem?.count ?? 0}; x ${f(bb0.minX)}..${f(bb0.maxX)} -> ${f(bb1.minX)}..${f(bb1.maxX)}; y ${f(bb0.minY)}..${f(bb0.maxY)} -> ${f(bb1.minY)}..${f(bb1.maxY)}`);
+      }
+    }
+  }
+});
+
+it('hand-drawn SVG tip as one C or Q', () => {
+  out('== P2-2 SVG single C / Q tip ==');
+  // needle / pointer: 60 mm long, 6 mm wide at the base, tip drawn as one cubic
+  const svgs: Array<[string, string]> = [
+    ['C tip (pointer, 2.9 deg half-taper)', 'M0 0 L60 2 C63 2.1 63 3.9 60 4 L0 6 Z'],
+    ['C tip, handles along sides', 'M0 0 L60 2 C62 2.0666 62 3.9333 60 4 L0 6 Z'],
+    ['Q tip', 'M0 0 L60 2 Q63 3 60 4 L0 6 Z'],
+    ['Inkscape-style rounded pencil end C', 'M0 0 L50 1.5 C54 1.6333 54 4.3667 50 4.5 L0 6 Z'],
+  ];
+  for (const [label, d] of svgs) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="20mm" viewBox="0 0 100 20"><path d="${d}" transform="translate(5 5)" stroke="#000" fill="none"/></svg>`;
+    const o = parseSvg({ svgText: svg, id: 'p', source: 'p.svg' }).object!;
+    const c = o.paths[0]!.curves![0]!;
+    const rem = removeCurveFillets(c);
+    const b0 = bbox(sample(c as Curve));
+    const b1 = rem ? bbox(sample(rem.curve as Curve)) : b0;
+    out(`${label}: segs ${kinds(c)}; Remove ${rem?.count ?? 0}; maxX ${f(b0.maxX)} -> ${f(b1.maxX)}`);
+  }
+});

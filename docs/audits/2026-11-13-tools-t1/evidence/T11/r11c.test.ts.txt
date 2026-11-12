@@ -1,0 +1,52 @@
+// T11 refuter part 3: does the G-code preflight catch the Remove spike past the bed edge?
+import { it } from 'vitest';
+import { appendFileSync } from 'node:fs';
+import { createLayer, createProject, DEFAULT_PROJECT_OPTIMIZATION, IDENTITY_TRANSFORM, type CurveSubpath, type Project } from '../t06-main/src/core/scene';
+import { flattenCurveSubpath } from '../t06-main/src/core/scene/curve-path';
+import { prepareOutput } from '../t06-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t06-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { hasOutOfBoundsObjects } from '../t06-main/src/ui/workspace/out-of-bounds';
+import { decode } from './geo';
+
+const out = (s: string) => appendFileSync('C:/Users/stolk/kd-t1/zz-t11r/r11.log', '\n' + s);
+
+it('Remove spike past the bed edge: preflight and canvas out-of-bed hint', () => {
+  resetStore();
+  out('== P2-2 preflight at bed edge (pointer drawn with one C tip) ==');
+  // 60 mm pointer, tip one cubic; placed so the art ends at x 380 on a 400 mm bed.
+  const c: CurveSubpath = {
+    start: { x: 0, y: 0 },
+    segments: [
+      { kind: 'line', to: { x: 60, y: 2 } },
+      { kind: 'cubic', control1: { x: 62, y: 2.0666667 }, control2: { x: 62, y: 3.9333333 }, to: { x: 60, y: 4 } },
+      { kind: 'line', to: { x: 0, y: 6 } },
+    ],
+    closed: true,
+  };
+  const r = flattenCurveSubpath(c, { toleranceMm: 0.01 });
+  if (r.kind !== 'ok') throw new Error('flatten');
+  const pts = [...r.polyline.points];
+  const o = {
+    kind: 'imported-svg', id: 'p', source: 'p.svg',
+    bounds: { minX: 0, minY: 0, maxX: Math.max(...pts.map((p) => p.x)), maxY: 6 },
+    transform: { ...IDENTITY_TRANSFORM, x: 318, y: 100 }, operationIds: ['L'],
+    paths: [{ color: '#ff0000', polylines: [{ points: pts, closed: true }], curves: [c] }],
+  } as any;
+  const base = createProject();
+  const layer = { ...createLayer({ id: 'L', color: '#ff0000', name: 'L', mode: 'line' }), speed: 777, power: 30 };
+  const project: Project = { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects: [o], layers: [layer], groups: [] } };
+  useStore.setState({ project, selectedObjectId: 'p', additionalSelectedIds: new Set(), selectedPathNodes: [] } as any);
+  const run = (label: string) => {
+    const p = useStore.getState().project;
+    const prep = prepareOutput(p);
+    const e = prep.ok ? emitPreparedGcode(prep) : null;
+    const d = e ? decode(e.gcode) : null;
+    const pf: any = e?.preflight ?? (prep as any).preflight;
+    out(`${label}: bed ${p.device.bedWidth}x${p.device.bedHeight}; canvas out-of-bed ${hasOutOfBoundsObjects(p)}; prepare ok ${prep.ok}; G-code maxX ${d?.box ? d.box.maxX.toFixed(2) : '-'}; preflight ${JSON.stringify(pf)?.slice(0, 300)}`);
+  };
+  run('before Remove');
+  useStore.getState().filletSelection(0, 'remove');
+  run('after Remove');
+});
