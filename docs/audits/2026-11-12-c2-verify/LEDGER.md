@@ -8,7 +8,8 @@ Plan: [AREAS.md](AREAS.md). Severity follows C2:
 | # | Area | Tree | Report | Raised | Refuted | P1 | P2 | P3 | Known |
 |---|---|---|---|---|---|---|---|---|---|
 | E1 | Import and notice fixes (#1750, #1819, #1820, #1822, #1762) | origin/main @ 66a7a008c (auditor and refuter). The coordinator re-read ce6b84357: only #1777 (DXF SPLINE) touched these files, and `arcSweep` is unchanged. The C2 repros were re-run; Node scripts ran on the real modules, with pdf.js for PDF; the refuter used its own methods (path lengths, the `.rd` encoder's motion plan, real `importPostscriptFile`) | [E1-import-and-notice-fixes.md](E1-import-and-notice-fixes.md) | 10 | 0 | 4 | 3 | 3 | 0 |
-| **Total** | | | | **10** | **0** | **4** | **3** | **3** | **0** |
+| E2 | Link-route parity (#1751, #1753, #1763, #1818, #1823) | origin/main @ 52c545886 (auditor and refuter). The coordinator re-read 1065be2af: nothing under `core/controllers/lihuiyu`, `io/egv` or `ui/state/lihuiyu-usb` changed. The same jobs ran through G-code, `.rd`, Ruida UDP, Moshi, `.egv` and K40 USB, decoded byte by byte (the refuter wrote its own `.egv` reader and speed formula); the stores ran on the repo simulators; the registration guard was replayed over mock stores | [E2-link-route-parity.md](E2-link-route-parity.md) | 9 | 0 | 2 | 3 | 4 | 3 |
+| **Total** | | | | **19** | **0** | **6** | **6** | **7** | **3** |
 
 ## C2 items verified
 
@@ -21,6 +22,12 @@ Plan: [AREAS.md](AREAS.md). Severity follows C2:
 | D6-P3-3→P2 cross-hatch notice | #1822 | Fixed for Fill hatches (1,120 of 1,120 combinations match); Line strokes on drawn objects are E1-P2-3 |
 | D2-P1-2 Ruida `.rd` rotary feed | #1762 | Fixed for dose (97.6–102.3 %); new E1-P2-2 and E1-P3-2 |
 | D2-P3-5 Ruida rotary note | #1762 | Fixed (the controller's own behaviour is still unverified on hardware) |
+| D1-P1-1/P1-2, D1-P2-2/P2-3/P2-5, D1-P3-1 Moshi raster, Ruida Frame, link guards, Abort | #1751, #1753, #1818 | Fixed (K40 home/jog Abort gap: E2-P3-1) |
+| D1-P2-1 warnings only after send | #1753 | Fixed for Moshi and Ruida; the K40 twin is E2-P2-1 |
+| D2-P1-1/P1-3, D2-P2-1..3 scope, scan offset, warnings, tabs, variable advance | #1763 | Fixed (K40 tab note: E2-P2-3) |
+| D4-P1-1, D4-P2-1..3, D4-P3-1 K40 invisible to guards | #1818 | Fixed: every machine-work guard sees all three link stores |
+| D6-P1-1, D6-P1-3, D6-P2-1..3, D6-P3-4 K40 scope, scan offset, warnings, autosave, first job | #1823 | Fixed; K40 USB bytes equal Save `.egv` |
+| D6-P1-2 K40 rotary feed | #1823 | Fixed in mechanism (Y strokes get their own speed); the whole-mm/s rounding is E2-P1-1 |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
@@ -33,12 +40,21 @@ Plan: [AREAS.md](AREAS.md). Severity follows C2:
 | E1-P2-1 | E1 | **A DXF ELLIPSE with parameters past one turn still clamps to a full ellipse**, unlike the fixed ARC. It is unchanged from before the fix. | Auditor and refuter **REPRO**. | routed to the EPS/AI import session, with E1-P1-2 |
 | E1-P2-2 | E1 | **The `.rd` speed-class split burns each rotary stroke in many out-of-order pieces.** One 30 mm circle becomes 30 parts with 1.5 m of laser-off travel and 60 rotary reversals, against 2 on a flat bed. The ETA shows 11.0 s where the moves take 43.6 s. Seams on hardware are unverified. | Auditor (decoded bytes) and refuter (encoder motion plan, app clock) **REPRO**. | routed to the rotary-speed session (local_203c64d8). Fix: emit class parts in path order, merging pieces of the same class, and count the `.rd` travel in the ETA |
 | E1-P2-3 (refuter) | E1 | **The old-project rotary notice still gives the worst case (6.28×) for Line strokes on drawn (non-imported) objects.** A pen-tool horizontal line compiles to 1.00× and a 45° line to 1.40×. This is D6-P3-3's symptom outside #1822's Fill fix. | Refuter **REPRO**; **READ** `old-project-rotary-feed.ts` `outlineAngles` returns "round the part" for any object that is not `imported-svg`. | routed to the rotary-speed session. Fix: read the outline angles from every object kind's own paths |
+| E2-P1-1 | E2 | **On a Y-port rotary the K40 rounds every burn to whole mm/s and never says what that does to the dose.** Round-the-part strokes burn at 17–127 % of the set dose (32 / 80 / 80 / 106 % at 120 / 300 / 600 / 1,200 mm/min on Ø80 glass). The Moshiboard route announces the same band, and K40 speed codes do not need whole mm/s: they resolve fractional speeds to within 0.2 %. From #1823. | **READ** on main `1065be2af`: `lhy-encoder.ts:180` `matchedMmPerSec` returns `Math.max(1, Math.round(feed / 60))`; `egv-advisories.ts` has no dose note. Auditor and refuter **REPRO** (decoded `.egv`; the refuter used its own reader and speed formula). | routed to the Moshiboard session (local_d7499c71), which wrote #1823. Fix: pass the matched feed to the speed code unrounded; keep a dose note only for what is still rounded, shared with E2-P1-2 |
+| E2-P1-2 (refuter) | E2 | **A K40 layer slower than 23.49 mm/min burns at 23.49 mm/min, unannounced.** 6 / 12 / 20 mm/min decode as 23.49 mm/min, i.e. 26 / 51 / 85 % of the set dose. The Moshi route names its speed step (ADR-705 Amd 5); the layer Speed input accepts 1 mm/min. | **READ** on main: `lhy-speed-code.ts:90` clamps the code at the board's slowest period with no note; `CutSettingsCommonFields.tsx:43` `min={1}`. Refuter **REPRO** (own `.egv` reader). **Rating:** P1 under METHOD §3 (a silent wrong dose, no reach clause). The Moshi twin O8-P2-1 was rated P2; the narrow reach is noted, not used to lower it. | routed to the Moshiboard session, with E2-P1-1. Fix: name the speed the board runs and the dose below 0.3915 mm/s, or refuse the layer in `groupRefusal` |
+| E2-P2-1 | E2 | **The K40 panel shows its job warnings only once Start is sending** (D1-P2-1's K40 twin, which #1753 fixed for Moshi and Ruida). Frame shows 0 warnings; Start shows 2. | **READ** on main: `lihuiyu-usb-store.ts:243` `advisories: frame ? [] : job.advisories`. Auditor and refuter **REPRO** (store and rendered panel). | routed to the Moshiboard session. Fix: compute the job's warnings at Frame and before Start, as `moshi-usb-store` does |
+| E2-P2-2 | E2 | **K40 Y-rotary Fill and Image rows get no row-grid check.** On Ø80 glass, 100 Image rows burn as 63 machine rows and 100 Fill lines as 34, while the Moshi route warns on the identical grid. | **READ** on main: `moshi-usb-job.ts:53` calls `detectRotaryRowGridWarnings`; nothing under `ui/state/lihuiyu-usb` or `io/egv` does. Auditor and refuter **REPRO**. | routed to the Moshiboard session. Fix: run `detectRotaryRowGridWarnings` with the K40's 1/1000 in grid on Save `.egv` and USB |
+| E2-P2-3 | E2 | **The K40 power note does not name burned tabs** (D2-P2-2's K40 twin). A tabbed cut on a K40 burns through its tabs with no note, where Moshi and `.rd` say so. | **READ** on main: `egv-advisories.ts` has no tab text. Auditor and refuter **REPRO**. | routed to the Moshiboard session |
 
-### P3s (3)
+### P3s (7)
 
 - **E1-P3-1:** a near-straight PostScript rule between 1e-6 and about 1.4e-6 pt tall still imports nothing. The threshold and the rounding disagree.
 - **E1-P3-2:** the `.rd` advisory blames a Max-feed hold (up to 367 % dose) on the speed classes. The range is right and shown before output; the cause is misnamed.
 - **E1-P3-3:** a legitimate 1.9 M-point EPS uses 61–80 % of the new 5 s limit, so a slower PC refuses it with "may loop forever".
+- **E2-P3-1:** Ctrl+. and the link bar's ABORT MOTION do nothing while the K40 homes or jogs.
+- **E2-P3-2:** a new link store can still skip the registry, the link job request and the job warnings. The registration guard matches folder names, and the JCZ route (#1725, open) is not in it.
+- **E2-P3-3:** a third copy of the preflight adapter, a React duplicate-key warning in the K40 panel, and no K40 air note.
+- **E2-P3-4:** header comments still describe a world with two link routes.
 
 ### Verified clean
 
@@ -52,8 +68,17 @@ Plan: [AREAS.md](AREAS.md). Severity follows C2:
   - passes do not multiply parts.
 - **Vitest:** the fixes' 7 test files pass (75 tests).
 
+### E2 verified clean
+
+- **Scope and anchor parity** on all six routes; Moshi refuses non-Absolute placement.
+- **Byte identity:** Ruida UDP equals Save `.rd`, and the K40 USB stream equals Save `.egv`.
+- **Fill and Image parity** with G-code on Moshi and K40: scan offset (layer and table), Dot width and overscan, within 0.15 % on the K40 (1/1000 in rounding), including passes, cross-hatch and 45°.
+- **Job warnings, bed and no-go checks** on all six routes; the variable advance on all three link stores, not after a Frame.
+- **Every machine-work guard** (Ctrl+., close, Update, drop, keep-awake, crash, autosave, unload) sees Moshi, Ruida and K40.
+- **Z and A rotary** are refused on `.egv`, K40 USB and Moshi with a clear reason.
+
 ### Not verified
 
-- **Hardware:** Ruida rotary seams, backlash and real idle speed.
+- **Hardware:** Ruida rotary seams, backlash and real idle speed; K40 speed-code timing, diagonal speed and whether a K40 speed change stops the head.
 - **Browser:** no browser run. The window-thread effect of E1-P1-1 is from READ plus Node timings.
 - **Real exporters:** their ARC full-circle, ELLIPSE-parameter and zero-width-stroke habits. Nothing in the repo shows them, and nothing was downloaded.
