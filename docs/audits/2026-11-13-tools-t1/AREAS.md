@@ -48,7 +48,7 @@ Run order puts tools that make or change burns first, then new tools, then the r
 | T07 | Fill repair | Close Open Fill Contours | `tools.close-open-fill-contours` | ledgered: P3 5 |
 | T08 | Fill repair | Close Fill Contours with Tolerance | `tools.close-fill-contours-with-tolerance` | ledgered: P3 5 (known 3) |
 | T09 | Fill repair | Leave White Unburned | `tools.leave-white-unburned` | ledgered: P1 3, P2 1 (fix session proposed), P3 3 |
-| T10 | Fill repair | Close Paths with Tolerance | `tools.close-paths-with-tolerance` | |
+| T10 | Fill repair | Close Paths with Tolerance | `tools.close-paths-with-tolerance` | ledgered: P2 2 (fix #1851), P3 3 (known 6) |
 | T11 | Fill repair | Radius Fillet | `tools.radius-fillet` | |
 | T12 | Fill repair | Shear | `tools.shear` | |
 | T13 | Image | Image Studio | `tools.edit-image` | |
