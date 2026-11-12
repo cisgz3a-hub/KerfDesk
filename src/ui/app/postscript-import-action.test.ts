@@ -1,8 +1,19 @@
+import { Blob as NodeBlob } from 'node:buffer';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SceneObject } from '../../core/scene';
-import { importPostscriptFile, isPostscriptIllustratorFile } from './postscript-import-action';
+import {
+  installImportWorkers,
+  postscriptWorkerRequests,
+  resetImportWorkers,
+} from '../import/import-workers.test-support';
+import { mainThreadImportFallbackAdvisory } from './import-size-advisory';
+import {
+  importPostscriptFile,
+  isPostscriptIllustratorFile,
+  POSTSCRIPT_HANG_GUARD_MS,
+} from './postscript-import-action';
 
 const golden = (name: string): Uint8Array<ArrayBuffer> =>
   new Uint8Array(
@@ -51,5 +62,64 @@ describe('EPS / Illustrator import action', () => {
     expect(await isPostscriptIllustratorFile(new File(['%PDF-1.6\n'], 'b.ai'))).toBe(false);
     const dos = new Uint8Array([0xc5, 0xd0, 0xd3, 0xc6, 0, 0]);
     expect(await isPostscriptIllustratorFile(new File([dos], 'c.ai'))).toBe(true);
+  });
+});
+
+describe('EPS / Illustrator import in the import worker (ADR-700 Amd 3)', () => {
+  const EPS_TEXT = '%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 72 72\n0 0 72 72 rectfill\n';
+  const epsFile = (name: string): File =>
+    Object.assign(new NodeBlob([EPS_TEXT]), { name }) as unknown as File;
+
+  afterEach(() => {
+    vi.useRealTimers();
+    resetImportWorkers();
+  });
+
+  it('converts in the worker and imports the artwork, with no main-thread fallback', async () => {
+    installImportWorkers();
+    const ctx = context();
+    await importPostscriptFile(epsFile('square.eps'), ctx);
+    expect(postscriptWorkerRequests).toHaveLength(1);
+    expect(ctx.imported).toHaveLength(1);
+    expect(ctx.pushToast).not.toHaveBeenCalledWith(
+      mainThreadImportFallbackAdvisory('square.eps'),
+      'warning',
+    );
+  });
+
+  it('gives up on a worker that never answers and retires it', async () => {
+    vi.useFakeTimers();
+    const terminated = vi.fn();
+    class SilentWorker {
+      onmessage: unknown = null;
+      onerror: unknown = null;
+      postMessage(): void {
+        // Never answers: the conversion it was sent never finishes.
+      }
+      terminate(): void {
+        terminated();
+      }
+    }
+    vi.stubGlobal('Worker', SilentWorker);
+    const ctx = context();
+    const done = importPostscriptFile(epsFile('stuck.eps'), ctx);
+    await vi.advanceTimersByTimeAsync(POSTSCRIPT_HANG_GUARD_MS);
+    await done;
+    expect(ctx.importObject).not.toHaveBeenCalled();
+    expect(ctx.pushToast).toHaveBeenCalledWith(
+      `stuck.eps: the file was still being read after ${POSTSCRIPT_HANG_GUARD_MS / 1000} s, so the import stopped.`,
+      'error',
+    );
+    expect(terminated).toHaveBeenCalled();
+  });
+
+  it('says so when it has to read on the window thread', async () => {
+    const ctx = context();
+    await importPostscriptFile(new File([EPS_TEXT], 'here.eps'), ctx);
+    expect(ctx.pushToast).toHaveBeenCalledWith(
+      mainThreadImportFallbackAdvisory('here.eps'),
+      'warning',
+    );
+    expect(ctx.imported).toHaveLength(1);
   });
 });

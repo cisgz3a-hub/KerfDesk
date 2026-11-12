@@ -25,6 +25,7 @@ import type {
   PreparedReliefHeightfieldImportResult,
 } from './depth-map-import-preparation';
 import type { BatchRasterFormat, DecodedBatchRaster } from './batch-raster-pixels';
+import type { PostscriptConversion } from '../../io/postscript';
 
 /** RGBA pixels with their own transferable buffer. */
 export type ImportWorkerRgba = {
@@ -63,6 +64,8 @@ export type ImportWorkerRequest =
       readonly objectId: string;
       readonly source: string;
     }
+  // EPS, PostScript and Illustrator 3–8 to SVG text (ADR-700 Amendment 3).
+  | { readonly id: number; readonly kind: 'postscript'; readonly blob: Blob }
   | {
       readonly id: number;
       readonly kind: 'gcode';
@@ -98,6 +101,7 @@ export type ImportWorkerResponse =
   | { readonly id: number; readonly kind: 'resample-rgba'; readonly result: ImportWorkerRgba }
   | { readonly id: number; readonly kind: 'dxf'; readonly result: PackedDxfResult }
   | { readonly id: number; readonly kind: 'hpgl'; readonly result: PackedHpglResult }
+  | { readonly id: number; readonly kind: 'postscript'; readonly result: PostscriptConversion }
   | { readonly id: number; readonly kind: 'gcode'; readonly result: PackedGcodeResult }
   | { readonly id: number; readonly kind: 'stl'; readonly result: PreparedStlImportResult }
   | { readonly id: number; readonly kind: 'psd'; readonly result: PreparedPsdImport }

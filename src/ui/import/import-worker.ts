@@ -47,6 +47,7 @@ async function parseRequest(request: ImportWorkerRequest): Promise<ImportWorkerR
   }
   postProgress(request.id, 'reading');
   if (request.kind === 'hpgl') return parseHpglRequest(request);
+  if (request.kind === 'postscript') return convertPostscriptRequest(request);
   if (request.kind === 'psd') {
     const { preparePsdImport } = await import('./psd-import-preparation');
     postProgress(request.id, 'parsing');
@@ -144,6 +145,19 @@ async function parseHpglRequest(
     id: request.id,
     kind: 'hpgl',
     result: packHpglResult(parseHpgl({ text, id: request.objectId, source: request.source })),
+  };
+}
+
+async function convertPostscriptRequest(
+  request: Extract<ImportWorkerRequest, { kind: 'postscript' }>,
+): Promise<ImportWorkerResponse> {
+  const { convertPostscript, PS_LIMITS } = await import('../../io/postscript');
+  const bytes = new Uint8Array(await request.blob.arrayBuffer());
+  postProgress(request.id, 'parsing', request.blob.size, request.blob.size);
+  return {
+    id: request.id,
+    kind: 'postscript',
+    result: convertPostscript(bytes, { milliseconds: PS_LIMITS.workerMilliseconds }),
   };
 }
 

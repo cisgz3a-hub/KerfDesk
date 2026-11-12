@@ -12,7 +12,7 @@ import {
   translation,
 } from './ps-matrix';
 import type { OpTable } from './ps-ops-stack';
-import { copyGState, HaltSignal, newGState, type ColorSpace, type PsVm } from './ps-vm';
+import { HaltSignal, newGState, type ColorSpace, type PsVm } from './ps-vm';
 import { PsError, type Matrix, type PsArray, type PsValue } from './ps-types';
 
 const noop = (): void => undefined;
@@ -108,8 +108,7 @@ export const GSTATE_OPS: OpTable = {
 };
 
 function saveGState(vm: PsVm): void {
-  if (vm.gstack.length >= 256) throw new PsError('limitcheck', 'Too many nested gsave operations.');
-  vm.gstack.push(copyGState(vm.gstate));
+  vm.saveState();
 }
 
 function restoreGState(vm: PsVm): void {

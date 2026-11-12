@@ -10,12 +10,14 @@ import { resetImportWorkerForTests } from './import-worker-client';
 import type { ImportWorkerRequest, ImportWorkerResponse } from './import-worker-protocol';
 import { packDxfResult } from './packed-dxf-result';
 import { parseDxfBlob } from './parse-dxf-blob';
+import { convertPostscript } from '../../io/postscript';
 
 type Request = ImportWorkerRequest | DocumentImportWorkerRequest;
 type Response = ImportWorkerResponse | DocumentImportWorkerResponse;
 
 export const dxfWorkerRequests: ImportWorkerRequest[] = [];
 export const svgWorkerRequests: DocumentImportWorkerRequest[] = [];
+export const postscriptWorkerRequests: ImportWorkerRequest[] = [];
 
 /** jsdom transport for the import workers' actual DXF and SVG parses.
  * It replaces browser Worker delivery, never the parsers or their results. */
@@ -49,6 +51,11 @@ export class InlineImportWorker {
       });
       return { id: request.id, kind: 'dxf', result: packDxfResult(result) };
     }
+    if (request.kind === 'postscript') {
+      postscriptWorkerRequests.push(request);
+      const bytes = new Uint8Array(await request.blob.arrayBuffer());
+      return { id: request.id, kind: 'postscript', result: convertPostscript(bytes) };
+    }
     if (request.kind === 'svg') {
       svgWorkerRequests.push(request);
       return parseDocumentImportSource(request, () => undefined);
@@ -64,6 +71,7 @@ export class InlineImportWorker {
 export function installImportWorkers(): void {
   dxfWorkerRequests.length = 0;
   svgWorkerRequests.length = 0;
+  postscriptWorkerRequests.length = 0;
   // jsdom's Blob has no stream(), which the workers' readers consume.
   vi.stubGlobal('Blob', NodeBlob);
   vi.stubGlobal('Worker', InlineImportWorker);
