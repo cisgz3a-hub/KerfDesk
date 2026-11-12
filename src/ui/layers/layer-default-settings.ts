@@ -1,6 +1,10 @@
 import { LAYER_DEFAULTS, type Layer, type MachineKind } from '../../core/scene';
 // Deep import: core/scene's barrel is ratcheted and may only shrink.
-import { withoutInactiveLaserLeadSettings, withoutLaserLeadSettings } from '../../core/scene/layer';
+import {
+  withoutCalibrationCouponOverrides,
+  withoutInactiveLaserLeadSettings,
+  withoutLaserLeadSettings,
+} from '../../core/scene/layer';
 import { normalizeLayer } from '../../io/project/normalize-layer';
 import { validateProjectLayer } from '../../io/project/project-layer-shape-validator';
 import type { LayerDefaultsState } from '../state/layer-default-actions';
@@ -17,6 +21,8 @@ type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 // a reusable setting. A saved 'baseline' marker would let every new layer skip
 // the verified-offset rule for bidirectional scanning (scan-direction-policy.ts),
 // so neither is captured, and neither is applied from an older saved default.
+// A coupon's own direction overrides (its explicit 0 mm offset and the
+// uncalibrated-scan switch) stay with the coupon too (T04R-P3-1).
 // Its Output value is the laser Output switch: `output` in Laser mode,
 // `parkedOutput` in CNC mode (ADR-416), so CNC's switch is never saved or set.
 export function captureLayerDefaultSettings(
@@ -34,7 +40,7 @@ export function captureLayerDefaultSettings(
     ...settings
   } = layer;
   return {
-    ...withoutInactiveLaserLeadSettings(settings),
+    ...withoutInactiveLaserLeadSettings(withoutCalibrationCouponOverrides(layer, settings)),
     output: machineKind === 'cnc' ? (parkedOutput ?? output) : output,
   };
 }

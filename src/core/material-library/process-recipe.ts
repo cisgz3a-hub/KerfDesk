@@ -34,6 +34,9 @@ export type ProcessRecipeStep = {
   readonly visible: boolean;
   readonly settings: LayerOperationSettings;
   readonly cnc?: CncLayerSettings;
+  /** Read only from recipes saved before T04-P2-1: it marks a step taken from
+   * a Scan Offset Test coupon. Applying such a step never marks the new
+   * operation and drops the coupon's direction overrides from its settings. */
   readonly scanOffsetCalibrationMode?: Layer['scanOffsetCalibrationMode'];
 };
 
