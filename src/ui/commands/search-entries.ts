@@ -11,6 +11,7 @@ import { isRemoteAccessRenderer } from '../remote-access/desktop-only';
 import { openSettings, type SettingsSectionId } from '../settings/settings-dialog-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
+import { findRevealControl } from './reveal-control';
 import type { RailPanelId } from '../state/ui-rail-panel';
 import { rankTutorials } from '../tutorials/tutorial-catalog';
 import { useTutorialStore } from '../tutorials/tutorial-store';
@@ -206,12 +207,11 @@ function lessonEntries(machineKind: MachineKind, query: string): SearchEntry[] {
  *  search window has closed and given focus back. */
 export function revealSearchTarget(target: SearchTarget, label: string): void {
   useUiStore.getState().focusRailPanel(TARGET_PANEL[target] ?? 'machine');
-  window.setTimeout(() => {
-    // Frame and Start also sit in the docked job bar; the visible copy wins.
-    const control =
-      [...document.querySelectorAll<HTMLElement>(`[data-search-target="${target}"]`)].find(
-        (candidate) => candidate.getClientRects().length > 0,
-      ) ?? document.querySelector<HTMLElement>(`[data-search-target="${target}"]`);
+  window.setTimeout(
+    () => findRevealControl(target, REVEAL_DELAY_MS, focusControl),
+    REVEAL_DELAY_MS,
+  );
+  function focusControl(control: HTMLElement | null): void {
     if (control === null) {
       useToastStore
         .getState()
@@ -227,7 +227,7 @@ export function revealSearchTarget(target: SearchTarget, label: string): void {
     if (disabled && control.title !== '') {
       useToastStore.getState().pushToast(`${label}: ${control.title}`, 'info');
     }
-  }, REVEAL_DELAY_MS);
+  }
 }
 
 // The search window restores focus to its opener as it closes; the reveal

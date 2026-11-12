@@ -1,5 +1,13 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { closeSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import {
+  appendFileSync,
+  closeSync,
+  mkdtempSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -12,6 +20,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // request changed, or whose imported helpers it changed, runs as well, and so
 // does every spec that names a changed browser fixture (an HTML page, the
 // module it loads, a script or a data file) the import graph cannot see.
+// When that selects more than PR_SMOKE_MAX_SPECS files, the workflow runs the
+// whole suite in its shards instead (ADR-647 Amendment 1).
 export const PR_SMOKE_CORE = [
   'e2e/foundations.spec.ts',
   'e2e/ux-shell.spec.ts',
@@ -39,35 +49,100 @@ export function specFilesOfListing(report) {
 const SPEC_FILE = /\.(?:e2e|spec)\.ts$/u;
 const TEXT_FILE = /\.(?:ts|tsx|js|mjs|cjs|html|json|css)$/u;
 
-// What a file is called where another file loads it: its name without
-// extensions (tools-ai-audit.html loads tools-ai-audit.tsx), and the folders
-// it sits in below e2e/fixtures/ (data folders are named, not each file).
-function namesOf(path) {
-  const folders = path
-    .split('/')
-    .slice(1, -1)
-    .filter((folder) => folder !== 'fixtures');
-  return [basename(path).replace(/\..*$/u, ''), ...folders].filter((name) => name !== '');
+const MODULE_FILE = /\.(?:[cm]?[jt]s|[jt]sx)$/u;
+const README_FILE = /^readme(?:\.|$)/iu;
+// File names that unrelated fixtures share or use as ordinary words. A file
+// so named is found only through its folder ("document-import-generated/
+// generate.mjs"), and reaching one does not search further for what names it:
+// on 2026-11-12 the bare word "generate" took one changed generator script
+// to 141 of 172 specs (code-quality audit C2 D7-P2-2).
+const GENERIC_STEMS = new Set([
+  'config',
+  'constants',
+  'data',
+  'generate',
+  'helpers',
+  'index',
+  'main',
+  'setup',
+  'shared',
+  'types',
+  'utils',
+]);
+
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }
 
-// Specs that load a changed non-spec file under e2e/ by name, directly or
-// through other files that do. Playwright's --only-changed follows only the
-// test process's imports, so a page fixture the browser loads is invisible to
-// it. A name found in an unrelated file selects more specs, never fewer.
+// A name standing on its own: not part of a longer file or folder name
+// ("composed-svg" is not found in "composed-svg-browser"). A full stop that
+// ends a sentence still ends the name.
+function standalone(text) {
+  return `(?<![\\w.-])${escapeRegExp(text)}(?![\\w-]|\\.\\w)`;
+}
+
+function stemOf(path) {
+  return basename(path).replace(/\..*$/u, '');
+}
+
+function isGeneric(path) {
+  return GENERIC_STEMS.has(stemOf(path).toLowerCase());
+}
+
+// How another file loads this one: by its file name with the extension
+// (tools-ai-audit.html loads ./tools-ai-audit.tsx), a module also by an
+// import specifier that may leave the extension off, and a data file by the
+// folder it sits in below e2e/fixtures/ (readFixture('composed-svg', name)).
+// A generic file name counts only with its folder in front.
+export function referencePatternOf(path) {
+  const parts = path.split('/');
+  const file = parts.at(-1);
+  const stem = stemOf(path);
+  const folder = parts.length > 2 ? `${parts.at(-2)}/` : '';
+  const qualifier = isGeneric(path) ? folder : '';
+  const alternatives = [standalone(`${qualifier}${file}`)];
+  if (MODULE_FILE.test(file)) {
+    alternatives.push(
+      `['"\`][^'"\`\\s]*/${escapeRegExp(`${qualifier}${stem}`)}(?:\\.(?:[cm]?[jt]s|[jt]sx))?['"\`]`,
+    );
+  }
+  for (const name of parts.slice(1, -1)) {
+    if (name !== 'fixtures' && !GENERIC_STEMS.has(name.toLowerCase())) {
+      alternatives.push(standalone(name));
+    }
+  }
+  return new RegExp(alternatives.join('|'), 'u');
+}
+
+// Specs that load a changed non-spec file under e2e/, directly or through
+// other files that do. Playwright's --only-changed follows only the test
+// process's imports, so a page fixture the browser loads is invisible to it.
+// README files are documentation, so a change to one selects nothing.
 export function specsNamingChangedFixtures(changedPaths, e2eSources) {
-  const pending = changedPaths.filter((path) => path.startsWith('e2e/') && !SPEC_FILE.test(path));
+  const pending = changedPaths.filter(
+    (path) => path.startsWith('e2e/') && !SPEC_FILE.test(path) && !README_FILE.test(basename(path)),
+  );
   const seen = new Set(pending);
   const specs = new Set();
   while (pending.length > 0) {
-    const names = namesOf(pending.pop());
+    const reference = referencePatternOf(pending.pop());
     for (const [path, source] of e2eSources) {
-      if (seen.has(path) || !names.some((name) => source.includes(name))) continue;
+      if (seen.has(path) || !reference.test(source)) continue;
       seen.add(path);
       if (SPEC_FILE.test(path)) specs.add(path);
-      else pending.push(path);
+      else if (!isGeneric(path)) pending.push(path);
     }
   }
   return [...specs].sort();
+}
+
+// Above this many spec files a pull request runs the whole suite in four
+// shards instead of its one job: the 123 specs #1730 selected held one runner
+// for 2 h 15 m, where the shards take about 40 minutes (D7-P2-2).
+export const PR_SMOKE_MAX_SPECS = 40;
+
+export function pullRequestSuiteFor(specs) {
+  return specs.length > PR_SMOKE_MAX_SPECS ? 'full' : 'focused';
 }
 
 function e2eSources(directory = resolve(workspaceRoot, 'e2e')) {
@@ -129,9 +204,9 @@ function changedSpecs(base) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const base = process.argv[2];
-  if (!base) {
-    process.stderr.write('Usage: node scripts/run-pr-browser-smoke.mjs <base revision>\n');
+  const [base, mode] = process.argv.slice(2);
+  if (!base || (mode !== undefined && mode !== '--plan')) {
+    process.stderr.write('Usage: node scripts/run-pr-browser-smoke.mjs <base revision> [--plan]\n');
     process.exit(2);
   }
   const changed = [
@@ -144,10 +219,22 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       specs.length - PR_SMOKE_CORE.length
     } more changed since ${base}:\n${specs.map((spec) => `- ${spec}`).join('\n')}\n`,
   );
-  const run = spawnSync(process.execPath, [playwrightCli, 'test', ...specs], {
-    cwd: workspaceRoot,
-    stdio: 'inherit',
-  });
-  if (run.error !== undefined) throw run.error;
-  process.exitCode = run.status ?? 1;
+  if (mode === '--plan') {
+    // The workflow's plan job: "focused" runs these specs in one job, "full"
+    // runs the whole suite in shards (ADR-647 Amendment 1).
+    const suite = pullRequestSuiteFor(specs);
+    process.stdout.write(
+      suite === 'full'
+        ? `${specs.length} spec files is over ${PR_SMOKE_MAX_SPECS}: the whole suite runs in shards.\n`
+        : `${specs.length} spec files run in the pull request job.\n`,
+    );
+    if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `suite=${suite}\n`);
+  } else {
+    const run = spawnSync(process.execPath, [playwrightCli, 'test', ...specs], {
+      cwd: workspaceRoot,
+      stdio: 'inherit',
+    });
+    if (run.error !== undefined) throw run.error;
+    process.exitCode = run.status ?? 1;
+  }
 }

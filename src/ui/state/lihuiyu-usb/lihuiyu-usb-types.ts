@@ -36,6 +36,8 @@ export type LihuiyuUsbJob = {
   readonly board: LhyBoardSetting;
   readonly framingMmPerMin: number;
   readonly advisories: ReadonlyArray<string>;
+  /** Runs once the board reports the job finished (variable advance). */
+  readonly completed?: () => void;
 };
 
 export type LihuiyuUsbFramed = { readonly footprint: LhyFootprint; readonly absolute: boolean };

@@ -28,11 +28,45 @@ export type LinkMachineWork = {
   readonly abort: () => Promise<void>;
 };
 
+/** Whether a link is connected and holds a completed Frame, for route-neutral
+ *  signals such as the guided first job (C2 D6-P2-3). */
+export type LinkMachineStatus = { readonly connected: boolean; readonly framed: boolean };
+
 type LinkMachineWorkState = {
   readonly works: Readonly<Partial<Record<LinkMachineSource, LinkMachineWork>>>;
+  readonly statuses: Readonly<Partial<Record<LinkMachineSource, LinkMachineStatus>>>;
 };
 
-export const useLinkMachineWorkStore = create<LinkMachineWorkState>()(() => ({ works: {} }));
+export const useLinkMachineWorkStore = create<LinkMachineWorkState>()(() => ({
+  works: {},
+  statuses: {},
+}));
+
+/** A link store reports whether it is connected and framed. */
+export function reportLinkMachineStatus(
+  source: LinkMachineSource,
+  status: LinkMachineStatus,
+): void {
+  const current = useLinkMachineWorkStore.getState().statuses[source];
+  if (current?.connected === status.connected && current.framed === status.framed) return;
+  useLinkMachineWorkStore.setState((state) => ({
+    statuses: { ...state.statuses, [source]: status },
+  }));
+}
+
+/** Some link is connected. */
+export function anyLinkConnected(
+  state: LinkMachineWorkState = useLinkMachineWorkStore.getState(),
+): boolean {
+  return LINK_MACHINE_SOURCES.some((source) => state.statuses[source]?.connected === true);
+}
+
+/** Some link holds a completed Frame of its current job. */
+export function anyLinkFramed(
+  state: LinkMachineWorkState = useLinkMachineWorkStore.getState(),
+): boolean {
+  return LINK_MACHINE_SOURCES.some((source) => state.statuses[source]?.framed === true);
+}
 
 /** A link store reports its work, or null once it is idle or gone. */
 export function reportLinkMachineWork(
@@ -70,5 +104,5 @@ export async function abortAllLinkMachineWork(): Promise<void> {
 
 /** Test support. */
 export function resetLinkMachineWorkForTests(): void {
-  useLinkMachineWorkStore.setState({ works: {} });
+  useLinkMachineWorkStore.setState({ works: {}, statuses: {} });
 }

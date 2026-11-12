@@ -61,6 +61,10 @@ jobs:
   deploy:
     name: Build + deploy web bundle
     runs-on: ubuntu-latest
+    # A CI-verified deploy only builds and publishes (about 2x its run time).
+    # A manual deploy runs the whole release gate in this one job, unsharded
+    # unit tests included (code-quality audit C2 D7-P3-1).
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && 180 || 30 }}
     # workflow_run fires for EVERY CI completion (success + failure).
     # Manual dispatches are production deploys, so the selected ref must
     # be main and the job runs the shared release gate below itself.
