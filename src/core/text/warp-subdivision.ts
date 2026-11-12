@@ -16,6 +16,7 @@ import type {
   Polyline,
   Vec2,
 } from '../scene';
+import { lerpPoint as lerp } from '../geometry/point-math';
 
 /**
  * Where a warp stops being affine. No piece spans more than `maxStepX` mm in
@@ -142,8 +143,4 @@ function splitCubic(from: Vec2, segment: CubicPathSegment, maxStepX: number): Pa
 
 function pieceCount(spanX: number, maxStepX: number): number {
   return Math.min(MAX_PIECES, Math.max(1, Math.ceil(spanX / maxStepX - 1e-9)));
-}
-
-function lerp(a: Vec2, b: Vec2, t: number): Vec2 {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
