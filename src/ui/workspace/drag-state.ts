@@ -13,7 +13,7 @@ import {
   type Transform,
   type Vec2,
 } from '../../core/scene';
-import { workspaceHitTest } from './workspace-hit-test';
+import { workspacePick } from './workspace-hit-test';
 import { useUiStore } from '../state/ui-store';
 import { type HandleKind, hitHandle, scaleObjectByHandleDrag } from './handles';
 import { hitAabbHandle } from './selection-handles';
@@ -52,6 +52,8 @@ export type DragState =
       readonly startTx: number;
       readonly startTy: number;
       readonly selectionStartTransforms?: ReadonlyArray<MoveStartTransform>;
+      /** A release without travel selects this object alone (ADR-196 Amendment 1). */
+      readonly clickSelectsId?: string;
     }
   | {
       readonly kind: 'scale';
@@ -93,6 +95,12 @@ export type DragState =
       readonly kind: 'marquee';
       readonly startScenePoint: Vec2;
       readonly additive: boolean;
+      /**
+       * The press landed inside this outline, which was not selected: a
+       * release without travel selects it, a drag draws the selection box
+       * (ADR-196 Amendment 1).
+       */
+      readonly clickSelectsId?: string;
     }
   | {
       readonly kind: 'measure';
@@ -160,16 +168,7 @@ type MouseDownDragArgs = {
 };
 
 export function computeMouseDownDrag(args: MouseDownDragArgs): DragState | null {
-  const {
-    e,
-    ref,
-    project,
-    selectedObjectId,
-    additionalSelectedIds,
-    viewState,
-    onShiftClick,
-    onPlainClick,
-  } = args;
+  const { e, ref, project, selectedObjectId, additionalSelectedIds, viewState } = args;
   // Three pan triggers: Space-held + left button (existing), middle
   // button (CAD convention), right button (alternative for users
   // without middle button). All three create the same pan DragState
@@ -179,11 +178,11 @@ export function computeMouseDownDrag(args: MouseDownDragArgs): DragState | null 
   if (args.panOnly === true) return null;
   const point = canvasMouseToScene(e, ref.current, project, viewState);
   if (point === null) return null;
-  if (handleAltSelectionCycle({ ...args, point })) return null;
+  const pxToMm = pxToMmForCanvas(ref.current, project, viewState);
+  if (handleAltSelectionCycle({ ...args, point, pxToMm })) return null;
   const selectedIds = selectedObjectIds(selectedObjectId, additionalSelectedIds);
   const selectedObjects = selectedObjectsForIds(project.scene.objects, selectedIds);
   const selectedObj = project.scene.objects.find((o) => o.id === selectedObjectId);
-  const pxToMm = pxToMmForCanvas(ref.current, project, viewState);
   const handleDrag = pickHandleOrRotateDrag({
     selectedObjects,
     selectedObj,
@@ -193,19 +192,39 @@ export function computeMouseDownDrag(args: MouseDownDragArgs): DragState | null 
     ...(args.selectionAnchor === undefined ? {} : { selectionAnchor: args.selectionAnchor }),
   });
   if (handleDrag !== null) return handleDrag;
-  const hitId = workspaceHitTest(project.scene, point);
-  if (hitId === null) {
+  return pickArtworkDrag({ ...args, point, pxToMm, selectedIds });
+}
+
+// A press that missed every handle: on artwork, inside an outline, or on
+// empty canvas.
+function pickArtworkDrag(
+  args: MouseDownDragArgs & {
+    readonly point: Vec2;
+    readonly pxToMm: number;
+    readonly selectedIds: ReadonlyArray<string>;
+  },
+): DragState | null {
+  const { e, project, point, selectedIds } = args;
+  const hit = workspacePick(project.scene, point, args.pxToMm);
+  if (hit === null) {
     return { kind: 'marquee', startScenePoint: point, additive: e.shiftKey };
   }
+  const hitId = hit.id;
   if (e.shiftKey) {
-    onShiftClick(hitId);
+    args.onShiftClick(hitId);
     return null;
   }
   const obj = project.scene.objects.find((o) => o.id === hitId);
   if (obj === undefined) return null;
   const dragExistingSelection = selectedIds.includes(hitId);
+  // Inside an outline that is not selected, the press has grabbed nothing
+  // yet: a click selects the outline (ADR-196), a drag draws a selection box,
+  // so a box can be started inside a border (ADR-196 Amendment 1).
+  if (!dragExistingSelection && hit.kind === 'interior') {
+    return { kind: 'marquee', startScenePoint: point, additive: false, clickSelectsId: hitId };
+  }
   const moveIds = dragExistingSelection ? selectedIds : [hitId];
-  if (!dragExistingSelection) onPlainClick(hitId);
+  if (!dragExistingSelection) args.onPlainClick(hitId);
   return {
     kind: 'move',
     objectId: hitId,
@@ -213,6 +232,8 @@ export function computeMouseDownDrag(args: MouseDownDragArgs): DragState | null 
     startTx: obj.transform.x,
     startTy: obj.transform.y,
     selectionStartTransforms: moveStartTransforms(project.scene.objects, moveIds),
+    // A click on one of several selected objects narrows the selection to it.
+    ...(dragExistingSelection && selectedIds.length > 1 ? { clickSelectsId: hitId } : {}),
   };
 }
 

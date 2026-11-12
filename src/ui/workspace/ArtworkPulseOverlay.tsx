@@ -161,7 +161,7 @@ function useCanvasHoverObject(
     // Locked artwork still shows its settings, and must not let the piece
     // beneath it answer for it.
     dwellTimer.current = setTimeout(
-      () => setHovered(workspaceHitTest(scene, point, { includeLocked: true })),
+      () => setHovered(workspaceHitTest(scene, point, 1 / scale, { includeLocked: true })),
       PULSE_HOVER_DWELL_MS,
     );
     return () => {

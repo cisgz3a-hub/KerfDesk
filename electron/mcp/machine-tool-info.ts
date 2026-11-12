@@ -12,7 +12,7 @@ export const mcpMachineToolInfo = {
   jog_machine: {
     title: 'Jog the machine',
     description:
-      'Move the approved computer’s machine by one bounded relative jog using the ordinary physical jog-pad direction. Requires separate machine-control approval, current expectedRevision and UUID requestId. Z requires reported support. An accepted receipt is not completed motion. Do not retry with a new ID after an uncertain reply.',
+      'Move the approved computer’s machine by one bounded relative jog using the ordinary physical jog-pad direction. Requires separate machine-control approval, current expectedRevision and UUID requestId. Z requires reported support. An accepted receipt is not completed motion. A completed operation’s message carries any configured-bounds or no-go-zone warning the PC showed for this jog; relay it to the user word for word (the jog was still sent). Do not retry with a new ID after an uncertain reply.',
   },
   frame_job: {
     title: 'Frame the current job',

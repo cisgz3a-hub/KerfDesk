@@ -7,7 +7,8 @@
 // stay identical.
 
 import type { AABB, SelectionAnchor, SelectionTransformEdit, Vec2 } from '../../core/scene';
-import { HANDLE_SCREEN_PX, type HandleKind } from './handles';
+import { nearestHandleAt, offeredHandleKinds, pressBelongsToBody } from './handle-layout';
+import type { HandleKind } from './handles';
 
 const MIN_SELECTION_DIMENSION_MM = 0.001;
 // The core resize's own zero-extent limit (selection-transform.ts).
@@ -34,19 +35,26 @@ export function aabbHandlePoints(bbox: AABB): ReadonlyArray<SelectionHandle> {
   ];
 }
 
+/** The handles the combined box shows at this zoom: fewer when it is small (handle-layout.ts). */
+export function visibleAabbHandlePoints(
+  bbox: AABB,
+  pxToMm: number,
+): ReadonlyArray<SelectionHandle> {
+  const offered = new Set(offeredHandleKinds(aabbHandleBox(bbox), pxToMm));
+  return aabbHandlePoints(bbox).filter((handle) => offered.has(handle.kind));
+}
+
+function aabbHandleBox(bbox: AABB): { readonly widthMm: number; readonly heightMm: number } {
+  return { widthMm: bbox.maxX - bbox.minX, heightMm: bbox.maxY - bbox.minY };
+}
+
 // Hit-test a scene point against the combined-box handles. Handles are sized in
-// screen pixels (via pxToMm) so they stay grabbable at any zoom.
+// screen pixels (via pxToMm) so they stay grabbable at any zoom. On a small box
+// a press inside it is left to the artwork, as on a single object.
 export function hitAabbHandle(bbox: AABB, point: Vec2, pxToMm: number): HandleKind | null {
-  const halfMm = (HANDLE_SCREEN_PX / 2) * pxToMm;
-  for (const handle of aabbHandlePoints(bbox)) {
-    if (
-      Math.abs(point.x - handle.position.x) <= halfMm &&
-      Math.abs(point.y - handle.position.y) <= halfMm
-    ) {
-      return handle.kind;
-    }
-  }
-  return null;
+  const local = { x: point.x - bbox.minX, y: point.y - bbox.minY };
+  if (pressBelongsToBody(aabbHandleBox(bbox), local, pxToMm)) return null;
+  return nearestHandleAt(visibleAabbHandlePoints(bbox, pxToMm), point, pxToMm)?.kind ?? null;
 }
 
 // Per-handle resize spec: the pinned pivot (opposite corner/edge) and which

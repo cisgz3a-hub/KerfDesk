@@ -16,6 +16,14 @@ import {
   type Transform,
   type Vec2,
 } from '../../core/scene';
+import {
+  nearestHandleAt,
+  offeredHandleKinds,
+  pressBelongsToBody,
+  type HandleBox,
+} from './handle-layout';
+
+export { HANDLE_SCREEN_PX } from './handle-layout';
 
 export type HandleKind = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 'e' | 's' | 'w';
 
@@ -23,8 +31,6 @@ export type Handle = {
   readonly kind: HandleKind;
   readonly position: Vec2; // scene coords (mm)
 };
-
-export const HANDLE_SCREEN_PX = 8;
 
 // All 8 scale handles for the given selected object: 4 corners + 4 edge
 // midpoints. The rotate handle is positioned separately by rotate-handle.ts
@@ -42,6 +48,34 @@ export function handlesFor(object: SceneObject): ReadonlyArray<Handle> {
   ];
 }
 
+/**
+ * The handles the object shows at this zoom (`pxToMm`: millimetres per canvas
+ * pixel): fewer on a box too small to hold all eight (handle-layout.ts).
+ */
+export function visibleHandlesFor(object: SceneObject, pxToMm: number): ReadonlyArray<Handle> {
+  return offeredHandleKinds(handleBoxFor(object), pxToMm).map((kind) => handleFor(object, kind));
+}
+
+// The object's box along its own axes, as it is drawn: scaled, not yet turned.
+function handleBoxFor(object: SceneObject): HandleBox {
+  const { minX, minY, maxX, maxY } = object.bounds;
+  return {
+    widthMm: (maxX - minX) * Math.abs(object.transform.scaleX),
+    heightMm: (maxY - minY) * Math.abs(object.transform.scaleY),
+  };
+}
+
+// The point measured along the box's own axes from its first corner, in millimetres.
+function pointInHandleBox(object: SceneObject, point: Vec2): Vec2 {
+  const t = object.transform;
+  const corner = applyTransform({ x: object.bounds.minX, y: object.bounds.minY }, t);
+  const scaled = inverseVectorToLocalScaleFrame(
+    { x: point.x - corner.x, y: point.y - corner.y },
+    t,
+  );
+  return { x: t.scaleX < 0 ? -scaled.x : scaled.x, y: t.scaleY < 0 ? -scaled.y : scaled.y };
+}
+
 export function selectionFrameFor(object: SceneObject): ReadonlyArray<Vec2> {
   return [
     localPointForHandle(object, 'nw'),
@@ -57,18 +91,14 @@ function handleFor(object: SceneObject, kind: HandleKind): Handle {
 
 // Hit-test a scene point against an object's handles. `pxToMm` is the scene-
 // units-per-pixel ratio at the current viewport scale — handles are sized in
-// screen pixels so they stay clickable at any zoom level.
+// screen pixels so they stay clickable at any zoom level. On a small box a
+// press inside it is left to the artwork, and of two handles whose squares
+// overlap the nearer answers (ADR-196 Amendment 1).
 export function hitHandle(object: SceneObject, point: Vec2, pxToMm: number): HandleKind | null {
-  const halfMm = (HANDLE_SCREEN_PX / 2) * pxToMm;
-  for (const handle of handlesFor(object)) {
-    if (
-      Math.abs(point.x - handle.position.x) <= halfMm &&
-      Math.abs(point.y - handle.position.y) <= halfMm
-    ) {
-      return handle.kind;
-    }
+  if (pressBelongsToBody(handleBoxFor(object), pointInHandleBox(object, point), pxToMm)) {
+    return null;
   }
-  return null;
+  return nearestHandleAt(visibleHandlesFor(object, pxToMm), point, pxToMm)?.kind ?? null;
 }
 
 // Returns the scene-coords point that should stay anchored while dragging.

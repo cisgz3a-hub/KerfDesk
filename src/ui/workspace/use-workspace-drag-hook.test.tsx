@@ -143,7 +143,10 @@ describe('useDragMove hook event pipeline', () => {
     expect(canvas.setPointerCapture as Mock).toHaveBeenCalledWith(POINTER_ID);
   });
 
-  it('clears selection on a stationary right-click in empty canvas space', async () => {
+  // Changed on purpose (ADR-196 Amendment 1, annoyance audit A2 B6-P2-1): this
+  // test used to pin that the right-click CLEARED the selection. A right-click
+  // no longer throws a selection away; the empty-canvas menu still opens.
+  it('keeps the selection on a stationary right-click in empty canvas space', async () => {
     const project = projectWithRectangle();
     useStore.getState().setProject(project);
     useStore.getState().selectObject('rect');
@@ -153,7 +156,7 @@ describe('useDragMove hook event pipeline', () => {
     await dispatchPointer(canvas, 'pointerdown', { ...emptyPoint, button: 2 });
     await dispatchPointer(canvas, 'pointerup', { ...emptyPoint, button: 2 });
 
-    expect(useStore.getState().selectedObjectId).toBeNull();
+    expect(useStore.getState().selectedObjectId).toBe('rect');
     expect(useStore.getState().additionalSelectedIds.size).toBe(0);
     expect(useUiStore.getState().workspaceContextBar).toMatchObject({
       context: 'workspace-empty',
@@ -210,7 +213,9 @@ describe('useDragMove hook event pipeline', () => {
     expect(useStore.getState().project.scene.objects[0]?.transform).toEqual(
       project.scene.objects[0]?.transform,
     );
-    expect(useStore.getState().pendingUndo).not.toBeNull();
+    // The owning press has not travelled, so it holds no undo snapshot yet
+    // (ADR-196 Amendment 1); it used to take one on the press.
+    expect(useStore.getState().pendingUndo).toBeNull();
 
     await dispatchPointer(canvas, 'pointermove', end);
     await dispatchPointer(canvas, 'pointerup', end);

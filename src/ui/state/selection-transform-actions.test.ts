@@ -79,7 +79,7 @@ describe('selection transform actions', () => {
     expect(state.dirty).toBe(false);
   });
 
-  it('aligns a multi-selection to the last selected reference as one undoable edit', () => {
+  it('aligns a selection with no click order to the first in draw order as one undoable edit', () => {
     useStore.getState().importSvgObject(svgObj('A', ['#ff0000']));
     useStore.getState().importSvgObject(svgObj('B', ['#00ff00']));
     useStore.getState().applySelectionTransforms([
@@ -98,10 +98,10 @@ describe('selection transform actions', () => {
     const after = useStore.getState();
     expect(
       after.project.scene.objects.find((object) => object.id === 'A')?.transform,
-    ).toMatchObject({ x: 40, y: 0 });
+    ).toMatchObject({ x: 10, y: 0 });
     expect(
       after.project.scene.objects.find((object) => object.id === 'B')?.transform,
-    ).toMatchObject({ x: 40, y: 25 });
+    ).toMatchObject({ x: 10, y: 25 });
     expect(after.undoStack).toHaveLength(1);
     expect(after.dirty).toBe(true);
 
