@@ -6,7 +6,8 @@
 //
 // Sources: meerk40t at d511944e — udp_transport.py L17-18 (send to 50200,
 // listen on 40200), rdjob.py L132 (STOP_PROCESS = D8 01), controller.py
-// L412-414 (abort sends Stop Process), swizzle_byte in rdjob.py.
+// L412-414 (abort sends Stop Process), swizzle_byte in rdjob.py (MIT; see
+// docs/licensing/meerk40t-ruida.txt).
 
 /** The controller's command port. */
 export const RUIDA_CONTROLLER_PORT = 50200;

@@ -39,7 +39,12 @@ Save click) and the `PlatformAdapter.pickFileForSave` contract in `src/platform/
    "Save timelapse video: The timelapse video is ready.") with **Cancel** and **Choose file…**,
    and the picker opens inside that fresh click, as the large project Save already does with
    `ProjectSaveDialog`. An abort closes the dialog. Once the picker is open, its
-   answer stands.
+   answer stands. *(Extended by
+   [Amendment 4](ADR-656-amendment-4-a-save-ready-in-time-opens-its-picker-at-once.md): Save
+   G-code and the large project save open the picker at once too, and their "Preparing…" dialog
+   appears only after 400 ms. Extended by
+   [Amendment 5](ADR-656-amendment-5-an-open-that-outlasted-its-click-asks-for-a-fresh-one.md):
+   an Open that had to wait for Save asks for its file the same way.)*
 3. **The pick is the commit.** After it, no Cancel is offered. A save cancelled while the picker
    was open still writes its prepared bytes, because the picker has already emptied the file.
 4. **Surfacing stages the whole program first.** Preflight and generation finish, with **Cancel

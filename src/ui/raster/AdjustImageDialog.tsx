@@ -2,7 +2,8 @@ import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 
 import { MAX_RASTER_LINES_PER_MM, MIN_RASTER_LINES_PER_MM } from '../../core/raster';
 import { effectiveOperationForObject } from '../../core/effective-output';
 import type { Layer, RasterImage } from '../../core/scene';
-import { jobAwareAlert, jobAwarePrompt } from '../state/job-aware-dialogs';
+import { appPrompt } from '../state/app-dialogs';
+import { useToastStore } from '../state/toast-store';
 import { Button, Dialog, DialogActions as KitDialogActions } from '../kit';
 import type { RasterImageAdjustmentPatch } from '../state/raster-adjustment-actions';
 import { AdjustFields } from './AdjustImageDialog.fields';
@@ -122,29 +123,45 @@ function useImagePresetControls(
           : applyUserImagePreset(prev, userPreset),
       );
     });
-  const savePreset = (): void => {
-    const name = jobAwarePrompt('Preset name');
-    if (name === null) return;
-    const saveResult = saveUserImagePreset(userPresets, name, imagePresetSettingsFromDraft(draft));
-    if (saveResult.kind !== 'ok') {
-      jobAwareAlert(imagePresetSaveError(saveResult.kind));
-      return;
-    }
-    const writeResult = writeUserImagePresets(saveResult.presets);
-    if (writeResult.kind !== 'ok') {
-      jobAwareAlert('Could not save image preset. Browser storage is unavailable.');
-      return;
-    }
-    setUserPresets(saveResult.presets);
-    setDraft((prev) => normalize({ ...prev, presetId: userImagePresetId(saveResult.preset.name) }));
-  };
+  // The name is asked in the app (ADR-707): Electron has no window.prompt, so
+  // Save failed on the desktop app (annoyance audit A1-P2-1). A name the save
+  // would refuse is said under the field, with the typed text kept.
+  const savePreset = (): void =>
+    void (async () => {
+      const settings = imagePresetSettingsFromDraft(draft);
+      const name = await appPrompt({
+        title: 'Save image preset',
+        message: 'A preset with the same name is replaced.',
+        label: 'Preset name',
+        confirmLabel: 'Save',
+        validate: (typed) => {
+          const check = saveUserImagePreset(userPresets, typed, settings);
+          return check.kind === 'ok' ? null : imagePresetSaveError(check.kind);
+        },
+      });
+      if (name === null) return;
+      const saveResult = saveUserImagePreset(userPresets, name, settings);
+      if (saveResult.kind !== 'ok') {
+        reportPresetProblem(imagePresetSaveError(saveResult.kind));
+        return;
+      }
+      const writeResult = writeUserImagePresets(saveResult.presets);
+      if (writeResult.kind !== 'ok') {
+        reportPresetProblem('Could not save image preset. Browser storage is unavailable.');
+        return;
+      }
+      setUserPresets(saveResult.presets);
+      setDraft((prev) =>
+        normalize({ ...prev, presetId: userImagePresetId(saveResult.preset.name) }),
+      );
+    })();
   const deletePreset = (): void => {
     const preset = findUserImagePreset(userPresets, draft.presetId);
     if (preset === null) return;
     const nextPresets = deleteUserImagePreset(userPresets, preset.name);
     const writeResult = writeUserImagePresets(nextPresets);
     if (writeResult.kind !== 'ok') {
-      jobAwareAlert('Could not delete image preset. Browser storage is unavailable.');
+      reportPresetProblem('Could not delete image preset. Browser storage is unavailable.');
       return;
     }
     setUserPresets(nextPresets);
@@ -168,25 +185,32 @@ function useImagePresetFiles(
           extensions: ['.json'],
         });
         await target?.write(exportUserImagePresetsFile(userPresets));
-      })().catch((error: unknown) => jobAwareAlert(`Could not export presets: ${String(error)}`)),
+      })().catch((error: unknown) =>
+        reportPresetProblem(`Could not export presets: ${String(error)}`),
+      ),
     importPresets: () =>
       void (async () => {
         const [file] = await platform.pickFilesForOpen({ accept: ['.json'], multiple: false });
         if (file === undefined) return;
         const result = importUserImagePresetsFile(readUserImagePresets(), await file.text());
         if (result.kind !== 'ok') {
-          jobAwareAlert(result.message);
+          reportPresetProblem(result.message);
           return;
         }
         if (writeUserImagePresets(result.presets).kind !== 'ok') {
-          jobAwareAlert('Could not import presets. Browser storage is unavailable.');
+          reportPresetProblem('Could not import presets. Browser storage is unavailable.');
           return;
         }
         setUserPresets(result.presets);
-        jobAwareAlert(
-          `Imported ${result.count} image ${result.count === 1 ? 'preset' : 'presets'}.`,
-        );
-      })().catch((error: unknown) => jobAwareAlert(`Could not import presets: ${String(error)}`)),
+        useToastStore
+          .getState()
+          .pushToast(
+            `Imported ${result.count} image ${result.count === 1 ? 'preset' : 'presets'}.`,
+            'success',
+          );
+      })().catch((error: unknown) =>
+        reportPresetProblem(`Could not import presets: ${String(error)}`),
+      ),
   };
 }
 
@@ -330,6 +354,11 @@ function normalizeDraft(draft: AdjustImageDraft, storedLinesPerMm: number): Adju
       dotWidthCorrectionMax(linesPerMm),
     ),
   };
+}
+
+// A toast, above the dialog and never a box to dismiss (annoyance audit A1).
+function reportPresetProblem(message: string): void {
+  useToastStore.getState().pushToast(message, 'error');
 }
 
 function imagePresetSaveError(kind: 'invalid-name' | 'reserved-name'): string {

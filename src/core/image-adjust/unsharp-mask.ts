@@ -6,6 +6,7 @@
 import { RGBA_CHANNELS, type PixelRect, type RgbaBuffer } from '../image-edit';
 import type { SelectionMask } from '../image-select';
 import { blurredRect, writeMasked } from './gaussian-blur';
+import type { FilterProgress } from './filter-progress';
 import { clampRectToDoc } from './lut';
 
 const RGB_CHANNELS = 3;
@@ -25,10 +26,11 @@ export function unsharpMaskInPlace(
   params: UnsharpParams,
   rect: PixelRect | null,
   mask: SelectionMask | null,
+  progress?: FilterProgress,
 ): void {
   const target = clampRectToDoc(doc, rect);
   if (target.width <= 0 || target.height <= 0 || params.sigma <= 0) return;
-  const blurred = blurredRect(doc, params.sigma, target);
+  const blurred = blurredRect(doc, params.sigma, target, progress);
   const values = new Float32Array(blurred.length);
   const amount = params.amountPercent / PERCENT;
   for (let y = 0; y < target.height; y += 1) {

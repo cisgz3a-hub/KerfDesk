@@ -11,6 +11,7 @@ import {
   bitFileSequenceNotice,
   bitFileSequenceXyOriginBlockMessage,
 } from '../state/bit-file-sequence';
+import { answerAppDialogs } from '../state/app-dialog-test-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { toolChangeXyOriginBlockMessage } from '../state/laser-store-helpers';
 import { useStore } from '../state/store';
@@ -85,8 +86,12 @@ describe('per-bit files through Run G-code file', () => {
     );
 
     // Declining the Frame's Zero Z offer leaves the next bit's file unframed.
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const answers = answerAppDialogs(() => false);
     expect(await settle(frameExternalProgram(openedProgram(BIT_TWO)))).toBeNull();
+    answers.stop();
+    expect(answers.asked.map((request) => request.options.title)).toEqual([
+      'Set Work Z zero here?',
+    ]);
     expect(useLaserStore.getState().frameVerification).toBeNull();
   });
 

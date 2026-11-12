@@ -207,6 +207,55 @@ test('a partial refund, such as a tax refund, is kept for support and does not r
   assert.equal(f.records.get(`payment-adjustment:paddle:adj_${'a'.repeat(26)}`).outcome, 'review');
 });
 
+test('support finds review refunds in the lookup by licence, order and transaction', async () => {
+  // O3-P3-1: the support guide sends support to the lookup for partial refunds,
+  // which it never showed. Two partial refunds adding up to the payment still only
+  // ask for review (ADR-592 decision 1), so support has to be able to see them.
+  const f = await purchased();
+  const half = (id, at) =>
+    adjustment({ id, type: 'partial', created_at: at, items: [{ item_id: 'x', type: 'partial' }] });
+  assert.equal((await f.adjust(half('adj_half_one', at(10)), 'evt_half_one')).adjustment, 'review');
+  assert.equal((await f.adjust(half('adj_half_two', at(20)), 'evt_half_two')).adjustment, 'review');
+  assert.equal(f.status(), 'active');
+  const orderId = f.records.get(`provider-order:paddle:${TXN}`).orderId;
+  for (const query of [{ licenseId: f.licenseId }, { orderId }, { transactionId: TXN }]) {
+    const found = await f.authority.lookupLicense(query);
+    assert.deepEqual(
+      found.paymentAdjustments.map(({ adjustmentId, action, status, type, outcome }) => [
+        adjustmentId,
+        action,
+        status,
+        type,
+        outcome,
+      ]),
+      [
+        ['adj_half_one', 'refund', 'approved', 'partial', 'review'],
+        ['adj_half_two', 'refund', 'approved', 'partial', 'review'],
+      ],
+      JSON.stringify(query),
+    );
+  }
+});
+
+test('a refund arriving after support revoked the licence is kept for review, not dropped', async () => {
+  // O3-P3-2: support's hand-set status stands, but a later restore must not miss
+  // the refund that arrived meanwhile.
+  const f = await purchased();
+  await f.authority.setLicenseStatus({ licenseId: f.licenseId, status: 'revoked' });
+  assert.equal((await f.adjust(adjustment(), 'evt_refund_after_support')).adjustment, 'review');
+  assert.equal(f.status(), 'revoked');
+  assert.equal(f.records.get(`payment-adjustment:paddle:adj_${'a'.repeat(26)}`).outcome, 'review');
+  const [listed] = (await f.authority.lookupLicense({ licenseId: f.licenseId })).paymentAdjustments;
+  assert.equal(listed.outcome, 'review');
+  // A later same-state update changes nothing and keeps the review visible.
+  assert.equal(
+    (await f.adjust(adjustment(), 'evt_refund_after_support_again', 'adjustment.updated'))
+      .adjustment,
+    'none',
+  );
+  assert.equal(f.records.get(`payment-adjustment:paddle:adj_${'a'.repeat(26)}`).outcome, 'review');
+});
+
 test('a chargeback revokes and its reversal restores, but a reversal never undoes a refund', async () => {
   const f = await purchased();
   const chargeback = adjustment({ id: `adj_${'b'.repeat(26)}`, action: 'chargeback' });

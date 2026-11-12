@@ -13,7 +13,7 @@ import { grblDriver } from './driver';
 import { grblLineReaderView } from './grbl-line-reader';
 
 const BLOCKED_PERSISTENT_REASON =
-  'This persistent controller command is blocked in the Console. Back up settings and use Machine Settings in a later lane.';
+  'KerfDesk does not send this command. It erases or rewrites settings stored on the controller (a factory restore, a startup line or the build info), so the Console refuses it. To run it you need another sender.';
 
 const DRIVERS: ReadonlyArray<readonly [string, ControllerDriver]> = [
   ['GRBL', grblDriver],

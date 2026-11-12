@@ -19,6 +19,13 @@ import { NO_WORK_OFFSET } from './host-recorded-origin';
 import { reopenHomeAlarmReplyWindow } from './laser-home-alarm-reply';
 import { requestTerminalOwnedActiveWcsReadback } from './terminal-owned-wcs-readback';
 import { hasPendingControllerWrite } from './laser-start-queue-fence';
+import {
+  focusMovedByHome,
+  homeMovedFocusPatch,
+  HOME_MOVED_FOCUS_REMINDER,
+  HOME_MOVED_FOCUS_TOAST_KEY,
+} from './home-moved-focus';
+import { useToastStore } from './toast-store';
 import type { LaserState } from './laser-store';
 import {
   assertAutofocusIdle,
@@ -83,6 +90,12 @@ export function homeLineTimeoutMs(
   return Math.max(HOME_COMMAND_TIMEOUT_MS, bound * SILENT_HOME_MARGIN + SILENT_HOME_EXTRA_MS);
 }
 
+// Plain words plus one next step (annoyance audit A3-P3-5).
+const HOME_NOT_CONFIRMED_MESSAGE =
+  'Home ended, but the machine did not report Idle afterwards, so it does not count as homed. Press Home again.';
+const HOME_INTERRUPTED_MESSAGE =
+  'Homing was interrupted before KerfDesk could confirm it, so it does not count as homed. Press Home again.';
+
 const PENDING_WRITE_HOME_MESSAGE =
   'Home is blocked until the previous controller write and terminal acknowledgement settle.';
 
@@ -112,7 +125,15 @@ function alarmRecoveryKnown(state: LaserState): boolean {
 function homeStateBlockMessage(state: LaserState, fromAlarm: boolean): string | null {
   const controllerState = state.statusReport?.state ?? null;
   if (controllerState === 'Idle' || fromAlarm) return null;
-  return `Machine must be known Idle or Alarm before homing (currently ${controllerState ?? 'unknown'}).`;
+  if (controllerState === null) {
+    return 'Home needs to know what the machine is doing, and it has not reported yet. Wait a moment, then press Home again.';
+  }
+  // Run, Jog and Home end by themselves; a hold, a door or sleep does not.
+  const moving = ['Run', 'Jog', 'Home'].includes(controllerState);
+  const next = moving
+    ? 'Wait for it to stop, then press Home again.'
+    : 'Press Home once it is Idle.';
+  return `Home works only when the machine reports Idle or Alarm (it reports ${controllerState}). ${next}`;
 }
 
 function blockHome(set: SetFn, get: GetFn, message: string): never {
@@ -149,6 +170,8 @@ export async function runHomeAction(
     // Homing re-establishes machine zero, so any prior G92 Z0 now points at a
     // different physical height — work Z0 must be re-set (Codex audit P1).
     workZZeroEvidence: null,
+    // Some machines move Z while homing X and Y (ADR-322 Amendment 5).
+    ...homeMovedFocusPatch(state),
     frameVerification: null,
     framedRun: null,
     frameTrace: null,
@@ -216,6 +239,11 @@ async function executeHomeSequence(
   await waitForFreshIdle(refs, { kind: 'home', requiredReports: 1 });
   assertHomeCurrent(get(), refs, epochs);
   confirmHome(set, get, epochs);
+  if (focusMovedByHome(get())) {
+    useToastStore.getState().pushToast(HOME_MOVED_FOCUS_REMINDER, 'warning', {
+      key: HOME_MOVED_FOCUS_TOAST_KEY,
+    });
+  }
 }
 
 // Home establishes machine position, not the absence of G92/G54 offsets: a
@@ -271,7 +299,7 @@ function confirmHome(set: SetFn, get: GetFn, epochs: HomeEpochs): void {
     observation.sessionEpoch !== epochs.session ||
     observation.positionEpoch !== epochs.position
   )
-    throw new Error('Home finished without fresh session-bound Idle settlement evidence.');
+    throw new Error(HOME_NOT_CONFIRMED_MESSAGE);
   set((state) => ({
     controllerOperation: null,
     homingState: 'confirmed',
@@ -372,7 +400,7 @@ function assertHomeCurrent(
     (refs.writeEpoch ?? 0) !== epochs.write ||
     (state.trustedPositionEpoch ?? 0) !== epochs.position
   ) {
-    throw new Error('Home evidence was invalidated before confirmation.');
+    throw new Error(HOME_INTERRUPTED_MESSAGE);
   }
 }
 

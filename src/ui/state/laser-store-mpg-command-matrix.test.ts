@@ -294,7 +294,7 @@ describe('latched grblHAL MPG machine-command ownership', () => {
 
     connection.emitLine('<Home|MPos:0.000,0.000,0.000|FS:0,0|MPG:1>');
     connection.emitLine('ok');
-    await expect(homing).rejects.toThrow(/invalidated/i);
+    await expect(homing).rejects.toThrow(/Homing was interrupted/i);
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|MPG:0>');
 
     expect(writes).toEqual(['$H\n']);

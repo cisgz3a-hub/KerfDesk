@@ -3,8 +3,10 @@ import type {
   SketchConstraint,
   SketchValue,
 } from '../../core/sketch-constraints/constrained-sketch';
+import { parseEnglishDecimalInput } from './english-decimal-input';
+/** English decimals only: Number() would also read "0x10" as 16 mm (O10-P3-6). */
 export function sketchConstraintValue(text: string): SketchValue {
-  return text.trim() !== '' && Number.isFinite(Number(text)) ? Number(text) : { parameter: text };
+  return parseEnglishDecimalInput(text) ?? { parameter: text };
 }
 export function sketchConstraintLabel(c: SketchConstraint): string {
   if (c.kind === 'x' || c.kind === 'y') return c.kind + ' position of ' + c.pointId;

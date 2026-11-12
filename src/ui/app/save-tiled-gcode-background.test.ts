@@ -12,7 +12,6 @@ const mocks = vi.hoisted(() => ({
   prepareOutput: vi.fn(),
   prepareTiledOutputOffThread: vi.fn(),
   finalizeTiledOutput: vi.fn(),
-  alert: vi.fn(),
 }));
 
 vi.mock('../../io/gcode', async (importActual) => ({
@@ -27,7 +26,6 @@ vi.mock('./tiled-output-preparation', async (importActual) => ({
   ...(await importActual<typeof TiledPreparationModule>()),
   finalizeTiledOutput: mocks.finalizeTiledOutput,
 }));
-vi.mock('../state/job-aware-dialogs', () => ({ jobAwareAlert: mocks.alert }));
 
 beforeEach(() => {
   for (const mock of Object.values(mocks)) mock.mockReset();
@@ -157,12 +155,13 @@ describe('costly tiled output isolation', () => {
       expect(costlyCanvasPreparation(project)).toBe(true);
       mocks.prepareTiledOutputOffThread.mockReturnValueOnce(result());
       const written: string[] = [];
+      const pushToast = vi.fn();
 
       const handled = await handleSaveTiledGcode({
         platform: capturingPlatform(written),
         project,
         savedName: 'mixed-tiles',
-        pushToast: () => undefined,
+        pushToast,
       });
 
       expect(handled).toBe(true);
@@ -172,10 +171,15 @@ describe('costly tiled output isolation', () => {
       expect(mocks.prepareOutput).not.toHaveBeenCalled();
       expect(mocks.finalizeTiledOutput).not.toHaveBeenCalled();
       expect(written).toEqual([]);
-      expect(mocks.alert).toHaveBeenCalledWith(
-        expect.stringContaining(
-          label === 'worker unavailable' ? 'Background compilation' : 'worker failed',
+      // One error toast, no native alert (ADR-656 Amendment 4).
+      expect(pushToast).toHaveBeenCalledExactlyOnceWith(
+        expect.stringMatching(
+          label === 'worker unavailable'
+            ? /^Cannot export tiles: .*Background compilation/
+            : /^Cannot export tiles: .*worker failed/,
         ),
+        'error',
+        expect.objectContaining({ key: 'export-refused' }),
       );
     },
   );

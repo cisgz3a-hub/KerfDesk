@@ -106,6 +106,13 @@ describe('parseStl', () => {
     expect(result.kind).toBe('error');
   });
 
+  // Oracle audit O8-P2-2: "vertex 12,5 0 0" read as x 12 with no error.
+  it('rejects a decimal-comma vertex instead of truncating it', () => {
+    const text = asciiStl([TRI_A]).replace('vertex 10 0 0', 'vertex 12,5 0 0');
+    const result = parseStl(new TextEncoder().encode(text).buffer as ArrayBuffer);
+    expect(result.kind).toBe('error');
+  });
+
   it('rejects non-STL bytes', () => {
     const result = parseStl(new TextEncoder().encode('<svg></svg>').buffer as ArrayBuffer);
     expect(result.kind).toBe('error');

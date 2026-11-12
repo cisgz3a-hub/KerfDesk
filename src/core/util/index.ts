@@ -5,6 +5,7 @@ export {
   type FinitePreservingFloatArray,
 } from './finite-preserving-float-array';
 export { iterateLines } from './iterate-lines';
+export { parseDecimalReal } from './decimal-real';
 export { numbersClose } from './numbers';
 export { finiteOr, finitePositiveOr, isFinitePositive } from './finite';
 export { appendAll, maxOf, minOf } from './spread-free';

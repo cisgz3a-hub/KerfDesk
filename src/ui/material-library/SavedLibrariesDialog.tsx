@@ -11,7 +11,7 @@ import {
 import { usePlatform } from '../app/platform-context';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
+import { appConfirm } from '../state/app-dialogs';
 import {
   libraryDocument,
   type MaterialLibraryCollection,
@@ -90,7 +90,9 @@ export function SavedLibrariesDialog(props: { readonly onClose: () => void }): J
               onRename={(name) => renameLibrary(summary.id, name)}
               onDuplicate={() => duplicateLibrary(summary.id)}
               onDelete={() => {
-                if (jobAwareConfirm(`Delete library "${summary.name}"?`)) deleteLibrary(summary.id);
+                void confirmLibraryDelete(summary.name).then((confirmed) => {
+                  if (confirmed) deleteLibrary(summary.id);
+                });
               }}
               onExport={() => exportLibrary(summary)}
             />
@@ -102,6 +104,16 @@ export function SavedLibrariesDialog(props: { readonly onClose: () => void }): J
       </DialogActions>
     </Dialog>
   );
+}
+
+// Asked in the app, so it can be answered during a job (ADR-707).
+function confirmLibraryDelete(name: string): Promise<boolean> {
+  return appConfirm({
+    title: 'Delete library?',
+    message: `Delete library "${name}" and the presets saved in it?`,
+    confirmLabel: 'Delete',
+    tone: 'danger',
+  });
 }
 
 function ClbImportButton(props: {

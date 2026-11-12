@@ -24,6 +24,7 @@ import {
 } from './console-command-readiness';
 import { consoleOwnershipBlockReason } from './console-command-ownership';
 import { writeConsoleCommand } from './console-command-transport';
+import { requestStatusAfterConsoleReply } from './console-status-follow-up';
 import { normalizeFrameReportUnits } from './frame-report-units';
 import {
   assertMachineExecutionOwner,
@@ -247,6 +248,10 @@ async function dispatchPreparedConsoleCommand(
   await rereadAfterConsoleWrite(set, get, refs.driver, command, settingWrite, (read) =>
     dispatchPreparedConsoleCommand(set, get, refs, write, read, 'system'),
   );
+  // The patches above forget the last status report; ask for the next one as
+  // soon as the controller has answered, not on the next idle poll (A3-P2-4).
+  // Last, so the query never lands inside the owned read-back above.
+  if (command.stateEffect !== 'read-only') void requestStatusAfterConsoleReply(get, refs, write);
 }
 
 function applyConsoleStateEffect(set: SetFn, command: PreparedConsoleCommand): void {

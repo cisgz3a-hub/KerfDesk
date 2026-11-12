@@ -8,6 +8,7 @@
 import { RGBA_CHANNELS, type PixelRect, type RgbaBuffer } from '../image-edit';
 import type { SelectionMask } from '../image-select';
 import { boxBlurredRect } from './box-blur';
+import { progressSpan, type FilterProgress } from './filter-progress';
 import { clampRectToDoc, MAX_BYTE } from './lut';
 
 const RGB_CHANNELS = 3;
@@ -22,10 +23,11 @@ export function gaussianBlurInPlace(
   sigma: number,
   rect: PixelRect | null,
   mask: SelectionMask | null,
+  progress?: FilterProgress,
 ): void {
   const target = clampRectToDoc(doc, rect);
   if (target.width <= 0 || target.height <= 0 || sigma <= 0) return;
-  const blurred = blurredRect(doc, Math.min(MAX_BLUR_SIGMA, sigma), target);
+  const blurred = blurredRect(doc, Math.min(MAX_BLUR_SIGMA, sigma), target, progress);
   writeMasked(doc, target, blurred, mask);
 }
 
@@ -33,18 +35,29 @@ export function gaussianBlurInPlace(
  * Blurred RGB floats for the rect, row-major, length rect.w * rect.h * 3.
  * Shared by Unsharp Mask and High Pass, which combine rather than replace.
  */
-export function blurredRect(doc: RgbaBuffer, sigma: number, rect: PixelRect): Float32Array {
+export function blurredRect(
+  doc: RgbaBuffer,
+  sigma: number,
+  rect: PixelRect,
+  progress?: FilterProgress,
+): Float32Array {
   // Filter Effects 1 (feGaussianBlur) lets three box blurs stand in from a
   // standard deviation of 2. Below that the exact kernel is at most 11 taps.
-  if (sigma >= BOX_BLUR_MIN_SIGMA) return boxBlurredRect(doc, sigma, rect);
+  if (sigma >= BOX_BLUR_MIN_SIGMA) return boxBlurredRect(doc, sigma, rect, progress);
   const kernel = buildKernel(sigma);
   const radius = (kernel.length - 1) / 2;
   // Horizontal pass covers extra rows above/below so the vertical pass has
   // true (not clamped) neighbours for every target pixel.
   const top = Math.max(0, rect.y - radius);
   const bottom = Math.min(doc.height, rect.y + rect.height + radius);
-  const horizontal = horizontalPass(doc, kernel, rect, top, bottom);
-  return verticalPass(horizontal, kernel, rect, top, bottom - top);
+  const horizontal = horizontalPass(
+    doc,
+    kernel,
+    rect,
+    { top, bottom },
+    progressSpan(progress, 0, 0.5),
+  );
+  return verticalPass(horizontal, kernel, rect, top, bottom - top, progressSpan(progress, 0.5, 1));
 }
 
 function buildKernel(sigma: number): Float32Array {
@@ -66,9 +79,10 @@ function horizontalPass(
   doc: RgbaBuffer,
   kernel: Float32Array,
   rect: PixelRect,
-  top: number,
-  bottom: number,
+  span: { readonly top: number; readonly bottom: number },
+  progress: FilterProgress,
 ): Float32Array {
+  const { top, bottom } = span;
   const radius = (kernel.length - 1) / 2;
   const out = new Float32Array(rect.width * (bottom - top) * RGB_CHANNELS);
   for (let y = top; y < bottom; y += 1) {
@@ -83,6 +97,7 @@ function horizontalPass(
         }
       }
     }
+    progress((y + 1 - top) / (bottom - top));
   }
   return out;
 }
@@ -95,6 +110,7 @@ function verticalPass(
   rect: PixelRect,
   top: number,
   rows: number,
+  progress: FilterProgress,
 ): Float32Array {
   const radius = (kernel.length - 1) / 2;
   const out = new Float32Array(rect.width * rect.height * RGB_CHANNELS);
@@ -110,6 +126,7 @@ function verticalPass(
         }
       }
     }
+    progress((y + 1) / rect.height);
   }
   return out;
 }

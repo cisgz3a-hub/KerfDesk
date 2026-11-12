@@ -50,7 +50,7 @@ for (const detail of [60, 100]) {
     await expect(dialog.getByText(/Trace ready/)).toBeVisible({ timeout: 60_000 });
     await dialog.getByRole('button', { name: 'Trace', exact: true }).click();
     await expect(dialog).toBeHidden({ timeout: 60_000 });
-    await saveProjectAs(page, kerfdesk, { expectPreparation: true });
+    await saveProjectAs(page, kerfdesk);
     await page.waitForFunction(() => {
       const saved = (
         window as typeof window & { __KERFDESK_E2E__: { savedFiles: Record<string, string> } }

@@ -1,7 +1,6 @@
 import { streamingModeForController } from '../../core/devices';
 import type { WorkStepsRunner } from '../../core/recovery/work-steps';
 import type { MachineKind, OutputScope, Project } from '../../core/scene';
-import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { StartJobOptions, useLaserStore } from '../state/laser-store';
 import type { createRunId, LastCompletedReceipt, RecoveryRepository } from '../state/recovery';
 import type { ReviewCarriedOverV2 } from '../state/recovery/execution-workflow-evidence';
@@ -24,10 +23,10 @@ import {
   type StartAuthorizationRefusal,
 } from './start-job-authorization';
 import {
+  reportRefusedStart,
   reportStartAuthorizationRefusal,
   startAuthorizationRefusalMessage,
 } from './start-job-authorization-reporting';
-import { reportStartBlockers } from './start-blocker-invalidation';
 import type { FramedRunStartClaim } from './framed-run-start-claim';
 import { assertMachineExecutionOwner } from '../state/machine-execution-owner';
 import type { FramedStartOptions } from './framed-start-options';
@@ -75,11 +74,12 @@ export async function transmitPreparedStart(input: {
   };
   // Observe before the first possible stream transition. A short program may
   // settle while startJob or recovery persistence is still awaiting a write.
-  const advancement = armVariableStreamAdvancement(
-    input.args.project,
-    input.runId,
-    input.args.outputScope,
-  );
+  // A painted second pass re-burns a finished part: it consumes nothing
+  // (oracle audit O1, O5-P3-5).
+  const advancement =
+    input.args.prepared.laserSecondPassChain === undefined
+      ? armVariableStreamAdvancement(input.args.project, input.runId, input.args.outputScope)
+      : { accept: () => undefined, cancel: () => undefined };
   const jigCompletion =
     input.args.prepared.laserSecondPassChain === undefined
       ? armRegistrationJigCompletion({
@@ -134,8 +134,7 @@ export async function transmitPreparedStart(input: {
       return false;
     }
     const message = error instanceof Error ? error.message : String(error);
-    reportStartBlockers([message]);
-    jobAwareAlert(`Could not start job:\n\n${message}`);
+    reportRefusedStart('Could not start job', message);
     return false;
   } finally {
     retention.stop();

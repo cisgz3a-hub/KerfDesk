@@ -500,7 +500,7 @@ Reviewer answers "what should this UI do?" from `WORKFLOW.md` alone; "why this a
 
 ## ADR-017 — Third-party library evaluation policy; DOMPurify pinned for Phase A
 
-**Status:** Accepted; macOS-target example amended by ADR-248; LGPL programs KerfDesk does not link allowed in the Linux AppImage by ADR-017 Amendment 1; its GPL-3.0 libraries and GConf left out by ADR-017 Amendment 2 | **Date:** 2026-05-26
+**Status:** Accepted; macOS-target example amended by ADR-248; LGPL programs KerfDesk does not link allowed in the Linux AppImage by ADR-017 Amendment 1; its GPL-3.0 libraries and GConf left out by ADR-017 Amendment 2; packages the build bundles made notice and licence-gate inputs by ADR-017 Amendment 3 | **Date:** 2026-05-26
 
 ### Context
 The project source code is MIT-licensed under ADR-120/247 and uses compatible dependencies freely (the dependency-policy half of the original ADR-008 survived ADR-018 and remains unchanged). The user has indicated that "if there is proven MIT code for extra features, we can do research and add it." This is a powerful capability — well-maintained libraries reduce bug surface, and proven implementations are often safer than hand-rolled equivalents.
@@ -10565,6 +10565,8 @@ labeling and default machining policy remain CNC-oriented.
 
 ## ADR-227 - Status-bar Update button replaces the PWA update popup
 
+**Amended by [ADR-227 Amendment 2](docs/decisions/ADR-227-amendment-2-the-web-update-waits-for-machine-work.md):** the web Update button reads "Update after job" and waits while machine work runs.
+
 **Date:** 2026-07-17
 **Status:** Accepted
 
@@ -11784,7 +11786,9 @@ ADR-030 §3 (Proposed) already called for a dedicated Adjust-Image surface out o
 ADR-242's amendments are separate decision files (ADR-344):
 `docs/decisions/ADR-242-amendment-1-image-studio-screens-track-tone-on-the-pixel-grid.md` (at 0°
 and 90° the Halftone and Line Screen filters rank each cell's pixels into a threshold array, so
-coverage tracks ink in s² + 1 tones and solid black stays solid).
+coverage tracks ink in s² + 1 tones and solid black stays solid) and
+`docs/decisions/ADR-242-amendment-2-screen-pitch-is-whole-pixels.md` (the screen pitch is rounded
+to whole pixels, so a typed fractional pitch keeps those guarantees).
 
 ## ADR-243 - Rasters of any size stream row-by-row; the raster budget becomes advisories
 

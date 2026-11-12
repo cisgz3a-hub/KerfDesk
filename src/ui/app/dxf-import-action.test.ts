@@ -242,7 +242,7 @@ describe('importDxfFiles parser notes', () => {
     [0, 'SECTION'],
     [2, 'HEADER'],
     [9, '$INSUNITS'],
-    [70, 8],
+    [70, 21],
     [0, 'ENDSEC'],
   );
 
@@ -265,7 +265,7 @@ describe('importDxfFiles parser notes', () => {
     });
     expect(toasts).toEqual([
       ['Imported 1 path from part.dxf — skipped 1 INSERT.', 'success'],
-      ['part.dxf: Unrecognized $INSUNITS 8 — assuming millimeters.', 'warning'],
+      ['part.dxf: Unrecognized $INSUNITS 21 — assuming millimeters.', 'warning'],
       ['part.dxf: INSERT references unknown block "HOLES"', 'warning'],
       [expect.stringContaining('scaled to 50%'), 'warning'],
     ]);

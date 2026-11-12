@@ -1,243 +1,160 @@
 # KerfDesk
 
-**Laser and CNC CAM in one application.** Import or draw artwork, assign named cut / fill /
-engrave operations to it, preview the toolpath, generate G-code, and stream it to a GRBL-family
-controller over USB — from a browser tab or a Windows desktop app, built from one codebase.
+**Laser and CNC software in one app.** Import or draw artwork, give it named cut, fill, image or
+CNC operations, preview the toolpath, and send the job to your machine — from a Chromium browser
+tab at <https://kerfdesk.com> or from the desktop app for Windows, macOS and Linux. Both are built
+from this one codebase.
 
-KerfDesk deliberately copies LightBurn's UX shape and workflow for lasers, and Easel/Carbide's
-conventions for routers. It deliberately does **not** copy their feature breadth.
+KerfDesk follows LightBurn's workflow for lasers and Easel/Carbide conventions for routers, so
+people coming from those tools find things where they expect them.
 
-> **A note on naming.** The product is **KerfDesk**. The repository, the npm package name
-> (`laserforge`) and the Electron application id (`dev.laserforge.app`) still say *LaserForge 2.0* —
-> that is historical, and those identifiers are deliberately frozen because changing them would
-> break release identity and the on-disk location of saved user data.
-> See [`src/core/app-branding.ts`](src/core/app-branding.ts) and [`PROJECT.md`](PROJECT.md).
+> **Naming.** The product is **KerfDesk**. The npm package (`laserforge`), the Electron app id
+> (`dev.laserforge.app`) and some internal documents still say *LaserForge 2.0*. Those identifiers
+> stay as they are on purpose: changing them would break upgrades and move saved user data. See
+> [`src/core/app-branding.ts`](src/core/app-branding.ts).
 
 ---
 
-## Status — please read before you cut anything
+## Status — read this before you cut anything
 
-KerfDesk is under active development and has **never been proven on hardware for output
-fidelity**. Be specific about what that means:
+KerfDesk is in active development. **No machine or controller is qualified.** The automated tests
+prove that output is structurally correct and repeatable — the same project always produces the
+same G-code, the laser is off on every travel move, paths stay inside the bed. They do not prove
+that a burn or a cut *looks* right on real material.
 
-| Area | Status |
+| Area | Where it stands |
 |---|---|
-| GRBL-family streaming | **Not qualified.** Used informally on a Creality Falcon A1 Pro and a Neotronics 4040, both running GRBL-family firmware (exact builds unconfirmed). |
-| FluidNC · Marlin · Smoothieware | Simulator-verified only |
-| Ruida `.rd` export | Encode→decode round-trip proven; **never accepted by a real controller** |
-| Ruida network control (desktop) | Simulator only; **never run against a real controller** |
-| JCZ LMC galvo over USB | Simulator only; **never run against a real board** |
-| Lihuiyu M2/M3 Nano (K40) `.egv` export and USB link | Simulator only; **never run against a real board** |
-| Moshiboard USB control (experimental) | Simulator only; **never run against a real Moshiboard** |
-| Laser raster/image engrave | **Not qualified.** Code + tests, plus informal use such as a photo engraving on a Neotronics 4040. |
-| **The entire CNC / router surface** | **Not qualified.** Code + tests, plus informal cuts on a Neotronics 4040. |
-| Box generator physical fit | Never cut and assembled |
-| Desktop launch / install | Packaging builds pass; real-OS qualification pending |
+| GRBL and grblHAL lasers and routers | Used informally on a Creality Falcon A1 Pro and a Neotronics 4040. Not qualified. |
+| FluidNC, Marlin, Smoothieware | Tested against simulators only |
+| Ruida (`.rd` export, desktop UDP link) | Simulator and round-trip tests only; never run on a real controller |
+| Stock K40 (Lihuiyu) `.egv` export and USB link, Moshiboard over USB | Experimental; simulator only |
+| JCZ LMC galvo (EZCad2: fiber, MOPA, UV) over USB | Experimental; simulator only |
+| Rotary (Y, A or Z axis) | Code and tests; not qualified on hardware |
+| Desktop installers | Published for Windows; macOS and Linux builds pass CI |
 
-The automated suite proves **structure and determinism** — byte-identical G-code across fuzz
-seeds, path counts, invariant predicates. It does not prove **fidelity**: that a fill, an engrave
-or a V-carve actually *looks* like the source. Output can be geometrically wrong and still pass
-everything. No machine is qualified, and passing software tests does not qualify one (see ADR-322
-in [`DECISIONS.md`](DECISIONS.md) and the
-[correction record](docs/audits/2026-09-19-machine-compatibility-fixes/README.md)). Informal use is
-not verification, and there is currently no machine available to this project for verification, so
-treat every hardware row above as unproven rather than pending.
-
-**Check your output in an independent G-code viewer before running it, keep the work area clear,
-and stay at the machine.** The in-app Abort is a software stop, not a safety-rated E-stop —
-dangerous conditions need the machine's physical E-stop or power isolation
-([`PROJECT.md`](PROJECT.md) non-negotiable #9).
-
----
-
-## Who it's for
-
-A single role: the **operator**. No accounts, no auth, no cloud, no telemetry, no subscription —
-the app trusts whoever launches it and runs fully offline.
-
-You'll feel at home if you own a GRBL-based diode or CO₂ laser (xTool, Sculpfun, Ortur,
-Atomstack, NEJE, FluidNC retrofits) or a GRBL router (Genmitsu, Shapeoko, X-Carve, Onefinity,
-LongMill), design in Inkscape / Illustrator / Affinity, and expect a LightBurn-shaped workflow.
+**Check every program in an independent G-code viewer before you run it, keep the work area
+clear, and stay at the machine.** The in-app Abort is a software stop, not a safety-rated E-stop.
+Use the machine's physical E-stop or power switch when anything goes wrong.
 
 ---
 
 ## What it does
 
-### Shared
+### Design and import
 
-- **Scene model** — imported SVG/DXF, editable text, traced artwork, raster images, generated
-  shapes and STL reliefs, all in one extensible discriminated union.
-- **Named operations** bound to artwork by explicit operation IDs (not by colour), with an
-  independent machine run order.
-- **Toolpath preview**, job-time estimation from a real GRBL-style trapezoidal motion planner
-  with lookahead and junction-deviation cornering, and a **G-code Inspector**: open any `.nc` /
-  `.gcode` / `.tap` — or the exact program you're about to run — in a 3D viewer with playback,
-  per-segment source links and an informational program-health report.
-- **Drawing tools** — rectangle, ellipse, polygon, star and pen/polyline, plus Bézier node
-  editing and boolean operations (weld, subtract, intersect, exclude) via `clipper2`. A separate
-  **Offset outlines** panel keeps the original and adds a larger or smaller outline of closed shapes.
-- **Text** — 21 bundled outline fonts and 4 single-line/stroke faces for engraving, plus imported
-  `.ttf`/`.otf` files and fonts installed on the computer (**System fonts...**, Chromium only),
-  embedded into the project. Variable text from CSV, serial numbers and dates.
-- **Parametric box generator** — finger-jointed closed, open-top and slide-lid boxes with
-  dividers, panel cutouts, baked joint clearance and CNC corner-overcut relief. (Kerf itself is
-  handled by the normal per-operation cut settings, not by the generator.)
-- **Auto-layout / nesting**, material libraries, and Material/Interval test-grid generators.
-- **Image Studio** — an in-progress in-app raster-editing workspace. The current Phase L surface
-  is building the line-work, selection, Apply and re-trace loop; adjustments/filters, retouching,
-  and persistent layers/blend modes remain staged work rather than shipped claims.
-- **Camera alignment** — checkerboard intrinsic calibration, lens rectification and marker-based
-  bed alignment, with USB and network camera sources.
+- **Import** SVG, DXF, PDF and Illustrator, EPS/PostScript, HP-GL/PLT, PNG, JPEG, BMP, GIF, TIFF,
+  PSD, STL, LightBurn projects (`.lbrn`, `.lbrn2`) and cut libraries (`.clb`), fonts and CSV data.
+  All imports share one picker, `Ctrl/Cmd+I` and drag-and-drop.
+- **Draw** rectangles, ellipses, polygons, stars and pen paths; edit nodes; weld, subtract,
+  intersect and offset shapes.
+- **Text** with bundled outline and single-line fonts, your own `.ttf`/`.otf` files, and variable
+  text from CSV, serial numbers and dates. QR codes and barcodes.
+- **Trace** images into vectors, and edit photos and vectors in **Design Studio**.
+- **Arrange** with alignment, grid and circular arrays, and nesting.
 
 ### Laser
 
-- Three operation modes: **Line** (vector outline cut), **Fill/Scan** (hatch the interior) and
-  **Image** (dithered raster engrave). Sub-layers let one operation stack fill *then* line.
-- Fill: scanline hatch with configurable angle and spacing, bidirectional/snake, cross-hatch,
-  plus **Follow Shape** (concentric offset) and **Island Fill** styles, and a LightBurn-style
-  **Ramp** that slopes the walls of a fill from Min power at its edges, for rubber stamps.
-- Image: 13 dither/conversion modes (threshold, Floyd–Steinberg, Jarvis, Stucki, Atkinson,
-  Burkes, three Sierra variants, Blue Noise, ordered Bayer, grayscale and **3D Sliced**, which
-  burns a depth map one threshold pass per slice), 5–25 lines/mm, dot-width correction, negative
-  and pass-through.
-- Image trace with five presets across three in-house engines: filled-contour (Line Art, Smooth,
-  Sharp), **centerline/medial-axis**, and Canny **edge detection**.
-- Kerf compensation, automatic holding tabs, **lead-in/lead-out** that finds the scrap side of
-  each shape, set-work-origin (`G92`), framing, and **Convert to Bitmap** for vector→raster
-  engraving.
+- **Line**, **Fill** and **Image** operations, with sub-layers to stack fill then line.
+- Fill styles include hatch, cross-hatch, follow-shape and island fill, plus a **Ramp** for
+  rubber stamps.
+- Image engraving with many dither modes, including **3D Sliced** for depth maps.
+- Tabs, lead-in/lead-out, overcut, perforation, kerf compensation, bidirectional scanning with
+  timing compensation, and material test grids.
+- **Rotary** jobs on a Y-port roller or a dedicated A or Z axis, including tapered glasses.
+- **Camera** alignment with USB, network and RTSP cameras.
 
 ### CNC / router
 
-- Eight selectable cut types: profile outside/inside/on-path, pocket, engrave, **V-carve**,
-  inlay pair and drill (explicit peck cycles — GRBL has no `G81`/`G83`).
-- Pocket clearing by contour-parallel rings, raster X/Y, or **constant-load adaptive clearing**
-  (pockets with islands too, ADR-154 Amendment 4), with two-tool **rest machining** and finish
-  allowance.
-- Depth passes, ramp entry, native `G2`/`G3` **helical entry**, arc/line lead-in-out, climb vs
-  conventional with hole mirroring, and **holding tabs as a Z-rise** inside one continuous
-  toolpath (draggable per contour).
-- **3D relief from STL** — clean-room parser → max-Z heightmap → waterline roughing → ball-nose
-  scallop finishing.
-- Tiling for jobs larger than the bed, with registration holes and per-tile export.
-- Touch-plate **probing** (Z and XYZ corner, two-stage `G38.2`), a tool library with 22 built-in
-  bits plus your own, a chipload-based feeds & speeds calculator, multi-tool jobs with `M0`
-  manual tool change, a spoilboard surfacing wizard, and a 3D view of the simulated cut in Preview.
+- Profile, pocket, engrave, drill, **V-carve** and inlay pairs.
+- Pocket clearing by offset rings, raster, or **adaptive clearing**, with rest machining.
+- Depth passes, ramp and helical entry, holding tabs, multi-tool jobs with manual tool change.
+- **3D relief** roughing and finishing from STL models and height maps.
+- Tiling for jobs bigger than the bed, touch-plate probing, a tool library, a feeds and speeds
+  calculator, and spoilboard surfacing.
 
-Cut ordering is a safety design, not a convenience: pockets and engraves run first, profiles
-last, inner contours before outer — a part is machined completely before the cut that could free it.
+Cut order is a safety rule: pockets and engraving run first and outside profiles run last, so a
+part is finished before the cut that frees it.
+
+### Running a job
+
+- Connect over USB (WebSerial), jog, home, set the origin, **Frame**, then **Start**. A
+  **G-code Inspector** opens any `.nc`, `.gcode` or `.tap` file, or the job you are about to run,
+  in a 3D viewer with playback.
+- **Recovery** after a lost connection shows where the job stopped and lets you continue.
+- A **guided first job** and a **Simple view** help new users.
+- **Phone and MCP access** (desktop, off by default): pair a phone or an MCP client to view and
+  edit the open project and, only if you separately approve it, to jog, frame and start jobs.
+  See [`docs/mcp/remote-control.md`](docs/mcp/remote-control.md).
+
+### Free and Pro
+
+KerfDesk is free to use. A few tools are **Pro** and need a trial or a paid licence: V-carve, 3D
+relief, adaptive clearing, advanced tracing, camera alignment, the registration jig, Place Board,
+the box generator and Design Studio (the list lives in
+[`src/ui/licensing/pro-features.ts`](src/ui/licensing/pro-features.ts)). A licence never blocks
+Frame, Start, saving G-code or a running job, and a project that already holds Pro work still
+runs after a trial ends.
 
 ---
 
-## File formats
+## Starting a job — Frame first
 
-### Read
+KerfDesk has one Start gate, and it is physical: **a completed Frame of the current job**, with
+the same outline and origin. You watch the head trace the job over the real material, and that
+trace is what allows Start, on lasers and routers alike.
 
-| Format | Notes |
+Everything else is advice. Bed overhang, no-go zones and controller-setting concerns appear as
+warnings in **Job Review** when you press Start; you read them and decide. KerfDesk refuses only
+when something factually cannot work: the controller cannot take the stream, the program cannot
+be produced, or the reviewed program is not the one about to be sent. See
+[`docs/architecture/07-frame-permit-model.md`](docs/architecture/07-frame-permit-model.md).
+
+---
+
+## Controllers and file formats
+
+| Controller | Connection |
 |---|---|
-| `.svg` | DOMParser + DOMPurify sanitisation. **Convert text to paths first** — `<text>` and `<image>` are counted and skipped. |
-| `.dxf` | Clean-room ASCII parser: LINE, CIRCLE, ARC, LWPOLYLINE (with bulges), POLYLINE, ELLIPSE, SPLINE, INSERT/MINSERT. Binary DXF is rejected with a message. |
-| `.pdf` `.ai` (PDF-based) | Pick a page, then editable paths or a rendered image (ADR-357). |
-| `.eps` `.epsf` `.ps` `.ai` (Illustrator 3–8) | Clean-room PostScript subset reader (ADR-700): paths, fills, strokes and colours become editable artwork through the SVG import. Text, clipping, dashes and gradients are skipped with a warning; embedded images and unknown operators are refused with a reason. Tested against KerfDesk's own EPS output and specification-based samples, not yet against a broad set of real third-party files. |
-| `.hpgl` `.plt` | Plotter files, clean-room HP-GL/2 subset. |
-| `.lbrn` / `.lbrn2` | LightBurn projects → a new KerfDesk project, carrying speed, power, passes and Line/Fill mode. Group/Rect/Ellipse/Path shapes; bitmaps and BackupPath-less text are dropped. Proven against five real public `.lbrn2` files; **`.lbrn` v1 has no test fixture**. |
-| `.clb` | LightBurn cut libraries → material presets. Proven against four real public libraries. Replaces the active library. |
-| `.lbdev` | LightBurn device profiles, with an Applied / Needs Review / Ignored card before anything is applied. GRBL-flavoured devices only. **Experimental — written against an inferred schema and never tested against a real LightBurn export.** |
-| `.png` `.jpg` | Engrave/trace sources. |
-| `.stl` | CNC relief through the unified Import picker or drag-and-drop, in either machine mode. |
-| `.nc` `.gcode` `.tap` | **View and run**, in the G-code Inspector (free). **Run on machine...** frames the program's outline, then streams it unchanged except for removed comments. Does not become editable geometry. (An older 2D simulator is reachable from inside the Inspector, in CNC mode only.) |
-| `.ttf` `.otf` | Embedded into the project (≤10 MB each, ≤32 per project). |
-| `.csv` | Variable-text datasets. |
-| `.lf2` | KerfDesk's own project format (JSON, schema v4, auto-migrating from v1/v2/v3). |
+| GRBL 1.1, Marlin, Smoothieware | USB (WebSerial) |
+| grblHAL, FluidNC | USB (WebSerial); network (raw TCP / Telnet) on the desktop |
+| Ruida | `.rd` file export; experimental UDP link on the desktop |
+| Stock K40 (Lihuiyu M2/M3 Nano) | `.egv` file export; experimental USB link (WebUSB) |
+| Moshiboard | Experimental USB link (WebUSB) |
+| JCZ LMC galvo (EZCad2: fiber, MOPA, UV) | Experimental USB link (WebUSB) and red-light Frame; no job file |
 
-Also: `.lfml.json` material libraries, `.lfmachine.json` machine profiles, `.lfsettings.json`
-controller snapshots. **File → Import...**, `Ctrl/Cmd+I`, the toolbar, and drag-and-drop share the
-ordered SVG, DXF, PDF/AI, EPS, HPGL, image and STL import surface; specialized formats retain
-their own dialogs.
+**Writes** G-code (`.gcode`, `.nc`, including per-tile files), Ruida `.rd`, K40 `.egv`, KerfDesk projects
+(`.lf2`), SVG and PNG exports, traced vectors (SVG, DXF, PDF, EPS, GeoJSON), material libraries
+and machine profiles.
+LightBurn interoperability is one-way: KerfDesk reads LightBurn files and writes none.
 
-Not supported: `.cdr`, Gerber, OBJ/3MF, and LightBurn `.lbzip` bundles.
-
-### Write
-
-`.gcode` / `.nc` (including per-tile export), `.rd` (Ruida, **experimental**), `.lf2` projects,
-`.lfml.json` libraries, `.lfmachine.json` profiles, `.svg` and `.png` exports.
-
-**LightBurn interoperability is one-way.** KerfDesk reads LightBurn files and writes none of them.
+KerfDesk projects are versioned JSON. Older projects are migrated forward automatically when they
+open.
 
 ---
 
-## Controllers
+## Privacy
 
-Seven firmware families drive the whole app through one `ControllerDriver` seam — connect,
-identify, jog, frame, run/pause/resume/abort, recover — with output, streaming, console and UI
-capability-gated per firmware.
+There are no accounts, analytics, advertising or automatic crash reports, and projects stay on
+your computer. The network connections KerfDesk does make are listed in the
+[privacy notice draft](docs/legal/kerfdesk-privacy-notice.md): update checks, the licence check
+for a Pro trial or licence, cameras and machines you add yourself, and phone/MCP access if you
+turn it on.
 
-| Family | Transport | Verification |
-|---|---|---|
-| grblHAL | WebSerial | **Not qualified.** Used informally on a Creality Falcon A1 Pro, whose KerfDesk profile uses this family as a compatibility choice. The vendor labels the connection GRBL-LPC; the exact firmware build is unconfirmed. |
-| GRBL v1.1 | WebSerial | **Not qualified.** Used informally on a Neotronics 4040 (GRBL-family firmware, exact build unconfirmed). The catalogue's Neotronics 4040 profile uses this family. |
-| FluidNC | WebSerial | Simulator only (settings read-only) |
-| Marlin | WebSerial | Simulator only |
-| Smoothieware | WebSerial | Simulator only |
-| Ruida | `.rd` file export; experimental UDP network link on the desktop (ADR-697) | `.rd` round-trip proven, never accepted by hardware; network link simulator only |
-| JCZ LMC galvo (fiber, MOPA, UV, CO2) | USB link (ADR-702), experimental (ADR-704); no job file | Simulator only |
-| Lihuiyu M2/M3 Nano (stock K40) | `.egv` file export; experimental USB link through the board's CH341 bridge (ADR-703) | Simulator only; never run against a real board |
-| Moshiboard | Experimental USB link (CH341), Frame/Start/Abort/Home only; no file export (ADR-705) | Simulator only |
-
-No controller family or machine is qualified. An earlier claim that the Falcon was
-hardware-verified, and that this proved the driver refactor on real hardware, was withdrawn after
-the 2026-09-19 audit found no reproducible evidence for it; see ADR-322 in
-[`DECISIONS.md`](DECISIONS.md).
-
-Output dialects: `grbl-compatible`, `grbl-dynamic`, `grbl-raster`, `neotronics-4040-safe`, plus
-`marlin-inline` (LASER_FEATURE) and `marlin-fan` (fan-mosfet). Twenty-one device profiles and nine
-CNC machine presets ship in the catalog.
-
-Streaming is exercised end-to-end against scripted firmware simulators
-([`src/__fixtures__/controllers/`](src/__fixtures__/controllers/) — GRBL, Marlin, Smoothieware and
-a Ruida decoder, over a fake serial port) driving the real application store rather than a mock.
-The desktop Ruida network link is exercised against a scripted Ruida UDP simulator built on that
-decoder, driving the real Ruida network store. The Lihuiyu USB link is exercised against a
-simulated M2 Nano behind a USB session (LHYMicro-GL decoder, CRC, status bytes), driving the real
-Lihuiyu USB store. The Moshiboard USB link is exercised against a scripted Moshiboard that decodes
-each program with this repo's Moshi decoder, driving the real Moshi USB store. The JCZ galvo link
-runs against a scripted LMC board behind the USB transfer calls, driving the real galvo store.
-grblHAL and FluidNC ride the GRBL driver with capability deltas rather than having simulators of
-their own.
+Report security problems privately as described in [`SECURITY.md`](SECURITY.md). Please do not
+test suspected machine-control issues on a powered laser or spindle.
 
 ---
 
-## Starting a job — the Frame-first model
-
-KerfDesk has exactly one Start gate, and it is a physical one. **A completed Frame for the exact
-current job** — matching bounds signature and origin identity — is what authorises Start, on both
-laser and CNC. You watch the head trace the real job outline over the real material, and that
-completed trace is the permit.
-
-Everything else **informs**. Calculated bed overhang, no-go zones and controller-setting policy
-surface as warnings in a single **Job Review** dialog that opens at Start; the operator reads them
-and decides. They never refuse the job.
-
-The only refusals that exist are factual, not policy: the serial channel cannot accept a stream
-(disconnected, alarm, not idle, busy), the program cannot be produced (compile failure, NaN
-coordinates, empty output), or the reviewed program is not the one about to be streamed.
-
-This is a hard architectural rule, not a preference — see
-[`docs/architecture/07-frame-permit-model.md`](docs/architecture/07-frame-permit-model.md) and
-[`CONTRIBUTING.md`](CONTRIBUTING.md) before proposing anything that blocks an operator action.
-
----
-
-## Getting started
+## Development
 
 ### Requirements
 
-- **Node.js 22 LTS.** `package.json` requires `>=22.13.0`; CI builds and tests only on 22.
-- **pnpm 11.3.0** (pinned via `packageManager`; the repo is pnpm-only).
-- **A Chromium-family browser** — Chrome, Edge, Brave or Arc. KerfDesk uses the File System
-  Access API for projects and WebSerial for machine control; **Firefox and Safari cannot open or
-  save files**. Brave may need WebSerial enabled under Shields/flags.
+- **Node.js 22** (`>=22.13.0`) and **pnpm 11.3.0** (pinned in `package.json`).
+- **A Chromium browser** — Chrome, Edge, Brave or Arc — for WebSerial and the File System Access
+  API. Firefox and Safari can open a dropped file but save by downloading, and cannot connect to
+  a machine.
 
-### Install and run
+### Run the web app
 
 ```bash
 pnpm install
@@ -247,8 +164,7 @@ pnpm install
 pnpm dev:web
 ```
 
-The dev server listens on **http://localhost:5173** (`strictPort` — it fails rather than hopping
-to another port if 5173 is busy).
+The dev server runs at <http://localhost:5173>.
 
 ### Build
 
@@ -256,211 +172,61 @@ to another port if 5173 is busy).
 pnpm build:web
 ```
 
-Outputs the PWA-installable, fully offline web bundle to `dist/web`. Note this script also
-regenerates the tracked file `public/third-party-notices.txt` before building — the output is
-deterministic, so a clean tree normally stays clean.
-
-```bash
-pnpm preview:web
-```
-
-Serves the built bundle on **http://localhost:4173**.
-
-### Headless trace command
-
-```bash
-pnpm trace --preset "Line Art" --format svg -o art.svg art.png
-cat art.png | pnpm -s trace -f dxf > art.dxf
-```
-
-Traces one PNG, JPEG, BMP, TIFF or PBM/PGM/PPM image to SVG, DXF, PDF, EPS or GeoJSON with the
-app's own tracer, presets, Trace dialog settings and relaxed-settings retry (ADR-477). For 8-bit
-sRGB PNG and BMP images up to 2048 px on the long edge the file is byte for byte what Multi-File
-Trace writes. The app has no Netpbm import, so PBM/PGM/PPM trace the pixels they hold as an app
-import of the same pixels would; GIF, which the app opens at its first frame, is refused here.
-Larger images trace at full resolution with pixel-unit settings scaled as the app scales them for
-its finer commit grid, and JPEG (a different decoder than the browser's) or images with colour
-profiles can trace slightly differently at edges. Warnings such as a relaxed-settings retry go to
-standard error. The package also exposes it as the `kerfdesk-trace` bin. `pnpm trace --help`
-lists every flag; the exit status is 0 traced, 1 failed, 2 invalid options, 3 nothing to draw.
-
-### Desktop (Electron)
+Builds the offline-capable web app into `dist/web`.
 
 ```bash
 pnpm dev:desktop
 ```
 
-Compiles the Electron main process, builds the web bundle, and launches Electron against it.
-This is *not* a hot-reload loop — the renderer loads the built bundle over a custom `app://`
-scheme, exactly as the packaged app does.
+Builds the Electron main process and the desktop bundle, then launches Electron.
 
 ```bash
 pnpm build:desktop
 ```
 
-Packages a **Windows x64 NSIS installer** (the local script hard-codes `--win --x64`). A separate
-preview release workflow also builds unsigned, un-notarized macOS x64 and arm64 DMGs. Linux is
-web/PWA only.
+Packages the Windows x64 installer. The release workflows also build macOS DMGs and Linux
+AppImage and `.deb` packages.
 
-The renderer runs with `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, no
-preload and no IPC handlers.
+### Command-line tracer
 
-### Deployed web app
+```bash
+pnpm trace --preset "Line Art" --format svg -o art.svg art.png
+```
 
-CI publishes the web build to Cloudflare Pages on every green `main` run; the canonical URL is
-<https://kerfdesk.com> (see [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)).
+Traces an image to SVG, DXF, PDF, EPS or GeoJSON with the app's own tracer. `pnpm trace --help`
+lists every option.
 
-### Product website
-
-The public product site — features, machines, downloads, pricing and help — lives in
-[`website/`](website/README.md). It is static HTML with no JavaScript, built by
-`pnpm website:build` and checked by `pnpm website:test`. It is not part of the app bundle and is
-not deployed automatically (ADR-524).
-
----
-
-## Tests and quality gates
+### Tests and checks
 
 ```bash
 pnpm test
 ```
 
-Vitest, jsdom, ~1,280 test files across `src/` and `electron/`. This is a large suite — expect it
-to take a while.
-
 ```bash
 pnpm release:check
 ```
 
-The single gate CI runs. Thirteen sequential steps: `typecheck`, `lint`, `lint:electron`,
-`format:check`, ADR numbering, license compliance, `test`, release-integrity, web build, Electron
-main compile, and three file-size/export checks.
+`pnpm release:check` is the full gate CI runs: type checks, lint, formatting, ADR numbering,
+licence and privacy checks, every test suite, the web and Electron builds, and size checks. Run
+`pnpm typecheck`, `pnpm lint` or `pnpm format:check` on their own for a quicker loop.
 
-Individually:
+### Architecture
 
-```bash
-pnpm typecheck
-```
-
-```bash
-pnpm lint
-```
-
-```bash
-pnpm format:check
-```
-
-Two traps worth knowing: **`prettier --check .` is repo-wide and is *not* part of `pnpm lint`**, so
-a Prettier-dirty file passes lint locally and fails the release gate. And the dependency
-vulnerability audit is **not** in the merge gate — it runs nightly and files a tracking issue
-instead of blocking PRs.
-
-A Playwright browser smoke (`pnpm test:e2e`) runs as a separate, observability-only workflow; it
-does not gate merges or deploys.
-
-### What is actually proven
-
-The safety and correctness non-negotiables are enforced at different strengths — worth knowing
-which is which:
-
-| Invariant | Enforced by |
-|---|---|
-| Paths fit inside the configured bed | **Property test**, generated inputs |
-| **Laser off on every travel move** — every `G0` carries inline `S0`, follows `M5`/`M107`, or runs under a sticky `S0` | **Property test**, generated inputs |
-| Deterministic G-code — same input and parameters produce byte-identical output | **Property test** (fuzz seeds) + snapshots |
-| `S` values match the device profile's `$30` max-power scale | **Property test** across `$30 ∈ {100, 255, 1000}` |
-| Output coordinates match the device profile's origin | Unit tests + review |
-| No partial output — a pipeline failure writes no file and sends no stream | Unit tests |
-| Millimetres internally; inches converted only at the import boundary | Review |
-
-CNC adds a Z-up-on-travel invariant and a spindle-start clearance check.
-
-The invariant predicates read the *final emitted G-code text* rather than intermediate
-structures. That is deliberate: a regression introduced anywhere upstream is caught because the
-check reads what will actually be sent, and the same predicates can validate G-code produced by
-external tools.
-
-### The perceptual harness
-
-Because green structural tests are not evidence that output *looks* right, the repo carries a
-test-only measuring instrument at
-[`src/__fixtures__/perceptual/`](src/__fixtures__/perceptual/). It rasterises pipeline output into
-binary ink masks and scores them against ground truth using IoU, precision, recall and F1. Ground
-truth for the synthetic fixtures is **analytic** — the same closed-form predicate generates both
-the source bitmap and the truth mask, so there are no golden images to re-bless. Supporting
-metrics cover what IoU cannot see: chamfer distance, centerline deviation/gap/fragment counts, and
-chord sagitta for faceting. The instruments are themselves unit-tested before being trusted.
-
-It runs as part of `pnpm test`, and it covers the trace engine, SVG import, scanline fill, the box
-generator, CNC V-carve, and laser raster/image burn. For laser fill it closes the loop all the way
-to controller text: emitted GRBL is **re-parsed back into an ink mask** and scored against source
-geometry. Raster/image fixtures similarly compile real bitmaps through G-code, reconstruct a
-cell-scale energy field, and compare position, orientation, tone, and power modulation against
-analytic, continuous-tone, and decoded-PNG truth.
-
-Be precise about its limits, because they matter:
-
-- The G-code re-rasterisation path is exercised on **synthetic rectangles only** — a solid square,
-  an annulus and a cross-hatched square. No traced or imported artwork is ever scored through
-  emitted G-code.
-- The trace tests score trace **geometry**, not G-code.
-- Raster/image coverage is cell-scale and energy-based. It cannot see within-cell dot arrangement,
-  dither banding/worming/moiré, beam width, scan-line overlap, material response, or the appearance
-  of a physical burn.
-- The rasteriser is power-blind (any `G1` with `S>0` inks at full strength) and understands only
-  `G0`/`G1` — no arcs, no Z. It measures geometric coverage, nothing else.
-- IoU is blind to waviness and to the outline-vs-centerline gap.
-
-A green perceptual suite rules out gross coverage regressions. It is not parity with LightBurn.
-
----
-
-## Architecture
-
-A pure-function pipeline core with strict module boundaries, built as a deliberate answer to the
-1.0 codebase's shotgun-surgery problem.
+The core is a pure, deterministic pipeline: the project's scene compiles to a job, the job emits
+G-code for the chosen controller, and an invariant scan reads the final G-code before anything is
+saved or streamed. Toolpaths and G-code are never saved in a project; they are rebuilt every
+time it opens.
 
 ```text
-import / draw / type / trace
-            ↓
-        Scene              SceneObject[] + Layer[] + run order   (the only persisted truth)
-            ↓
-   ┌────────┴────────┐     ← fork on machine kind
-   ↓                 ↓
-compileJob      compileCncJob                                    (pure, deterministic)
-   ↓                 ↓
-      Job = groups                cut | fill | raster | cnc
-   ↓                 ↓
-grblStrategy    cncGrblStrategy                                  (emit → G-code text)
-marlinStrategy
-smoothiewareStrategy
-            ↓
-   pre-emit invariant scan                                       (refuse before write/stream)
-            ↓
-   ┌────────┴────────┐
-   ↓                 ↓
-save to disk    stream to controller
+src/core/       pure logic: no I/O, no clock, no randomness
+src/io/         file parsers and writers
+src/platform/   browser and desktop adapters (files, WebSerial, WebUSB)
+src/ui/         React + Zustand interface
+electron/       desktop main process
 ```
 
-`Job`, `Plan`, `Output` and emitted G-code are pure derivations from the project and are never
-persisted — a reopened project always recompiles and cannot inherit a stale toolpath.
-
-```text
-src/core/       pure: no I/O, no platform, no clock, no randomness
-src/io/         parsers and serializers (svg, dxf, stl, lightburn, gcode, rd, project)
-src/platform/   PlatformAdapter — File System Access API, WebSerial, drag-drop
-src/ui/         React 18 + Zustand + Canvas2D, imports core and platform via DI
-electron/       main process, CSP and renderer trust policy
-```
-
-Boundaries are enforced by `eslint-plugin-boundaries` in CI, not by convention: nothing in
-`core/` may import from `io/`, `platform/` or `ui/`. State is modelled as discriminated unions
-with exhaustive `assertNever` matching. Files are capped at 400 counted lines by ESLint with a 600
-raw-line CI backstop.
-
-Fourteen runtime dependencies, total: `@tabler/icons`, `clipper2-ts`, `delaunator`, `dompurify`,
-`electron-updater`, `imagetracerjs`, `linkedom`, `lucide-static`, `opentype.js`, `react`,
-`react-dom`, `saxes`, `three`, `zustand`.
+Module boundaries and a 400-line file limit are enforced by ESLint in CI.
+[`docs/architecture/`](docs/architecture/) is the guided tour of the code.
 
 ---
 
@@ -468,68 +234,24 @@ Fourteen runtime dependencies, total: `@tabler/icons`, `clipper2-ts`, `delaunato
 
 | Document | What it covers |
 |---|---|
-| [`PROJECT.md`](PROJECT.md) | Scope, phase plan, the non-negotiables |
-| [`WORKFLOW.md`](WORKFLOW.md) | User flows, with success / error / empty / edge states |
-| [`DECISIONS.md`](DECISIONS.md) | Every architectural decision and its rationale (ADRs) |
-| [`CLAUDE.md`](CLAUDE.md) | The engineering operating manual — size limits, naming, checklists |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Process gates and what needs an ADR |
-| [`SECURITY.md`](SECURITY.md) | Reporting vulnerabilities; security boundaries |
-| [`RESEARCH_LOG.md`](RESEARCH_LOG.md) | Every external claim and library adoption, with sources |
-| [`LIGHTBURN-STUDY.md`](LIGHTBURN-STUDY.md) · [`EASEL-STUDY.md`](EASEL-STUDY.md) | Reference-behaviour ledgers and known divergences |
+| [`AGENTS.md`](AGENTS.md) | Repository rules for contributors and coding agents |
+| [`PROJECT.md`](PROJECT.md) | Scope, delivery targets and non-negotiables |
+| [`WORKFLOW.md`](WORKFLOW.md) | User flows, including error and edge cases |
+| [`DECISIONS.md`](DECISIONS.md) and [`docs/decisions/`](docs/decisions/) | Architecture decisions (ADRs) |
+| [`CHANGELOG.md`](CHANGELOG.md) | What changed in each desktop release |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | How changes are proposed and reviewed |
+| [`website/`](website/README.md) | The product website at kerfdesk.com |
 
-[`docs/architecture/`](docs/architecture/) is the code-grounded tour, in reading order: the stack
-and why, the pipeline spine, coordinates and origin, the laser chain, the CNC chain, controllers
-and transport, the Frame permit model, invariants and verification, and an honest
-[weakness register](docs/architecture/09-weakness-register.md).
-
-Documentation density lags the code in places — several shipped features are ahead of their
-entries in `PROJECT.md`. Where a document and the code disagree, **the code is authoritative**.
+Where a document and the code disagree, the code is the authority.
 
 ---
 
-## Security posture
+## Licence
 
-Imported SVG, DXF, image, font, project and material-library files are all treated as untrusted
-input: sanitised, depth-capped and size-checked before parsing — hard caps on project, library,
-STL and G-code reads, and a confirmation prompt on unusually large SVG, DXF and image files. The
-web build ships a strict CSP
-with no inline scripts and no third-party CDNs. There is **no telemetry** — no analytics, error
-reporting, cloud sync or account data; nothing about your projects, machine or jobs leaves your
-computer. The only permitted network call is a desktop-only, anonymous, metadata-only release
-check on launch in packaged preview builds.
+© 2026 Johann Stolk. All rights reserved; see [`LICENSE`](LICENSE). KerfDesk is free to use under
+its [License & Safety Notice](public/eula.txt), except features marked Pro, which need a trial or
+a paid licence. Versions up to and including the `mit-final` tag keep the licence they were
+released under, as [`LICENSE`](LICENSE) explains.
 
-Report vulnerabilities privately via [`SECURITY.md`](SECURITY.md) — please don't test suspected
-machine-control issues on an energized laser or spindle.
-
----
-
-## Contributing
-
-Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first, then [`CLAUDE.md`](CLAUDE.md). Two rules catch
-most newcomers:
-
-1. **Never add a *new* guard.** Anything that blocks, refuses, caps, hides or adds a confirmation
-   before an otherwise-available operator action will be rejected on sight — and so will re-adding
-   a deleted one, widening an existing refusal, or promoting a warning into a block. Findings
-   belong in the Job Review warnings list, which informs and never refuses. A small set of
-   existing factual refusals is permitted; [`CLAUDE.md`](CLAUDE.md) rule 7 defines them exactly,
-   and widening any of them needs the maintainer's explicit prior permission.
-2. **Verify, don't guess.** Every factual claim in a PR — an API signature, a version range, a
-   `$` setting, a G-code behaviour, a LightBurn behaviour — must be backed by something you
-   actually read or ran, and cited so a reviewer can check it.
-
-PR titles follow Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`,
-`ci:`).
-
----
-
-## License
-
-© 2026 Johann Stolk. All rights reserved; see [`LICENSE`](LICENSE). The app is free to use under
-its [License & Safety Notice](public/eula.txt), except features marked Pro, which need a trial or a
-paid licence. Versions up to and including the `mit-final` tag keep the licence they were released
-under, as [`LICENSE`](LICENSE) explains (ADR-543).
-
-Bundled dependencies, fonts and assets remain under their own licenses — see
-[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the readable summary and
-`public/third-party-notices.txt` for the generated, complete notice file.
+Bundled dependencies, fonts and assets keep their own licences; see
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

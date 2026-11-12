@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { moshiStatusText } from '../../core/controllers/moshi/moshi-live-commands';
-import { useStore } from '../state';
+import { currentLinkJobRequest } from '../state/link-job-request';
 import { MOSHI_NOT_QUALIFIED, MOSHI_POWER_NOTE } from '../state/moshi-usb/moshi-usb-messages';
 import { prepareMoshiUsbJob } from '../state/moshi-usb/moshi-usb-job';
 import { useMoshiUsbStore, type MoshiUsbState } from '../state/moshi-usb/moshi-usb-store';
@@ -80,8 +80,9 @@ function MoshiJobControls({ moshi }: { readonly moshi: MoshiUsbState }): JSX.Ele
   const idle = moshi.phase === 'idle';
   const active = moshi.phase === 'framing' || moshi.phase === 'running' || moshi.phase === 'homing';
   const withJob = async (action: 'frame' | 'start'): Promise<void> => {
-    const { project, jobPlacement } = useStore.getState();
-    const prepared = await prepareMoshiUsbJob(project, jobPlacement);
+    // Placement, the output scope and the variable advance, as Save and G-code
+    // Start take them (C2 D2-P1-1, D2-P2-3).
+    const prepared = await prepareMoshiUsbJob(currentLinkJobRequest());
     if (!prepared.ok) {
       setCompileError(prepared.messages.join(' '));
       return;

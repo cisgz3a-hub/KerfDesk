@@ -1,3 +1,4 @@
+import { DEFAULT_OVERSCAN_MM } from '../../core/job/compile-job-defaults';
 import {
   DEFAULT_PERFORATION_CUT_MM,
   DEFAULT_PERFORATION_SKIP_MM,
@@ -36,10 +37,12 @@ export function changedCutSettingsPatch(
   );
 }
 
-/** Showing an absent Line option at its default is not an operation edit.
- * Keep stored values and deliberate edits, even an explicit default, while
- * leaving artwork-selection patches to their existing changed-control path. */
-export function withoutUntouchedLineDefaults(
+/** Showing an absent option at its default is not an operation edit. Keep
+ * stored values and deliberate edits, even an explicit default, while leaving
+ * artwork-selection patches to their existing changed-control path. Without
+ * this a no-op Apply stores the shown defaults, the operation no longer matches
+ * its linked recipe, and an ADR-496 §6 Process switch stops reseeding it. */
+export function withoutUntouchedOptionDefaults(
   form: HTMLFormElement,
   patch: LayerPatch,
   layer: Layer,
@@ -47,23 +50,39 @@ export function withoutUntouchedLineDefaults(
 ): LayerPatch {
   return Object.fromEntries(
     Object.entries(patch).filter(([name, value]) => {
-      const key = name as keyof typeof LINE_OPTION_DEFAULTS;
+      const key = name as keyof typeof OPTION_DEFAULTS;
       const control = changed.get(name);
       return !(
-        Object.hasOwn(LINE_OPTION_DEFAULTS, key) &&
+        Object.hasOwn(OPTION_DEFAULTS, key) &&
         layer[key] === undefined &&
-        value === LINE_OPTION_DEFAULTS[key] &&
+        value === OPTION_DEFAULTS[key] &&
         (control === undefined || !form.contains(control))
       );
     }),
   );
 }
 
-const LINE_OPTION_DEFAULTS = {
+/** What each optional field compiles as when the operation does not store it.
+ * Every value is the compiler's own fallback for an absent key. */
+const OPTION_DEFAULTS = {
+  // Line (ADR-415, ADR-494): operation-cut-extras.ts.
   overcutMm: 0,
   perforationEnabled: false,
   perforationCutMm: DEFAULT_PERFORATION_CUT_MM,
   perforationSkipMm: DEFAULT_PERFORATION_SKIP_MM,
   tabLayout: 'count',
   tabCutPowerPercent: 0,
+  // Fill and Image. ADR-495 Automatic overscan runs only when `=== true`
+  // (automatic-overscan.ts); ADR-492 steps by `passAngleStepDeg ?? 0`
+  // (scan-pass-angles.ts); an uncalibrated bidirectional scan is allowed only
+  // when set (scan-direction-policy.ts).
+  autoOverscan: false,
+  passAngleStepDeg: 0,
+  allowUncalibratedBidirectionalScan: false,
+  // Image only. ADR-415 overscan falls back to DEFAULT_OVERSCAN_MM
+  // (imageOverscanMmFor); ADR-492 scans at `imageScanAngleDeg ?? 0` and
+  // cross-hatches only when `imageCrossHatch === true` (scan-pass-angles.ts).
+  imageOverscanMm: DEFAULT_OVERSCAN_MM,
+  imageScanAngleDeg: 0,
+  imageCrossHatch: false,
 } as const satisfies LayerPatch;

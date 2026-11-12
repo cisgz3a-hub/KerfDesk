@@ -134,7 +134,7 @@ describe('cutting start preference bounds', () => {
   it('applies calibrated reverse fill precision before deciding its bounds', () => {
     const group = { ...fill(10), fillRunwayPolicy: 'feed-matched-every-sweep' as const };
     expect(computeJobStartBounds({ groups: [group] }, device)).toBeNull();
-    const calibrated = { ...device, scanningOffsets: [{ speedMmPerMin: 1000, offsetMm: 0.00065 }] };
+    const calibrated = { ...device, scanningOffsets: [{ speedMmPerMin: 1000, offsetMm: 0.0013 }] };
     const bounds = computeJobStartBounds({ groups: [group] }, calibrated);
     expect(bounds?.minX).toBeCloseTo(9.99945, 8);
     expect(bounds?.maxX).toBeCloseTo(9.99955, 8);

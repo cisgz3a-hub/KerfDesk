@@ -34,6 +34,7 @@ import { parseOpenedProjectFile, type OpenProjectFile } from './project-open-par
 import { importSvgFiles } from './svg-import-action';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 import { saveGcodePlacement, type PrebuiltGcodeSave } from './transactional-gcode-save';
+import { GCODE_SAVE_REFUSED, pushExportRefusal } from './export-refusal';
 import { pushSavedGcodeNotices } from './save-gcode-notices';
 import { errorMessage, suggestedGcodeName } from './file-action-formatters';
 import {
@@ -45,6 +46,7 @@ import {
 import { claimProjectOpenRequest } from './project-open-request-owner';
 import { rememberOpenedProject } from '../recent-projects/recent-project-record';
 import { chosenOrPickedProjectFiles } from './chosen-project-file';
+import { pickFilesToOpen } from './pick-files-to-open';
 import {
   bindImportActionsToDocument,
   captureImportDocumentOwner,
@@ -288,12 +290,15 @@ async function saveOrdinaryGcode(
   ]) {
     ctx.pushToast(advisory, 'warning');
   }
-  // Production calls this from the Save as button with a prebuilt
-  // artifact, so the picker is invoked synchronously inside that fresh user
-  // gesture. Direct/test callers without an artifact prepare first: factual
-  // failure must never create, open, truncate, or modify a final target.
+  // Production calls this with a prebuilt artifact while a click or key press
+  // is still active (gcode-save-flow.ts), so the picker opens at once.
+  // Direct/test callers without an artifact prepare first: factual failure
+  // must never create, open, truncate, or modify a final target.
   const prepared = prebuilt?.prepared ?? (await prepareGcodeSave(ctx, placement));
-  if (prepared.kind === 'failed') return;
+  if (prepared.kind === 'failed') {
+    pushExportRefusal(ctx.pushToast, GCODE_SAVE_REFUSED, prepared.reasons);
+    return;
+  }
   let target: SaveTarget | null;
   try {
     // Preparation is complete, so use the normal Save As dialog. A directory
@@ -361,11 +366,17 @@ export async function handleOpenProject(
   };
   let files: ReadonlyArray<OpenProjectFile>;
   try {
+    // The Save changes? question may have outlasted the click (ADR-656 Amendment 5).
     files = await chosenOrPickedProjectFiles(chosenFile, () =>
-      ctx.platform.pickFilesForOpen({
-        accept: ['.lf2', '.lbrn', '.lbrn2'],
-        multiple: false,
-      }),
+      pickFilesToOpen(
+        ctx.platform,
+        { accept: ['.lf2', '.lbrn', '.lbrn2'], multiple: false },
+        {
+          title: 'Open project',
+          choice: 'the project to open',
+          stillWanted: () => owner.isCurrent() && ctx.stillAllowed?.() !== false,
+        },
+      ),
     );
   } catch (err) {
     ownedCtx.pushToast(`Could not open project: ${errorMessage(err)}`, 'error');

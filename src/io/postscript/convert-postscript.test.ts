@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parseSvg } from '../svg/parse-svg';
 import { convertPostscript } from './convert-postscript';
+import { PS_LIMITS } from './ps-vm';
 
 const bytes = (text: string): Uint8Array => new TextEncoder().encode(text);
 const golden = (name: string): Uint8Array =>
@@ -46,6 +47,50 @@ describe('EPS written by KerfDesk itself (round trip)', () => {
 
   it('reads the traced-page golden', () => {
     expect(ok(golden('traced-image-page.eps')).pathCount).toBeGreaterThan(0);
+  });
+});
+
+describe('artwork with no height or width (audit C2 D1-P2-4)', () => {
+  const PS = (body: string, box = ''): string =>
+    `%!PS-Adobe-3.0\n${box === '' ? '' : `%%BoundingBox: ${box}\n`}${body}\nshowpage\n`;
+
+  function imported(text: string) {
+    const result = ok(text);
+    const parsed = parseSvg({ svgText: result.svg, id: 'ps', source: 'rule.ps' });
+    if (parsed.object === null || parsed.object.kind !== 'imported-svg')
+      throw new Error('nothing imported from ' + result.svg);
+    return { svg: result.svg, object: parsed.object };
+  }
+
+  it('imports a horizontal rule, its viewBox as tall as the minimum 1 pt', () => {
+    const { svg, object } = imported(PS('1 setlinewidth 10 50 moveto 90 50 lineto stroke'));
+    expect(svg).toContain('viewBox="0 0 80 1"');
+    expect(object.bounds.maxX - object.bounds.minX).toBeCloseTo(80 * (25.4 / 72), 3);
+  });
+
+  it('imports a vertical rlineto rule', () => {
+    const { svg } = imported(PS('20 10 moveto 0 60 rlineto stroke'));
+    expect(svg).toContain('viewBox="0 0 1 60"');
+  });
+
+  it('imports two collinear horizontal rules as two paths', () => {
+    const { object } = imported(PS('0 0 moveto 30 0 lineto stroke 50 0 moveto 80 0 lineto stroke'));
+    expect(object.paths.length).toBe(2);
+  });
+
+  it('makes a thick rule’s canvas as tall as its stroke', () => {
+    const { svg } = imported(PS('10 setlinewidth 0 20 moveto 72 20 lineto stroke'));
+    expect(svg).toContain('viewBox="0 0 72 10"');
+    expect(svg).toContain('height="3.527778mm"');
+  });
+
+  it('imports a rule whose declared BoundingBox is itself zero-height', () => {
+    const { svg } = imported(PS('0 30 moveto 72 30 lineto stroke', '0 30 72 30'));
+    expect(svg).toContain('viewBox="0 0 72 1"');
+  });
+
+  it('leaves artwork with both dimensions unchanged', () => {
+    expect(ok(PS('0 0 moveto 72 36 lineto stroke')).svg).toContain('viewBox="0 0 72 36"');
   });
 });
 
@@ -121,6 +166,39 @@ describe('PostScript language subset', () => {
   it('stops a file that loops forever instead of hanging', () => {
     const looping = convertPostscript(bytes(EPS('{ 1 pop } loop')));
     expect(looping).toEqual({ kind: 'error', reason: expect.stringMatching(/loop forever/) });
+  });
+
+  describe('bounds every run in work and time (ADR-700 Amd 2)', () => {
+    const tooLong = { kind: 'error', reason: expect.stringMatching(/takes too long/) };
+    const timed = (program: string) => {
+      const started = performance.now();
+      const result = convertPostscript(bytes(program));
+      return { result, ms: performance.now() - started };
+    };
+
+    it.each([
+      ['a procedure with nothing in it', EPS('{} loop')],
+      ['the same inside stopped', EPS('{ {} loop } stopped pop')],
+      ['a counted run of it', EPS('1e15 {} repeat')],
+      ['large allocations', EPS('{ 100000 array pop } loop')],
+      ['large copies', EPS('/s 100000 string def { s 0 100000 getinterval pop } loop')],
+      [
+        'an Illustrator script',
+        '%!PS-Adobe-3.0 EPSF-3.0\n%%Creator: Adobe Illustrator(R) 8.0\n%%EndProlog\n{} loop\n',
+      ],
+    ])('ends %s with the budget error', (_label, program) => {
+      const { result, ms } = timed(program);
+      expect(result).toEqual(tooLong);
+      expect(ms).toBeLessThan(PS_LIMITS.milliseconds);
+    });
+
+    it('ends a run that outlasts the time limit even within the step budget', () => {
+      const program = bytes(EPS('2000000 { 1 pop } repeat 0 0 moveto 1 1 lineto stroke'));
+      expect(convertPostscript(program).kind).toBe('ok');
+      let now = 0;
+      const clock = (): number => (now += 1_000);
+      expect(convertPostscript(program, { clock })).toEqual(tooLong);
+    });
   });
 
   it('rejects files that are not PostScript', () => {

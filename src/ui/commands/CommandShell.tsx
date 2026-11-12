@@ -1,12 +1,11 @@
 import { useCallback, useState, type ComponentType } from 'react';
-import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { primaryOperationForObject } from '../../core/scene';
 import { ConnectionHelpHost, showConnectionHelp } from '../help/ConnectionHelpDialog';
-import { SAFETY_NOTICE_TEXT } from '../help/safety-notice';
+import { HelpNoticeHost } from '../help/HelpNoticeDialogs';
+import { openHelpNotice } from '../help/help-notices';
 import { LicenseNoticeHost } from '../help/LicenseNoticeDialog';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
-import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { BarcodeDialogHost } from '../barcode/BarcodeDialogHost';
 import { ExportSvgDialogHost } from './ExportSvgDialog';
 import { useBarcodeDialogStore } from '../barcode/barcode-dialog-store';
@@ -117,9 +116,9 @@ export function CommandShell(): JSX.Element {
     requestProjectNotes: () => setProjectNotesOpen(true),
     requestUndoHistory: () => setUndoHistoryOpen(true),
     requestCloseOpenFillContoursWithTolerance: () => setCloseToleranceDialogOpen(true),
-    showAbout: () => jobAwareAlert(aboutText()),
+    showAbout: () => openHelpNotice('about'),
     showConnectionHelp,
-    showSafety: () => jobAwareAlert(SAFETY_NOTICE_TEXT),
+    showSafety: () => openHelpNotice('safety'),
   });
   return (
     <>
@@ -172,7 +171,7 @@ function BitmapDialog(): JSX.Element | null {
 function StoreOpenedDialogs(): JSX.Element {
   return (
     <>
-      <GcodeSaveDialogHost />
+      <GcodeSaveDialog />
       <ProjectSaveDialog />
       <SaveReadyDialog />
       <BarcodeDialogHost />
@@ -186,15 +185,10 @@ function StoreOpenedDialogs(): JSX.Element {
       <PhotoEngravingDialogHost />
       <ToneCalibrationDialogHost />
       <LicenseNoticeHost />
+      <HelpNoticeHost />
       <ConnectionHelpHost />
     </>
   );
-}
-
-function GcodeSaveDialogHost(): JSX.Element | null {
-  const open = useUiStore((state) => state.gcodeSaveDialogOpen);
-  const close = useUiStore((state) => state.closeGcodeSaveDialog);
-  return open ? <GcodeSaveDialog onClose={close} /> : null;
 }
 
 function SettingsDialogHost(props: {
@@ -386,22 +380,4 @@ function useSelectedConvertibles(): ReadonlyArray<ConvertibleVector> {
     project,
     selectedObjectIds(selectedObjectId, additionalSelectedIds),
   );
-}
-
-function aboutText(): string {
-  return [
-    `${APP_DISPLAY_NAME} ${__APP_VERSION__}`,
-    `Commit ${__GIT_SHA__}`,
-    `Built ${__BUILD_TIME__}`,
-    '',
-    'Copyright © 2026 Johann Stolk. All rights reserved.',
-    // verify-packaged-preview-metadata.mjs finds the About asset by this line's
-    // "Terms of use: License & Safety Notice" prefix.
-    'Terms of use: License & Safety Notice, in the Help menu.',
-    'Third-party components and their licences: see /third-party-notices.txt.',
-    '',
-    'SAFETY: this software drives laser and CNC machinery. Verify every',
-    'job (preview, simulation, or air run) before cutting, and never',
-    'leave a running machine unattended.',
-  ].join('\n');
 }

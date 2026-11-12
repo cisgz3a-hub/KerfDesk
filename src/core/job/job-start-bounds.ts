@@ -7,11 +7,12 @@ import { isEmittableCutSegment } from './cut-emission-resolution';
 import { firstToolpathProcessPoint } from './first-process-point';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
+import { fillSpanPoints } from './fill-sweeps';
 import type { FillGroup, Group, Job, RasterGroup } from './job';
 import { computeEmittedJobBounds, type JobBounds } from './job-bounds';
 import { hasJobStartPower } from './job-start-power';
 import { rasterRowsInProviderOrder } from './raster-rows';
-import { offsetForEmittedFeed } from './scan-offset';
+import { offsetForEmittedFeed, rasterRowShiftX } from './scan-offset';
 
 /** Bounds for relative cutting-start preferences only. Frame continues to use
  * its full motion envelope. Scan planners supply powered spans without white
@@ -88,7 +89,12 @@ function fillStartBounds(group: FillGroup, device: DeviceProfile): JobBounds | n
       expandFillHatchWithRunways([first.start, last.end], plan) === null
     )
       continue;
-    for (const span of plan.sweep.spans) bounds.add(span.start, span.end);
+    for (const span of plan.sweep.spans) {
+      const points = fillSpanPoints(span);
+      for (let i = 1; i < points.length; i += 1) {
+        bounds.add(points[i - 1] as Vec2, points[i] as Vec2);
+      }
+    }
   }
   return bounds.result();
 }
@@ -137,7 +143,7 @@ function addRasterSweep(
     activeStartX:
       group.bounds.minX + (reverse ? plan.span.lastX + 1 : plan.span.firstX) * pixelWidthMm,
     y,
-    shiftX: reverse ? -offset : 0,
+    shiftX: rasterRowShiftX(offset, reverse, group.bidirectional ?? true),
     scanAngleDeg: group.scanAngleDeg,
   }))
     bounds.add(span.from, span.to);

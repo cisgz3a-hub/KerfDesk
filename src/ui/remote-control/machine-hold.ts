@@ -11,7 +11,11 @@ import { selectNativeBedEvidence } from '../state/native-bed-frame';
 import { useStore } from '../state/store';
 import type { MachineExecutionOwner } from '../state/machine-execution-owner';
 import type { MachineExecutionContext } from './machine-execution';
-import { operationIsTerminal, type OwnedMachineOperation } from './machine-operation-state';
+import {
+  completeRemoteJog,
+  operationIsTerminal,
+  type OwnedMachineOperation,
+} from './machine-operation-state';
 import type { MachineCommand } from './machine-types';
 import { MachineRefusal } from './machine-actions';
 import { cancelOwnedMotionOnce } from './machine-owned-operation';
@@ -104,9 +108,10 @@ export async function executeHold(
   operation.committed = true;
   if (operation.holdReleased === true) releaseHeldMotion(operation);
   await settleHold(operation);
-  operation.state = 'completed';
-  operation.message =
-    operation.holdReleased === true ? 'Stopped.' : 'Reached the hold travel limit.';
+  completeRemoteJog(
+    operation,
+    operation.holdReleased === true ? 'Stopped.' : 'Reached the hold travel limit.',
+  );
 }
 
 /** A released hold is cancelled on purpose; it is complete once the controller is Idle again. */

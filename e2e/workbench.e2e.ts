@@ -13,6 +13,7 @@ import {
 } from './fixtures/workspace-ui';
 import { expectControllerSettingsRead } from './fixtures/controller-settings-read';
 import { confirmJobReview } from './fixtures/recovery-flow';
+import { finishGcodeSave } from './fixtures/gcode-save';
 import { acknowledgedStartControlLinesSince } from './fixtures/recovery-start-boundary';
 
 const SVG =
@@ -130,12 +131,9 @@ baseTest(
     await page.getByRole('tab', { name: 'Artwork' }).click();
 
     await (await toolbarCommand(page, 'Save G-code...')).click();
-    await choosePreparedGcodeDestination(page);
-    await expect
-      .poll(() =>
-        page.evaluate(() => Boolean((window as Window & { __e2eSaved?: string }).__e2eSaved)),
-      )
-      .toBe(true);
+    await finishGcodeSave(page, () =>
+      page.evaluate(() => Boolean((window as Window & { __e2eSaved?: string }).__e2eSaved)),
+    );
 
     await page.getByRole('button', { name: 'CNC', exact: true }).click();
     await expect(page.getByRole('button', { name: 'CNC', exact: true })).toHaveAttribute(
@@ -493,12 +491,12 @@ async function runPageBackedImport(
       });
     });
     await (await toolbarCommand(page, 'Save G-code...')).click();
-    await choosePreparedGcodeDestination(page);
-    await expect
-      .poll(() =>
-        page.evaluate(() => (window as Window & { __e2eSaved?: string }).__e2eSaved ?? ''),
-      )
-      .toMatch(/S[1-9]\d*/);
+    await finishGcodeSave(page, () =>
+      page.evaluate(() => Boolean((window as Window & { __e2eSaved?: string }).__e2eSaved)),
+    );
+    expect(
+      await page.evaluate(() => (window as Window & { __e2eSaved?: string }).__e2eSaved ?? ''),
+    ).toMatch(/S[1-9]\d*/);
     expect(workerUrls.some((url) => url.includes('output-preparation-worker'))).toBe(true);
   }
 }
@@ -675,9 +673,7 @@ baseTest('an interrupted-job checkpoint surfaces isolated optional recovery', as
   await expect(savedRecovery).toBeVisible();
   await expect(page.getByText(/^Last (Start|Frame) attempt blocked$/)).toHaveCount(0);
   await savedRecovery.click();
-  await expect(
-    page.getByText('It is isolated from the current canvas', { exact: false }),
-  ).toBeVisible();
+  await expect(page.getByText('It is kept apart from your work', { exact: false })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Review recovery' })).toBeVisible();
 });
 
@@ -685,12 +681,6 @@ baseTest('an interrupted-job checkpoint surfaces isolated optional recovery', as
 // single Job Review opens at Start and streams that exact artifact on confirm.
 async function confirmStartReview(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
   await confirmJobReview(page, kerfdesk);
-}
-
-async function choosePreparedGcodeDestination(page: Page): Promise<void> {
-  const dialog = page.getByRole('dialog', { name: 'Save G-code' });
-  await expect(dialog).toContainText('The complete export is ready.');
-  await dialog.getByRole('button', { name: 'Save as…' }).click();
 }
 
 async function installFileSystemMocks(

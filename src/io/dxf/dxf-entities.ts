@@ -11,6 +11,7 @@ import {
   type Vec2,
 } from '../../core/scene';
 import { CLOSURE_EPS_MM } from '../../core/scene/polyline-closure';
+import { parseDecimalReal } from '../../core/util';
 import type { DxfTag } from './dxf-tags';
 import {
   classifyExtrusion,
@@ -23,10 +24,12 @@ import {
 import {
   bulgeSegment,
   isFullEllipseSweep,
+  normalizedSweep,
   sampleArc,
   sampleCircle,
   sampleEllipse,
 } from './dxf-curve-sampling';
+import { fitPointSpline } from './dxf-fit-spline';
 import { sampleSpline } from './dxf-spline';
 import { bulgeCurveSegment, circleCurve, ellipseArcCurve } from './dxf-native-curves';
 
@@ -84,16 +87,33 @@ function arcInOcs(tags: ReadonlyArray<DxfTag>, scale: number): EntityConversion 
   const radius = firstNumber(tags, 40) * scale;
   if (!(radius > 0)) return SKIP;
   const center: Vec2 = { x: firstNumber(tags, 10) * scale, y: firstNumber(tags, 20) * scale };
-  const startRad = firstNumber(tags, 50) * DEGREES_TO_RADIANS;
-  const endRad = firstNumber(tags, 51) * DEGREES_TO_RADIANS;
-  // DXF arcs always run counter-clockwise from start to end.
-  let sweep = endRad - startRad;
-  while (sweep <= 0) sweep += FULL_TURN;
+  const startDeg = firstNumber(tags, 50);
+  const startRad = startDeg * DEGREES_TO_RADIANS;
+  const sweep = arcSweep(startDeg, firstNumber(tags, 51));
   return {
     kind: 'ok',
     polyline: { points: sampleArc(center, radius, startRad, sweep), closed: false },
     curve: ellipseArcCurve(center, { x: radius, y: 0 }, 1, startRad, sweep, false),
   };
+}
+
+/**
+ * An ARC's counter-clockwise sweep, in radians, in (0, 2π]: DXF arcs run from
+ * the start angle to the end angle, so angles a whole number of turns apart
+ * mean the same arc. A sweep within one turn keeps its former value exactly;
+ * a larger one is reduced in degrees, where whole turns are exact, and equal
+ * angles mean a full circle.
+ */
+export function arcSweep(startDeg: number, endDeg: number): number {
+  const sweepDeg = endDeg - startDeg;
+  if (!Number.isFinite(sweepDeg)) return FULL_TURN;
+  if (sweepDeg > -360 && sweepDeg <= 360) {
+    let sweep = endDeg * DEGREES_TO_RADIANS - startDeg * DEGREES_TO_RADIANS;
+    while (sweep <= 0) sweep += FULL_TURN; // at most twice: |sweep| < one turn
+    return sweep;
+  }
+  const wrapped = sweepDeg % 360;
+  return (wrapped <= 0 ? wrapped + 360 : wrapped) * DEGREES_TO_RADIANS;
 }
 
 type BulgeVertex = { x: number; y: number; bulge: number };
@@ -174,24 +194,27 @@ function ellipseInOcs(
 export function splineToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): EntityConversion {
   const flags = Math.trunc(firstNumber(tags, 70));
   const flaggedClosed = (flags & (CLOSED_FLAG_BIT | PERIODIC_SPLINE_FLAG_BIT)) !== 0;
-  const controlPoints: Vec2[] = [];
-  for (const tag of tags) {
-    if (tag.code === 10) controlPoints.push({ x: parseNumber(tag.value) * scale, y: 0 });
-    else if (tag.code === 20 && controlPoints.length > 0) {
-      const last = controlPoints.length - 1;
-      controlPoints[last] = {
-        x: (controlPoints[last] as Vec2).x,
-        y: parseNumber(tag.value) * scale,
-      };
-    }
-  }
-  const result = sampleSpline({
-    degree: Math.trunc(firstNumber(tags, 71, 3)),
-    knots: allNumbers(tags, 40),
-    controlPoints,
-    weights: allNumbers(tags, 41),
-    closed: flaggedClosed,
-  });
+  const controlPoints = pointPairs(tags, 10, 20, scale);
+  const fitPoints = pointPairs(tags, 11, 21, scale);
+  // Fit points only (codes 11/21, no 10/20): the CAD program builds the curve
+  // through them, so this import does too (audit O2-P2-1).
+  const spline =
+    controlPoints.length === 0 && fitPoints.length >= MIN_POLYLINE_POINTS
+      ? fitPointSpline({
+          fitPoints,
+          closed: flaggedClosed,
+          startTangent: optionalVector(tags, 12, 22),
+          endTangent: optionalVector(tags, 13, 23),
+        })
+      : {
+          degree: Math.trunc(firstNumber(tags, 71, 3)),
+          knots: allNumbers(tags, 40),
+          controlPoints,
+          weights: allNumbers(tags, 41),
+          closed: flaggedClosed,
+        };
+  if (spline === null) return SKIP;
+  const result = sampleSpline(spline);
   if (result.kind === 'error') return { kind: 'skip', reason: `SPLINE skipped: ${result.reason}` };
   const { points, closed } = withoutRepeatedSeam(result.points, flaggedClosed);
   if (points.length < MIN_POLYLINE_POINTS) return SKIP;
@@ -277,10 +300,27 @@ export function entityExtrusion(tags: ReadonlyArray<DxfTag>): DxfExtrusion {
   );
 }
 
-function normalizedSweep(startParam: number, endParam: number): number {
-  let sweep = endParam - startParam;
-  while (sweep <= 0) sweep += FULL_TURN;
-  return Math.min(sweep, FULL_TURN);
+// Each X code starts a point; the Y code that follows it completes it.
+function pointPairs(
+  tags: ReadonlyArray<DxfTag>,
+  xCode: number,
+  yCode: number,
+  scale: number,
+): Vec2[] {
+  const points: Vec2[] = [];
+  for (const tag of tags) {
+    if (tag.code === xCode) points.push({ x: parseNumber(tag.value) * scale, y: 0 });
+    else if (tag.code === yCode && points.length > 0) {
+      const last = points.length - 1;
+      points[last] = { x: (points[last] as Vec2).x, y: parseNumber(tag.value) * scale };
+    }
+  }
+  return points;
+}
+
+function optionalVector(tags: ReadonlyArray<DxfTag>, xCode: number, yCode: number): Vec2 | null {
+  if (!tags.some((tag) => tag.code === xCode)) return null;
+  return { x: firstNumber(tags, xCode), y: firstNumber(tags, yCode) };
 }
 
 export function firstNumber(tags: ReadonlyArray<DxfTag>, code: number, fallback = 0): number {
@@ -300,8 +340,9 @@ export function allNumbers(tags: ReadonlyArray<DxfTag>, code: number): ReadonlyA
     .filter((value) => Number.isFinite(value));
 }
 
+// The whole value or nothing: a decimal-comma "12,5" is not read as 12 (O8-P2-2).
 function parseNumber(value: string, fallback = 0): number {
-  const parsed = Number.parseFloat(value);
+  const parsed = parseDecimalReal(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
@@ -328,7 +369,7 @@ export const DXF_COORDINATE_MAGNITUDE_MM = 1_000_000;
 export function hasUnreadableGeometry(tags: ReadonlyArray<DxfTag>, scale: number): boolean {
   for (const tag of tags) {
     if (!DXF_GEOMETRY_CODES.has(tag.code)) continue;
-    const value = Number.parseFloat(tag.value);
+    const value = parseDecimalReal(tag.value);
     if (!Number.isFinite(value)) return true;
     if (
       DXF_SCALED_LENGTH_CODES.has(tag.code) &&

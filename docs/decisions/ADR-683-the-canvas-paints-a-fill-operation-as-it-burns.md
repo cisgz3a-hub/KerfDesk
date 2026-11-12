@@ -88,5 +88,6 @@ click selection and the advisories change.
   text or multi-path member is resolved once per display zoom bucket.
 - Copies that are close but not exact (nudged, or the same shape redrawn with other nodes) are
   not advised; the canvas now shows what they burn.
-- Not changed: the phone's vector projection (it sends per-path fill flags to the phone's own
-  renderer) and Design Studio's underlay of project artwork still fill object by object.
+- The phone's vector projection and Design Studio's underlay of project artwork, which filled
+  object by object here, pool as well since Amendment 4: the phone receives each member's share
+  of its pool, so its renderer and the projection's contract are unchanged.

@@ -14,6 +14,7 @@ import type { SaveGcodeCtx } from './file-actions';
 
 const mocks = vi.hoisted(() => ({
   alert: vi.fn(),
+  pushToast: vi.fn(),
   direct: vi.fn(),
   prepareBackground: vi.fn(),
   shouldRunOffThread: vi.fn(),
@@ -38,6 +39,7 @@ import { handleSaveRd } from './save-rd-action';
 
 beforeEach(() => {
   mocks.alert.mockReset();
+  mocks.pushToast.mockReset();
   mocks.direct.mockReset();
   mocks.prepareBackground.mockReset();
   mocks.shouldRunOffThread.mockReset().mockReturnValue(true);
@@ -61,10 +63,16 @@ describe('costly Ruida Save routing', () => {
       expect(order).toEqual(['worker']);
       expect(mocks.direct).not.toHaveBeenCalled();
       expect(writes).toEqual([]);
-      expect(mocks.alert).toHaveBeenCalledWith(
-        expect.stringContaining(
-          failure === 'unavailable' ? 'Background compilation is unavailable' : 'worker crashed',
+      // One error toast, never a native alert (ADR-656 Amendment 4).
+      expect(mocks.alert).not.toHaveBeenCalled();
+      expect(mocks.pushToast).toHaveBeenCalledExactlyOnceWith(
+        expect.stringMatching(
+          failure === 'unavailable'
+            ? /^Cannot save \.rd file: .*Background compilation is unavailable/
+            : /^Cannot save \.rd file: .*worker crashed/,
         ),
+        'error',
+        expect.objectContaining({ key: 'export-refused' }),
       );
     },
   );
@@ -95,7 +103,7 @@ describe('costly Ruida Save routing', () => {
           platform: webAdapter,
           project: createProject(),
           savedName: null,
-          pushToast: () => undefined,
+          pushToast: mocks.pushToast,
         },
         { ok: true },
       );
@@ -104,7 +112,12 @@ describe('costly Ruida Save routing', () => {
     }
     expect(picker.picks()).toBe(0);
     expect(disk.get('job.rd')).toBe('previous rd');
-    expect(mocks.alert).toHaveBeenCalledWith(expect.stringContaining('worker crashed'));
+    expect(mocks.alert).not.toHaveBeenCalled();
+    expect(mocks.pushToast).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining('worker crashed'),
+      'error',
+      expect.objectContaining({ key: 'export-refused' }),
+    );
   });
 
   it('asks for a fresh Choose file click when compiling outlasts the click', async () => {
@@ -166,6 +179,6 @@ function context(order: string[], writes: Array<string | Blob>): SaveGcodeCtx {
     platform,
     project: createProject(),
     savedName: null,
-    pushToast: () => undefined,
+    pushToast: mocks.pushToast,
   };
 }

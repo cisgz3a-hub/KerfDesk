@@ -71,7 +71,7 @@ describe('Wake Alarm completion cannot clear a replacement owner', () => {
         queueMicrotask(f.replace);
       }
       const result = await wake;
-      expect(String(result)).toContain('superseded');
+      expect(String(result)).toContain('took over');
       const replacement = f.replacement();
       expect(replacement).not.toBeNull();
       expect(f.get().controllerOperation).toBe(replacement!.controllerOperation);

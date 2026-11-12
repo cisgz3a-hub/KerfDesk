@@ -52,6 +52,7 @@ No control anywhere in `src/ui` remembers a dismissal ("don't ask again", "don't
 - Result on desktop: the user clicks Save, nothing appears, no preset is saved, and no message says why.
 - In a browser it works, but an empty name gives a second popup and the user starts again.
 - **Runtime check owed** (read only). **Frequency:** every attempt on desktop.
+- **Runtime check done 2026-11-11 (fix group F1):** on Electron 44.9.1 `prompt()` throws `Error: prompt() is not supported.`; it does not return null. The handler dies and the global error toast appears. Fixed by ADR-707; see [F1-fix-native-popups.md](F1-fix-native-popups.md).
 - **Lighter form:** an inline name field beside the preset list, as CNC presets already have (`src/ui/layers/CncSaveCuttingPresetRows.tsx:46-49`).
 
 ### A1-P2-2 — A modal opens by itself after every finished laser job
@@ -103,6 +104,8 @@ Ordinary Start folds every acknowledgement into one click (`job-review/job-revie
 | A1-P3-8 | Frame's Home / Unlock / Set origin / Zero Z offers are native OK/Cancel boxes that must explain their own buttons ("OK: unlock now. Cancel: leave it blocked."). A CNC Frame can show two in a row | `start-blocked-alarm-offers.ts:20-58`, `start-blocked-setup-offers.ts:44-55`, `frame-cnc-preparation.ts:29-32` | The existing blocker banner with named buttons. The offers themselves are good (ADR-367) |
 | A1-P3-9 | Export refusals are native alerts ("Cannot save G-code:", "Cannot export tiles:", "Cannot save .rd file:") | `app/prepare-gcode-save.ts:39,71`, `save-tiled-gcode.ts:74-92`, `save-rd-action.ts:137` | Error toast with the `details` fold |
 | A1-P3-10 | Desktop "No serial ports found" box loops on Retry, does not close when a port arrives, and points to Help, which cannot be opened while the box is up | `electron/serial-port-wait.ts:19-20,60-73` | Close on port arrival; add a Troubleshooting button |
+
+**Fix status (F6, ADR-656 Amendment 4):** A1-P3-9 is fixed. Reproduced: an empty canvas raised the alert and left the Save G-code dialog open behind it with only Cancel. All three refusals are now one error toast with further reasons folded, or are listed inside the Save G-code dialog with one Close when it is already open. Record: [F6-fix-save-dialogs.md](F6-fix-save-dialogs.md).
 
 ### A1 checked and sound
 
@@ -205,6 +208,8 @@ Scope: everything outside Start and Frame. Timings below are derived from consta
 | A3-P3-5 | Internal wording reaches toasts: "Manual motion could not obtain a fresh same-session controller status…", "Home finished without fresh session-bound Idle settlement evidence.", "Controller recovery was superseded by another session or operation.", "Wait for GRBL to report Idle" on Marlin, "isolated recovery capsule" | `state/manual-motion-fresh-idle.ts:42-43`, `laser-home-action.ts:115,274,375`, `laser-store-helpers.ts:40-41`, `CheckpointResumeBanner.tsx:226-236` | Plain words plus one next step |
 | A3-P3-6 | Jog is refused while Fire or the laser dot is on. Deliberate, ADR-664, so a slow jog cannot draw a line. Keep; listed for completeness | `state/laser-store-helpers.ts:42-43` | None proposed |
 
+**Fix status (F7, ADR-674 Amendment 1):** A3-P3-1, A3-P3-4 and A3-P3-5 are fixed. A3-P3-1 took the first lighter form: the commands stay refused and the sentence now says KerfDesk does not send them. A3-P3-4 also covers Auto-focus. A3-P3-5 reworded the messages listed; the same kind of wording remains in "Laser Start could not obtain a fresh same-session controller status report…" (`state/laser-live-start-readiness.ts`), the start-mark timeout (`state/laser-job-start-mark-transaction.ts`) and the laser recovery review dialog, which were not in this finding.
+
 A recovery attempt that failed blocks Review for five minutes (`state/recovery/recovery-model.ts:55`). The stacked confirms in recovery are A1-P2-3, the Console write confirm is A1-P3-5, and the release-motors confirm is A1-P3-2.
 
 ### A3 checked and sound
@@ -253,6 +258,7 @@ A recovery attempt that failed blocks Review for five minutes (`state/recovery/r
 - **Deliberate in part:** ADR-656 (bytes before the picker). Its decision 2 says to open the picker at once while the click is still live; `pick-prepared-save-target.ts:31` does, but these two dialogs never take that path.
 - **Frequency:** every export; every first save of a real project.
 - **Lighter form:** open the picker straight away when preparation finishes in time; show the dialog only when it is slow.
+- **Fix status (F6, ADR-656 Amendment 4):** fixed as the lighter form says, for Save G-code and project Save As. A CNC export keeps its dialog, because Save as… or the setup sheet package is a choice. Record: [F6-fix-save-dialogs.md](F6-fix-save-dialogs.md).
 
 ### A4-P2-5 — In Preview the canvas silently becomes pan-only, but keyboard edits still change the design
 
@@ -285,6 +291,10 @@ A recovery attempt that failed blocks Review for five minutes (`state/recovery/r
 | A4-P3-3 | Opening a project with a different machine setup is refused during a job; a different bed size alone triggers it. Deliberate, ADR-416 Amendment 2; the message is good | `state/job-machine-lock.ts:34-56` | Offer "Open with the current machine setup" |
 | A4-P3-4 | Number fields clamp silently on leaving (9999 becomes 6000). Deliberate, M25 | `layers/use-debounced-commit.ts:79-90` | Flash the field or say "Limited to 6000" once |
 | A4-P3-5 | The rotary test pattern and camera target ask to replace artwork with a native OK/Cancel; other generators use Save / Don't Save / Cancel | `laser/RotarySetupHost.tsx:29-34`, `CalibrationSetupStep.tsx:193` | Route both through `confirmDiscard` |
+
+**Fix status (F6, ADR-656 Amendment 4):** A4-P3-2 is reduced, not closed. Reproduced as four steps for a large project with no file. It is now at most three (Save changes?, the OS save picker, the OS open picker): a project validated within 5 s opens its save picker by itself. Left open: when the save picker stays open for more than 5 s, the open picker has no click left to run on and Open ends in an error toast; pressing Open again works. That holds for small projects on `main` too. Record: [F6-fix-save-dialogs.md](F6-fix-save-dialogs.md).
+
+**Fix status (follow-up, ADR-656 Amendment 5):** A4-P3-2 is closed. The remainder was reproduced first, with real key presses and a save picker held open for 6 s: Ctrl+O, the toolbar **Open** and **Open template** each asked for the open picker with no click left (`navigator.userActivation.isActive` false) and ended in the error toast. An Open that outlasted its click now shows a small dialog, **Open project** or **Open template** ("`<name>` is saved. Choose the project to open."), with **Choose file…** and **Cancel**. The picker opens inside that click. **Cancel** keeps the saved project. A quick save is unchanged and shows no extra dialog. A picker that is still refused says so in plain words. Record: [F6-fix-save-dialogs.md](F6-fix-save-dialogs.md), "A4-P3-2: the remainder, fixed".
 
 ### A4 checked and sound
 

@@ -120,7 +120,7 @@ describe('fill executable start selection', () => {
       fillRunwayPolicy: 'feed-matched-every-sweep',
     });
     const input: Job = { groups: [group, vector] };
-    const scanningOffsets = [{ speedMmPerMin: 1000, offsetMm: 0.00065 }];
+    const scanningOffsets = [{ speedMmPerMin: 1000, offsetMm: 0.0013 }];
     const options = jobStartPointOptions(createProject().optimization, scanningOffsets);
     expect(jobStartEditingJob(input)).toEqual({ groups: [vector] });
     expect(resolveJobStartPoint(input, target)?.supported).toBe(true);

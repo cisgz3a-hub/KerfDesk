@@ -12,20 +12,26 @@ import {
   parseArgs as parseReleaseArgs,
 } from './generate-release-integrity.mjs';
 import {
+  BUNDLED_BUILD_PACKAGES,
   CALLIGRAPHY_OUTLINE_FONTS,
   CNC_STROKE_FONTS,
+  DESKTOP_MCP_VIEW_PACKAGES,
   OPENCLIPART_ASSETS,
   OUTLINE_FONTS,
   REPO_ROOT,
+  collectBundledBuildPackages,
   collectElectronPackage,
   collectProductionPackages,
   readPackageLicense,
+  readPnpmLicenseInventory,
+  verifyDesktopMcpViewPackages,
   verifyOpenClipartAssets,
 } from './third-party-closure.mjs';
 import { verifyPackagedPreviewMetadata } from './verify-packaged-preview-metadata.mjs';
 import { OFFLINE_ENGINE_ASSETS, verifyOfflineEngineAssets } from './offline-engine-assets.mjs';
 
 const packages = collectProductionPackages();
+const bundledBuildPackages = collectBundledBuildPackages();
 const electronPackage = collectElectronPackage();
 
 test('includes the pinned pako Zlib notice alongside its root MIT licence', () => {
@@ -175,7 +181,10 @@ test('renders deterministic notices for every production package and artwork ass
     fs.readFileSync(path.join(REPO_ROOT, 'public/third-party-notices.txt'), 'utf8'),
     `${first}\n`,
   );
-  assert.equal(countMatches(first, /^--- Package:/gm), packages.length + 1);
+  assert.equal(
+    countMatches(first, /^--- Package:/gm),
+    packages.length + 1 + bundledBuildPackages.length + DESKTOP_MCP_VIEW_PACKAGES.length,
+  );
   assert.equal(countMatches(first, /^--- Artwork:/gm), 8);
   const photoCraftNotice = fs
     .readFileSync(path.join(REPO_ROOT, 'docs/licensing/photocraft-color-to-alpha.txt'), 'utf8')
@@ -209,6 +218,14 @@ test('renders deterministic notices for every production package and artwork ass
     first.includes(meerk40tMoshiNotice),
     'the Moshi protocol carried over from MeerK40t must ship its MIT notice',
   );
+  const meerk40tRuidaNotice = fs
+    .readFileSync(path.join(REPO_ROOT, 'docs/licensing/meerk40t-ruida.txt'), 'utf8')
+    .trim()
+    .replace(/\r\n?/g, '\n');
+  assert.ok(
+    first.includes(meerk40tRuidaNotice),
+    'the Ruida swizzle carried over from MeerK40t must ship its MIT notice (O11-P3-11)',
+  );
   const meerk40tBalormkNotice = fs
     .readFileSync(path.join(REPO_ROOT, 'docs/licensing/meerk40t-balormk.txt'), 'utf8')
     .trim()
@@ -238,6 +255,103 @@ test('renders deterministic notices for every production package and artwork ass
   }
   assert.match(first, /Copyright 2015 The Great Vibes Pro Project Authors/);
   assert.match(first, /Copyright 2024 The Pinyon Project Authors/);
+});
+
+test('keeps NOTICE and COPYING files beside a package licence (O11-P3-3)', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'kerfdesk-notice-file-'));
+  try {
+    fs.writeFileSync(path.join(temp, 'LICENSE'), 'Apache fixture licence');
+    fs.writeFileSync(path.join(temp, 'NOTICE'), 'Fixture NOTICE attribution');
+    fs.writeFileSync(path.join(temp, 'LICENSE-MIT'), 'MIT fixture licence');
+    fs.writeFileSync(path.join(temp, 'README.md'), 'not a licence');
+    const record = readPackageLicense({
+      depDir: temp,
+      license: 'Apache-2.0',
+      name: 'fixture',
+      version: '1.0.0',
+    });
+    assert.deepEqual(record.sourceFiles, ['LICENSE', 'LICENSE-MIT', 'NOTICE']);
+    assert.match(record.text, /Fixture NOTICE attribution/);
+    fs.rmSync(path.join(temp, 'LICENSE'));
+    fs.rmSync(path.join(temp, 'LICENSE-MIT'));
+    fs.rmSync(path.join(temp, 'NOTICE'));
+    fs.writeFileSync(path.join(temp, 'COPYING'), 'Copying fixture terms');
+    const copying = readPackageLicense({
+      depDir: temp,
+      license: 'MIT',
+      name: 'fixture',
+      version: '1.0.0',
+    });
+    assert.deepEqual(copying.sourceFiles, ['COPYING']);
+  } finally {
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
+});
+
+test('lists the development packages the build bundles into the app (O11-P3-1, O11-P3-2)', () => {
+  assert.deepEqual(
+    bundledBuildPackages.map(({ name }) => name).sort(),
+    BUNDLED_BUILD_PACKAGES.map(({ name }) => name).sort(),
+  );
+  const notice = fs.readFileSync(path.join(REPO_ROOT, 'public/third-party-notices.txt'), 'utf8');
+  for (const dependency of bundledBuildPackages) {
+    const heading = `--- Package: ${dependency.name}@${dependency.version} (${dependency.license}) ---`;
+    assert.ok(notice.includes(heading), `${dependency.name} must have a notice section`);
+    assert.ok(notice.includes(dependency.text), `${dependency.name} licence text must ship`);
+  }
+  for (const name of ['workbox-core', 'workbox-precaching', 'workbox-routing']) {
+    assert.match(notice, new RegExp(`Package: ${name}@[^\\n]*\\n[^]*?Copyright 2018 Google LLC`));
+  }
+  assert.match(notice, /Package: vite-plugin-pwa@[^\n]*\n[^]*?Anthony Fu/);
+  for (const entry of DESKTOP_MCP_VIEW_PACKAGES) {
+    assert.ok(notice.includes(`--- Package: ${entry.name}@${entry.version}`));
+  }
+  assert.match(notice, /wasm\/LICENSE_PDFJS_QCMS/);
+  assert.match(notice, /Nixie One: Copyright \(c\) 2011 by Jovanny Lemonad/);
+  assert.match(
+    notice,
+    /with Reserved Font Name Petit Formal Script \(not used by this derivative\)/,
+  );
+  assert.match(notice, /Covered By Your Grace: Copyright \(c\) 2010, Kimberly Geswein/);
+});
+
+test('fails closed when a bundled build package leaves the install', () => {
+  const inventory = readPnpmLicenseInventory(REPO_ROOT, '--dev');
+  const withoutCore = Object.fromEntries(
+    Object.entries(inventory).map(([license, entries]) => [
+      license,
+      entries.filter(({ name }) => name !== 'workbox-core'),
+    ]),
+  );
+  assert.throws(
+    () => collectBundledBuildPackages(REPO_ROOT, withoutCore),
+    /bundled build package workbox-core is installed 0 times/,
+  );
+});
+
+test('fails closed when the desktop MCP view drifts from its reviewed licence', () => {
+  assert.equal(verifyDesktopMcpViewPackages().length, DESKTOP_MCP_VIEW_PACKAGES.length);
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'kerfdesk-mcp-view-'));
+  try {
+    fs.mkdirSync(path.join(temp, 'services/remote-control'), { recursive: true });
+    fs.writeFileSync(
+      path.join(temp, 'services/remote-control/package.json'),
+      JSON.stringify({ dependencies: { '@modelcontextprotocol/ext-apps': '2.0.4' } }),
+    );
+    assert.throws(() => verifyDesktopMcpViewPackages(temp), /pinned at 2\.0\.4, reviewed 2\.0\.3/);
+    fs.writeFileSync(
+      path.join(temp, 'services/remote-control/package.json'),
+      JSON.stringify({ dependencies: { '@modelcontextprotocol/ext-apps': '2.0.3' } }),
+    );
+    fs.mkdirSync(path.join(temp, 'node_modules/@modelcontextprotocol/server'), { recursive: true });
+    fs.writeFileSync(
+      path.join(temp, 'node_modules/@modelcontextprotocol/server/LICENSE'),
+      'a different licence',
+    );
+    assert.throws(() => verifyDesktopMcpViewPackages(temp), /no longer matches/);
+  } finally {
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
 });
 
 test('writes deterministic checksums, manifest, and CycloneDX SBOM', () => {

@@ -23,9 +23,13 @@ export function applyLumaAdjustments(input: Uint8Array, adjustments: LumaAdjustm
  * and banded smooth skin gradients.
  */
 export function lumaAdjustmentLut(adjustments: LumaAdjustments): Uint8Array | null {
-  const brightness = adjustments.brightness ?? 0;
-  const contrast = adjustments.contrast ?? 0;
-  const gamma = adjustments.gamma ?? 1;
+  // A hand-edited project can carry NaN or a contrast below -100, which no
+  // control produces: NaN made every level 0 (a solid burn) and a negative
+  // contrast factor reversed the curve. Both fall back to the nearest valid
+  // setting, so the curve stays monotone (oracle audit O6-P3-3).
+  const brightness = numberOr(adjustments.brightness, 0);
+  const contrast = Math.max(-100, numberOr(adjustments.contrast, 0));
+  const gamma = numberOr(adjustments.gamma, 1);
   if (brightness === 0 && contrast === 0 && gamma === 1) return null;
   const offset = brightness * 2.55;
   const factor = 1 + contrast / 100;
@@ -46,6 +50,10 @@ export function maybeInvertLuma(input: Uint8Array, negative: boolean): Uint8Arra
   const out = new Uint8Array(input.length);
   for (let i = 0; i < input.length; i += 1) out[i] = BYTE_MAX - (input[i] ?? BYTE_MAX);
   return out;
+}
+
+function numberOr(value: number | undefined, fallback: number): number {
+  return value === undefined || Number.isNaN(value) ? fallback : value;
 }
 
 // The stage clamp without the stage rounding: NaN (an infinite contrast factor

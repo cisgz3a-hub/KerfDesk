@@ -15,7 +15,8 @@ import {
   type Transform,
   type Vec2,
 } from '../../core/scene';
-import { preparePolylineContacts, weldOpenPolylines } from '../../core/toolpath';
+import { preparePolylineContactsSteps, weldOpenPolylines } from '../../core/toolpath';
+import { runTraceSteps, type TraceSteps } from '../../core/trace/trace-steps';
 
 // Target G1 chord away from drawn corners. Audit band 0.3-0.5 mm; 0.4 mm
 // keeps the impulse rate below ~12 Hz at the F300 default while the chord
@@ -42,14 +43,27 @@ export function fairTracedPathsForCnc(
   paths: ReadonlyArray<ColoredPath>,
   placement: Transform,
 ): ColoredPath[] {
+  return runTraceSteps(fairTracedPathsForCncSteps(paths, placement));
+}
+
+/** fairTracedPathsForCnc as resumable steps, with a checkpoint after each
+ *  whole-drawing pass and after each faired polyline. Fairing is a pure
+ *  per-polyline map, so fairing them one at a time is the same computation. */
+export function* fairTracedPathsForCncSteps(
+  paths: ReadonlyArray<ColoredPath>,
+  placement: Transform,
+): TraceSteps<ColoredPath[]> {
+  const cooperate = yield;
   const metric = physicalMetricForPlacement(placement);
   const sourcePolylines = paths.flatMap((path) => path.polylines);
   const contacts =
     metric === null
       ? { polylines: sourcePolylines, pinnedPoints: new Set<Vec2>() }
-      : preparePolylineContacts(sourcePolylines);
+      : yield* preparePolylineContactsSteps(sourcePolylines);
   let offset = 0;
-  return paths.map((path) => {
+  const faired: ColoredPath[] = [];
+  for (const path of paths) {
+    if (cooperate) yield;
     const prepared = contacts.polylines.slice(offset, offset + path.polylines.length);
     offset += path.polylines.length;
     const pinnedPoints = new Set<Vec2>();
@@ -64,16 +78,23 @@ export function fairTracedPathsForCnc(
       maxGapMm: CNC_TRACE_WELD_GAP_MM,
       retainedPoints: pinnedPoints,
     });
-    const faired = fairToolpathPolylines(welded, {
+    const options = {
       mmPerPx: metric?.referenceMmPerUnit ?? 0,
       minSegmentMm: CNC_TRACE_MIN_SEGMENT_MM,
       maxDeviationMm: CNC_TRACE_MAX_DEVIATION_MM,
       cornerAngleDeg: CNC_TRACE_CORNER_ANGLE_DEG,
       pinnedPoints,
-    });
-    const polylines = metric === null ? faired : mapPolylinesFromMetric(faired, metric);
-    return { ...path, polylines, curves: polylines.map(polylineToCurveSubpath) };
-  });
+    };
+    const fairedPolylines: Polyline[] = [];
+    for (const polyline of welded) {
+      if (cooperate) yield;
+      fairedPolylines.push(...fairToolpathPolylines([polyline], options));
+    }
+    const polylines =
+      metric === null ? fairedPolylines : mapPolylinesFromMetric(fairedPolylines, metric);
+    faired.push({ ...path, polylines, curves: polylines.map(polylineToCurveSubpath) });
+  }
+  return faired;
 }
 
 type PhysicalMetric = {

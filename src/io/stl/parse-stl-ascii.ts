@@ -13,7 +13,7 @@
 // is a hard error — silently dropping geometry would carve the wrong relief.
 
 import type { TriangleMesh } from '../../core/relief';
-import { finitePreservingFloatArray } from '../../core/util';
+import { finitePreservingFloatArray, parseDecimalReal } from '../../core/util';
 
 export type AsciiStlResult =
   | { readonly kind: 'ok'; readonly mesh: TriangleMesh }
@@ -58,9 +58,10 @@ function readVertex(
   tokens: ReadonlyArray<string>,
   at: number,
 ): { x: number; y: number; z: number } | null {
-  const x = Number.parseFloat(tokens[at + 1] ?? '');
-  const y = Number.parseFloat(tokens[at + 2] ?? '');
-  const z = Number.parseFloat(tokens[at + 3] ?? '');
+  // Whole tokens only: "12,5" is refused, not read as 12 (O8-P2-2).
+  const x = parseDecimalReal(tokens[at + 1] ?? '');
+  const y = parseDecimalReal(tokens[at + 2] ?? '');
+  const z = parseDecimalReal(tokens[at + 3] ?? '');
   if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
   return { x, y, z };
 }

@@ -414,7 +414,9 @@ Variable text with a different dataset needs a new or matching project.
 
 Use **File → Save template** for a complete reusable project, including unused operations and
 notes. **File → Open template** starts a dirty new project. Its first ordinary Save asks for a
-destination and cannot overwrite the template source.
+destination and cannot overwrite the template source. Over unsaved work it asks **Save changes?**
+first; when saving took more than 5 s, **Open template** asks for **Choose file…** before the OS
+Open dialog (F-A12, ADR-656 Amendment 5).
 
 #### Single object — click
 1. Click on an object's visible geometry.
@@ -425,11 +427,20 @@ destination and cannot overwrite the template source.
    (ADR-683). The same holds for a hole another shape on its Fill operation cuts, and inside
    stacked copies that cancel (ADR-683 Amendment 1). In Wireframe, where nothing is filled, every
    shape's interior lets clicks through this way (ADR-683 Amendment 2).
+5. A click reaches a line within 5 screen pixels at any zoom (ADR-196 Amendment 1). Where several
+   lines are that close the nearest is picked, and the one drawn on top when they are equally near.
+   A filled area or an image under the pointer hides the lines beneath it; a line drawn over it is
+   still picked from beside the line.
+6. A click never moves artwork. A press becomes a drag only after the pointer has travelled more
+   than 4 pixels (6 with a pen, 10 by touch), so a click that slips selects and changes nothing
+   else: no move, no undo step, and a completed Frame still stands.
 
 #### Multi — shift+click
 1. Shift+click on additional object.
 2. Both objects are now selected; selection box wraps their combined bounding box.
 3. Resize handles operate on the combined box.
+4. A plain click on one of several selected objects selects that object alone, when the button is
+   released without a drag. Dragging it moves the whole selection and keeps it.
 
 #### Overlapping objects — Alt+click
 1. Alt+click where two or more selectable objects cross or overlap.
@@ -439,7 +450,9 @@ destination and cannot overwrite the template source.
 4. Hidden-layer and locked objects are excluded. Ordinary click selection remains geometry-based.
 
 #### Multi — marquee
-1. Click+drag in empty workspace area.
+1. Click+drag in empty workspace area, or inside an outline that is not selected (ADR-196
+   Amendment 1): a click there selects the outline, a drag draws the box and leaves the outline
+   where it is. To move an outline, drag it by its line, or select it first.
 2. Dashed-blue marquee box follows cursor.
 3. On release, selection is directional (LightBurn-style), keyed on the drag's horizontal direction: dragging left→right is an **enclosing** select (only objects whose bounding box is fully inside the marquee); dragging right→left is a **crossing** select (objects inside or merely touched).
 4. Locked objects inside the marquee are skipped.
@@ -468,11 +481,18 @@ destination and cannot overwrite the template source.
 3. Each notice says how many objects were added. When none qualify, or no closed shape is
    selected, it says why and the selection is kept.
 
+#### Right-click — context bar (ADR-196 Amendment 1)
+1. A stationary right click on an object of the selection, or on the selection's move handle,
+   keeps the whole selection and opens the selection context bar, so Group, Align and Distribute
+   act on what was selected.
+2. On an object that is not selected it selects that object alone.
+3. On empty space it keeps the selection and opens the empty-workspace context bar. On locked
+   artwork it keeps the selection and offers **Unlock** first (ADR-706).
+4. A right-button drag remains a pan and does not change selection.
+
 #### Deselect — Escape or click in empty space
 1. Selection cleared. Status bar updates: `Nothing selected`.
-2. A stationary right click in empty space also clears selection, then opens the empty-workspace
-   context bar. A right-button drag remains a pan and does not change selection.
-3. Single-artwork default (ADR-222): import, Open, undo/redo into a lone-artwork scene, and
+2. Single-artwork default (ADR-222): import, Open, undo/redo into a lone-artwork scene, and
    deleting down to one selectable artwork initially mark it. That default is one-shot; Escape
    or an empty-space click leaves the artwork unmarked until the operator selects it again or the
    scene enters a different lone-artwork state.
@@ -558,7 +578,10 @@ the linked artwork.
 
 #### Move — drag
 1. Drag visible selected geometry, or drag the four-arrow handle at the center of the single or
-   combined selection box. The center handle has a fixed screen-size target at every zoom.
+   combined selection box. The center handle has a fixed screen-size target at every zoom. The
+   drag starts once the pointer has travelled more than 4 pixels and is measured from where the
+   button went down, so the point that was grabbed stays under the pointer (ADR-196 Amendment 1).
+   For a smaller move use the arrow keys or the position boxes.
 2. The center handle takes precedence over artwork below it and the cursor changes to a move cursor.
    Blank space elsewhere inside a hollow object's bounds remains transparent to ordinary selection,
    so large outlines do not become invisible slabs over nested artwork.
@@ -579,6 +602,11 @@ the linked artwork.
 - Shift+drag corner: unlock aspect ratio / stretch.
 - Ctrl/Cmd+drag: scale from center instead of opposite edge.
 - Live mm dimensions shown next to handle while dragging.
+- Handles wait for the same few pixels of travel as a move; so does the rotate handle.
+- Small selections show fewer handles (ADR-196 Amendment 1). A side under 24 screen pixels has no
+  middle handle, and a box under 24 pixels on its shorter side leaves its inside to the artwork: a
+  drag that starts inside it moves it, and a corner handle answers from just outside. A straight
+  line keeps the two handles at its ends, which lengthen it; dragging its middle moves it.
 
 #### Rotate — handle above selection
 - Handle appears 24 screen pixels above the selection box, keeping the same reach at every zoom.
@@ -868,6 +896,12 @@ the linked artwork.
    centre it on X or Y; **Alt+Shift+H** and **Alt+Shift+V** move it together (Move H / V
    Together), as in LightBurn. Both need two or more objects; a group counts as one. Each is one
    undo step. Distribute spacing has no key, as in LightBurn (ADR-499 Amendment 2).
+6. Align, Make Same Width / Height and Move H / V Together keep one object still and move the rest
+   to it, as in LightBurn. That reference is the object last clicked into the selection. A
+   selection made at once (a marquee or Select All), or one whose clicked object was deselected or
+   deleted, has no click order. It then aligns to the first selected object in draw order, the
+   bottom of the stack (ADR-709). Remote `arrange_artwork` keeps the last listed id, and Design
+   Studio aligns to the selection's bounds.
 
 ### F-A6j. Show lengths in inches (ADR-629)
 
@@ -1133,11 +1167,11 @@ that owns those fields, without changing the existing Frame/Start policy.
 
 #### Edge — Layer has zero objects left (all deleted)
 - Layer row is *removed* from the panel.
-- If the row was the only output-enabled row, Save G-code button is disabled.
+- If the row was the only output-enabled row, Save G-code reports `No output layers.` (F-A9 edge).
 
 #### Edge — every layer has output: false
-- Save G-code button is disabled.
-- Tooltip on the disabled button: `Enable Output on at least one layer.`
+- Save G-code stays available and reports one error toast:
+  `Cannot save G-code: No output layers. Enable Output on at least one layer.` (F-A9 edge).
 
 #### Edge — two SVGs share a color
 - Each imported artwork keeps its own operation by default. Matching source colors do not couple
@@ -1449,8 +1483,23 @@ that owns those fields, without changing the existing Frame/Start policy.
 #### Success — web and packaged desktop
 1. User clicks `File → Save G-code` (`Cmd/Ctrl+Shift+E`).
 2. Pre-flight and background preparation run (F-A10) before choosing a file. A failure creates no file.
-3. When the complete export is ready, click **Save as…**. The standard Chromium Save As dialog
-   opens with `<project-name>.gcode` when the project has a saved name, otherwise `untitled.gcode`.
+3. A laser export that is ready while the click or key press is still active goes straight to
+   the standard Chromium Save As dialog: no KerfDesk dialog and no second click (ADR-656
+   Amendment 4). It opens with `<project-name>.gcode` when the project has a saved name,
+   otherwise `untitled.gcode`. Chromium keeps a click or key press active for 5 s, in the browser
+   and in the desktop app, which opens the same picker.
+   - Preparation that runs longer than 0.4 s shows **Save G-code** with `Preparing your G-code
+     file…`, the progress the preparation reports (for example `Planning toolpaths: 3 of 12`) and
+     **Cancel**, which stops it. If the export is ready within the 5 s, the Save As dialog still
+     opens by itself.
+   - An export ready later than that shows `The complete export is ready…` and waits for a click
+     on **Save as…**: the picker cannot open without a fresh click.
+   - A CNC export shows **Save G-code** whenever it is ready, because **Save as…** or **Save setup
+     sheet + program…** is a choice (F-CNC14).
+   - A tiled CNC save (F-CNC19) asks for its folder at the click, and a `.rd` save asks for its
+     file once it is compiled. Neither shows **Save G-code** first; one still compiling after
+     0.4 s says `Preparing the export…` in a toast until it is done.
+   - One save at a time: a second request while one is under way is ignored.
 4. Choose any permitted folder, such as **Downloads** or **Desktop**, and enter a new filename
    or choose an existing file to replace. An existing file is not required. The native dialog handles
    overwrite confirmation; cancelling it writes nothing.
@@ -1464,13 +1513,20 @@ that owns those fields, without changing the existing Frame/Start policy.
    ADR-688).
 
 #### Error — pre-flight failure
-- See F-A10.
+- See F-A10 for what refuses a save. The reasons are shown once (ADR-656 Amendment 4), never in
+  a native alert:
+  - With no dialog open, one error toast: `Cannot save G-code: <first reason>`, with any further
+    reasons folded under **Show all**.
+  - With **Save G-code** already open (a slow preparation), the reasons are listed inside it with
+    `No file was created or changed.` and a single **Close**.
+  - Tiled and `.rd` saves use the same toast: `Cannot export tiles: …`, `Cannot save .rd file: …`.
 
 #### Error — file system error (disk full, permissions, etc.)
 - Toast: `Could not save G-code: <one-line reason>`. Project is unaffected.
 
 #### Edge — save when no output-enabled layers exist
-- Save G-code button is disabled (see F-A7 edge).
+- One error toast: `Cannot save G-code: No output layers. Enable Output on at least one layer.`
+  No **Save G-code** dialog and no file dialog opens.
 
 ---
 
@@ -1688,9 +1744,15 @@ the completed physical Frame is the spatial source of truth.
 
 #### Success — first save
 1. `File → Save` (`Cmd/Ctrl+S`).
-2. For a large project, **Save project** shows `Preparing <name>…` while validation runs.
-   When it is ready, click **Choose file…** to open the OS Save dialog. Smaller projects open
-   the OS dialog directly after validation. Cancel leaves the project unsaved and changes no file.
+2. The OS Save dialog opens once the project is validated. Smaller projects validate at once. A
+   large project (250 objects, about 5,000 path points, a 375 KB image or embedded fonts)
+   validates in the background, and its OS dialog still opens by itself when that finishes while
+   the click is active, which Chromium allows for 5 s (ADR-656 Amendment 4).
+   - Validation that runs longer than 0.4 s shows **Save project** with `Preparing <name>…` and
+     **Cancel**.
+   - Validation that outlasts the 5 s ends at `Your project is ready.`; click **Choose file…** to
+     open the OS dialog.
+   - Cancel leaves the project unsaved and changes no file.
 3. Default name: `untitled.lf2`, default location: Documents.
 4. On confirm, the captured, validated project JSON is written to disk.
 5. Window title updates: `KerfDesk — <project-name>`.
@@ -1719,9 +1781,9 @@ the completed physical Frame is the spatial source of truth.
 
 #### Success — Save As
 1. `File → Save As` (`Cmd/Ctrl+Shift+S`).
-2. Always shows dialog. Default name: current project name.
-   A large project first shows **Save project**, then **Choose file…** opens the native picker
-   after validation is complete, using that click's file access permission.
+2. Always shows the OS dialog. Default name: current project name.
+   A large project opens it as the first save does (step 2 above): by itself when validated within
+   5 s, otherwise after a click on **Choose file…**.
 
 #### Error — save failure
 - Error toast: `Could not save project: <reason>`. Unpersisted changes remain unsaved and the user can retry.
@@ -1798,6 +1860,21 @@ the completed physical Frame is the spatial source of truth.
 5. If equal: project loaded. Window title updates.
 6. Save writes over the opened file (F-A11, ADR-550).
 
+#### Edge — unsaved work, and saving it took more than 5 s (ADR-656 Amendment 5)
+1. `File → Open` (or `Cmd/Ctrl+O`) over unsaved work asks **Save changes?** first (F-A13). With
+   no file yet, **Save** opens the OS Save dialog.
+2. The OS Open dialog is due once the project is saved. It opens by itself when that is within
+   5 s of the **Save** click. The browser and the desktop app refuse a file dialog after that.
+3. Past 5 s, **Open project** appears instead: `<name> is saved. Choose the project to open.`
+   with **Choose file…** (focused) and **Cancel**. **Choose file…** opens the OS Open dialog.
+4. **Cancel**, Esc, or closing the OS Open dialog without a file keeps the saved project open.
+5. The dialog closes by itself, with no file dialog, if another Open or a recovery takes the
+   project while it waits. A file that arrives from the operating system meanwhile waits in its
+   banner (F-DESK4). A project opened from Recent Projects or the operating system has its file
+   already and never shows this dialog.
+6. Should a file dialog still be refused, the toast says `Could not open project: The file dialog
+   did not open, because too much time had passed since your last click or key press. Try again.`
+
 #### Success — schema older
 1. Migration runs to current version.
 2. Toast (info) identifies the migration, for example: `Project migrated from v1 to v2.` Any change
@@ -1870,6 +1947,16 @@ the completed physical Frame is the spatial source of truth.
 5. When the controller answers `error:9`, it was in Alarm or Jog: clear the alarm or let the jog
    finish, then retry. `error:20` means the firmware has no probe input or does not support the
    command.
+
+#### Edge — Home moves the focus height on a Falcon A1 Pro (ADR-322 Amendment 5)
+1. The A1 Pro firmware moves Z while it homes X and Y, so a Home after Auto-focus loses the height.
+   KerfDesk itself sends only `$HX`, `$HY` and the settle marker.
+2. After a completed Home a warning toast says: `Home moved the laser's height: this machine's homing
+   also moves Z. Move the head over your material and run Auto-focus again before you burn.`
+3. Until a successful Auto-focus or a Z jog, Job Review lists a warning on laser jobs that the height
+   has not been set since the last Home. It never blocks Frame or Start. A reconnect clears it.
+4. KerfDesk does not re-focus by itself: after Home the head is at the front-left corner, which may
+   not be over the material.
 
 #### Edge — the file kept a photo behind its trace (ADR-673 Amendment 1)
 1. KerfDesk 1.0.27 and earlier marked a picture kept after Trace as the trace's source and never
@@ -1976,6 +2063,16 @@ are shown. Nothing here is a gate: Frame, Start and Save are unchanged.
 1. Modal: `Save changes to <project-name>?` with `Save`, `Don't Save`, `Cancel`.
 2. `Save` → save flow F-A11, then new only if the saved version is still the current document.
    `Don't Save` → discard, then new. `Cancel` → no action.
+3. `File → Open` over unsaved work asks the same question. `Save` then shows at most the OS Save
+   dialog (none when the project already has a file) and the OS Open dialog; a large project no
+   longer adds **Save project** between them when it validates within 5 s (ADR-656 Amendment 4).
+4. When that save ends more than 5 s after the **Save** click (the OS Save dialog was left open,
+   or the write was slow), the OS Open dialog cannot open by itself: the browser and the desktop
+   app open a file dialog only within 5 s of a click or key press. A small dialog, **Open
+   project**, then reads `<name> is saved. Choose the project to open.` **Choose file…** has the
+   focus, so Enter continues, and opens the OS Open dialog. **Cancel** or Esc keeps the saved
+   project open and unchanged. `File → Open template` does the same under **Open template**
+   (ADR-656 Amendment 5).
 
 ---
 
@@ -2148,6 +2245,9 @@ Left to right:
 - **Device** — `Default 400×400`
 - **Zoom** — `100%`
 - **Job estimate** — Phase C feature; not in Phase A.
+- **Background save signs** — at the right, shown only while they apply: `Autosave failed`,
+  `Autosave waiting for job` and `Machine settings not saved`. Each stays until the save it
+  names succeeds, and its tooltip says what to do (F-C3, ADR-305 Amendment 1).
 
 Status bar messages (toasts that appear in the bar for 3 s) for non-blocking events.
 
@@ -3877,7 +3977,7 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 4. **Discard** deletes only the capsule. It does not stop, reset, reconnect, move,
    or modify the current job.
 5. Recovery storage/quota/schema failure shows a nonblocking warning. Current Start
-   and the status-bar PWA Update button (ADR-227) remain available.
+   and the status-bar PWA Update button (ADR-227) remain available (the Update button waits while machine work runs, ADR-227 Amendment 2).
 
 #### Error — project changed since the run
 1. Exact capsules do not depend on the current project and therefore cannot fail
@@ -4046,6 +4146,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
      burns D mm round the part at every height, and one turn stays one turn. Rows round the part
      stay level; a stroke along the side leans slightly away from the job's anchor row (2.3° at
      30 mm from it on an Ø80→Ø70 cup), so anchor a Current Position job at its centre.
+   - A Fill's hatch lines bend with the warp. Each bent line burns through its points as one
+     sweep, at every hatch angle and on Y, A or Z (ADR-694 Amendment 1). If a Fill's planned burn is
+     ever shorter than what was compiled, output stops and names the layer instead of burning
+     short. Job Review's row-step check reads a tapered 0° Fill's rows at both ends of the artwork.
    - The preview gives one turn round the top and round the bottom, and checks the artwork against
      one turn where the part is narrowest under it. Job Review's Rotary fact names the taper, for
      example "Chuck, taper Ø80 → Ø70 mm over 100 mm". A taper whose ends differ in radius by more
@@ -4160,7 +4264,7 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 
 - F-C1. Settings → Device Profile editor
 - F-C2. Settings → Preferences
-- F-C3. Autosave + recovery — specified below (ADR-305, ADR-688)
+- F-C3. Autosave + recovery — specified below (ADR-305 and its Amendment 1, ADR-688)
 - F-C4. Re-import changed SVG with diff
 - F-C5. Copy / paste / duplicate
   Copy and Paste carry the imported fonts used by copied text across documents, so that text stays
@@ -4173,7 +4277,8 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 
 Every 30 s, and when the window closes, unsaved work is written to this window's autosave slot in
 the browser's storage (ADR-305). Each window session has its own slot, kept until it is restored or
-discarded.
+discarded. The copy is prepared and written in a worker, and it keeps being written while a job
+runs (ADR-305 Amendment 1).
 
 #### Success — return to unsaved work
 1. The user reopens KerfDesk to an empty, untouched project while an earlier session's slot holds
@@ -4205,6 +4310,29 @@ discarded.
 4. A crash, a forced kill, the system ending the session, a reload and the browser's own **Leave
    site?** are not that answer: the next launch shows the card. Don't Save before New or Open
    still discards the session's copy (F-A13).
+
+#### Alternate — while a job runs (ADR-305 Amendment 1)
+1. Work drawn while a job streams or is paused is autosaved every 30 s like any other work. The
+   job, Pause and Abort do not wait for it.
+2. A heavy project waits for the job to end: from about two 12-megapixel photos, a trace of
+   470,000 points, or 7,500 objects. Copying one could take the UI thread, or the PC's memory, from
+   the job. The status bar then shows **Autosave waiting for job**. Its tooltip says that changes
+   made during the job have no recovery copy yet, and to save the project to keep them now.
+3. The sign goes when the job ends and the copy is written, or when the project is saved.
+4. Autosave also waits for the job to end while copies cannot reach the browser's database and
+   fall back to localStorage, and after a hand-over that measured more than 30 ms during that job.
+5. Closing the window writes the close copy as before, whatever the job is doing.
+
+#### Failure — the copy cannot be written
+1. A toast says so once for each cause, for example **Autosave could not preserve the newest
+   project. Save the .lf2 file manually; image-heavy projects can exceed browser storage.**
+2. The status bar shows **Autosave failed** for as long as the newest work has no copy. Its
+   tooltip repeats the cause and what to do.
+3. The sign goes with the next copy that is written, or when the project is saved. Autosave keeps
+   trying on every interval; a project that storage refused for its size is tried again once it
+   changes.
+4. Machine settings that cannot be saved for the next session follow the same pattern: one toast,
+   and **Machine settings not saved** in the status bar until a later machine change is saved.
 
 #### Edge — browser without file pickers (Firefox, Safari)
 1. A banner above the workspace reads **This browser can't open or save files. Use Chrome or Edge,
@@ -9199,17 +9327,26 @@ Simulator-tested only; no real JCZ board has run this path.
    finger width, ladder start/step/count (defaults 0.05/0.05/6), and in
    CNC mode the relief tool. Machine-aware defaults follow F-K3.
 2. **Generate** inserts two strips — a tab comb and a slot strip — as
-   one undo step. Rung i carries i+1 index nicks; its joint play is
-   exactly start + i·step, split across tab and notch like production
-   panels.
-3. The operator cuts both strips, presses each rung, and types the
-   winning rung's clearance into the Box Generator.
+   one undo step. The strips carry no index marks: rung 0 sits half a
+   finger from the start, the last rung two fingers from the end
+   (ADR-119 Amendment 1). Rung i's joint play is exactly start + i·step,
+   split across tab and notch like production panels.
+3. The operator cuts both strips on the layer the box will use, presses
+   each rung, and types the winning rung's clearance into the Box
+   Generator.
+
+#### Edge — laser layer without a kerf offset
+
+1. Kerf is compensated by the cutting layer, not the coupon. On a layer
+   whose kerf offset is 0 every rung is loose by about twice the kerf. The
+   ladder start may be negative (a press fit) down to the same bound as
+   the Box Generator, and the laser dialog says so.
 
 #### Error — ladder exceeds the joint limit
 
 1. A ladder whose top rung reaches half the finger width (or half the
-   thickness) reports the count/step fields; **Generate** stays
-   disabled.
+   thickness), or whose first rung is that far below zero, reports the
+   ladder fields; **Generate** stays disabled.
 
 #### Empty
 
@@ -10104,7 +10241,7 @@ Selecting **Download update** immediately shows that the request is starting. Th
 
 #### Edge case - browser build
 
-The web app keeps its status bar **Update** button (ADR-227, ADR-228); applying it reloads the page.
+The web app keeps its status bar **Update** button (ADR-227, ADR-228); applying it reloads the page. While machine work runs it reads **Update after job** and does nothing, as the toolbar button does, because a reload would stop a job streaming from the tab (ADR-227 Amendment 2).
 
 1. On each packaged unsigned Preview launch, KerfDesk makes at most one anonymous
    metadata request to `https://dl.kerfdesk.com/desktop/previews/latest.json`.

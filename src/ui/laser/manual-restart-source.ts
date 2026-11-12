@@ -170,11 +170,29 @@ function timeBoundNoteOption(
 ): { readonly timeBoundNote?: string } {
   const notes = [
     registration == null ? null : registrationNote(project, registration, ran?.registration, now),
-    evaluatedNow && projectHasVariableData(project)
-      ? 'Variable text: evaluated now, so a date or time in it can differ from the part already burned.'
-      : null,
+    manualRestartVariableNote(project, evaluatedNow),
   ].filter((note): note is string => note !== null);
   return notes.length === 0 ? {} : { timeBoundNote: notes.join(' ') };
+}
+
+/**
+ * What a manual restart does to variable text (oracle audit O1, O5-P2-1).
+ * Evaluated now, it takes the current serial number and CSV record, which an
+ * earlier completed job may already have advanced past the part's own. And a
+ * manual restart never advances them itself, so an operator who finishes a
+ * part this way must press Next before the next job.
+ */
+export function manualRestartVariableNote(project: Project, evaluatedNow: boolean): string | null {
+  if (!projectHasVariableData(project)) return null;
+  const evaluated = evaluatedNow
+    ? 'Variable text: evaluated now, with the current serial number and CSV record, so a date, time, serial number or record in it can differ from the part already burned.'
+    : null;
+  const advance =
+    project.variables?.advancement === 'after-successful-stream'
+      ? 'A manual restart does not advance the serial number or CSV record; if it finishes the part, press Next before the next job.'
+      : null;
+  const notes = [evaluated, advance].filter((note): note is string => note !== null);
+  return notes.length === 0 ? null : notes.join(' ');
 }
 
 function registrationNote(

@@ -1,4 +1,5 @@
 import { FLOATS_PER_TRIANGLE } from '../../core/relief';
+import { parseDecimalReal } from '../../core/util';
 import { readBlobLines, type BlobReadProgress } from '../blob-line-reader';
 import {
   BINARY_STL_HEADER_BYTES,
@@ -135,7 +136,7 @@ function createAsciiTokenPass(output?: Float32Array | Float64Array): {
     if (vertexToken !== null) {
       coordinateTokens.push(token);
       if (coordinateTokens.length === 3) {
-        const values = coordinateTokens.map((value) => Number.parseFloat(value));
+        const values = coordinateTokens.map((value) => parseDecimalReal(value));
         if (values.some((value) => !Number.isFinite(value))) {
           error = `Non-numeric vertex near token ${vertexToken}.`;
         } else {

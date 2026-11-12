@@ -32,6 +32,27 @@ export async function lookup(authority, body, admin) {
   return result;
 }
 
+/**
+ * The Paddle adjustments (refunds, chargebacks, their reversals) retained for a licence
+ * or a transaction, oldest first. Partial and renewal refunds are only recorded for
+ * review (ADR-592), so support decides them from this list. No customer details.
+ */
+function paymentAdjustments(authority, field, value) {
+  return authority.records
+    .keysWhere('payment-adjustment:', field, value)
+    .map((key) => authority.records.get(key))
+    .map((item) => ({
+      adjustmentId: item.adjustmentId,
+      transactionId: item.transactionId,
+      action: item.action,
+      status: item.status,
+      type: item.type,
+      outcome: item.outcome,
+      occurredAt: item.occurredAt,
+    }))
+    .sort((a, b) => a.occurredAt - b.occurredAt || (a.adjustmentId < b.adjustmentId ? -1 : 1));
+}
+
 async function licenceSummary(authority, licenseId) {
   const license = authority.records.get(`license:${licenseId}`);
   requireValue(license && license.tier !== 'trial', 404, 'license_not_found');
@@ -43,6 +64,7 @@ async function licenceSummary(authority, licenseId) {
     status: license.status,
     updatesUntil: license.updatesUntil,
     activeDevices: license.active.length,
+    paymentAdjustments: paymentAdjustments(authority, 'licenseId', licenseId),
   };
 }
 
@@ -57,14 +79,22 @@ async function orderSummary(authority, orderId) {
   };
   if (order.status === 'fulfilled')
     return { ...summary, ...(await licenceSummary(authority, order.licenseId)) };
-  if (order.status === 'failed') return { ...summary, failure: order.failure ?? null };
+  // An unfulfilled order can already hold a refund Paddle delivered before completion.
+  const adjustments =
+    typeof order.providerOrderId === 'string'
+      ? {
+          paymentAdjustments: paymentAdjustments(authority, 'transactionId', order.providerOrderId),
+        }
+      : {};
+  if (order.status === 'failed')
+    return { ...summary, failure: order.failure ?? null, ...adjustments };
   if (order.status === 'rejected') {
     const stored = authority.records.get(
       `payment-rejected:${order.provider}:${order.rejection?.transactionId}`,
     );
-    return { ...summary, rejection: stored ?? order.rejection ?? null };
+    return { ...summary, rejection: stored ?? order.rejection ?? null, ...adjustments };
   }
-  return summary;
+  return { ...summary, ...adjustments };
 }
 
 async function transactionSummary(authority, transactionId) {
@@ -76,7 +106,13 @@ async function transactionSummary(authority, transactionId) {
     // A refused payment for an order this service does not hold (a wrong environment
     // or a restored database) is still found by its transaction.
     requireValue(rejection, 404, 'order_not_found');
-    return { transactionId, orderId, orderStatus: null, rejection };
+    return {
+      transactionId,
+      orderId,
+      orderStatus: null,
+      rejection,
+      paymentAdjustments: paymentAdjustments(authority, 'transactionId', transactionId),
+    };
   }
   const summary = await orderSummary(authority, orderId);
   return { transactionId, ...summary, ...(rejection ? { rejection } : {}) };

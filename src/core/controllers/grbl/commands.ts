@@ -193,7 +193,7 @@ function formatMm(n: number): string {
   return n.toFixed(3);
 }
 
-function assertFiniteOptionalAxis(value: number | undefined, label: string): void {
+export function assertFiniteOptionalAxis(value: number | undefined, label: string): void {
   if (value !== undefined && !Number.isFinite(value)) {
     throw new Error(`buildJogCommand: ${label} must be finite.`);
   }

@@ -17,12 +17,16 @@
 // part too and are checked the same way, read from the machine-space job; an
 // offered interval must land evenly at every phase; layers go by their names,
 // and a Fill (ramped or not) is advised on its Interval.
+// ADR-705 Amendment 2 (rolling audit v14 Z4-P2-1): a Moshiboard places every
+// coordinate on a whole mil of machine Y, so the same check runs on that grid
+// for a Moshi Y-port rotary (detectRotaryRowGridWarnings).
 
 import { rotaryYScale } from '../../../core/devices';
 import type { RotaryAxis } from '../../../core/devices/rotary';
 import { rotaryAxisOf } from '../../../core/devices/rotary-axis';
 import type { FillGroup, Job, RasterGroup } from '../../../core/job';
 import { machineSpaceJob, rotaryAppliesTo } from '../../../core/job';
+import { rotaryTaperYFactorAt } from '../../../core/job/rotary-taper-profile';
 import type { ControllerSettingsSnapshot } from '../../../core/preflight';
 import type { Project } from '../../../core/scene';
 import {
@@ -78,19 +82,71 @@ export function detectRotaryRowStepWarnings(
   if (stepsPerUnit === undefined || !(stepsPerUnit > 0)) {
     return [rotaryRowStepsUnknownWarning(axis)];
   }
-  // k is in the axis's own units per surface mm (degrees on A), as its steps are.
-  const steps: AxisSteps = {
-    scale: rotaryYScale(rotary),
+  return detectRotaryRowGridWarnings(project, job, {
     stepsPerUnit,
     stepsText: `${axis} step (${AXIS_STEPS[axis].setting} = ${stepsPerUnit} ${AXIS_STEPS[axis].unit})`,
-  };
+  });
+}
+
+/** The positions the controller can place the rotary axis on: `stepsPerUnit`
+ *  per mm (or per degree), named in the warning by `stepsText`. */
+export type RotaryRowGrid = { readonly stepsPerUnit: number; readonly stepsText: string };
+
+/** The same disclosure for a known position grid, such as a Moshiboard's
+ *  whole mils (ADR-705 Amendment 2). It never changes output or blocks Start. */
+export function detectRotaryRowGridWarnings(
+  project: Pick<Project, 'device' | 'machine'> & {
+    readonly scene?: Pick<Project['scene'], 'layers'>;
+  },
+  job: Job,
+  grid: RotaryRowGrid,
+): ReadonlyArray<string> {
+  const rotary = project.device.rotary;
+  if (!rotaryAppliesTo(project.device, project.machine) || rotary === undefined) return [];
+  const rasters = job.groups.filter((group): group is RasterGroup => group.kind === 'raster');
+  const fills = job.groups.filter(isScanlineFill);
+  if (rasters.length === 0 && fills.length === 0) return [];
+  // k is in the axis's own units per surface mm (degrees on A), as its steps are.
+  const steps: AxisSteps = { scale: rotaryYScale(rotary), ...grid };
   const name = (layerId: string) =>
     project.scene?.layers.find((layer) => layer.id === layerId)?.name ?? layerId;
   const seen = new Set<string>();
   const images = imageWarnings(rasters, steps, name, seen);
   if (fills.length === 0) return images;
-  const machineFills = machineSpaceJob(job, project.device, project.machine).groups;
-  return [...images, ...fillWarnings(machineFills.filter(isScanlineFill), steps, name, seen)];
+  return [...images, ...fillWarnings(machineFillRows(project, job), steps, name, seen)];
+}
+
+type FillRows = { readonly group: FillGroup; readonly factors: ReadonlyArray<number> };
+
+/** Each 0° Fill's machine-space rows. On a tapered part (ADR-694 Amendment 1)
+ *  the warp bends rows by a factor that changes along the part, so the rows are
+ *  read from the job without the warp and checked at the pitch they take at
+ *  each end of the artwork. */
+function machineFillRows(
+  project: Pick<Project, 'device' | 'machine'>,
+  job: Job,
+): ReadonlyArray<FillRows> {
+  const warped = machineSpaceJob(job, project.device, project.machine);
+  const taper = warped.rotaryTaper;
+  const rotary = project.device.rotary;
+  if (taper === undefined || rotary === undefined) {
+    return warped.groups.filter(isScanlineFill).map((group) => ({ group, factors: [1] }));
+  }
+  const { taper: _warp, ...cylinder } = rotary;
+  const flat = machineSpaceJob(job, { ...project.device, rotary: cylinder }, project.machine);
+  return flat.groups.filter(isScanlineFill).map((group) => {
+    const xs = group.segments.flatMap((segment) => segment.polyline.map((point) => point.x));
+    const ends = xs.length === 0 ? [] : [minOf(xs), maxOf(xs)];
+    return { group, factors: ends.map((x) => rotaryTaperYFactorAt(taper, x)) };
+  });
+}
+
+function minOf(values: ReadonlyArray<number>): number {
+  return values.reduce((least, value) => Math.min(least, value), Number.POSITIVE_INFINITY);
+}
+
+function maxOf(values: ReadonlyArray<number>): number {
+  return values.reduce((most, value) => Math.max(most, value), Number.NEGATIVE_INFINITY);
 }
 
 function imageWarnings(
@@ -110,16 +166,18 @@ function imageWarnings(
 }
 
 function fillWarnings(
-  fills: ReadonlyArray<FillGroup>,
+  fills: ReadonlyArray<FillRows>,
   steps: AxisSteps,
   name: (layerId: string) => string,
   seen: Set<string>,
 ): string[] {
   const warnings: string[] = [];
-  for (const group of fills) {
+  for (const { group, factors } of fills) {
     if (seen.has(group.layerId)) continue;
-    const warning = fillRowWarning(group, steps, name(group.layerId));
-    if (warning === null) continue;
+    const warning = factors
+      .map((factor) => fillRowWarning(group, steps, name(group.layerId), factor))
+      .find((found) => found !== null);
+    if (warning === undefined || warning === null) continue;
     seen.add(group.layerId);
     warnings.push(warning);
   }
@@ -159,8 +217,17 @@ function imageRowWarning(group: RasterGroup, axis: AxisSteps, name: string): str
 }
 
 /** A 0° Fill's hatch rows, read where the machine-space job puts them. */
-function fillRowWarning(group: FillGroup, axis: AxisSteps, name: string): string | null {
-  const rows = hatchRowPositions(group);
+function fillRowWarning(
+  group: FillGroup,
+  steps: AxisSteps,
+  name: string,
+  taperFactor = 1,
+): string | null {
+  const flatRows = hatchRowPositions(group);
+  const origin = flatRows[0] ?? 0;
+  // A taper stretches the rows' pitch by its factor about the first row.
+  const rows = flatRows.map((row) => origin + (row - origin) * taperFactor);
+  const axis = { ...steps, scale: steps.scale * taperFactor };
   if (rows.length < 2) return null;
   const placement = steppedRowPlacement(rows, axis.stepsPerUnit);
   if (rowsLandEvenly(placement)) return null;

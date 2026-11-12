@@ -2,11 +2,11 @@
 // the same .rd bytes Save .rd writes (emitPreparedRdFile, preview = save), and
 // the footprint the Frame traces and Start checks.
 
-import type { JobPlacementSettings } from '../../../core/job';
-import type { Project } from '../../../core/scene';
 import { prepareOutput } from '../../../io/gcode';
 import { withTextGlyphCheck } from '../../../io/gcode/prepare-output-snapshot';
-import { emitPreparedRdFile, rdPreparationOptions, type EmitRdOptions } from '../../../io/rd';
+import { rdPreparationOptions, type EmitRdOptions } from '../../../io/rd';
+import { emitPreparedRdWithJobWarnings } from '../../laser/rd-job-warnings';
+import type { LinkJobRequest } from '../link-job-request';
 import { resolveExportJobPlacement } from '../../job-placement';
 import { outputTextRenderer } from '../../text/output-text-renderer';
 import type { RuidaNetworkJob } from './ruida-network-store';
@@ -19,9 +19,9 @@ export type RuidaNetworkJobResult =
   | { readonly ok: false; readonly messages: ReadonlyArray<string> };
 
 export async function prepareRuidaNetworkJob(
-  project: Project,
-  placement: JobPlacementSettings,
+  request: LinkJobRequest,
 ): Promise<RuidaNetworkJobResult> {
+  const { project, placement, outputScope } = request;
   if (placement.startFrom === 'current-position')
     return { ok: false, messages: [RUIDA_CURRENT_POSITION_UNSUPPORTED] };
   // No live GRBL-style machine state exists for a Ruida: placement is the
@@ -33,9 +33,11 @@ export async function prepareRuidaNetworkJob(
     ...(resolved.preflightMotionOffset === undefined
       ? {}
       : { preflightMotionOffset: resolved.preflightMotionOffset }),
+    // The canvas output scope, as Save .rd compiles with (C2 D2-P1-1).
+    outputScope,
   };
   const prepared = prepareOutput(project, rdPreparationOptions(options));
-  const result = emitPreparedRdFile(
+  const result = emitPreparedRdWithJobWarnings(
     await withTextGlyphCheck(prepared, project, outputTextRenderer),
     options,
   );
@@ -45,7 +47,11 @@ export async function prepareRuidaNetworkJob(
     job: {
       bytes: result.bytes,
       footprint: result.footprint,
-      advisories: result.advisories.map((issue) => issue.message),
+      advisories: [
+        ...result.advisories.map((issue) => issue.message),
+        ...(result.jobWarnings ?? []),
+      ],
+      completed: request.completed,
     },
   };
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { SketchEditorProps } from './SketchConstraintEditor';
+import { parseEnglishDecimalInput } from './english-decimal-input';
 import { SketchInitialPointEditor } from './SketchInitialPointEditor';
 import {
   appendSketchPrimitive,
@@ -78,7 +79,7 @@ function PrimitiveComposer({ sketch, onChange }: SketchEditorProps): JSX.Element
         ? ['Start X (mm)', 'Start Y (mm)', 'End X (mm)', 'End Y (mm)']
         : ['X (mm)', 'Y (mm)', 'Width (mm)', 'Height (mm)'];
   const visibleValues = kind === 'circle' ? [...values.slice(0, 3), '0'] : values;
-  const parsed = visibleValues.map((value) => (value.trim() === '' ? NaN : Number(value)));
+  const parsed = visibleValues.map((value) => parseEnglishDecimalInput(value) ?? NaN);
   const next = appendSketchPrimitive(sketch, kind, parsed);
   return (
     <div className="lf-sketch-composer">
