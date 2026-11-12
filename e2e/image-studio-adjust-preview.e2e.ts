@@ -93,6 +93,10 @@ test('Image Studio renders Halftone in a worker with a progress bar and Cancel',
   await page.getByRole('button', { name: /^Edit Image/ }).click();
   const editor = page.getByRole('dialog', { name: /^Image Studio/ });
   await expect(editor).toContainText(`${PHOTO_WIDTH_PX}×${PHOTO_HEIGHT_PX}`);
+  // The import toast resizes the studio (and its canvas) when it goes.
+  await expect(
+    page.getByRole('button', { name: /^Dismiss success notification: Added image:/ }),
+  ).toHaveCount(0);
   await expect.poll(async () => (await samples(page)).length).toBeGreaterThan(0);
   const fit = await settledSamples(page);
   await editor.getByRole('button', { name: '100%', exact: true }).click();
