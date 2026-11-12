@@ -95,7 +95,7 @@ export const LAYOUT_COMMAND_HELP: Readonly<Record<LayoutCommandId, CommandHelpTo
   'tools.radius-fillet': {
     family: 'tools',
     tooltip:
-      'Round the corners between straight sides with an arc of the given radius, bite them out with a reverse (concave) radius centred on the corner, or remove tangent fillets to restore sharp corners. Nodes picked with the node tool limit it to those corners. A corner whose sides are too short is left sharp. One undo step.',
+      'Round the corners between straight sides with an arc of the given radius, bite them out with a reverse (concave) radius centred on the corner, or remove tangent fillets to restore sharp corners. Nodes picked with the node tool limit it to those corners. A corner whose sides are too short is left sharp. With nothing picked, Remove leaves a rounded tip sharper than about 14° alone, since its sides meet far beyond it; pick its node to sharpen it. One undo step.',
   },
   'tools.tangent-circle': {
     family: 'tools',

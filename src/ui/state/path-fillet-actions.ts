@@ -65,10 +65,11 @@ function filletMutation(
           .filter((node) => node.pathIndex === pathIndex && node.polylineIndex === curveIndex)
           .map((node) => node.pointIndex);
         if (picked.length > 0 && nodes.length === 0) return curve;
+        const only = picked.length > 0 ? nodes : undefined;
         const result =
           action === 'remove'
-            ? removeCurveFillets(curve)
-            : filletCurveCorners(curve, localRadius, action, picked.length > 0 ? nodes : undefined);
+            ? removeCurveFillets(curve, only)
+            : filletCurveCorners(curve, localRadius, action, only);
         if (result === null) return curve;
         corners += result.count;
         return result.curve;
