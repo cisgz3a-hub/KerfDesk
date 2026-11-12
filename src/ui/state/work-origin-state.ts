@@ -14,6 +14,7 @@
 import type { LaserState, WorkOriginSource } from './laser-store';
 import type { WorkCoordinateOffset } from './origin-actions';
 import type { BitFileSequenceState } from './bit-file-sequence';
+import type { SpindleBitState } from './spindle-bit';
 
 /** What the first accepted work-offset report of a connection showed. */
 export type OriginAtConnect = {
@@ -27,25 +28,30 @@ export type OriginAtConnect = {
 };
 
 // A set of per-bit files holds the X/Y origin between its runs (ADR-392 Amendment 4).
-export type WorkOriginState = BitFileSequenceState & {
-  readonly workOriginActive: boolean;
-  readonly workOriginSource: WorkOriginSource;
-  // Monotonic identity for XY work-origin mutations. Place Board registration
-  // binds to this so a later G92/G92.1/G10 cannot silently reuse stale targets.
-  readonly workOriginVersion?: number;
-  /** The status sequence when the last origin write was acknowledged: reports
-   *  up to it predate the write (origin-status-fence.ts). Optional so
-   *  hand-built test states stay valid; absent or null reads as none. */
-  readonly originStatusFence?: number | null;
-  /** Optional so hand-built test states stay valid; absent reads as unseen. */
-  readonly originAtConnect?: OriginAtConnect | null;
-  /** Counts the times machine zero may have moved unmeasured (machineZeroMovedPatch).
-   *  Optional so hand-built test states stay valid; absent reads as 0. */
-  readonly machineZeroEpoch?: number;
-  /** The controller session in which a Home moved Z after the laser height was
-   *  last set (home-moved-focus.ts, ADR-322 Amendment 5). Absent reads as none. */
-  readonly focusMovedByHomeEpoch?: number | null;
-};
+// The bit in the spindle, as last declared by a bit-change hold or in the
+// Machine rail, is the bit Zero Z and the probe record Work Z for (ADR-416
+// Amendment 4). It is kept for the app session: a reconnect does not change
+// the bit in the collet.
+export type WorkOriginState = BitFileSequenceState &
+  SpindleBitState & {
+    readonly workOriginActive: boolean;
+    readonly workOriginSource: WorkOriginSource;
+    // Monotonic identity for XY work-origin mutations. Place Board registration
+    // binds to this so a later G92/G92.1/G10 cannot silently reuse stale targets.
+    readonly workOriginVersion?: number;
+    /** The status sequence when the last origin write was acknowledged: reports
+     *  up to it predate the write (origin-status-fence.ts). Optional so
+     *  hand-built test states stay valid; absent or null reads as none. */
+    readonly originStatusFence?: number | null;
+    /** Optional so hand-built test states stay valid; absent reads as unseen. */
+    readonly originAtConnect?: OriginAtConnect | null;
+    /** Counts the times machine zero may have moved unmeasured (machineZeroMovedPatch).
+     *  Optional so hand-built test states stay valid; absent reads as 0. */
+    readonly machineZeroEpoch?: number;
+    /** The controller session in which a Home moved Z after the laser height was
+     *  last set (home-moved-focus.ts, ADR-322 Amendment 5). Absent reads as none. */
+    readonly focusMovedByHomeEpoch?: number | null;
+  };
 
 /**
  * Machine zero may have moved without KerfDesk measuring it: a new connection

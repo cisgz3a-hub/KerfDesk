@@ -12,6 +12,7 @@
 
 import type { StreamerState } from '../../core/controllers/grbl';
 import type { LaserState } from './laser-store';
+import { holdEntrySpindleBitPatch } from './spindle-bit';
 
 type ToolQueueState = Pick<
   LaserState,
@@ -27,18 +28,24 @@ export type ToolChangeHoldEntryPatch = Pick<
   | 'pendingToolId'
   | 'toolChangeLabels'
   | 'toolChangeToolIds'
->;
+> &
+  Pick<LaserState, 'spindleBit'>;
 
 // A new bit is going in: void the prior tool's Z0 and bump the epoch, require
 // a FRESH Idle before the setup gate / Continue unlock, and advance the
-// pending-tool label + id to name the incoming bit.
+// pending-tool label + id to name the incoming bit. That bit also becomes the
+// declared bit in the spindle, so the touch-off the hold asks for is recorded
+// for it (ADR-416 Amendment 4); the operator can declare another in the rail.
 export function toolChangeHoldEntryPatch(state: ToolQueueState): ToolChangeHoldEntryPatch {
+  const pendingToolLabel = state.toolChangeLabels[0] ?? null;
+  const pendingToolId = state.toolChangeToolIds[0] ?? null;
   return {
     workZZeroEvidence: null,
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     toolChangeIdleSeen: false,
-    pendingToolLabel: state.toolChangeLabels[0] ?? null,
-    pendingToolId: state.toolChangeToolIds[0] ?? null,
+    pendingToolLabel,
+    pendingToolId,
+    ...holdEntrySpindleBitPatch({ pendingToolId, pendingToolLabel }),
     toolChangeLabels: state.toolChangeLabels.slice(1),
     toolChangeToolIds: state.toolChangeToolIds.slice(1),
   };

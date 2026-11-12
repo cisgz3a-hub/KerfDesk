@@ -115,7 +115,8 @@ describe('RunningControls tool-change (CNC-04)', () => {
     };
 
     expect(host.textContent).toContain('Load 6.35 mm end mill');
-    expect(host.textContent).toContain('select it as the Active bit');
+    expect(host.textContent).toContain('Bit in the spindle, beside Zero Z');
+    expect(host.textContent).not.toContain('Active bit');
     expect(host.textContent).not.toContain('Load the next bit');
   });
 

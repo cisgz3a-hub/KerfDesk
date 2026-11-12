@@ -1,6 +1,5 @@
 import { parseOwnedWorkOffsetReadback } from '../../core/controllers/grbl/work-offset-readback';
 import type { ControllerDriver } from '../../core/controllers';
-import { activeCncTool } from '../../core/scene';
 import {
   continueControllerOperation,
   controllerOperationCommandBlockMessage,
@@ -9,6 +8,7 @@ import { startControllerCommand, type ControllerLifecycleRefs } from './laser-in
 import { mpgCommandBlockMessage, pushLog, setupCommandBlockMessage } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import { useStore } from './store';
+import { SPINDLE_BIT_LABEL, spindleBitId } from './spindle-bit';
 import { captureControllerWorkZEvidence } from './work-z-zero-evidence';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
 
@@ -134,9 +134,9 @@ function recoveryReadinessIssue(
   driver: ControllerDriver,
   confirmation: WorkZRecoveryConfirmation,
 ): string | null {
-  const projectMachine = useStore.getState().project.machine;
+  const project = useStore.getState().project;
   return (
-    recoveryProjectIssue(projectMachine, confirmation) ??
+    recoveryProjectIssue(project, spindleBitId(state, project), confirmation) ??
     recoveryMachineStateIssue(state) ??
     recoveryOwnershipIssue(refs) ??
     recoveryCapabilityIssue(driver)
@@ -144,15 +144,16 @@ function recoveryReadinessIssue(
 }
 
 function recoveryProjectIssue(
-  projectMachine: ReturnType<typeof useStore.getState>['project']['machine'],
+  project: ReturnType<typeof useStore.getState>['project'],
+  spindleBit: string | undefined,
   confirmation: WorkZRecoveryConfirmation,
 ): string | null {
-  if (projectMachine?.kind !== 'cnc') return 'Work-Z recovery is available only for CNC projects.';
+  if (project.machine?.kind !== 'cnc') return 'Work-Z recovery is available only for CNC projects.';
   if (confirmation.controllerOffsetRepresentsStockTop !== true) {
     return 'Confirm that the controller Work Z represents the stock top before recovery.';
   }
-  if (activeCncTool(projectMachine).id !== confirmation.activeToolId) {
-    return 'The Active bit changed before Work-Z recovery. Review and confirm the current bit.';
+  if (spindleBit !== confirmation.activeToolId) {
+    return `${SPINDLE_BIT_LABEL} changed before Work-Z recovery. Review and confirm the current bit.`;
   }
   return null;
 }
@@ -210,14 +211,14 @@ function assertRecoveryCommandOwnership(state: LaserState): void {
 }
 
 function assertRecoveryReservation(state: LaserState, expected: RecoveryContext): void {
-  const currentMachine = useStore.getState().project.machine;
+  const project = useStore.getState().project;
   const unchanged =
     state.controllerOperation?.kind === 'work-z-recovery' &&
     state.connection.kind === 'connected' &&
     state.controllerSessionEpoch === expected.controllerSessionEpoch &&
     state.workZReferenceEpoch === expected.workZReferenceEpoch &&
-    currentMachine?.kind === 'cnc' &&
-    activeCncTool(currentMachine).id === expected.toolId;
+    project.machine?.kind === 'cnc' &&
+    spindleBitId(state, project) === expected.toolId;
   if (!unchanged) {
     throw new Error('CNC setup changed during Work-Z recovery. Review setup and try again.');
   }

@@ -1,9 +1,10 @@
 // CNC pass and supervised recovery start only with a CNC project open (ADR-416
 // Amendment 3, rolling audit v3 G2-P1-1). The recovery streams the saved CNC
 // job whatever is open, but the bit-change hold it reaches is worked from the
-// open project: the Active bit that Zero Z and the probe bind to is chosen
-// there, and the Laser/CNC switch stays locked to it. With a Laser project
-// open, Continue could never unlock, and only Abort ended the run.
+// open project: the touch-plate probe's geometry, the bit list, the point-move
+// bed mapping and the jog feeds come from it, and the Laser/CNC switch stays
+// locked to it. The bit in the spindle itself is session state since ADR-416
+// Amendment 4, so Zero Z no longer needs the project; the rest still does.
 //
 // A CNC that KerfDesk 1.0.29 may have made from a laser does not start a
 // recovery either until its owner says whether it is a laser (ADR-637

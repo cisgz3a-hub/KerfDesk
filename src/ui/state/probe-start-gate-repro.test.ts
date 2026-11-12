@@ -208,7 +208,7 @@ function frameVerificationFromStore(
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
   // The store probe reads the ACTIVE bit from the project store when it
-  // records evidence (laser-probe-actions.ts: selectedCncToolId).
+  // records evidence (laser-probe-actions.ts: spindleBitId).
   useStore.setState({ project: cncProject });
 });
 
@@ -380,8 +380,8 @@ describe('probe -> CNC Start work-zero gate (field repro: "cannot start without 
     if (prepared.ok) {
       expect(prepared.warnings).toContain(
         'This job starts with 3.175 mm (1/8") end mill, but work Z was established for ' +
-          '6.35 mm (1/4") end mill. Load 3.175 mm (1/8") end mill, select it as the Active bit, ' +
-          'then touch it to the stock top and Zero Z — or probe again.',
+          '6.35 mm (1/4") end mill. Load 3.175 mm (1/8") end mill, choose it under Bit in the spindle in the ' +
+          'Machine rail, then touch it to the stock top and Zero Z — or probe again.',
       );
       expect(prepared.warnings.join('\n')).not.toContain(CNC_NO_WORK_ZERO_START_MESSAGE);
     }

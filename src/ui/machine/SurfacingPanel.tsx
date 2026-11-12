@@ -47,7 +47,7 @@ export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): J
       <button
         type="button"
         onClick={save}
-        title="Generate the facing G-code with the active bit and save it as a standalone .nc file."
+        title="Generate the facing G-code with the Default bit and save it as a standalone .nc file."
       >
         Save surfacing G-code…
       </button>

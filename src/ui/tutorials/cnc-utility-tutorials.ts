@@ -113,7 +113,7 @@ export const CNC_UTILITY_TUTORIALS: readonly Tutorial[] = [
     minutes: 3,
     location: 'Machine controls → Surface spoilboard',
     prerequisites:
-      'CNC mode with the intended active bit, machine limits and stock footprint configured.',
+      'CNC mode with the intended Default bit, machine limits and stock footprint configured.',
     visual: 'pocket',
     steps: [
       {
@@ -126,7 +126,7 @@ export const CNC_UTILITY_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose row spacing and removal',
         instruction:
-          'Set Stepover % relative to the active bit diameter and Total depth for the intended material removal. Review the active bit and machine settings because this utility generates its own standalone cutting program.',
+          'Set Stepover % relative to the Default bit diameter and Total depth for the intended material removal. Review the Default bit and machine settings because this utility generates its own standalone cutting program.',
         focus: 'Stepover % · Total depth',
         result: 'The example shows overlapping serpentine rows across the face.',
       },
