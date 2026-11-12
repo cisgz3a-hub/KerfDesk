@@ -1,0 +1,46 @@
+// T02: save/reopen byte-identical G-code; scan-offset shift per row direction.
+import { it, expect } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { DEFAULT_DEVICE_PROFILE, emitProject, generateIntervalTestGrid, litMoves, projectFor, type DeviceProfile } from './harness';
+import { serializeProject } from '../t01-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t01-main/src/io/project/deserialize-project';
+
+const BASE = { steps: 10, speed: 1500, power: 30, intervalMinMm: 0.08, intervalMaxMm: 0.2, swatchSizeMm: 8, gapMm: 2, maxFeedMmPerMin: 6000 };
+
+it('round trip and scan offset', () => {
+  const log: string[] = [];
+  for (const opts of [BASE, { ...BASE, steps: 20, intervalMinMm: 0.05, intervalMaxMm: 0.12 }]) {
+    const project = projectFor(generateIntervalTestGrid(opts), DEFAULT_DEVICE_PROFILE);
+    const before = emitProject(project).gcode;
+    const loaded = deserializeProject(serializeProject(project));
+    if (loaded.kind !== 'ok') {
+      log.push(`load failed: ${loaded.kind}`);
+      continue;
+    }
+    const after = emitProject(loaded.project).gcode;
+    const lb = loaded.project.scene.layers.map((l) => l.hatchSpacingMm).join(',');
+    log.push(`roundtrip steps=${opts.steps}: ${before === after ? 'identical' : 'DIFFERENT'} (${before.length} bytes); reloaded spacings ${lb}`);
+    expect(after).toBe(before);
+  }
+  // Scan offset: forward vs reverse rows; X extents per direction for swatch 0.
+  for (const [title, device, patch] of [
+    ['device table 0.15 @1500', { ...DEFAULT_DEVICE_PROFILE, scanningOffsets: [{ speedMmPerMin: 1500, offsetMm: 0.15 }] }, {}],
+    ['layer offset 0.3', DEFAULT_DEVICE_PROFILE, { bidirectionalScanOffsetMm: 0.3 }],
+  ] as [string, DeviceProfile, Record<string, unknown>][]) {
+    const grid = generateIntervalTestGrid(BASE);
+    const project = projectFor(grid, device);
+    const p2 = { ...project, scene: { ...project.scene, layers: project.scene.layers.map((l) => (l.id.startsWith('interval-test-step-') ? { ...l, ...patch } : l)) } };
+    const moves = litMoves(emitProject(p2).gcode, device).filter((m) => m.s === 300 && Math.abs(m.to.y - m.from.y) < 1e-6);
+    for (const c of [grid.cells[0]!, grid.cells[9]!]) {
+      const mine = moves.filter((m) => (m.from.x + m.to.x) / 2 > c.bounds.minX - 1 && (m.from.x + m.to.x) / 2 < c.bounds.maxX + 1);
+      const fwd = mine.filter((m) => m.to.x > m.from.x);
+      const rev = mine.filter((m) => m.to.x < m.from.x);
+      const ext = (ms: typeof mine): string =>
+        `${Math.min(...ms.map((m) => Math.min(m.from.x, m.to.x))).toFixed(3)}..${Math.max(...ms.map((m) => Math.max(m.from.x, m.to.x))).toFixed(3)}`;
+      const ys = [...new Set(mine.map((m) => Number(m.from.y.toFixed(4))))].sort((a, b) => a - b);
+      const mean = (ys[ys.length - 1]! - ys[0]!) / (ys.length - 1);
+      log.push(`${title} step ${c.step} (${c.bounds.minX}..${c.bounds.maxX}, interval ${c.intervalMm}): fwd ${fwd.length} X ${ext(fwd)}; rev ${rev.length} X ${ext(rev)}; mean Y step ${mean.toFixed(6)}`);
+    }
+  }
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t02/t02-roundtrip.log', log.join('\n'));
+});
