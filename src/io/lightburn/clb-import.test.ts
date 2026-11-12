@@ -208,4 +208,18 @@ describe('LightBurn CLB import', () => {
       'Entry 1 was skipped because speed or power was missing.',
     ]);
   });
+
+  // O9-P3-2: the .lbrn importer rounds a pass count, so the .clb one does too.
+  it('rounds a fractional pass count as a LightBurn project import does', () => {
+    const passes = (value: string): number | undefined => {
+      const result = importLightBurnClb(
+        `<LightBurnLibrary><Material name="Oak"><Entry Thickness="3" Desc="Cut"><CutSetting type="Cut"><maxPower Value="50"/><speed Value="10"/><numPasses Value="${value}"/></CutSetting></Entry></Material></LightBurnLibrary>`,
+        'passes.clb',
+      );
+      return result.ok ? result.library.entries[0]?.recipe.passes : undefined;
+    };
+    expect(passes('2.7')).toBe(3);
+    expect(passes('2.2')).toBe(2);
+    expect(passes('0.4')).toBe(1);
+  });
 });
