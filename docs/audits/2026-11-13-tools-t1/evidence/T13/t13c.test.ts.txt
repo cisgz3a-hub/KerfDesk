@@ -1,0 +1,106 @@
+// T13 auditor, part C: a transparent-background logo through the REAL Studio
+// decode (loader output mocked as the import pipeline hands it), Invert, Apply,
+// and the burn compared with the layer's own "Negative image".
+import { it, vi } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { createRgbaBuffer } from '../t13-main/src/core/image-edit/rgba-buffer';
+import type { RgbaBuffer } from '../t13-main/src/core/image-edit';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type Project, type RasterImage } from '../t13-main/src/core/scene';
+import { prepareOutput } from '../t13-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t13-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t13-main/src/ui/state/store';
+import { resetStore } from '../t13-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t13-main/src/ui/state/toast-store';
+import * as imageLoader from '../t13-main/src/ui/trace/image-loader';
+import * as decodeMod from '../t13-main/src/ui/image-editor/image-editor-decode';
+import { useImageEditorStore } from '../t13-main/src/ui/image-editor/image-editor-store';
+import { useAdjustDialogStore } from '../t13-main/src/ui/image-editor/adjust-dialog-store';
+import { computeWindowPreview } from '../t13-main/src/ui/image-editor/adjust-preview-window';
+import { commitAdjustment } from '../t13-main/src/ui/image-editor/editor-adjust-session';
+import { createSession } from '../t13-main/src/ui/image-editor/editor-session';
+import { compositeSession } from '../t13-main/src/ui/image-editor/editor-session-layers';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t13/t13c.log';
+const log: string[] = [];
+const out = (s: string) => { log.push(s); writeFileSync(LOG, log.join('\n')); };
+const st = () => useStore.getState();
+const ed = () => useImageEditorStore.getState();
+const lumaOf = (b: RgbaBuffer) => { const l = new Uint8Array(b.width * b.height); for (let i = 0; i < l.length; i++) l[i] = Math.round(0.299 * b.data[i * 4]! + 0.587 * b.data[i * 4 + 1]! + 0.114 * b.data[i * 4 + 2]!); return l; };
+const b64 = (u: Uint8Array) => Buffer.from(u).toString('base64');
+const unb64 = (s: string) => new Uint8Array(Buffer.from(s, 'base64'));
+
+function gcodeOf(p: Project): string {
+  const r = prepareOutput(p);
+  if (!r.ok) return `NOT OK ${JSON.stringify((r as never as { preflight: unknown }).preflight).slice(0, 300)}`;
+  return emitPreparedGcode(r).gcode;
+}
+// Burn length: sum of |dx| of G1 moves with S>0 (raster rows are horizontal)
+function litLength(g: string): { mm: number; moves: number } {
+  let x = 0, s = 0, mode = 0, mm = 0, moves = 0;
+  for (const raw of g.split('\n')) {
+    const line = raw.replace(/;.*$/, '').trim(); if (!line) continue;
+    const m = line.match(/^G0?([0-3])(?![0-9])/); if (m) mode = Number(m[1]);
+    const nx = line.match(/X(-?[\d.]+)/), ns = line.match(/S([\d.]+)/);
+    if (ns) s = Number(ns[1]);
+    const x1 = nx ? Number(nx[1]) : x;
+    if (mode === 1 && s > 0 && nx) { mm += Math.abs(x1 - x); moves++; }
+    x = x1;
+  }
+  return { mm, moves };
+}
+
+it('C1 transparent logo: Studio Invert vs layer Negative image', async () => {
+  // 24 x 8 logo: black bar x 6..17, rows 2..5, 1-px antialiased rim at alpha 128; the rest transparent.
+  const Wd = 24, Ht = 8;
+  const straight = new Uint8ClampedArray(Wd * Ht * 4);
+  for (let y = 0; y < Ht; y++) for (let x = 0; x < Wd; x++) {
+    const i = (y * Wd + x) * 4;
+    const inBar = x >= 6 && x < 18 && y >= 2 && y < 6;
+    const rim = !inBar && x >= 5 && x < 19 && y >= 1 && y < 7;
+    straight.set(inBar ? [0, 0, 0, 255] : rim ? [0, 0, 0, 128] : [0, 0, 0, 0], i);
+  }
+  const imported = imageLoader.compositeRgbOverWhitePreservingAlpha({ width: Wd, height: Ht, data: straight });
+  const importLuma = lumaOf(imported as RgbaBuffer);
+  resetStore();
+  useToastStore.setState({ toasts: [] } as never);
+  const base = createProject();
+  const layer = { ...createLayer({ id: 'img', color: '#808080', name: 'Image', mode: 'image' }), power: 80, minPower: 0, speed: 3000 };
+  const image = { kind: 'raster-image', id: 'logo', source: 'logo.png', dataUrl: 'data:image/png;base64,iVBORw0KGgo=', pixelWidth: Wd, pixelHeight: Ht,
+    bounds: { minX: 10, minY: 10, maxX: 10 + Wd, maxY: 10 + Ht }, transform: IDENTITY_TRANSFORM, color: '#808080', dither: 'threshold', linesPerMm: 1,
+    lumaBase64: b64(importLuma) } as RasterImage;
+  const project: Project = { ...base, scene: { ...base.scene, objects: [image], layers: [layer], groups: [] } };
+  useStore.setState({ project, undoStack: [], redoStack: [] } as never);
+  const g0 = gcodeOf(st().project);
+  const neg = gcodeOf({ ...st().project, scene: { ...st().project.scene, layers: [{ ...layer, negativeImage: true }] } });
+  out(`original burn ${JSON.stringify(litLength(g0))}; layer Negative image burn ${JSON.stringify(litLength(neg))}`);
+  out(`G-code head (original):\n${g0.split('\n').filter((l) => /^G[01]/.test(l)).slice(0, 12).join('\n')}`);
+
+  vi.spyOn(imageLoader, 'loadImageAsRawData').mockResolvedValue(imported);
+  ed().openEditor(image);
+  await vi.waitFor(() => { if (ed().session === null) throw new Error('open'); });
+  const doc = ed().session!.doc;
+  out(`decoded Background alpha row 3: ${[...Array(Wd)].map((_, x) => doc.data[(3 * Wd + x) * 4 + 3]).join(',')}`);
+  useAdjustDialogStore.getState().open('invert');
+  out(`after Invert, Studio composite luma row 3: ${[...lumaOf(compositeSession(ed().session!))].slice(3 * Wd, 4 * Wd).join(',')}`);
+  vi.spyOn(decodeMod, 'bakeBufferToBitmapFields').mockImplementation(async (d) => ({ dataUrl: 'data:image/png;base64,iVBORw0KGgo=', lumaBase64: imageLoader.extractLumaBase64(d as never) }));
+  ed().apply();
+  await vi.waitFor(() => { if (ed().isApplying) throw new Error('applying'); });
+  const applied = st().project.scene.objects[0] as RasterImage;
+  const al = unb64(applied.lumaBase64!);
+  out(`applied luma row 3: ${[...al].slice(3 * Wd, 4 * Wd).join(',')}; toasts ${(useToastStore.getState().toasts as Array<{ message: string }>).map((t) => t.message).join(' | ')}`);
+  out(`burn after Studio Invert + Apply: ${JSON.stringify(litLength(gcodeOf(st().project)))}  (expected like Negative image: ${JSON.stringify(litLength(neg))})`);
+  out(`expected inverted luma row 3 (255 - imported): ${[...importLuma].slice(3 * Wd, 4 * Wd).map((v) => 255 - v).join(',')}`);
+});
+
+it('C2 fit-view Threshold preview on thin dark lines (text-like)', () => {
+  // white page with 1-px dark lines every 6 px (thin text strokes / hatching)
+  const N = 192; const b = createRgbaBuffer(N, N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const v = x % 6 === 0 ? 30 : 245; b.data.set([v, v, v, 255], (y * N + x) * 4); }
+  const win = { rect: { x: 0, y: 0, width: N, height: N }, width: N / 4, height: N / 4 };
+  const s = createSession('t', 't', b, { minX: 0, minY: 0, maxX: N, maxY: N });
+  const pv = computeWindowPreview({ current: null }, s, { id: 'threshold', params: { level: 128 } }, win);
+  let blackPv = 0; for (let i = 0; i < pv.data.length; i += 4) if (pv.data[i] === 0) blackPv++;
+  const after = compositeSession(commitAdjustment(createSession('t', 't', { ...b, data: new Uint8ClampedArray(b.data) }, { minX: 0, minY: 0, maxX: N, maxY: N }), 'threshold', { level: 128 }));
+  let blackAfter = 0; for (let i = 0; i < after.data.length; i += 4) if (after.data[i] === 0) blackAfter++;
+  out(`\nC2 1-px lines every 6 px, Threshold 128 at 25% view: preview black share ${(blackPv / (pv.data.length / 4)).toFixed(3)}; after OK black share ${(blackAfter / (after.data.length / 4)).toFixed(3)} (preview grey values: ${[...new Set([...pv.data].filter((_, i) => i % 4 === 0))].join(',')})`);
+});
