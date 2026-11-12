@@ -79,4 +79,30 @@ describe('shearSelection', () => {
     useStore.getState().shearSelection(89, 0);
     expect(useStore.getState().project).toBe(before);
   });
+
+  // T12-P2-1: both slants together collapse the artwork at tan·tan = 1 and
+  // mirror and enlarge it beyond, which was applied as "Sheared 1 object.".
+  it.each([
+    [45, 45],
+    [30, 60],
+    [-45, -45],
+    [44, 45],
+    [60, 60],
+    [85, 85],
+  ])('refuses %s° and %s° together, which would flatten or mirror the artwork', (ax, ay) => {
+    const before = useStore.getState().project;
+    useStore.getState().shearSelection(ax, ay);
+    expect(useStore.getState().project).toBe(before);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+    expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(
+      /^These two angles together would flatten or mirror the artwork/,
+    );
+  });
+
+  it('still applies two slants that keep the shape', () => {
+    useStore.getState().shearSelection(20, 20);
+    const sheared = useStore.getState().project.scene.objects[0] as ImportedSvg;
+    expect(sheared.paths).not.toEqual(SQUARE.paths);
+    expect(useStore.getState().undoStack).toHaveLength(1);
+  });
 });

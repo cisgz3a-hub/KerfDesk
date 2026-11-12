@@ -57,4 +57,14 @@ describe('Shear dialog', () => {
     expect(shearButton()?.disabled).toBe(true);
     expect(alertText()).toBe('Enter a horizontal or vertical angle other than 0.');
   });
+
+  it('refuses two angles that together would flatten or mirror the artwork (T12-P2-1)', async () => {
+    await type(angleInput('Horizontal'), '45');
+    await type(angleInput('Vertical'), '45');
+    expect(shearButton()?.disabled).toBe(true);
+    expect(alertText()).toMatch(/^These two angles together would flatten or mirror the artwork/);
+    await type(angleInput('Vertical'), '20');
+    expect(shearButton()?.disabled).toBe(false);
+    expect(alertText()).toBeNull();
+  });
 });
