@@ -1,0 +1,116 @@
+// @vitest-environment jsdom
+// T01: Generate through the real MaterialDialog, then Undo / Redo / Cancel.
+import { describe, expect, it, beforeEach } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { MaterialDialog } from '../t01-main/src/ui/commands/CalibrationGridDialogs';
+import { useStore } from '../t01-main/src/ui/state/store';
+import { resetStore, svgObj } from '../t01-main/src/ui/state/test-helpers';
+
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+let roots: Root[] = [];
+function cleanup(): void {
+  for (const r of roots) act(() => r.unmount());
+  roots = [];
+  document.body.innerHTML = '';
+}
+function render(el: JSX.Element): void {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  roots.push(root);
+  act(() => root.render(el));
+}
+function button(name: string): HTMLButtonElement {
+  const b = [...document.querySelectorAll('button')].find((x) => x.textContent?.trim() === name);
+  if (!b) throw new Error(`no button ${name}`);
+  return b as HTMLButtonElement;
+}
+function click(el: HTMLElement): void {
+  act(() => {
+    el.click();
+  });
+}
+function input(label: string): HTMLInputElement {
+  const l = [...document.querySelectorAll('label')].find((x) => x.textContent?.trim().startsWith(label));
+  const i = l?.querySelector('input');
+  if (!i) throw new Error(`no input ${label}`);
+  return i as HTMLInputElement;
+}
+function setValue(i: HTMLInputElement, v: string): void {
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    setter.call(i, v);
+    i.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+const out: string[] = [];
+
+beforeEach(() => {
+  cleanup();
+  resetStore();
+  try {
+    localStorage.clear();
+  } catch {
+    /* ignore */
+  }
+});
+
+function experimentCount(): number {
+  const lib = useStore.getState().materialLibrary as unknown as { experiments?: unknown[] } | null;
+  return lib?.experiments?.length ?? -1;
+}
+
+describe('material test dialog history', () => {
+  it('Generate, Undo, Redo', () => {
+    useStore.getState().importSvgObject(svgObj('user-art', ['#ff0000']));
+    useStore.setState({ undoStack: [], redoStack: [], dirty: false });
+    const before = useStore.getState().project;
+    let closed = 0;
+    render(<MaterialDialog onClose={() => closed++} />);
+    click(button('Generate'));
+    const generated = useStore.getState().project;
+    out.push(
+      `closed=${closed} objects after generate=${generated.scene.objects.length} layers=${generated.scene.layers.length} userArtKept=${generated.scene.objects.some((o) => o.id === 'user-art')} undoDepth=${useStore.getState().undoStack.length}`,
+    );
+    out.push(`library=${useStore.getState().materialLibrary === null ? 'none' : 'created'} experiments=${experimentCount()}`);
+    useStore.getState().undo();
+    const undone = useStore.getState().project;
+    out.push(
+      `undo: scene restored=${JSON.stringify(undone.scene) === JSON.stringify(before.scene)} experiments=${experimentCount()} library=${useStore.getState().materialLibrary === null ? 'none' : 'still there'}`,
+    );
+    useStore.getState().redo();
+    const redone = useStore.getState().project;
+    out.push(`redo: scene equals generated=${JSON.stringify(redone.scene) === JSON.stringify(generated.scene)}`);
+    expect(true).toBe(true);
+  });
+
+  it('Generate twice adds two experiments', () => {
+    render(<MaterialDialog onClose={() => undefined} />);
+    click(button('Generate'));
+    cleanup();
+    render(<MaterialDialog onClose={() => undefined} />);
+    click(button('Generate'));
+    out.push(`two generates -> experiments=${experimentCount()}`);
+  });
+
+  it('Cancel leaves nothing', () => {
+    useStore.getState().importSvgObject(svgObj('user-art', ['#ff0000']));
+    useStore.setState({ undoStack: [], redoStack: [], dirty: false });
+    const before = useStore.getState().project;
+    const ls = localStorage.length;
+    let closed = 0;
+    render(<MaterialDialog onClose={() => closed++} />);
+    setValue(document.querySelector('input') as HTMLInputElement, '3');
+    click(button('Cancel'));
+    const after = useStore.getState();
+    out.push(
+      `cancel: closed=${closed} sameProject=${after.project === before} undo=${after.undoStack.length} dirty=${after.dirty} library=${after.materialLibrary === null ? 'none' : 'created'} localStorage ${ls}->${localStorage.length}`,
+    );
+  });
+
+  it('log', () => writeFileSync('C:/Users/stolk/kd-t1/zz-t01/t01-undo.log', out.join('\n')));
+});

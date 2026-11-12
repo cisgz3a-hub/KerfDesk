@@ -1,0 +1,74 @@
+// @vitest-environment jsdom
+// T01: Material Test dialog with Settings -> Units = Inches (ADR-629).
+import { describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import { MaterialTestDialog } from '../t01-main/src/ui/calibration/MaterialTestDialog';
+import { useDisplayUnitsStore } from '../t01-main/src/ui/state/display-units';
+import { generateMaterialTestGrid } from '../t01-main/src/core/job/material-test-grid';
+import type { MaterialTestGridOptions } from '../t01-main/src/core/job';
+import { emit, litMoves, DEFAULT_DEVICE_PROFILE } from './harness';
+
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+function setValue(i: HTMLInputElement, v: string): void {
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    setter.call(i, v);
+    i.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+describe('inch display', () => {
+  it('fields and generated feed', () => {
+    try {
+      localStorage.clear();
+    } catch {
+      /* ignore */
+    }
+    act(() => useDisplayUnitsStore.getState().setLengthUnit('in'));
+    const out: string[] = [`display unit: ${useDisplayUnitsStore.getState().lengthUnit}`];
+    let generated: MaterialTestGridOptions | undefined;
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    act(() =>
+      root.render(
+        <MaterialTestDialog
+          onCancel={() => undefined}
+          onGenerate={(o) => (generated = o)}
+          maxFeedMmPerMin={6000}
+          accelMmPerSec2={500}
+        />,
+      ),
+    );
+    const inputs = [...document.querySelectorAll('input[type="number"]')] as HTMLInputElement[];
+    for (const i of inputs) {
+      const label = i.closest('label');
+      out.push(`field "${label?.textContent?.trim()}" value=${i.value} aria=${i.getAttribute('aria-label')}`);
+    }
+    // An inch operator types the feeds they use: 40 to 120 in/min.
+    const byLabel = (t: string) => inputs.find((i) => i.getAttribute('aria-label') === t)!;
+    setValue(byLabel('Min speed'), '40');
+    setValue(byLabel('Max speed'), '120');
+    setValue(byLabel('Cell width'), '0.5');
+    setValue(byLabel('Cell height'), '0.5');
+    const status = [...document.querySelectorAll('[role="status"]')].map((n) => n.textContent).join(' | ');
+    out.push(`status: ${status}`);
+    act(() => {
+      (document.querySelector('form') as HTMLFormElement).requestSubmit();
+    });
+    out.push(`generated speedMin=${generated?.speedMin} speedMax=${generated?.speedMax} cellWidthMm=${generated?.cellWidthMm}`);
+    if (generated) {
+      const grid = generateMaterialTestGrid({ ...generated, maxFeedMmPerMin: 6000, accelMmPerSec2: 500 });
+      const g = emit(grid, DEFAULT_DEVICE_PROFILE);
+      const fs = [...new Set(litMoves(g.gcode, DEFAULT_DEVICE_PROFILE).map((m) => m.fWord))];
+      out.push(`emitted F words: ${fs.join(',')} (40 in/min = 1016 mm/min, 120 in/min = 3048 mm/min)`);
+      out.push(`cell bounds: ${JSON.stringify(grid.cells[0]?.bounds)}`);
+    }
+    writeFileSync('C:/Users/stolk/kd-t1/zz-t01/t01-inch.log', out.join('\n'));
+    act(() => root.unmount());
+    expect(true).toBe(true);
+  });
+});

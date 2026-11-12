@@ -39,7 +39,7 @@ Run order puts tools that make or change burns first, then new tools, then the r
 
 | # | Group | Tool | Command id | Status |
 |---|---|---|---|---|
-| T01 | Calibrate | Material Test | `tools.material-test` | |
+| T01 | Calibrate | Material Test | `tools.material-test` | ledgered: P3 8 |
 | T02 | Calibrate | Interval Test | `tools.interval-test` | |
 | T03 | Calibrate | Tone Calibration (new since October) | `tools.tone-calibration` | |
 | T04 | Calibrate | Scan Offset Test | `tools.scan-offset-test` | |

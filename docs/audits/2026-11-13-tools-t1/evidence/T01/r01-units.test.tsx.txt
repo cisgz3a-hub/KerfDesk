@@ -1,0 +1,201 @@
+// @vitest-environment jsdom
+// T01 refuter: a unit census of every calibration dialog under Settings -> Units = Inches,
+// plus what the operator sees after typing inch-sized numbers into Material Test.
+// Method: walk the rendered DOM (visible text, aria-label, title, preview SVG text) rather than
+// inspecting field labels only; compare against the layer Speed box in inches.
+import { describe, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { MaterialTestDialog } from '../t01-main/src/ui/calibration/MaterialTestDialog';
+import { IntervalTestDialog } from '../t01-main/src/ui/calibration/IntervalTestDialog';
+import { ScanOffsetCalibrationDialog } from '../t01-main/src/ui/calibration/ScanOffsetCalibrationDialog';
+import { ToneCalibrationDialog } from '../t01-main/src/ui/calibration/ToneCalibrationDialog';
+import { FocusTestDialog } from '../t01-main/src/ui/calibration/FocusTestDialog';
+import { SpeedInput } from '../t01-main/src/ui/layers/LayerSpeedInput';
+import { useDisplayUnitsStore } from '../t01-main/src/ui/state/display-units';
+import { createLayer } from '../t01-main/src/core/scene';
+import { generateMaterialTestGrid } from '../t01-main/src/core/job/material-test-grid';
+import type { MaterialTestGridOptions } from '../t01-main/src/core/job';
+
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const UNIT = /(mm\/min|in\/min|\bmm\b|\bin\b|%|mm\/s|in\/s|\bDPI\b)/;
+const out: string[] = [];
+const log = (s: string): void => {
+  out.push(s);
+};
+
+function mount(node: JSX.Element): { host: HTMLDivElement; root: Root } {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  act(() => root.render(node));
+  return { host, root };
+}
+
+function unmount(m: { host: HTMLDivElement; root: Root }): void {
+  act(() => m.root.unmount());
+  m.host.remove();
+  // kit Dialog may portal into body
+  document.body.innerHTML = '';
+}
+
+function census(name: string): void {
+  const inputs = [...document.querySelectorAll('input')].filter(
+    (i) => i.type === 'number' || i.type === 'text',
+  ) as HTMLInputElement[];
+  let unlabelled = 0;
+  log(`\n## ${name}: ${inputs.length} typed boxes`);
+  for (const i of inputs) {
+    const labelText = (i.closest('label')?.textContent ?? '').trim();
+    const sources = [labelText, i.getAttribute('aria-label') ?? '', i.title, i.placeholder];
+    const unitSeen = sources.some((s) => UNIT.test(s));
+    if (!unitSeen) unlabelled += 1;
+    log(
+      `  [${unitSeen ? 'unit' : 'NO UNIT'}] type=${i.type} label="${labelText}" value=${i.value} ` +
+        `aria="${i.getAttribute('aria-label')}" title="${i.title}"`,
+    );
+  }
+  log(`  -> ${unlabelled} of ${inputs.length} boxes carry no unit in label/aria/title/placeholder`);
+}
+
+function setValue(i: HTMLInputElement, v: string): void {
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    setter.call(i, v);
+    i.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+function byAria(label: string): HTMLInputElement {
+  const el = document.querySelector(`input[aria-label="${label}"]`);
+  if (!(el instanceof HTMLInputElement)) throw new Error(`no input ${label}`);
+  return el;
+}
+
+function unitMentions(): string[] {
+  // every visible text run outside the field labels that names a unit
+  const texts: string[] = [];
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+  for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) {
+    const el = n as Element;
+    if (el.closest('label') !== null) continue;
+    const own = [...el.childNodes]
+      .filter((c) => c.nodeType === 3)
+      .map((c) => c.textContent ?? '')
+      .join('')
+      .trim();
+    if (own !== '' && UNIT.test(own)) texts.push(`<${el.tagName.toLowerCase()}> ${own}`);
+    const t = el.getAttribute('title');
+    if (t !== null && UNIT.test(t)) texts.push(`<${el.tagName.toLowerCase()} title> ${t}`);
+    const a = el.getAttribute('aria-label');
+    if (a !== null && UNIT.test(a) && el.tagName !== 'INPUT')
+      texts.push(`<${el.tagName.toLowerCase()} aria> ${a}`);
+  }
+  return texts;
+}
+
+describe('refuter T01 units', () => {
+  it('census and inch-typed material test', () => {
+    try {
+      localStorage.clear();
+    } catch {
+      /* Node 25 webstorage shadow */
+    }
+    act(() => useDisplayUnitsStore.getState().setLengthUnit('in'));
+    log(`display unit = ${useDisplayUnitsStore.getState().lengthUnit}`);
+
+    // 1. Layer Speed box in inches (the reference behaviour)
+    const layer = createLayer({ id: 'l1', name: 'Engrave', color: '#ff0000' });
+    let m = mount(
+      <SpeedInput
+        layer={layer}
+        ceiling={{ maxFeed: 6000, request: null, observe: () => undefined }}
+        operationTarget={{
+          settings: { ...layer, speed: 1500 },
+          selectedObjectCount: 1,
+          reconcileKey: 'k',
+          commit: () => undefined,
+          owner: { operationId: layer.id },
+        }}
+      />,
+    );
+    const sp = document.querySelector('input[aria-label="Speed for Engrave"]') as HTMLInputElement;
+    log(`\n## Layer Speed box (1500 mm/min stored): value="${sp.value}"; text="${m.host.textContent?.replace(/\s+/g, ' ').trim()}"`);
+    unmount(m);
+
+    // 2. Census of calibration dialogs
+    m = mount(<MaterialTestDialog onCancel={() => undefined} onGenerate={() => undefined} maxFeedMmPerMin={6000} accelMmPerSec2={500} />);
+    census('Material Test');
+    log('  unit mentions outside field labels:');
+    for (const t of unitMentions()) log(`    ${t}`);
+    unmount(m);
+    m = mount(<IntervalTestDialog onCancel={() => undefined} onGenerate={() => undefined} maxFeedMmPerMin={6000} />);
+    census('Interval Test');
+    log('  unit mentions outside field labels:');
+    for (const t of unitMentions()) log(`    ${t}`);
+    unmount(m);
+    m = mount(<ScanOffsetCalibrationDialog onCancel={() => undefined} onGenerate={() => undefined} maxFeedMmPerMin={6000} />);
+    census('Scan Offset Test');
+    unmount(m);
+    m = mount(
+      <ToneCalibrationDialog initialStep="generate" seed={null} onClose={() => undefined} onGenerate={() => undefined} onSave={() => undefined} />,
+    );
+    census('Tone Calibration (wedge step)');
+    unmount(m);
+    m = mount(<FocusTestDialog onClose={() => undefined} />);
+    census('Focus Test');
+    unmount(m);
+
+    // 3. Material Test: an inch operator types 40..120 (in/min) and 0.5 (in) cells
+    let generated: MaterialTestGridOptions | undefined;
+    m = mount(
+      <MaterialTestDialog onCancel={() => undefined} onGenerate={(o) => (generated = o)} maxFeedMmPerMin={6000} accelMmPerSec2={500} />,
+    );
+    setValue(byAria('Min speed'), '40');
+    setValue(byAria('Max speed'), '120');
+    setValue(byAria('Cell width'), '0.5');
+    setValue(byAria('Cell height'), '0.5');
+    log('\n## Material Test after typing Min speed 40, Max speed 120, cell 0.5 x 0.5 (inch intent)');
+    log(`  status: ${document.querySelector('p[role="status"]')?.textContent}`);
+    const img = document.querySelector('[role="img"]');
+    log(`  preview aria: ${img?.getAttribute('aria-label')}`);
+    log(`  preview visible text: ${img?.textContent?.replace(/\s+/g, ' ').trim().slice(0, 300)}`);
+    act(() => {
+      (document.querySelector('form') as HTMLFormElement).requestSubmit();
+    });
+    log(`  generated: speedMin=${generated?.speedMin} speedMax=${generated?.speedMax} cellWidthMm=${generated?.cellWidthMm}`);
+    if (generated !== undefined) {
+      const grid = generateMaterialTestGrid({ ...generated, maxFeedMmPerMin: 6000, accelMmPerSec2: 500 });
+      const names = grid.scene.layers.map((l) => `${l.name} [speed ${l.speed}]`);
+      log(`  generated layer names (shown in Artwork panel): ${names.slice(0, 3).join(' | ')} ... (${names.length})`);
+    }
+    unmount(m);
+
+    // 4. Typed units and inch-sized values in Material Test boxes
+    m = mount(<MaterialTestDialog onCancel={() => undefined} onGenerate={() => undefined} maxFeedMmPerMin={6000} />);
+    const cw = byAria('Cell width');
+    setValue(cw, '0.25in');
+    log(`\n## Typed unit: Cell width "0.25in" -> input.value="${cw.value}"; alert="${document.querySelector('p[role="alert"]')?.textContent ?? ''}"`);
+    setValue(cw, '6.35');
+    log(`## Quarter inch in mm: Cell width "6.35" -> alert="${document.querySelector('p[role="alert"]')?.textContent ?? ''}"`);
+    setValue(cw, '5');
+    setValue(byAria('Gap'), '3.175');
+    log(`## Eighth inch gap: Gap "3.175" -> alert="${document.querySelector('p[role="alert"]')?.textContent ?? ''}"`);
+    setValue(byAria('Gap'), '1');
+    unmount(m);
+
+    // 5. P3-4 check: fractional ceiling in the feed note vs labels
+    m = mount(<MaterialTestDialog onCancel={() => undefined} onGenerate={() => undefined} maxFeedMmPerMin={1234.9} />);
+    setValue(byAria('Min speed'), '1000');
+    setValue(byAria('Max speed'), '3000');
+    log(`\n## Ceiling 1234.9: status: ${document.querySelector('p[role="status"]')?.textContent}`);
+    const svg = document.querySelector('[role="img"] svg');
+    const rowLabels = [...(svg?.querySelectorAll('[data-part="row-labels"] text') ?? [])].map((t) => t.textContent);
+    log(`  preview row labels (burned values): ${rowLabels.join(',')}`);
+    unmount(m);
+
+    writeFileSync('C:/Users/stolk/kd-t1/zz-t01r/r01-units.log', out.join('\n'));
+  });
+});
