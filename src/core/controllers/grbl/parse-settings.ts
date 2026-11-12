@@ -41,6 +41,7 @@ import {
   type GrblMachineMode,
 } from './grbl-machine-mode';
 import type { ControllerEvent } from '../controller-event';
+import { rotaryAxesMaskField } from './reported-turn-units';
 import { maxOf, minOf } from '../../util';
 
 export type ControllerSettingsSnapshot = Partial<
@@ -105,6 +106,9 @@ export type ControllerSettingsSnapshot = Partial<
   // Amendment 1).
   readonly maxRateZ?: number;
   readonly maxRateA?: number;
+  // grblHAL `$376` rotary axes mask. With `$13=1` an axis past Z outside it is
+  // reported in inches (reported-turn-units.ts; Oracle audit O1 O12-P1-1).
+  readonly rotaryAxesMask?: number;
   // `$30=0` was reported. `maxPowerS` holds only a positive S range, because a
   // zero top must never reach a profile, but the report itself is evidence:
   // the controller has no S range at all (ADR-567 Amendment 1).
@@ -225,6 +229,7 @@ export function settingsMapToControllerSettings(
     ...grblHalSignalSettingsField(map),
     ...forceSetOriginField(map),
     ...stepsPerMmFields(map),
+    ...rotaryAxesMaskField(map),
     ...zeroMaxPowerField(map),
   };
 }
