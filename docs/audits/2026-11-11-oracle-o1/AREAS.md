@@ -79,4 +79,4 @@ Finding IDs are `O<area>-P<n>-<k>`. Three areas run at a time.
 - **Research:** primary sources only, cited by section or URL; at most one short quotation per source; never paste copyrighted text.
 - **Pushes:** `LICENSE` must say "All rights reserved" before any push. Grep for conflict markers before committing. Each report PR touches only its own file; the coordinator alone edits `LEDGER.md`.
 
-**Status:** started 2026-11-11. Batch 1 (O1–O3) running.
+**Status:** started 2026-11-11. Batches 1–3 (O1–O9) reported by 2026-11-12: 92 raised, P1 3, P2 12, P3 63 ([LEDGER.md](LEDGER.md)). Batch 4 (O10–O12) not started.
