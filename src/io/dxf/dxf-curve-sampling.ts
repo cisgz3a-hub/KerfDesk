@@ -69,21 +69,31 @@ export function sampleEllipse(
   return points;
 }
 
+/** Whether an ELLIPSE closes, by the same rule as its sweep. */
 export function isFullEllipseSweep(startParam: number, endParam: number): boolean {
-  return normalizedSweep(startParam, endParam) >= FULL_TURN - 1e-9;
+  return normalizedSweep(startParam, endParam) === FULL_TURN;
 }
 
-/** Relative rounding allowance for a whole turn, and ulps of the inputs. */
+/** Relative rounding allowance for equal angles, and ulps of the inputs. */
 const TURN_TOLERANCE = 1e-12;
 const INPUT_ULPS = 4 * Number.EPSILON;
+/**
+ * How near a whole turn, as a fraction of it, printed angles still mean one:
+ * 0.036° or 0.00063 rad. Angles written to 4 or more decimals (or 6 or more
+ * significant digits) round well inside it.
+ */
+export const WHOLE_TURN_SNAP = 1e-4;
 
 /**
  * The counter-clockwise sweep from `start` to `end` in (0, turn], the one
  * direction rule DXF ARC (degrees) and ELLIPSE (radians) share. Whole turns
  * between the two are dropped, so 0 → 450° is a quarter. Equal angles mean a
- * full turn, and a remainder within rounding of zero or of a whole turn is one:
- * a circle written as s → s + 360 stays a circle even when the decimal end
- * angle rounds a hair past it. Worked out in one step, so any inputs end at once.
+ * full turn. A sweep within WHOLE_TURN_SNAP of a whole turn is one, and so is a
+ * remainder that near zero when the angles are at least a turn apart: a circle
+ * written as s → s + 360 (or 0 → 6.28319) stays a circle whichever way its
+ * printed angles round. Angles less than a turn apart keep a tiny sweep, so a
+ * small arc across 0° (359.99° → 0.01°) stays small. Worked out in one step, so
+ * any inputs end at once.
  */
 export function counterClockwiseSweep(start: number, end: number, turn: number): number {
   const difference = end - start;
@@ -91,7 +101,9 @@ export function counterClockwiseSweep(start: number, end: number, turn: number):
   const tolerance = TURN_TOLERANCE * turn + INPUT_ULPS * (Math.abs(start) + Math.abs(end));
   const remainder = difference % turn;
   const sweep = remainder < 0 ? remainder + turn : remainder;
-  return sweep <= tolerance || turn - sweep <= tolerance ? turn : sweep;
+  const snap = WHOLE_TURN_SNAP * turn;
+  if (sweep <= tolerance || turn - sweep <= snap) return turn;
+  return sweep <= snap && Math.abs(difference) >= turn ? turn : sweep;
 }
 
 /** An ELLIPSE's parameter sweep, by the shared rule. */
