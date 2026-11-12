@@ -184,3 +184,40 @@ test('failure artifacts from parallel browser jobs do not collide', async () => 
   assert.equal(new Set(names).size, names.length);
   assert.ok(names.includes('playwright-report-${{ matrix.shard }}'));
 });
+
+// Code-quality audit C2 D7-P3-1: with no limit GitHub lets a hung job hold a
+// runner for 6 hours. Each limit is about twice the job's 90th-percentile run
+// time, so a slower runner still finishes and a hang ends within the hour.
+test('every CI and Browser smoke job, and the web deploy, has a time limit', async () => {
+  const limits = {
+    '.github/workflows/ci.yml': {
+      'static-checks': 30,
+      'policy-and-build': 20,
+      'windows-native-tests': 20,
+      'unit-tests': 45,
+      'remote-control': 20,
+      ci: 10,
+    },
+    '.github/workflows/e2e.yml': {
+      plan: 10,
+      checks: 30,
+      suite: 75,
+      'pull-request-suite': 60,
+      chrome: 10,
+    },
+  };
+  for (const [path, jobs] of Object.entries(limits)) {
+    const workflow = await readWorkflow(path);
+    assert.deepEqual(Object.keys(workflow.jobs).sort(), Object.keys(jobs).sort(), path);
+    for (const [id, minutes] of Object.entries(jobs)) {
+      assert.equal(workflow.jobs[id]['timeout-minutes'], minutes, `${path} ${id}`);
+    }
+  }
+  // A manual deploy runs the whole release gate in one job; a CI-verified
+  // one only builds and publishes.
+  const deploy = await readWorkflow('.github/workflows/deploy.yml');
+  assert.equal(
+    deploy.jobs.deploy['timeout-minutes'],
+    "${{ github.event_name == 'workflow_dispatch' && 180 || 30 }}",
+  );
+});

@@ -18,6 +18,7 @@ import type { CDPSession } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
+import { functionSampleCounts } from './fixtures/profile-function-samples';
 import {
   connectMachineAndDismissFirstSetup,
   expectToolbarCommandVisible,
@@ -181,23 +182,10 @@ async function wholeProgramPassSamples(
     runReviewProfileProbe();
   });
   const { profile } = await cdp.send('Profiler.stop');
-  const nodes = new Map(profile.nodes.map((node) => [node.id, node]));
-  const parents = new Map<number, number>();
-  for (const node of profile.nodes) {
-    for (const child of node.children ?? []) parents.set(child, node.id);
-  }
-  const counts: Record<string, number> = Object.fromEntries(
-    [...WHOLE_PROGRAM_PASSES, PROFILE_PROBE].map((name) => [name, 0]),
-  );
-  for (const sampled of profile.samples ?? []) {
-    const seen = new Set<string>();
-    for (let at: number | undefined = sampled; at !== undefined; at = parents.get(at)) {
-      const name = nodes.get(at)?.callFrame.functionName ?? '';
-      if (name in counts) seen.add(name);
-    }
-    for (const name of seen) counts[name] = (counts[name] ?? 0) + 1;
-  }
-  const { [PROFILE_PROBE]: probe = 0, ...passes } = counts;
+  const counts = functionSampleCounts(profile, [...WHOLE_PROGRAM_PASSES, PROFILE_PROBE]);
+  const probe = counts.get(PROFILE_PROBE) ?? 0;
+  counts.delete(PROFILE_PROBE);
+  const passes = Object.fromEntries(counts);
   return { passes, probe };
 }
 
