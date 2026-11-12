@@ -19,7 +19,6 @@ import { operatorAbortAlarm, restoreOriginAfterAbort } from './abort-alarm-recov
 import { rotaryTurnSinceAbort } from './abort-rotary-turn';
 import {
   drive,
-  frameUntilPermit,
   harness,
   installRecoveryStressHooks,
   startFramedJob,
@@ -157,10 +156,6 @@ describe('Abort on a Z rotary, stock GRBL simulator reporting inches ($13=1)', (
       await drive(useLaserStore.getState().setOriginHere());
       await tick(1_500);
 
-      // The first Frame after the turn writes its own G92 Z0, and Start then
-      // refuses that Frame's permit ("The framed coordinates or machine setup
-      // changed during review"), so frame once more before Start.
-      await frameUntilPermit();
       const { running } = await startFramedJob(h.repository);
       await tick(2_500);
       // The job's G92 Z0 zeroed the turn it started from, 7 mm of Z. Stock GRBL

@@ -343,9 +343,14 @@ function preparedStartReusable(
   if (!controllerStartPreparationStillCurrent(previous.laser, laser)) return false;
   // Alarm, a busy operation, a lost connection, camera placement: every
   // machine fact the compile reads, whether or not it would change the bytes.
+  // Compared with the key taken when that compile was prepared: the camera
+  // facts (and the "camera may have moved" store) are not on `previous.laser`,
+  // so a key rebuilt from it would compare the live camera with itself (code
+  // quality verification C2 E3-P2-1, ADR-345 Amendment 1). A bundle without one is
+  // never reused.
   if (
-    startMachineInputsKey(app.project, previous.laser, camera) !==
-    startMachineInputsKey(app.project, laser, camera)
+    previous.preparedMachineInputsKey === undefined ||
+    previous.preparedMachineInputsKey !== startMachineInputsKey(app.project, laser, camera)
   ) {
     return false;
   }
@@ -420,6 +425,9 @@ async function rebuildCurrentStart(
   const app = useStore.getState();
   const laser = useLaserStore.getState();
   const camera = useCameraStore.getState();
+  // Taken before the compile reads them: a fact that changes during the compile
+  // then fails the next reuse check, which recompiles.
+  const machineInputsKey = startMachineInputsKey(app.project, laser, camera);
   const laserModeStartSnapshot = captureLaserModeStartSnapshot(laser);
   if (
     completedReceipt !== null &&
@@ -447,7 +455,7 @@ async function rebuildCurrentStart(
       ? previousBundle.preparedMachineInputsKey === undefined
         ? {}
         : { preparedMachineInputsKey: previousBundle.preparedMachineInputsKey }
-      : { preparedMachineInputsKey: startMachineInputsKey(app.project, laser, camera) }),
+      : { preparedMachineInputsKey: machineInputsKey }),
     ...frameDisclosures(previousBundle),
   };
   const frameRefusal = frameFirstRefusal(purpose, bundle);
