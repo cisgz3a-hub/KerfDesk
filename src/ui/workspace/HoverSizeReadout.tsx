@@ -30,12 +30,6 @@ export function HoverSizeReadout(props: {
 }): JSX.Element | null {
   const cursor = useStore((state) => state.cursorMm);
   const unit = useLengthUnit();
-  const hovered = useDwellHit(props.enabled ? cursor : null, props.project);
-  if (hovered === null) return null;
-  const object = props.project.scene.objects.find((candidate) => candidate.id === hovered.id);
-  if (object === undefined) return null;
-  const bbox = transformedBBox(object);
-  const settings = hoverOutputSettings(props.project, object, unit);
   const view = computeView(
     props.canvasSize.width,
     props.canvasSize.height,
@@ -43,6 +37,12 @@ export function HoverSizeReadout(props: {
     props.project.device.bedHeight,
     props.viewState,
   );
+  const hovered = useDwellHit(props.enabled ? cursor : null, props.project, 1 / view.scale);
+  if (hovered === null) return null;
+  const object = props.project.scene.objects.find((candidate) => candidate.id === hovered.id);
+  if (object === undefined) return null;
+  const bbox = transformedBBox(object);
+  const settings = hoverOutputSettings(props.project, object, unit);
   const placement = readoutPlacement(
     view.offsetX + hovered.point.x * view.scale,
     view.offsetY + hovered.point.y * view.scale,
@@ -92,7 +92,7 @@ function SettingsLines(props: { readonly settings: HoverOutputSettings }): JSX.E
 type Hover = { readonly id: string; readonly point: Vec2 };
 
 /** Null while the pointer is still moving; the hit once it has settled. */
-function useDwellHit(cursor: Vec2 | null, project: Project): Hover | null {
+function useDwellHit(cursor: Vec2 | null, project: Project, pxToMm: number): Hover | null {
   const [hover, setHover] = useState<Hover | null>(null);
   const x = cursor?.x ?? null;
   const y = cursor?.y ?? null;
@@ -103,11 +103,11 @@ function useDwellHit(cursor: Vec2 | null, project: Project): Hover | null {
     const timer = setTimeout(() => {
       // Locked artwork too, like the hover pulse (ADR-620): the piece under a
       // locked one must not answer for it.
-      const id = workspaceHitTest(project.scene, point, { includeLocked: true });
+      const id = workspaceHitTest(project.scene, point, pxToMm, { includeLocked: true });
       setHover(id === null ? null : { id, point });
     }, DWELL_MS);
     return () => clearTimeout(timer);
-  }, [x, y, project.scene]);
+  }, [x, y, project.scene, pxToMm]);
   return hover;
 }
 

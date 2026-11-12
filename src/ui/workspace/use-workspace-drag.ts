@@ -23,12 +23,13 @@ import { beginPathNodeDrag } from './path-node-drag';
 import { beginPathSegmentDrag } from './path-segment-drag';
 import { beginGuideDrag } from './guide-drag';
 import { finishEditDrag } from './edit-drag-finish';
+import { finishPressWithoutTravel, type PressRelease } from './drag-threshold';
 
 import { beginTracePartDrag } from './trace-part-tool';
 import { hitCncTabAnchor } from './cnc-tab-editor';
 import { finishLaserTabDrag } from './laser-tab-editor';
 import { beginHandleToolDrag } from './handle-tool-drag';
-import { selectObjectsInMarquee } from './selection-marquee';
+import { commitSelectionMarquee } from './selection-marquee-commit';
 import { runClickTool } from './workspace-click-tools';
 import { useEscCancelsDrag } from './use-esc-cancels-drag';
 import { useToolChangeCancelsDrag } from './use-tool-change-cancels-drag';
@@ -79,12 +80,13 @@ export function useDragMove(
   viewState: WorkspaceViewState,
 ): DragMoveResult {
   const deps = useWorkspaceDragDeps();
-  const { drag, setDrag, activePointerId, cancelPending, documentEpoch, clearDrag } =
+  const { drag, setDrag, activePointerId, press, cancelPending, documentEpoch, clearDrag } =
     useWorkspacePointerState(ref);
 
   const handlers = createOwnedPointerHandlers({
     getCanvas: () => ref.current,
     activePointerId,
+    press,
     drag,
     deps,
     setDrag,
@@ -121,9 +123,10 @@ export function useDragMove(
       });
       runWorkspaceDragMove({ e, ref, drag, project, viewState, deps });
     },
-    finish: (e, ownedDrag) =>
+    finish: (e, ownedDrag, release) =>
       finishWorkspaceDrag({
         drag: ownedDrag,
+        release,
         e,
         ref,
         project,
@@ -343,6 +346,7 @@ function updateWorkspaceDrag(args: {
 
 function finishWorkspaceDrag(args: {
   readonly drag: DragState;
+  readonly release: PressRelease;
   readonly e: CanvasMouseEvent;
   readonly ref: CanvasRef;
   readonly project: Project;
@@ -395,28 +399,8 @@ function finishWorkspaceDrag(args: {
     return;
   }
   if (finishEditDrag(args.drag, { ...args, canvas: args.ref.current })) return;
+  if (finishPressWithoutTravel(args.drag, args.release, args.selectObject)) return;
   args.endInteraction();
-}
-
-function commitSelectionMarquee(args: {
-  readonly drag: Extract<DragState, { kind: 'marquee' }>;
-  readonly e: CanvasMouseEvent;
-  readonly ref: CanvasRef;
-  readonly project: Project;
-  readonly viewState: WorkspaceViewState;
-  readonly selectObjects: (
-    ids: ReadonlyArray<string>,
-    options?: { readonly additive?: boolean },
-  ) => void;
-  readonly setSelectionMarquee: (
-    marquee: { readonly start: Vec2; readonly end: Vec2 } | null,
-  ) => void;
-}): void {
-  const end = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
-  args.setSelectionMarquee(null);
-  if (end === null) return;
-  const ids = selectObjectsInMarquee(args.project.scene, args.drag.startScenePoint, end);
-  args.selectObjects(ids, { additive: args.drag.additive });
 }
 
 function visibleDragKind(drag: DragState | null): DragMoveResult['dragKind'] {
