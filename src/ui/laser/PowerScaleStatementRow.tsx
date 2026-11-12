@@ -42,6 +42,7 @@ export function PowerScaleStatementRow(props: {
             type="checkbox"
             checked={standing !== null}
             aria-label={`${POWER_SCALE_STATEMENT_LABEL}: full power is S${device.maxPowerS} on this machine`}
+            title={explanation}
             onChange={(event) =>
               update({
                 operatorPowerScaleStatement: event.target.checked
