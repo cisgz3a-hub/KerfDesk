@@ -1,0 +1,70 @@
+name: Main is green
+
+# ADR-710: no pull request merges while main is red. This workflow writes the
+# commit status `main-is-green` onto the head of every open pull request into
+# main: success when main's latest completed CI and Browser smoke runs both
+# passed, failure (linking the red run) when either did not. main's ruleset
+# requires that status, so a red main blocks every merge except a pull request
+# labelled `fixes-main`, which gets success so the fix itself can land.
+#
+# A status set once at a pull request's own push would go stale when main turns
+# red later, so every trigger re-syncs every open pull request, writing only
+# where the status would change (scripts/main-is-green.mjs):
+# - workflow_run: CI or Browser smoke finished on main, so main's verdict may
+#   have changed.
+# - pull_request_target: a pull request was opened, pushed to, retargeted or
+#   relabelled, so its head needs the status. A new head has none, and a
+#   required status that is missing blocks the merge.
+#
+# Both triggers run this file and the script as they are on main, never a pull
+# request's copy, so a pull request cannot rewrite the gate to pass itself.
+# The job checks out main only (the default ref of both events) and never a
+# pull request's code; it runs one dependency-free Node script.
+on:
+  workflow_run:
+    workflows: [CI, Browser smoke]
+    types: [completed]
+    branches: [main]
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, labeled, unlabeled]
+    branches: [main]
+  workflow_dispatch:
+
+# Every run syncs everything, so a newer run may replace a pending one; runs
+# never overlap, so an older verdict cannot overwrite a newer one.
+concurrency:
+  group: main-is-green
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  sync:
+    name: Sync main-is-green statuses
+    # workflow_run and pull_request_target both run on main. A manual run from
+    # another branch would run that branch's script, so it does nothing.
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # The script only. On a public repository this is not needed; it keeps
+      # the checkout working if the repository is private again.
+      contents: read
+      # Read main's CI and Browser smoke runs.
+      actions: read
+      # List open pull requests, their labels and their head commits.
+      pull-requests: read
+      # Read and write the `main-is-green` commit status.
+      statuses: write
+    steps:
+      - name: Check out the main-is-green script from main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/main-is-green.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Write main-is-green onto every open pull request
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/main-is-green.mjs

@@ -169,7 +169,7 @@ function stateAfterCustomToolDeletion(state: AppState, toolId: string): StatePat
     toolId,
   );
   // Manual/legacy primary settings remain exact. Material recipes carrying
-  // automatic provenance recalculate against the surviving Active bit.
+  // automatic provenance recalculate against the surviving Default bit.
   return {
     cncLibrary: library,
     project: { ...state.project, scene, machine: nextMachine },

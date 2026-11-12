@@ -22,7 +22,8 @@ import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 import { useStore } from './store';
-import { captureWorkZZeroEvidence, selectedCncToolId } from './work-z-zero-evidence';
+import { spindleBitId } from './spindle-bit';
+import { captureWorkZZeroEvidence } from './work-z-zero-evidence';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -67,7 +68,8 @@ async function runProbe(
   const preflight = probePreflight(get(), refs, lines, request);
   if (preflight !== null) return preflight;
   const connection = refs.connection as SerialConnection;
-  const toolId = selectedCncToolId(useStore.getState().project);
+  // The bit in the spindle as declared when the probe began (ADR-416 Amendment 4).
+  const toolId = spindleBitId(get(), useStore.getState().project);
   const transactionId = reserveProbe(set, request.kind === 'corner');
   let pendingLine = lines[0] ?? '';
   try {

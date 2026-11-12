@@ -208,9 +208,11 @@ describe('a remote jog receipt carries the PC jog warnings (ADR-585 Amendment 3)
     const pc = await pcJog(sent);
 
     expect(shownForRemote).toEqual(pc);
-    expect(pc).toHaveLength(2);
-    expect(pc[0]).toMatch(/outside the configured machine bounds/);
-    expect(pc[1]).toMatch(/crosses the configured no-go zone "Left clamp"/);
+    // The PC says a jog's findings in one toast slot, bounds first (ADR-708).
+    expect(pc).toHaveLength(1);
+    expect(pc[0]).toMatch(
+      /outside the configured machine bounds.* crosses the configured no-go zone "Left clamp"/,
+    );
     expect(owned.state).toBe('completed');
     expect(owned.committed).toBe(true);
     expect(owned.message).toBe(pc.join(' '));

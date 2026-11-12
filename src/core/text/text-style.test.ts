@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import type { ColoredPath, CurveSubpath, Polyline } from '../scene';
-import { bendTextUndistorted, styledTextContent, styleTextRender } from './text-style';
+import {
+  IDENTITY_TRANSFORM,
+  type ColoredPath,
+  type CurveSubpath,
+  type Polyline,
+  type SceneObject,
+} from '../scene';
+import { placeTextOnPath } from './text-on-path';
+import {
+  bendTextUndistorted,
+  styledBentRender,
+  styledTextContent,
+  styleTextRender,
+} from './text-style';
 import type { TextRenderResult } from './text-to-polylines';
 
 // Two 10 x 10 "glyphs" side by side, 5 mm apart, as squares.
@@ -128,3 +140,90 @@ describe('text style keeps the alignment anchor (rolling v7 L3)', () => {
     expect(plain.bounds.maxX).toBeCloseTo(10, 12);
   });
 });
+
+// Audit S7-P2-3 (ADR-691): bounds that spread every point into Math.min and
+// Math.max threw "Maximum call stack size exceeded" past about 120,000 points.
+// 450 characters of Great Vibes is about 236,000, so a long script paragraph
+// crashed when styled, bent or put on a path. This drives all three over a
+// text-sized point set: 2,000 closed glyph rings of 160 points each.
+describe('styled, bent and placed text with a large point set', () => {
+  const GLYPHS = 2000;
+  const RING = 160;
+
+  function manyGlyphs(): TextRenderResult {
+    const polylines: Polyline[] = Array.from({ length: GLYPHS }, (_, glyph) => ({
+      closed: true,
+      points: Array.from({ length: RING }, (_, index) => {
+        const turn = (index / RING) * 2 * Math.PI;
+        return { x: glyph + 0.5 + 0.3 * Math.cos(turn), y: 0.5 + 0.3 * Math.sin(turn) };
+      }),
+    }));
+    return {
+      paths: [{ color: '#000000', polylines }],
+      bounds: { minX: 0.2, minY: 0.2, maxX: GLYPHS - 0.2, maxY: 0.8 },
+    };
+  }
+
+  function pointCount(result: TextRenderResult): number {
+    return result.paths.reduce(
+      (sum, path) => sum + path.polylines.reduce((inner, line) => inner + line.points.length, 0),
+      0,
+    );
+  }
+
+  // Squeezed to 1,600 mm and slanted, the rings still do not overlap in x, so
+  // the rigid bend keeps 2,000 separate glyphs. A 90 degree arc of 1,600 mm has
+  // a chord of 2 * (1600 / (pi / 2)) * sin(45 degrees), about 1,440 mm.
+  it('styles and bends, distorting and rigid, without overflowing the stack', () => {
+    const text = manyGlyphs();
+    expect(pointCount(text)).toBe(GLYPHS * RING);
+    for (const bendUndistorted of [false, true]) {
+      const bent = styledBentRender(text, {
+        bendDeg: 90,
+        sizeMm: 10,
+        textStyle: { italic: true, maxWidthMm: 1600, bendUndistorted },
+      });
+      expect(pointCount(bent)).toBe(GLYPHS * RING);
+      expect(bent.bounds.minX).toBe(0);
+      expect(bent.bounds.minY).toBe(0);
+      expect(bent.bounds.maxX).toBeGreaterThan(1400);
+      expect(bent.bounds.maxX).toBeLessThan(1500);
+    }
+  });
+
+  it('places styled text on a path without overflowing the stack', () => {
+    const styled = styleTextRender(manyGlyphs(), { italic: true }, 10);
+    const placed = placeTextOnPath(styled, LONG_GUIDE, {
+      guideObjectId: LONG_GUIDE.id,
+      offsetMm: 0,
+      reverse: false,
+    });
+    expect(placed.kind).toBe('ok');
+    if (placed.kind !== 'ok') return;
+    expect(pointCount(placed.rendered)).toBe(GLYPHS * RING);
+    expect(placed.rendered.bounds.minX).toBeGreaterThanOrEqual(0);
+    expect(placed.rendered.bounds.maxX).toBeGreaterThan(GLYPHS - 10);
+  });
+});
+
+const LONG_GUIDE: SceneObject = {
+  kind: 'imported-svg',
+  id: 'long-guide',
+  source: 'long-guide.svg',
+  bounds: { minX: 0, minY: 0, maxX: 5000, maxY: 0 },
+  transform: IDENTITY_TRANSFORM,
+  paths: [
+    {
+      color: '#000000',
+      polylines: [
+        {
+          closed: false,
+          points: [
+            { x: 0, y: 0 },
+            { x: 5000, y: 0 },
+          ],
+        },
+      ],
+    },
+  ],
+};

@@ -25,9 +25,9 @@ export function MachineModeToggle(): JSX.Element {
   const setMachineKind = useStore((s) => s.setMachineKind);
   const pushToast = useToastStore((s) => s.pushToast);
   // A running or held job keeps the mode it started with. Jog, Zero Z, Probe
-  // and the safe-Z lift before a point move follow the job's mode, but the
-  // Active bit is chosen in the project, so only the job's own mode stays
-  // selectable (ADR-416 Amendment 3).
+  // and the safe-Z lift before a point move follow the job's mode, and the
+  // probe's geometry and the bit list come from a CNC project, so only the
+  // job's own mode stays selectable (ADR-416 Amendments 3 and 4).
   const jobActive = useLaserStore((s) => isActiveJobStatus(s.streamer?.status ?? null));
   const jobKind = useLaserStore((s) => runningJobMachineKind(s));
   const select = (machineKind: MachineKind): void => {

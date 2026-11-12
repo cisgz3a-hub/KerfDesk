@@ -88,10 +88,10 @@ export function SurfacingFields({
         ))}
       </div>
       <p>
-        Active cutter: {tool.name}.{' '}
+        Default bit: {tool.name}.{' '}
         {starter === null
           ? 'Generic starting values; verify them for this cutter and material.'
-          : 'Starting values use the stock material and active cutter; verify them with a test cut.'}
+          : 'Starting values use the stock material and the Default bit; verify them with a test cut.'}
       </p>
       {limited ? (
         <p role="note">
@@ -121,7 +121,7 @@ function surfacingFields(v: Values): ReadonlyArray<NumProps> {
       label: 'Stepover %',
       value: v.inputs.stepoverPct,
       onCommit: v.setStepoverPct,
-      title: `Row spacing as a percentage of the active bit's diameter, at most ${String(SURFACING_MAX_STEPOVER_PCT)}%. Wider rows leave uncut strips.`,
+      title: `Row spacing as a percentage of the Default bit's diameter, at most ${String(SURFACING_MAX_STEPOVER_PCT)}%. Wider rows leave uncut strips.`,
       range: { min: 1, max: SURFACING_MAX_STEPOVER_PCT },
     },
     {

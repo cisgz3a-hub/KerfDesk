@@ -17,6 +17,7 @@ import { AUTOSAVE_INTERVAL_MS } from '../state/autosave';
 import { projectAutosaveService } from '../state/autosave-durable';
 import { useBackgroundSaveHealth } from '../state/background-save-health';
 import { useLaserStore } from '../state/laser-store';
+import { reportLinkMachineWork, resetLinkMachineWorkForTests } from '../state/link-machine-work';
 import { projectWithCurrentJobSetup } from '../state/project-job-setup';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
@@ -272,5 +273,32 @@ describe('the lasting sign of a failed autosave (A5-P2-1)', () => {
 
     act(() => useStore.setState({ dirty: false }));
     expect(autosaveSign()).toBeUndefined();
+  });
+});
+
+// A K40, Moshiboard or Ruida link job streams from this window as a laser
+// stream does (code quality audit C2 D6-P2-2), so the same hold applies.
+describe('autosave while a link job runs (C2 D6-P2-2)', () => {
+  afterEach(() => resetLinkMachineWorkForTests());
+
+  it('holds back a heavy project during a K40 job and writes it when the job ends', async () => {
+    const write = vi.spyOn(projectAutosaveService, 'write').mockResolvedValue(WRITTEN);
+    await mountHook();
+    await tick();
+    reportLinkMachineWork('lihuiyu-usb', {
+      controller: 'K40',
+      activity: 'running',
+      advisories: [],
+      abort: () => Promise.resolve(),
+    });
+    importPhotos();
+
+    await tick(2);
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(autosaveSign()).toEqual({ state: 'waiting', message: AUTOSAVE_WAITING_FOR_JOB_MESSAGE });
+
+    reportLinkMachineWork('lihuiyu-usb', null);
+    await tick();
+    expect(write).toHaveBeenCalledTimes(2);
   });
 });

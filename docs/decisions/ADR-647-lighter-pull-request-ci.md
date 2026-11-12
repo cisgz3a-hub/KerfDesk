@@ -104,3 +104,48 @@ this plan before any change.
 - This change's own pull request ran the new browser job and the packaging scope job. It
   changes scripts and workflows, so its scope selected the installer jobs; the skip path is
   covered by the scope and gate tests.
+
+### Amendment 1 - Fixture names match exactly, and a large selection runs the shards (2026-11-12)
+
+Code-quality audit C2 (area D7, CI health) found that the selector's name matching made the
+"rare" case of Consequences common. A changed non-spec file was matched by its name without
+extensions as a bare substring, and every file that matched was searched for again by its own
+name. One changed generator script, `e2e/fixtures/document-import-generated/generate.mjs`,
+reached 141 of 172 specs through the word "generate". #1730's pull request job ran 476 tests on
+one runner for 2 h 15 m and was reported as hung; another job selected 123 specs and ran 1 h 46 m
+(D7-P2-2).
+
+1. **Exact names.** A changed non-spec file is found by its file name with the extension
+   (`tools-ai-audit.tsx`), a module also by an import specifier that may leave the extension off
+   (`'./fixtures/save-helper'`), and a data file by its folder below `e2e/fixtures/`. Each name
+   counts only on its own, not inside a longer name (`composed-svg` is not found in
+   `composed-svg-browser`). A changed `README*` selects nothing.
+2. **Generic file names.** A file whose name is a common word (`generate`, `index`, `utils` and
+   similar) is found only with its folder in front, and reaching one does not search further for
+   what names it.
+3. **Whole suite above 40 specs.** A new job, *Choose the pull request's browser specs*, runs the
+   selection with `--plan` on every pull request. At 40 spec files or fewer the one pull request
+   job runs them, as before; above 40 the four shards run instead, so a change to a helper most
+   specs import takes about 40 minutes on four runners rather than about two hours on one. The
+   gate needs the plan job too, and lets only the jobs a run does not use be skipped: outside a
+   pull request the plan and the pull request job, and on one the suite job its plan did not
+   choose. A failed plan runs neither suite job and fails the gate.
+4. **Time limits.** Every job in `ci.yml` and `e2e.yml`, and the web deploy job, now has
+   `timeout-minutes` at about twice its 90th-percentile run time (D7-P3-1): unit shards 45, browser
+   shards 75, the pull request job 60, static checks 30, browser checks 30, policy 20, Windows
+   native and the phone service 20, plan and gates 10. The deploy job has 30 for a CI-verified
+   deploy and 180 for a manual one, which runs the whole release gate in that job.
+
+The Consequences point that a helper change "runs for well over an hour" in one job no longer
+holds; such a pull request runs the shards. Main's runs, merge queue entries and manual runs are
+unchanged, and conditions still test only `github.event_name == 'pull_request'` (point 5) besides
+the plan job's own output.
+
+Verification: `scripts/run-pr-browser-smoke.test.mjs` pins exact-name, specifier, folder,
+generic-name and README matching on small trees; on the real `e2e/` tree, the generated import
+fixtures (`generate.mjs`, `illustrator-3.ai`, their README) select at most five specs and always
+`document-import-acceptance.e2e.ts`. It pins the 40-spec limit, the plan job, both suite
+conditions and the gate's skip list, and where `jq` is installed it runs the gate's own filter
+over push, focused, full and failed-plan results. `scripts/ci-parallel-gate.test.mjs` pins every
+job's time limit. Locally, `--plan` chose the pull request job for this change (13 specs) and the
+shards with `e2e/fixtures/kerfdesk-test.ts` changed (141 specs).

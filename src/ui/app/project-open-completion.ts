@@ -6,9 +6,10 @@ import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capabi
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ProjectMachineCapabilityLoadResult } from '../state/project-machine-capability';
 import type { MarkLoadedOptions } from '../state/store-save-tracking-actions';
-import type { ToastVariant } from '../state/toast-store';
+import { pushFoldedNotice, type Notice } from '../state/folded-notice';
+import type { ToastOptions, ToastVariant } from '../state/toast-store';
 import { describePendingProProject } from '../state/pending-pro-project';
-import { pushProjectLoadNotices } from '../state/project-load-notices';
+import { PROJECT_NOTICES_TOAST_KEY, projectLoadNotices } from '../state/project-load-notices';
 import { missingFontOpenNotice } from '../text/missing-font-notice';
 import { clearAutosaveAfterFileHandoff } from './autosave-file-cleanup';
 import { projectOpenFailure } from './file-action-formatters';
@@ -16,11 +17,7 @@ import { projectOpenFailure } from './file-action-formatters';
 export type ProjectOpenCompletionContext = {
   readonly setProject: (project: Project) => ProjectMachineCapabilityLoadResult;
   readonly markLoaded: (filename: string, options?: MarkLoadedOptions) => void;
-  readonly pushToast: (
-    message: string,
-    variant?: ToastVariant,
-    options?: { readonly details?: ReadonlyArray<string> },
-  ) => void;
+  readonly pushToast: (message: string, variant?: ToastVariant, options?: ToastOptions) => void;
 };
 
 /** Where Save writes a KerfDesk project opened from `ref` (ADR-550), when the
@@ -51,14 +48,22 @@ export function completeNativeProjectOpen(
     clearAutosaveAfterFileHandoff(ctx.pushToast);
     const migration =
       result.migratedFrom === undefined ? '' : ` — migrated from schema v${result.migratedFrom}`;
-    ctx.pushToast(
-      `Opened ${fileName}${migration}`,
-      result.migratedFrom === undefined ? 'success' : 'info',
-    );
-    pushProjectLoadNotices(result, ctx.pushToast, { migration: false, project: result.project });
     const missingFonts = missingFontOpenNotice(result.project);
-    if (missingFonts !== null) ctx.pushToast(missingFonts, 'warning');
-    reportMachineCapabilityRepair(loadResult, ctx.pushToast);
+    // One toast: what the loader changed folds under "Opened", so a project
+    // with many notes cannot push its first ones out unseen (A5-P2-6, ADR-708).
+    pushFoldedNotice(
+      ctx.pushToast,
+      PROJECT_NOTICES_TOAST_KEY,
+      {
+        message: `Opened ${fileName}${migration}`,
+        variant: result.migratedFrom === undefined ? 'success' : 'info',
+      },
+      [
+        ...projectLoadNotices(result, { migration: false, project: result.project }),
+        ...(missingFonts === null ? [] : [warning(missingFonts)]),
+        ...machineCapabilityRepairNotes(loadResult),
+      ],
+    );
     return true;
   }
   if (result.kind === 'schema-too-new') {
@@ -94,28 +99,31 @@ export function completeLightBurnProjectOpen(
   // unsupported shape types among them, and the project's notes keep the
   // whole report (ADR-388).
   const warnings = result.report.warnings.length;
-  ctx.pushToast(
-    `Imported ${fileName}: ${result.report.importedObjects} objects, ${result.report.importedLayers} layers${warnings === 0 ? '' : `, ${warnings} warning(s)`}. Save as .lf2 to keep changes.`,
-    warnings === 0 ? 'success' : 'warning',
+  const visible = result.report.warnings.slice(0, 3);
+  const remainder = warnings - visible.length;
+  const review = `LightBurn import review: ${visible.join(' ')}${remainder > 0 ? ` ${remainder} more warning(s) are in the import report in Window > Project Notes.` : ''}`;
+  pushFoldedNotice(
+    ctx.pushToast,
+    PROJECT_NOTICES_TOAST_KEY,
+    {
+      message: `Imported ${fileName}: ${result.report.importedObjects} objects, ${result.report.importedLayers} layers${warnings === 0 ? '' : `, ${warnings} warning(s)`}. Save as .lf2 to keep changes.`,
+      variant: warnings === 0 ? 'success' : 'warning',
+    },
+    [...(warnings === 0 ? [] : [warning(review)]), ...machineCapabilityRepairNotes(loadResult)],
   );
-  if (warnings > 0) {
-    const visible = result.report.warnings.slice(0, 3);
-    const remainder = warnings - visible.length;
-    ctx.pushToast(
-      `LightBurn import review: ${visible.join(' ')}${remainder > 0 ? ` ${remainder} more warning(s) are in the import report in Window > Project Notes.` : ''}`,
-      'warning',
-    );
-  }
-  reportMachineCapabilityRepair(loadResult, ctx.pushToast);
   return true;
 }
 
-function reportMachineCapabilityRepair(
+function warning(message: string): Notice {
+  return { message, variant: 'warning' };
+}
+
+function machineCapabilityRepairNotes(
   result: ProjectMachineCapabilityLoadResult,
-  pushToast: ProjectOpenCompletionContext['pushToast'],
-): void {
-  if (result.kind !== 'capability-warning') return;
-  pushToast(loadedMachineCapabilityWarningMessage(result.activeKind), 'warning');
+): ReadonlyArray<Notice> {
+  return result.kind === 'capability-warning'
+    ? [warning(loadedMachineCapabilityWarningMessage(result.activeKind))]
+    : [];
 }
 
 function markCapabilityAwareLoad(

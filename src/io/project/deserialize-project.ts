@@ -23,6 +23,7 @@ import {
 } from '../../core/devices';
 import { isBidirectionalScanPolicy, kinematicsEntry } from '../../core/devices/device-profile';
 import { laserArcMovesEntry } from '../../core/devices/laser-arc-moves';
+import { normalizedPowerScaleStatement } from '../../core/devices/power-scale-statement';
 import { normalizeScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
 import { normalizeCameraProfile, type CameraProfile } from '../../core/camera';
 import {
@@ -320,6 +321,7 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     ...optionalDeviceFlags(dev),
     accelMmPerSec2: numberOrDefault(dev['accelMmPerSec2'], DEFAULT_DEVICE_PROFILE.accelMmPerSec2),
     kinematics: kinematicsEntry(dev['kinematics']).kinematics, // ADR-675
+    ...normalizedPowerScaleStatement(dev['operatorPowerScaleStatement']), // ADR-095 Amd 1
     junctionDeviationMm: numberOrDefault(
       dev['junctionDeviationMm'],
       DEFAULT_DEVICE_PROFILE.junctionDeviationMm,

@@ -55,6 +55,28 @@ async function replyWithPresentationSvg(extraNotes: readonly string[] = []): Pro
   });
 }
 
+// One toast for the import (ADR-708). Its last three warnings are in the open,
+// one a line, and the earlier ones fold under a count: nothing is missing.
+function expectOneImportToast(
+  opacityNote: string,
+  expected: { readonly lastOpen: string; readonly folded: number },
+): void {
+  const toasts = useToastStore.getState().toasts;
+  expect(toasts).toHaveLength(1);
+  const toast = toasts[0];
+  if (toast === undefined) throw new Error('expected the import toast');
+  const lines = toast.message.split('\n');
+  const details = toast.details ?? [];
+  expect(toast.variant).toBe('warning');
+  expect(lines).toContain('revision.svg: ' + opacityNote);
+  expect(lines.at(-2)).toContain(expected.lastOpen);
+  expect(lines.at(-1)).toBe(`${expected.folded} more warnings below.`);
+  expect(details).toContain(PRESENTATION_WARNINGS[0]);
+  expect(details).toHaveLength(expected.folded);
+  // The result line, three open notes and the count.
+  expect(lines).toHaveLength(5);
+}
+
 afterEach(() => {
   resetDocumentImportWorkerForTests();
   for (const toast of useToastStore.getState().toasts) {
@@ -98,15 +120,19 @@ describe('importSvgFiles', () => {
       const committed = parser === 'worker reply' ? importFragment : importObject;
       expect(committed).toHaveBeenCalledOnce();
       expect(parser === 'worker reply' ? importObject : importFragment).not.toHaveBeenCalled();
-      // Worker progress is informational and precedes the completed import.
+      // Worker progress is informational and precedes the completed import,
+      // which is one toast: the result, then its warnings, one a line (ADR-708).
       expect(pushToast.mock.calls.filter(([, variant]) => variant !== 'info')).toEqual([
         [
-          kind === 'added'
-            ? 'Imported revision.svg — 1 object, 1 color'
-            : 'Re-imported revision.svg — layer settings preserved (1 kept)',
-          'success',
+          [
+            kind === 'added'
+              ? 'Imported revision.svg — 1 object, 1 color'
+              : 'Re-imported revision.svg — layer settings preserved (1 kept)',
+            ...PRESENTATION_WARNINGS,
+          ].join('\n'),
+          'warning',
+          { key: 'svg-import:revision.svg' },
         ],
-        ...PRESENTATION_WARNINGS.map((message) => [message, 'warning']),
       ]);
       if (parser === 'worker reply') expect(text).not.toHaveBeenCalled();
     },
@@ -129,6 +155,7 @@ describe('importSvgFiles', () => {
         'Re-imported clean.svg — new layer settings (1 new, 1 removed). New parts start from ' +
           'default settings: check them before you burn.',
         'warning',
+        { key: 'svg-import:clean.svg' },
       ],
     ]);
   });
@@ -176,13 +203,13 @@ describe('importSvgFiles', () => {
       const root = createRoot(host);
       try {
         await act(async () => root.render(createElement(Toasts)));
-        const visible = [...host.querySelectorAll('.lf-toast__message')].map(
-          (element) => element.textContent,
-        );
-        expect(visible).toHaveLength(3);
-        expect(visible).toContain('Warning: revision.svg: ' + opacityNote);
-        expect(visible.at(-1)).toContain(
-          kind === 'added' ? 'so it was scaled to 36% to fit' : opacityNote,
+        expect(host.querySelectorAll('.lf-toast')).toHaveLength(1);
+        expect(host.querySelector('.lf-toast__message')?.textContent).toContain(opacityNote);
+        expectOneImportToast(
+          opacityNote,
+          kind === 'added'
+            ? { lastOpen: 'so it was scaled to 36% to fit', folded: 3 }
+            : { lastOpen: opacityNote, folded: 2 },
         );
       } finally {
         await act(async () => root.unmount());
@@ -260,12 +287,15 @@ describe('importSvgFiles', () => {
       pushToast,
     );
 
-    const messages = pushToast.mock.calls.map(([message]) => String(message));
+    // One toast (ADR-708); the fit is its last line.
+    expect(pushToast).toHaveBeenCalledOnce();
+    const [message, variant, options] = pushToast.mock.calls[0] ?? [];
+    const messages = String(message).split('\n');
     expect(messages.slice(0, -1)).toContainEqual(expect.stringMatching(/text element.*ignored/));
-    expect(pushToast).toHaveBeenLastCalledWith(
+    expect(messages.at(-1)).toBe(
       'banner.svg is larger than the 400 × 400 mm bed (1000 × 500 mm), so it was scaled to 36% ' +
         'to fit. Undo restores the original size.',
-      'warning',
     );
+    expect([variant, options]).toEqual(['warning', { key: 'svg-import:banner.svg' }]);
   });
 });

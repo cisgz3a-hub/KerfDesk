@@ -33,7 +33,11 @@ import {
   ruidaStopOutcome,
 } from './ruida-network-messages';
 import { watchRuidaRun, type RuidaMonitor } from './ruida-network-monitor';
-import { reportLinkMachineWork, type LinkMachineWork } from '../link-machine-work';
+import {
+  reportLinkMachineStatus,
+  reportLinkMachineWork,
+  type LinkMachineWork,
+} from '../link-machine-work';
 
 export type RuidaNetworkPhase =
   | 'disconnected'
@@ -355,6 +359,10 @@ const ACTIVE_WORK: Partial<Record<RuidaNetworkPhase, LinkMachineWork['activity']
 
 useRuidaNetworkStore.subscribe((state) => {
   const activity = ACTIVE_WORK[state.phase];
+  reportLinkMachineStatus('ruida-network', {
+    connected: state.phase !== 'disconnected' && state.phase !== 'connecting',
+    framed: state.framed !== null,
+  });
   reportLinkMachineWork(
     'ruida-network',
     activity === undefined

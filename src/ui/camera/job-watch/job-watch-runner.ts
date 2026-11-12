@@ -14,6 +14,7 @@ import type {
 } from '../../state/canvas-motion-plan';
 import { useCameraStore } from '../../state/camera-store';
 import { useLaserStore } from '../../state/laser-store';
+import { nativeBedUnknownReason, nativeBedUnknownWhy } from '../../state/native-bed-unknown-reason';
 import { headPositionNow } from '../head/head-position';
 import {
   burnCheckBlocker,
@@ -136,6 +137,13 @@ function retirePendingWatch(): void {
   }
 }
 
+// Why this firmware and session have no bed mapping, for the burn check's
+// "unavailable" line (annoyance audit A2 B3-P2-2).
+function bedUnknownWhy(plan: CanvasMotionPlan): string | null {
+  const reason = nativeBedUnknownReason(plan.device, useLaserStore.getState());
+  return reason === null ? null : nativeBedUnknownWhy(reason, plan.device);
+}
+
 function startBurnCheck(
   plan: CanvasMotionPlan,
   region: ReturnType<typeof burnRegion>,
@@ -143,7 +151,7 @@ function startBurnCheck(
   io: WatchIo,
   isCurrent: () => boolean,
 ): Promise<BeforePicture> | null {
-  const blocker = burnCheckBlocker(plan, camera);
+  const blocker = burnCheckBlocker(plan, camera, bedUnknownWhy(plan));
   if (blocker !== null || camera === null) {
     setBurnCheck({ kind: 'unavailable', reason: blocker ?? '' }, isCurrent);
     return null;

@@ -410,7 +410,7 @@ describe('a running CNC recovery keeps its own machine in the bit-change hold (G
     await streamToBitChange();
     useStore.setState({ project: createProject() });
 
-    // The job's own mode stays selectable, so its Active bit can be chosen;
+    // The job's own mode stays selectable, so its probe and bit list return;
     // once there, the lock keeps it.
     useStore.getState().setMachineKind('cnc');
     expect(machineKindOf(useStore.getState().project.machine)).toBe('cnc');

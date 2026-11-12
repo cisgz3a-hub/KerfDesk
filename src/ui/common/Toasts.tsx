@@ -8,24 +8,33 @@
 // folded list of notes' summary) is interactive: a click-to-dismiss toast over the drawing surface had the
 // import worker's "parsing in worker" advisory swallow the mousedown that
 // started a rectangle drag (e2e shape-properties caught it).
+//
+// ADR-708: the countdown stops while the pointer is over a toast or focus is
+// inside it (use-toast-pause.ts watches the pointer without taking it). The
+// region announces additions only, so a keyed toast rewritten with the same
+// text says nothing again, a progress line that changes stays quiet, and a
+// warning or error rewritten with new text is put in as a new node so it is
+// read once.
 
 import { createPortal } from 'react-dom';
 import { Icon } from '../kit/icons';
-import { useToastStore, type Toast, type ToastVariant } from '../state/toast-store';
+import { VISIBLE_TOASTS, useToastStore, type Toast, type ToastVariant } from '../state/toast-store';
+import { useToastPause } from './use-toast-pause';
 import { useToastPlacement } from './use-toast-placement';
 import { useToastScrollability } from './use-toast-scrollability';
 import './Toasts.css';
 
-// Three single-line toasts fit the reserved band; a fourth (the import
-// worker's burst) would push into the drawing. Older toasts stay in the store
-// and expire on their own timers; only the newest three are rendered.
-const MAX_VISIBLE_TOASTS = 3;
-
 export function Toasts(): JSX.Element {
-  const toasts = useToastStore((s) => s.toasts).slice(-MAX_VISIBLE_TOASTS);
+  // Three single-line toasts fit the reserved band; a fourth (the import
+  // worker's burst) would push into the drawing. Older toasts stay in the
+  // store and expire on their own timers; warnings and errors among them stay
+  // readable in the status bar's Notices list.
+  const toasts = useToastStore((s) => s.toasts).slice(-VISIBLE_TOASTS);
   const dismiss = useToastStore((s) => s.dismissToast);
   const placement = useToastPlacement(toasts.length > 0);
-  const { ref, scrollable } = useToastScrollability(JSON.stringify(toasts), placement.host);
+  const layoutSignature = JSON.stringify(toasts);
+  const { ref, scrollable } = useToastScrollability(layoutSignature, placement.host);
+  const focus = useToastPause(ref, layoutSignature);
   const notifications = (
     <div
       ref={ref}
@@ -41,8 +50,15 @@ export function Toasts(): JSX.Element {
         const variantLabel = toastVariantLabel(toast.variant);
         const dismissLabel = `Dismiss ${variantLabel.toLowerCase()} notification: ${toast.message}`;
         return (
-          <div key={toast.id} className="lf-toast" style={variantStyle(toast.variant)}>
-            <span className="lf-toast__message">
+          <div
+            key={toast.id}
+            className="lf-toast"
+            style={variantStyle(toast.variant)}
+            data-toast-id={toast.id}
+            onFocus={() => focus.onFocus(toast.id)}
+            onBlur={(event) => focus.onBlur(toast.id, event)}
+          >
+            <span key={announcedKey(toast)} className="lf-toast__message">
               <strong>{variantLabel}: </strong>
               {toast.message}
               {toast.details === undefined ? null : <ToastDetails toast={toast} />}
@@ -86,6 +102,16 @@ function ToastDetails(props: { readonly toast: Toast }): JSX.Element {
       </ul>
     </details>
   );
+}
+
+// The node a screen reader hears. A warning or error whose text changed is a
+// new node, which the additions-only live region announces; the same text
+// again, and every info or success rewrite, keeps its node and stays quiet
+// (ADR-207, UX audit U7-P2-1: a live region must not be flooded).
+function announcedKey(toast: Toast): string {
+  return toast.variant === 'warning' || toast.variant === 'error'
+    ? `${toast.variant}:${toast.message}`
+    : 'quiet';
 }
 
 function toastVariantLabel(variant: ToastVariant): string {

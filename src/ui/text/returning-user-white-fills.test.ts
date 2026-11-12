@@ -75,7 +75,9 @@ function opened(): { readonly project: Project; readonly toasts: string[] } {
     {
       setProject: useStore.getState().setProject,
       markLoaded: () => undefined,
-      pushToast: (message) => toasts.push(message),
+      // One toast carries the result and its notes, one a line (ADR-708).
+      pushToast: (message, _variant, options) =>
+        toasts.push(...message.split('\n'), ...(options?.details ?? [])),
     },
     `${NAME}.lf2`,
     result,

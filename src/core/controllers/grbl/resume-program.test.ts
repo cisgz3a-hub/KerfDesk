@@ -78,6 +78,55 @@ describe('buildResumeProgram', () => {
     expect(preamble.indexOf('G55')).toBeLessThan(moveIndex);
   });
 
+  // Code quality audit C2, D3 mutant P06: an imported program that leaves G55
+  // for G54 before the resume line resumes in G54, not in the frame it left.
+  it('follows a return from G55 to G54 before the resume line', () => {
+    const laser = [
+      'G21',
+      'G90',
+      'G55',
+      'M3 S0',
+      'G0 X0 Y0 S0',
+      'G1 X10 Y0 F1500 S300',
+      'G54',
+      'G1 X20 Y0',
+      'G1 X30 Y0',
+      'M5',
+    ].join('\n');
+    const result = buildResumeProgram(laser, 9, LASER_OPTIONS);
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    const preamble = result.lines.slice(0, result.preambleCount);
+
+    expect(preamble.filter((line) => /^G5[4-9]$/.test(line))).toEqual(['G54']);
+    expect(preamble.indexOf('G54')).toBeLessThan(
+      preamble.findIndex((line) => line.startsWith('G0 X')),
+    );
+  });
+
+  // Code quality audit C2, D3 mutant P14: an imported program that switched the
+  // beam off with M5 and then has `G1 … S800` moves meant dark must resume with
+  // the beam still off, not re-armed with M3.
+  it('keeps the beam off when the program turned it off with M5 before the resume line', () => {
+    const laser = [
+      'G21',
+      'G90',
+      'M3 S0',
+      'G0 X0 Y0 S0',
+      'G1 X10 Y0 F1500 S300',
+      'M5',
+      'G1 X20 Y0 S800',
+      'G1 X30 Y0',
+      'G1 X40 Y0',
+    ].join('\n');
+    const result = buildResumeProgram(laser, 8, LASER_OPTIONS);
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    const preamble = result.lines.slice(0, result.preambleCount);
+
+    expect(preamble).toContain('M5');
+    expect(preamble.filter((line) => /^M[34]\b/.test(line))).toEqual([]);
+    expect(result.lines.filter((line) => /^M[34]\b/.test(line))).toEqual([]);
+  });
+
   it('defaults the resume preamble to G54 when the program selects no WCS', () => {
     const laser = 'G21\nG90\nM3 S0\nG0 X0 Y0 S0\nG1 X10 Y0 F1500 S300\nM5';
     const result = buildResumeProgram(laser, 5, LASER_OPTIONS);

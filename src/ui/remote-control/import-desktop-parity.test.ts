@@ -128,9 +128,13 @@ describe('a remote import reports and undoes its bed fit as the desktop import d
     expect(remote.afterOneUndo).toEqual(desktop.afterOneUndo);
     expect((remote.afterOneUndo?.maxX ?? 0) - (remote.afterOneUndo?.minX ?? 0)).toBeCloseTo(1000);
     expect(remote.afterTwoUndos).toBe(0);
-    expect(remote.toasts).toEqual(desktop.toasts);
-    expect(noticeMessages(remote.receipt)).toEqual(desktop.toasts);
-    expect(desktop.toasts).toEqual(
+    // The desktop says its result and notes on one toast, one a line (ADR-708);
+    // the remote import's PC toasts and receipt carry the same lines.
+    expect(desktop.toasts).toHaveLength(1);
+    const desktopLines = desktop.toasts.flatMap((toast) => toast.split('\n'));
+    expect(remote.toasts).toEqual(desktopLines);
+    expect(noticeMessages(remote.receipt)).toEqual(desktopLines);
+    expect(desktopLines).toEqual(
       expect.arrayContaining([
         expect.stringContaining('1 text element ignored'),
         expect.stringMatching(/scaled to 36% to fit\. Undo restores the original size\.$/),

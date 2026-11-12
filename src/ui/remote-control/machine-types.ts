@@ -1,3 +1,4 @@
+import type { RemoteReviewAcknowledgementKind } from '../laser/job-review/before-you-start';
 import type { JobReviewModel } from '../laser/job-review/job-review-model';
 
 /** Lifetime of a granted client, independent of a completed command RPC. */
@@ -100,7 +101,7 @@ export type MachineReview = {
   };
   // The prompt leads with the Before you start points (ADR-689).
   readonly acknowledgement: {
-    readonly kind: JobReviewModel['acknowledgement']['kind'];
+    readonly kind: RemoteReviewAcknowledgementKind;
     readonly prompt: string;
   };
   readonly frame: { readonly required: true; readonly complete: boolean };

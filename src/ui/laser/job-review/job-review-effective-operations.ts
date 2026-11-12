@@ -242,7 +242,7 @@ function effectiveGroupSummary(
 }
 
 function cncGroupSummary(group: CncGroup): string {
-  const tool = group.toolName ?? group.toolId ?? 'active bit';
+  const tool = group.toolName ?? group.toolId ?? 'Default bit';
   const coolant =
     group.coolant === undefined || group.coolant === 'off'
       ? 'coolant off'

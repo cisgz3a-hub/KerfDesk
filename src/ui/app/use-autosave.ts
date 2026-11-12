@@ -31,6 +31,7 @@ import { createAutosaveProjectSnapshot } from '../state/autosave-project-snapsho
 import { useBackgroundSaveHealth } from '../state/background-save-health';
 import { noteProjectCopyOnDisk } from '../state/design-document-copies';
 import { useLaserStore } from '../state/laser-store';
+import { activeLinkMachineWork } from '../state/link-machine-work';
 import { useToastStore } from '../state/toast-store';
 import {
   projectLoadRefused,
@@ -107,8 +108,11 @@ function createSnapshotForAutosave(noteJob: (active: boolean) => void): Autosave
     const s = useStore.getState();
     const ls = useLaserStore.getState();
     const streamer = ls.streamer;
+    // A Moshi, K40 or Ruida link job streams from this window too, so autosave
+    // holds for it as for a laser stream (code quality audit C2 D6-P2-2).
     const isStreaming =
-      streamer !== null && (streamer.status === 'streaming' || streamer.status === 'paused');
+      (streamer !== null && (streamer.status === 'streaming' || streamer.status === 'paused')) ||
+      activeLinkMachineWork() !== null;
     noteJob(isStreaming);
     return {
       project: snapshotProject(s),
@@ -326,14 +330,20 @@ function reportRestoredProject(
   loadResult: ProjectMachineCapabilityLoadResult,
   record: AutosaveDurableSnapshot,
 ): void {
-  const pushToast = useToastStore.getState().pushToast;
-  if (loadResult.kind === 'capability-warning') {
-    pushToast(loadedMachineCapabilityWarningMessage(loadResult.activeKind), 'warning');
-  }
-  pushProjectLoadNotices(record.loadNotices ?? {}, pushToast, {
-    migration: true,
-    project: record.project,
-  });
+  // One toast for what Restore changed (annoyance audit A5-P2-6, ADR-708).
+  pushProjectLoadNotices(
+    record.loadNotices ?? {},
+    useToastStore.getState().pushToast,
+    { migration: true, project: record.project },
+    loadResult.kind === 'capability-warning'
+      ? [
+          {
+            message: loadedMachineCapabilityWarningMessage(loadResult.activeKind),
+            variant: 'warning',
+          },
+        ]
+      : [],
+  );
 }
 
 export function recoveryAgeLabel(savedAt: number): string {

@@ -60,7 +60,7 @@
 //    (grbl-sim-lines.ts): G0/G1 past the travel raises no ALARM:2, and the
 //    grblHAL mode checks no soft limits.
 
-import { formatVec3, SIM_ZERO_VEC3, type SimVec3 } from './grbl-sim-gcode';
+import { formatReportedVec3, formatVec3, SIM_ZERO_VEC3, type SimVec3 } from './grbl-sim-gcode';
 import { reduceGrblSimLine } from './grbl-sim-lines';
 import {
   applyGrblSimOverrideByte,
@@ -382,7 +382,14 @@ function reportedAxes(
   wco: SimVec3,
 ): { readonly mpos: string; readonly wcoText: string } {
   const a = state.aAxis;
-  if (a === undefined) return { mpos: formatVec3(state.mpos), wcoText: formatVec3(wco) };
+  if (a === undefined) {
+    // `$13=1` inch reports are modelled for a three-axis build only; a
+    // four-axis build's A unit depends on grblHAL `$376`.
+    return {
+      mpos: formatReportedVec3(state.settings, state.mpos),
+      wcoText: formatReportedVec3(state.settings, wco),
+    };
+  }
   return {
     mpos: `${formatVec3(state.mpos)},${a.mpos.toFixed(3)}`,
     wcoText: `${formatVec3(wco)},${a.g92.toFixed(3)}`,

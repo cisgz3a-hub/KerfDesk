@@ -4,6 +4,7 @@
 
 import { machineKindOf, type CncTool, type Project } from '../../core/scene';
 import type { CncToolPlanEntry } from '../state/cnc-tool-plan';
+import { SPINDLE_BIT_LABEL } from '../state/spindle-bit';
 import {
   isWorkZEvidenceCurrentForStart,
   probePlateRemovalRequired,
@@ -54,7 +55,7 @@ export function cncWorkZeroToolStartIssue(
   const evidenceName = evidenceToolName(machine.tools, evidence?.toolId);
   return (
     `${subject} starts with ${expectedName}, but work Z was established for ${evidenceName}. ` +
-    `Load ${expectedName}, select it as the Active bit, then touch it to the stock top and ` +
+    `Load ${expectedName}, choose it under ${SPINDLE_BIT_LABEL} in the Machine rail, then touch it to the stock top and ` +
     'Zero Z — or probe again.'
   );
 }

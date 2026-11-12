@@ -2760,8 +2760,9 @@ inches hides the position until `$G` or the next Frame (ADR-375 Amendment 11).
    - the machine is a laser. A CNC job always shows Job Review, because its setup confirmation
      belongs to each run;
    - the prepared program is the one the completed run sent, byte for byte;
-   - the review needs no answer: laser mode is verified, there is no machine-type question and
-     nothing blocks Start;
+   - the review needs no answer: laser mode is verified, or the firmware reports no power
+     scale and the operator has recorded that they checked it (ADR-237 Amendment 4, ADR-095
+     Amendment 1); there is no machine-type question and nothing blocks Start;
    - its warnings are exactly the ones accepted for the run being repeated;
    - that run was reviewed in this KerfDesk session, on this controller session. After a
      reload, or once the controller session has changed (a reconnect, for example), the
@@ -6866,7 +6867,7 @@ and lifts the command's CNC-only gate.)*
    name. Engraving rows also identify a pointed tip or the stored tip-flat
    diameter. Tapered ball-nose rows show the tip diameter and the per-side
    taper instead of the included angle.
-7. Choosing an Active bit briefly shows a dismissible **Modeled cutting
+7. Choosing a Default bit briefly shows a dismissible **Modeled cutting
    envelope** preview. For an end mill, full-radius ball, valid point V-bit, or
    engraving bit with a valid included angle and optional valid tip flat,
    it uses the same profile as removal simulation, reports a catalog shank
@@ -7101,9 +7102,13 @@ and lifts the command's CNC-only gate.)*
    Start — the Job Review dialog carries the warning instead, and Zero Z /
    probing remain available in the panel. KerfDesk's CNC emitter still defines
    Z0 as the stock top, so the warning is prominent.
-2. The evidence still records the Active bit selected when Zero Z/probing begins.
-   Start compares it with the first bit in the exact compiled tool-section plan;
-   missing or mismatched identity is a Job Review warning, not a block.
+2. The evidence records the bit in the spindle when Zero Z/probing begins: the
+   bit the last bit-change hold declared or the operator chose under **Bit in
+   the spindle** in the Machine rail, and the project's Default bit until either
+   has happened (ADR-416 Amendment 4). Start compares it with the first bit in
+   the exact compiled tool-section plan; missing or mismatched identity is a Job
+   Review warning, not a block. The warning says to choose the bit under Bit in
+   the spindle and zero again; Machine Setup and the project are not involved.
 3. Probe-derived evidence still starts with touch-plate removal unconfirmed.
    Unconfirmed removal surfaces as a Job Review warning at ordinary Start (the
    mid-job tool-change probe-plate check is unchanged — resume/recovery class).
@@ -7112,8 +7117,13 @@ and lifts the command's CNC-only gate.)*
 
 #### Success
 1. Every M0 change block carries "; re-zero Z on the stock top, then
-   cycle-start to resume". The operator swaps the bit, selects that exact bit
-   as Active, jogs Z to touch the stock top, zeros Z (or probes), and resumes.
+   cycle-start to resume". The hold names the bit to load and declares it as
+   the **Bit in the spindle** (Machine rail, beside Zero Z), with the line "This
+   job is waiting for {bit}. Zero Z and the probe now record Work Z for it."
+   The operator swaps the bit, jogs Z to touch the stock top, zeros Z (or
+   probes), and resumes. Nothing is selected or saved in Machine Setup, whose
+   Save waits for the job, and the project's Default bit does not change
+   (ADR-416 Amendments 1 and 4). A job may change bits any number of times.
 2. **Continue remains disabled** until the pre-change retract/park has drained
    to a fresh controller Idle and the new tool's Z zero has been established
    with the stable tool ID expected by the compiled section plan. A probe also
@@ -7126,11 +7136,30 @@ and lifts the command's CNC-only gate.)*
    successful probe records fresh work-Z evidence for the replacement bit.
    That evidence records whether it came from manual Zero Z or a settled probe
    and must match the current work-Z reference epoch.
-2. KerfDesk proves agreement between the selected Active-bit ID, the Z evidence,
-   and the compiled plan, and records an explicit plate-removal acknowledgement.
-   It cannot sense the physical cutter or plate; truthful tool selection,
-   removal confirmation, clamping, and actual spindle-at-speed remain
+2. KerfDesk proves agreement between the declared bit in the spindle, the Z
+   evidence, and the compiled plan, and records an explicit plate-removal
+   acknowledgement (**Dismiss reminder** on the touch-plate notice).
+   It cannot sense the physical cutter or plate; loading the bit the hold
+   names, removal confirmation, clamping, and actual spindle-at-speed remain
    operator/machine responsibilities.
+
+#### Edge — a different bit is loaded, or declared, at the hold
+1. Choosing another bit under **Bit in the spindle** at a hold is the operator
+   saying that bit is loaded. The line under the selector then reads "This job
+   is waiting for {bit}, but {other} is chosen here…", a Work Z taken now is
+   recorded for the chosen bit, and Continue stays off with "Work Z belongs to
+   a different bit. Load {bit}, choose it under Bit in the spindle, then touch
+   it to the stock top and Zero Z — or probe again — before continuing."
+2. Choosing a bit never changes a Work Z already recorded, so choosing the
+   right bit afterwards does not unlock Continue; zeroing or probing again does.
+   With the bit more than 0.5 mm from the zero it replaces, Zero Z first asks
+   "Replace the work Z zero?" in the app, with the button **Zero Z here**. The
+   question is asked at a hold too; a yes given after the bit moved sends
+   nothing and says to press Zero Z again.
+3. The selector is off while the job is cutting. A hold whose program names no
+   bit (an imported file, a resume tail) declares nothing and compares no bit.
+4. The declared bit is kept for the app session, across a reconnect, and is
+   cleared by Forget device. It is never written to the project.
 
 #### Error — X/Y origin change during the hold
 1. The hold re-zeroes Z only. The rest of the job runs on the X/Y origin it
@@ -7453,8 +7482,14 @@ and lifts the command's CNC-only gate.)*
 1. Router controls → "Probe (touch plate)": pick Z-only (stock top) or
    XYZ corner (plus which corner). Plate thickness, max travel, and (for
    XYZ) bit diameter are editable; bit diameter prefills from the
-   machine's active bit. Run is enabled only when connected, Idle and
-   the probe circuit is tested.
+   **Bit in the spindle** (the bit the last bit-change hold declared or the
+   operator chose in the Machine rail; the project's Default bit until
+   then, ADR-416 Amendment 4). Run is enabled only when connected, Idle and
+   the probe circuit is tested. A probe records Work Z for that bit, as
+   Zero Z does, so at a bit-change hold a Z probe of the bit the hold asked
+   for unlocks Continue once the plate reminder is dismissed. A declared
+   bit the open project does not list has no known diameter, so only the
+   Z cycle runs for it; the XYZ button says why.
 2. Test touch (ADR-103 Amendment 2): a live **Probe circuit** line reads
    "not tested". The operator holds the plate against the bit (or clip)
    until it reads "closed" (a status report with `Pn:P`; an idle machine is
@@ -7482,7 +7517,7 @@ and lifts the command's CNC-only gate.)*
    that supports owned modal/WCS reads exposes **Advanced: Reuse existing
    controller setup** → **Use existing controller Z zero**. After explicit
    stock-top/tool confirmation, it reads `$G` → `$#` → `$G` and records the
-   verified offset; it never probes, moves, writes a zero, imports G-code, or
+   verified offset for the Bit in the spindle; it never probes, moves, writes a zero, imports G-code, or
    starts interrupted-job recovery. Success replaces the action with compact
    verified status.
 
@@ -8365,14 +8400,16 @@ as the pane's design record.
    (F-CNC27), which uses the current-project fingerprint fallback.
 3. With a Laser project open, Start stays off and the wizard says to open the
    job's CNC project or switch the toolbar to CNC: the bit-change holds are
-   worked from the open project (the Active bit that Zero Z and the probe bind
-   to). The runway review refuses the same way, and both check again at the
+   worked from the open project (the probe's geometry, the bit list, the
+   point-move bed mapping and the jog feeds; the bit in the spindle itself is
+   session state since ADR-416 Amendment 4). The runway review refuses the same way, and both check again at the
    final Start assertion, since the switch stays usable while their dialogs
    are open. The recovery stays on its card; no job line is sent (ADR-416
    Amendment 3).
 4. Work Z set for another bit than the one the recovery program starts with
    refuses recovery and names both bits: a resume in a later operation needs
-   that operation's bit zeroed and selected as the Active bit. The runway
+   that operation's bit chosen under **Bit in the spindle** in the Machine rail
+   and then zeroed (ADR-416 Amendment 4). The runway
    review checks the same way. Nothing is sent and the card stays retryable
    (ADR-215 Amendment 2).
 
@@ -8950,7 +8987,26 @@ as the pane's design record.
    safety copy say so). **Resume** continues the stream. **ABORT** requests the
    controller-specific reset/de-energize path; it is not a physical E-stop. The
    host stops sending and requests `M5 I` + `M107` cleanup.
-4. Start shows the power-scale-unverified warning (no $30/$32 proof exists).
+4. Marlin reports no laser power scale, so KerfDesk cannot check Full-power S (ADR-095
+   Amendment 1; the same holds for Smoothieware).
+   - Until the operator has recorded a check, every Job Review asks **Confirm laser settings**
+     in Marlin's terms: full power is sent as the profile's S, and the firmware's laser power
+     unit (`CUTTER_POWER_UNIT`: PWM255 is S0 to S255, PERCENT is S0 to S100, RPM runs up to
+     `SPEED_POWER_MAX`) must top out at that value. On fan wiring it asks that the laser is on
+     the fan output (`M106` S0 to S255). On Smoothieware it asks that
+     `laser_module_maximum_s_value` equals Full-power S. The warnings list carries the same
+     note. Neither names a GRBL setting.
+   - **Machine Setup > Full-power S > Power scale check** has a tick box, "I have checked this:
+     full power is S*n* on this machine". It is the operator's own statement; KerfDesk tests
+     nothing. It is stored with the machine profile and is cleared when Full-power S, the
+     controller or the output dialect changes. KerfDesk cannot see a firmware change on these
+     controllers, so the operator checks again after one.
+   - With the box ticked, Job Review shows one plain line instead of the banner and the
+     warning: "Power scale: operator-stated. You recorded on *date* that full power is S*n* on
+     this machine. KerfDesk has not checked it, …". Nothing is clicked for it, the "Laser mode
+     verified" chip is not shown, and the run's record says operator-stated. Run again can then
+     carry the review. A program run from the G-code Inspector still asks, because its S values
+     come from the file.
    Its final status check sends an owned `M400`, then an owned `M114`, because Marlin has no
    realtime status query; the fresh Idle-shaped report must match the Frame (ADR-362
    Amendment 1).
@@ -9953,6 +10009,17 @@ Simulator-tested only; no real JCZ board has run this path.
   firmware accepts, keeping the homing-side edge the homing pull-off (`$27`,
   1 mm if unread) clear of the switch (ADR-375). It then sends one absolute
   beam-off jog through the normal jog safety gates.
+- **Error / bed position unknown.** The move needs a bed mapping: where the controller's
+  coordinates sit on the bed. It is known after a Home in this connection on a Falcon A1 Pro
+  preset, on stock GRBL 1.1, and on grblHAL whose settings report gives its homed area (homing
+  on, X and Y both in a homing pass, travel, pull-off and origin settings) with the profile bed
+  that size (ADR-322 Amendment 4). Without it nothing is sent, and the message says why for
+  this machine: not homed yet, homing off in the profile, settings not read, a bed that is not
+  the controller's homed area, or a firmware KerfDesk cannot map. FluidNC, Marlin and
+  Smoothieware report nothing that places their homed coordinates on the bed, so there the
+  message says so and to jog instead. The same reason is on the status line's hover over
+  "Relative view", in Job Review's bed note after "Why:", and in the camera burn check's
+  "unavailable" line. None of this gates Frame or Start.
 - **Error / machine not ready.** If the machine is disconnected, busy, alarmed,
   or otherwise blocked for jogging, no command is sent and the operator sees
   the same block reason as the Jog Pad.
@@ -10136,8 +10203,9 @@ Simulator-tested only; no real JCZ board has run this path.
   timelapse, and "The camera was not running when the job started."
 - **Error / cannot check.** A CNC job, a camera that is not fixed and calibrated, or a job that
   was stopped says why it was not checked. So does a job whose bed position is unverified (no
-  homing, not homed, Verified Origin): KerfDesk does not know where it burns (ADR-490
-  Amendment 1). The camera stopping mid-job ends the timelapse with the
+  homing, not homed, Verified Origin, or a firmware KerfDesk cannot map): KerfDesk does not
+  know where it burns (ADR-490 Amendment 1), and the line adds the reason for this machine
+  (ADR-322 Amendment 4). The camera stopping mid-job ends the timelapse with the
   frames it has.
 
 ---

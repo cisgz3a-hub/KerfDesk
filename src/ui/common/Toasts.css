@@ -63,6 +63,8 @@
   flex: 1 1 auto;
   min-width: 0;
   padding: 2px 0;
+  /* One toast for one action puts each of its notes on a line (ADR-708). */
+  white-space: pre-line;
 }
 
 .lf-toast__details {

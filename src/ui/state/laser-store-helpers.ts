@@ -25,6 +25,7 @@ import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import type { LaserState } from './laser-store';
 import { initialControllerConnectionState } from './laser-controller-initial-state';
 import { bitFileSequenceXyOriginBlockMessage } from './bit-file-sequence';
+import { wrongBitContinueMessage } from './spindle-bit';
 import {
   isWorkZEvidenceCurrentForStart,
   probePlateRemovalRequired,
@@ -54,7 +55,7 @@ export const TOOL_CHANGE_MOTION_ACTIVE_MESSAGE =
 export const TOOL_CHANGE_ACK_OWED_MESSAGE =
   'The controller has not yet answered your last command. Continue once it has, so its answer is not counted as a job line.';
 export const TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE =
-  'Load the new bit, select it as the Active bit, and establish its Z zero on the stock top before continuing.';
+  'Load the new bit and establish its Z zero on the stock top (jog, then Zero Z, or probe) before continuing.';
 export const TOOL_CHANGE_XY_ORIGIN_MESSAGE =
   'A tool change re-zeroes Z only. The rest of the job is placed on the X/Y origin it started with, so the XYZ corner probe and Set or Reset origin wait until the job ends. Use the Z probe or Zero Z for the new bit.';
 
@@ -153,11 +154,7 @@ export function toolChangeContinueBlockMessage(state: LaserState): string | null
     return PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE;
   }
   if (state.pendingToolId !== null && state.workZZeroEvidence?.toolId !== state.pendingToolId) {
-    const expected = state.pendingToolLabel ?? state.pendingToolId;
-    return (
-      `Work Z belongs to a different bit. Load ${expected}, select it as the Active bit, ` +
-      'then touch it to the stock top and Zero Z — or probe again — before continuing.'
-    );
+    return wrongBitContinueMessage(state.pendingToolLabel ?? state.pendingToolId);
   }
   return null;
 }
@@ -372,6 +369,7 @@ type InitialLaserState = Pick<
   | 'completedFrameRunOwner'
   | 'frameTrace'
   | 'framedRunStartClaim'
+  | 'spindleBit'
 >;
 
 export function initialLaserState(): InitialLaserState {
@@ -429,6 +427,7 @@ export function initialLaserState(): InitialLaserState {
     completedFrameRunOwner: null,
     frameTrace: null,
     framedRunStartClaim: null,
+    spindleBit: null,
   };
 }
 

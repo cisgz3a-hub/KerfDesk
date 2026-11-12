@@ -3,7 +3,7 @@
 // USB device: Home, Frame, Start, Pause, Resume and Abort, and the failures a
 // link can meet. Simulator-tested only; nothing here touches hardware.
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { joinCollinear } from '../../../__fixtures__/controllers/lihuiyu-decoder';
 import { LihuiyuSimulator } from '../../../__fixtures__/controllers/lihuiyu-simulator';
 import { encodeLhyJob, lhyBoardSetting } from '../../../core/controllers/lihuiyu/lhy-encoder';
@@ -14,8 +14,11 @@ import { UsbLinkOpenError, type UsbLinkAdapter } from '../../../platform/usb-lin
 import { installAbortShortcut } from '../../laser/use-job-shortcuts';
 import {
   activeLinkMachineWork,
+  anyLinkConnected,
+  anyLinkFramed,
   anyMachineJobActive,
   resetLinkMachineWorkForTests,
+  useLinkMachineWorkStore,
 } from '../link-machine-work';
 import { LIHUIYU_FRAME_FIRST, LIHUIYU_HOME_FIRST, lihuiyuLinkLost } from './lihuiyu-usb-messages';
 import { LIHUIYU_DRIVER_HELP, lihuiyuUsbOpener } from './lihuiyu-usb-opener';
@@ -131,6 +134,23 @@ describe('Lihuiyu USB store', () => {
     expect([simulator.decoder.x, simulator.decoder.y]).toEqual([0, 0]);
     // The head is back at its start, so the Frame still holds for another run.
     expect(store().framed).not.toBeNull();
+  });
+
+  // ADR-703 Amendment 1 (code quality audit C2 D6-P2-1, D6-P2-3): the variable
+  // advance runs once the job finishes, never after a Frame, and the link
+  // reports its connection and Frame to the app-wide registry the guide reads.
+  it('runs the job completion after the job, and reports connected and framed', async () => {
+    const simulator = await connectedHomed();
+    expect(anyLinkConnected(useLinkMachineWorkStore.getState())).toBe(true);
+    const completed = vi.fn();
+    const job = { ...zigzagJob(4), completed };
+    await store().frame(job);
+    simulator.drain();
+    expect(anyLinkFramed(useLinkMachineWorkStore.getState())).toBe(true);
+    expect(completed).not.toHaveBeenCalled();
+    await store().start(job);
+    simulator.drain();
+    expect(completed).toHaveBeenCalledTimes(1);
   });
 
   it('runs Start → Pause → Resume → Abort against the simulator', async () => {

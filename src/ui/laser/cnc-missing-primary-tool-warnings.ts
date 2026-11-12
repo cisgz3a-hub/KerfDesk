@@ -22,7 +22,7 @@ export function detectCncMissingPrimaryToolWarnings(project: Project): ReadonlyA
     }
     warnings.push(
       `Operation "${layer.name}" requests missing bit "${requestedToolId}". ` +
-        `Output will use the active bit "${activeTool.name}" instead; verify the bit and its ` +
+        `Output will use the Default bit "${activeTool.name}" instead; verify the bit and its ` +
         'feed, plunge, RPM, and depth/pass before cutting.',
     );
   }

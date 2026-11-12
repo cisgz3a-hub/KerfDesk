@@ -98,10 +98,12 @@ describe('a project with a missing font (U5-P3-9)', () => {
     const ctx = { setProject: state.setProject, markLoaded: state.markLoaded, pushToast };
     const opened = deserializeProject(serializeProject(projectWithText('system:Bauhaus 93')));
     expect(completeNativeProjectOpen(ctx, 'missing-font.lf2', opened)).toBe(true);
-    expect(pushToast).toHaveBeenCalledWith('Opened missing-font.lf2', 'success');
+    // One toast: the result, then the note on its own line (ADR-708).
     expect(pushToast).toHaveBeenCalledWith(
-      "This project uses a font that isn't on this computer (Bauhaus 93). Its text will burn as saved; to edit that text, choose Import or System fonts... in the text panel.",
+      'Opened missing-font.lf2\n' +
+        "This project uses a font that isn't on this computer (Bauhaus 93). Its text will burn as saved; to edit that text, choose Import or System fonts... in the text panel.",
       'warning',
+      { key: 'project-notices' },
     );
   });
 

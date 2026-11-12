@@ -241,7 +241,10 @@ const SETUP_LABELS: ReadonlyArray<{
   { label: 'saved positions', keys: ['savedPositions'] },
   { label: 'max feed', keys: ['maxFeed'] },
   { label: 'frame speed', keys: ['framingFeedMmPerMin'] },
-  { label: 'S range', keys: ['minPowerS', 'maxPowerS', 'laserModeEnabled'] },
+  {
+    label: 'S range',
+    keys: ['minPowerS', 'maxPowerS', 'laserModeEnabled', 'operatorPowerScaleStatement'],
+  },
   { label: 'air assist', keys: ['airAssistCommand', 'airAssistRestartUnreliable'] },
   { label: 'Z setup', keys: ['zTravelMm', 'zTravelConfirmed', 'zProbePresent'] },
   { label: 'Auto-focus command', keys: ['autofocusCommand'] },

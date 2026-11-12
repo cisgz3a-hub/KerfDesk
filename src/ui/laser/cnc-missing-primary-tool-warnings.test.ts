@@ -55,7 +55,7 @@ describe('detectCncMissingPrimaryToolWarnings', () => {
     const warnings = detectCncMissingPrimaryToolWarnings(projectWithToolId('deleted-bit'));
 
     expect(warnings).toEqual([
-      'Operation "Profile cut" requests missing bit "deleted-bit". Output will use the active bit "3.175 mm (1/8") end mill" instead; verify the bit and its feed, plunge, RPM, and depth/pass before cutting.',
+      'Operation "Profile cut" requests missing bit "deleted-bit". Output will use the Default bit "3.175 mm (1/8") end mill" instead; verify the bit and its feed, plunge, RPM, and depth/pass before cutting.',
     ]);
   });
 

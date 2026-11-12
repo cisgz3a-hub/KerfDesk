@@ -15,7 +15,8 @@ import {
   machineFrameRestoreLine,
 } from './host-recorded-origin';
 import { useStore } from './store';
-import { captureWorkZZeroEvidence, selectedCncToolId } from './work-z-zero-evidence';
+import { spindleBitId } from './spindle-bit';
+import { captureWorkZZeroEvidence } from './work-z-zero-evidence';
 import { sleepRefusalMessage, sleepUnavailableReason } from './controller-sleep';
 import { ControllerCommandRefusedError } from './laser-interactive-command';
 import {
@@ -153,11 +154,12 @@ async function zeroZHere(
   safeWrite: SafeWriteFn,
 ): Promise<void> {
   // Tool edits and Undo can run while readiness or the G92 acknowledgement is
-  // pending. The reference belongs to the tool/epoch that initiated this action.
+  // pending. The reference belongs to the tool/epoch that initiated this action:
+  // the bit in the spindle as declared when Zero Z was pressed (ADR-416 Amendment 4).
   const workZZeroEvidence = captureWorkZZeroEvidence(
     'manual-zero',
     get().workZReferenceEpoch,
-    selectedCncToolId(useStore.getState().project),
+    spindleBitId(get(), useStore.getState().project),
   );
   await assertOriginActionReady(set, get, refs, safeWrite, 'z');
   const machineBeforeG92 = hostRecordedMachinePosition(get());

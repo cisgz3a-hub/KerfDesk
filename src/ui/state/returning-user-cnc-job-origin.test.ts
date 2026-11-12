@@ -38,7 +38,9 @@ function openToasts(text: string, name: string): ReadonlyArray<string> {
     {
       setProject: useStore.getState().setProject,
       markLoaded: () => undefined,
-      pushToast: (message) => toasts.push(message),
+      // One toast carries the result and its notes, one a line (ADR-708).
+      pushToast: (message, _variant, options) =>
+        toasts.push(...message.split('\n'), ...(options?.details ?? [])),
     },
     `${name}.lf2`,
     deserializeProject(text),
