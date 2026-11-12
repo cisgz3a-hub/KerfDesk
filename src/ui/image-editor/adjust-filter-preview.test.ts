@@ -9,10 +9,7 @@ import type { SelectionMask } from '../../core/image-select';
 import { refreshAdjustPreview, useAdjustDialogStore } from './adjust-dialog-store';
 import { START_DELAY_MS } from './adjust-filter-preview';
 import { resetFilterPreviewWorkerForTests } from './adjust-filter-worker-client';
-import type {
-  FilterPreviewRequest,
-  FilterPreviewResponse,
-} from './adjust-filter-worker-protocol';
+import type { FilterPreviewRequest, FilterPreviewResponse } from './adjust-filter-worker-protocol';
 import { sampleWindowInto, type PreviewWindow } from './adjust-preview-window';
 import { commitAdjustment } from './editor-adjust-session';
 import { ADJUSTMENTS, defaultParams, type AdjustmentId } from './editor-adjustments';

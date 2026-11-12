@@ -8,11 +8,7 @@
 // a step with other settings stops the running render immediately.
 
 import type { RgbaBuffer } from '../../core/image-edit';
-import {
-  selectionBounds,
-  type AdjustRequest,
-  type PreviewWindow,
-} from './adjust-preview-window';
+import { selectionBounds, type AdjustRequest, type PreviewWindow } from './adjust-preview-window';
 import {
   cancelFilterPreview,
   filterPreviewWorkerAvailable,
@@ -24,8 +20,8 @@ import { adjustmentById } from './editor-adjustments';
 import type { EditorSession } from './editor-session';
 
 /**
- * Below this many pixels a filter step stays on the UI thread: Gaussian Blur,
- * the slowest at its default, takes about 60 ms there at 512 x 512.
+ * Below this many pixels a filter step stays on the UI thread: at 512 x 512
+ * every filter took 10-76 ms in the Node bench (Median at radius 2 slowest).
  */
 export const WORKER_FILTER_MIN_PIXELS = 512 * 512;
 export const START_DELAY_MS = 120;

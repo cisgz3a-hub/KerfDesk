@@ -205,12 +205,18 @@ function renderInWorker(session: EditorSession, request: AdjustRequest, win: Pre
     done: (filtered) => {
       setPreviewProgress(null);
       if (!current()) return;
-      setPreview({ buffer: composeFilteredWindow(previewCache, session, win, filtered), rect: win.rect });
+      setPreview({
+        buffer: composeFilteredWindow(previewCache, session, win, filtered),
+        rect: win.rect,
+      });
     },
     fallback: () => {
       setPreviewProgress(null);
       if (!current()) return;
-      setPreview({ buffer: computeWindowPreview(previewCache, session, request, win), rect: win.rect });
+      setPreview({
+        buffer: computeWindowPreview(previewCache, session, request, win),
+        rect: win.rect,
+      });
     },
   });
 }

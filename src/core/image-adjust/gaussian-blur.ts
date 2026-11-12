@@ -50,7 +50,13 @@ export function blurredRect(
   // true (not clamped) neighbours for every target pixel.
   const top = Math.max(0, rect.y - radius);
   const bottom = Math.min(doc.height, rect.y + rect.height + radius);
-  const horizontal = horizontalPass(doc, kernel, rect, { top, bottom }, progressSpan(progress, 0, 0.5));
+  const horizontal = horizontalPass(
+    doc,
+    kernel,
+    rect,
+    { top, bottom },
+    progressSpan(progress, 0, 0.5),
+  );
   return verticalPass(horizontal, kernel, rect, top, bottom - top, progressSpan(progress, 0.5, 1));
 }
 

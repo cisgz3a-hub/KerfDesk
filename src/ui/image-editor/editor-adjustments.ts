@@ -22,8 +22,9 @@ import {
   thresholdLut,
   unsharpMaskInPlace,
   type CurvePoint,
-  type FilterProgress,
 } from '../../core/image-adjust';
+// Its own module, not the barrel: image-adjust/index.ts is at its export cap.
+import type { FilterProgress } from '../../core/image-adjust/filter-progress';
 
 export type AdjustmentId =
   | 'brightness-contrast'

@@ -93,8 +93,11 @@ test('Image Studio renders Halftone in a worker with a progress bar and Cancel',
   await page.getByRole('button', { name: /^Edit Image/ }).click();
   const editor = page.getByRole('dialog', { name: /^Image Studio/ });
   await expect(editor).toContainText(`${PHOTO_WIDTH_PX}×${PHOTO_HEIGHT_PX}`);
-  await editor.getByRole('button', { name: '100%', exact: true }).click();
   await expect.poll(async () => (await samples(page)).length).toBeGreaterThan(0);
+  const fit = await settledSamples(page);
+  await editor.getByRole('button', { name: '100%', exact: true }).click();
+  // Two equal reads can still be the fit view before 100% repaints.
+  await expect.poll(async () => sameSamples(await samples(page), fit)).toBe(false);
   const unzoomed = await settledSamples(page);
   expect(binaryShare(unzoomed)).toBeLessThan(0.5);
 
