@@ -1,0 +1,56 @@
+// Refuter T06: P2-1 reach from a real LightBurn project import (Scan and Scan+Cut layers).
+import { it } from 'vitest';
+import { appendFileSync } from 'node:fs';
+import { importLightBurnProject } from '../t06-main/src/io/lightburn/lbrn-import';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { operationIdsForObject } from '../t06-main/src/core/scene';
+import { prepareOutput } from '../t06-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t06-main/src/io/gcode/emit-gcode';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t06r/r01-fill-selection.log';
+const log = (line: string): void => appendFileSync(LOG, line + '\n');
+
+function open(type: string, shapes: string): void {
+  const result = importLightBurnProject(
+    `<LightBurnProject AppVersion="1.7.08" FormatVersion="1"><CutSetting type="${type}"><index Value="0"/><name Value="Badge"/><maxPower Value="25"/><speed Value="50"/><interval Value="0.2"/><angle Value="45"/></CutSetting>${shapes}</LightBurnProject>`,
+    'badge.lbrn2',
+  );
+  if (!result.ok) throw new Error(result.reason);
+  resetStore();
+  useStore.setState({ project: result.project });
+}
+
+function state(tag: string): void {
+  const scene = useStore.getState().project.scene;
+  const parts = scene.objects.map((o) => {
+    const ops = operationIdsForObject(o, scene.layers)
+      .map((id) => scene.layers.find((l) => l.id === id)!)
+      .map((l) => `${l.name}:${l.mode} p${l.power} s${l.speed} sp${l.hatchSpacingMm} ang${l.hatchAngleDeg}`);
+    return `${o.id}[${ops.join(' + ')}]`;
+  });
+  const g = emitPreparedGcode(prepareOutput(useStore.getState().project)).gcode;
+  const s = [...g.matchAll(/S(\d+)/g)].map((m) => m[1]);
+  const f = [...g.matchAll(/F(\d+)/g)].map((m) => m[1]);
+  log(`${tag}: objects=${scene.objects.length} ${parts.join(' ')} | gcode S{${[...new Set(s)].join(',')}} F{${[...new Set(f)].join(',')}} G1 lines=${(g.match(/^G1/gm) ?? []).length}`);
+}
+
+const rect = (x: number) => `<Shape Type="Rect" CutIndex="0" W="20" H="10"><XForm>1 0 0 1 ${x} 100</XForm></Shape>`;
+
+it('Scan layer with two shapes: Fill Selection on one', () => {
+  open('Scan', rect(50) + rect(100));
+  state('LBRN Scan before');
+  const ids = useStore.getState().project.scene.objects.map((o) => o.id);
+  useStore.setState({ selectedObjectId: ids[0] ?? null, additionalSelectedIds: new Set() });
+  useStore.getState().fillSelectionSeparately();
+  state('LBRN Scan after FS on first object');
+});
+
+it('Scan+Cut layer, one shape: Fill Selection', () => {
+  open('Scan+Cut', rect(50));
+  state('LBRN Scan+Cut before');
+  const ids = useStore.getState().project.scene.objects.map((o) => o.id);
+  useStore.setState({ selectedObjectId: ids[0] ?? null, additionalSelectedIds: new Set() });
+  useStore.getState().fillSelectionSeparately();
+  state('LBRN Scan+Cut after FS');
+});

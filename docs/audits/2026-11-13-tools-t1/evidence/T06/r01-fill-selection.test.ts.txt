@@ -1,0 +1,245 @@
+// Refuter T06: own repros for T06-P1-1, T06-P2-1, T06-P2-2 and an extra sub-layer case.
+// Libraries come from the tree's REAL external LightBurn .clb corpus and the shipped
+// Neotronics starter presets (not the auditor's hand fixture). The G-code is decoded
+// by the small parser below (not the auditor's decode.ts).
+import { beforeEach, it } from 'vitest';
+import { readFileSync, appendFileSync, writeFileSync } from 'node:fs';
+import { importLightBurnClb } from '../t06-main/src/io/lightburn/clb-import';
+import { IDENTITY_TRANSFORM, primaryOperationForObject, type Layer } from '../t06-main/src/core/scene';
+import { createRectangle } from '../t06-main/src/core/shapes/primitives';
+import { prepareOutput } from '../t06-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t06-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { boundMaterialLabel } from '../t06-main/src/ui/laser/job-review/job-review-detail-facts';
+import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../t06-main/src/core/devices';
+import { NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS } from '../t06-main/src/core/material-library/neotronics-4040-presets';
+import { buildStarterLibrary } from '../t06-main/src/ui/layers/material-library-builders';
+import type { MaterialLibraryDocument } from '../t06-main/src/io/material-library';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t06r/r01-fill-selection.log';
+const CLB = 'C:/Users/stolk/kd-t1/t06-main/src/__fixtures__/lightburn/external/clb/';
+const log = (line: string): void => appendFileSync(LOG, line + '\n');
+
+// ---------- independent G-code decode ----------
+type Burn = { lit: number; moves: number; s: number[]; f: number[]; dose: number };
+function decode(gcode: string): Burn {
+  let x = 0, y = 0, s = 0, f = 0, g = 0, on = false;
+  let lit = 0, moves = 0, dose = 0;
+  const ss = new Set<number>(), fs = new Set<number>();
+  for (const raw of gcode.split(/\r?\n/)) {
+    const line = raw.replace(/;.*$/, '').replace(/\([^)]*\)/g, '').trim().toUpperCase();
+    if (line === '') continue;
+    const words = [...line.matchAll(/([A-Z])([-+]?\d*\.?\d+)/g)].map((m) => [m[1], Number(m[2])] as const);
+    let nx = x, ny = y, moved = false;
+    for (const [letter, value] of words) {
+      if (letter === 'M' && (value === 3 || value === 4)) on = true;
+      if (letter === 'M' && value === 5) on = false;
+      if (letter === 'G' && (value === 0 || value === 1 || value === 2 || value === 3)) g = value;
+      if (letter === 'S') s = value;
+      if (letter === 'F') f = value;
+      if (letter === 'X') { nx = value; moved = true; }
+      if (letter === 'Y') { ny = value; moved = true; }
+    }
+    if (moved) {
+      const len = Math.hypot(nx - x, ny - y);
+      if (g === 1 && on && s > 0 && len > 0) {
+        lit += len; moves += 1; ss.add(s); fs.add(f);
+        dose += (s * len) / f; // S x minutes: proportional to delivered energy
+      }
+      x = nx; y = ny;
+    }
+  }
+  return { lit, moves, s: [...ss].sort((a, b) => a - b), f: [...fs].sort((a, b) => a - b), dose };
+}
+
+function burn(): Burn & { codes: string[] } {
+  const project = useStore.getState().project;
+  const prepared = prepareOutput(project);
+  const emitted = emitPreparedGcode(prepared);
+  const codes = [
+    ...(prepared.ok ? (prepared.advisories ?? []).map((i) => `adv:${i.code}`) : []),
+    ...emitted.preflight.issues.map((i) => `pf:${i.code}`),
+  ];
+  return { ...decode(emitted.gcode), codes };
+}
+
+function opOf(objectId: string): Layer {
+  const scene = useStore.getState().project.scene;
+  const object = scene.objects.find((o) => o.id === objectId);
+  const op = object === undefined ? null : primaryOperationForObject(object, scene.layers);
+  if (op === null) throw new Error('no op for ' + objectId);
+  return op;
+}
+
+const fmtOp = (op: Layer): string =>
+  `${op.id} ${op.mode} p${op.power} s${op.speed} x${op.passes} sp${op.hatchSpacingMm} ang${op.hatchAngleDeg} preset=${op.materialBinding?.presetId ?? '-'}`;
+const fmtBurn = (b: Burn & { codes?: string[] }): string =>
+  `lit=${b.lit.toFixed(1)}mm moves=${b.moves} S=${b.s.join('/')} F=${b.f.join('/')} dose=${b.dose.toFixed(2)}${b.codes ? ' codes=[' + b.codes.join(',') + ']' : ''}`;
+
+function draw(id: string, x = 5, y = 5, w = 20, h = 10): void {
+  useStore.getState().drawShape(
+    createRectangle({
+      id,
+      color: '#0000ff',
+      spec: { widthMm: w, heightMm: h, cornerRadiusMm: 0 },
+      transform: { ...IDENTITY_TRANSFORM, x, y },
+    }),
+  );
+}
+function select(...ids: string[]): void {
+  useStore.setState({ selectedObjectId: ids[0] ?? null, additionalSelectedIds: new Set(ids.slice(1)) });
+}
+function clb(file: string): MaterialLibraryDocument {
+  const r = importLightBurnClb(readFileSync(CLB + file, 'utf8'), file);
+  if (!r.ok) throw new Error(r.reason);
+  return r.library;
+}
+
+beforeEach(() => resetStore());
+
+it('setup', () => writeFileSync(LOG, `refuter T06 run ${new Date().toISOString()}\n`));
+
+// ---------- P1-1 with real imported LightBurn libraries ----------
+const REAL_CASES = [
+  { file: 'h3mul-main-material-library.clb', name: 'Basswood', t: 2 },
+  { file: 'jayson-big-blue-laser.clb', name: 'Laser Plywood', t: 3.3 },
+  { file: 'ddlab-laser-settings-current.clb', name: 'Plywood (Finer)', t: 3 },
+];
+for (const c of REAL_CASES) {
+  it(`P1 ${c.file} ${c.name}`, () => {
+    const lib = clb(c.file);
+    const runPath = (path: 'fill-selection' | 'inspector'): void => {
+      resetStore();
+      useStore.getState().setMaterialLibrary(lib);
+      useStore.getState().setJobLaserMaterial({ name: c.name, thicknessMm: c.t, autoApplyRecipes: true });
+      draw('r');
+      const seeded = opOf('r');
+      const undo0 = useStore.getState().undoStack.length;
+      if (path === 'fill-selection') {
+        select('r');
+        useStore.getState().fillSelectionSeparately();
+      } else {
+        useStore.getState().setLayerParam(seeded.id, { mode: 'fill' });
+      }
+      const after = opOf('r');
+      const b = burn();
+      const label = boundMaterialLabel(after.materialBinding, useStore.getState().materialLibrary ?? null);
+      log(`P1 ${c.file} [${c.name} ${c.t}] ${path}: seeded ${fmtOp(seeded)} -> ${fmtOp(after)} | ${fmtBurn(b)} | undo+${useStore.getState().undoStack.length - undo0} | JobReview label: ${label}`);
+    };
+    runPath('fill-selection');
+    const fsDose = burn().dose;
+    runPath('inspector');
+    const insDose = burn().dose;
+    log(`P1 ${c.file} dose ratio fill-selection / inspector = ${(fsDose / insDose).toFixed(1)}x`);
+  });
+}
+
+// ---------- P1-1 with the shipped starter library (no fill recipe exists) ----------
+it('P1 starter library', () => {
+  const lib = buildStarterLibrary(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS);
+  for (const path of ['fill-selection', 'inspector'] as const) {
+    resetStore();
+    const p = useStore.getState().project;
+    useStore.setState({ project: { ...p, device: NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } });
+    useStore.getState().setMaterialLibrary(lib);
+    useStore.getState().setJobLaserMaterial({ name: 'Basswood / plywood', thicknessMm: 3, autoApplyRecipes: true });
+    draw('r');
+    const seeded = opOf('r');
+    if (path === 'fill-selection') {
+      select('r');
+      useStore.getState().fillSelectionSeparately();
+    } else useStore.getState().setLayerParam(seeded.id, { mode: 'fill' });
+    const after = opOf('r');
+    log(`P1 starter ${path}: seeded ${fmtOp(seeded)} -> ${fmtOp(after)} | ${fmtBurn(burn())}`);
+  }
+});
+
+// ---------- P1-1 ownership dependence: two drawn shapes selected together ----------
+it('P1 two shapes, each owning its op', () => {
+  const lib = clb('h3mul-main-material-library.clb');
+  useStore.getState().setMaterialLibrary(lib);
+  useStore.getState().setJobLaserMaterial({ name: 'Basswood', thicknessMm: 2, autoApplyRecipes: true });
+  draw('a', 5, 5);
+  draw('b', 40, 5);
+  select('a', 'b');
+  useStore.getState().fillSelectionSeparately();
+  log(`P1 two-shapes fill-selection: a ${fmtOp(opOf('a'))} b ${fmtOp(opOf('b'))} | ${fmtBurn(burn())}`);
+});
+
+// ---------- P2-1: artwork already on a shared tuned Fill op ----------
+it('P2-1 shared tuned Fill op vs Make unique', () => {
+  for (const path of ['fill-selection', 'make-unique', 'unshared-fill-selection'] as const) {
+    resetStore();
+    draw('a', 5, 5);
+    draw('b', 40, 5);
+    const opA = opOf('a').id;
+    if (path !== 'unshared-fill-selection') {
+      select('a', 'b');
+      useStore.getState().useOperationForSelection(opA);
+    }
+    const shared = opOf('a').id;
+    useStore.getState().setLayerParam(shared, { mode: 'fill', power: 25, speed: 3000, hatchSpacingMm: 0.2, hatchAngleDeg: 45 });
+    if (path === 'unshared-fill-selection') useStore.getState().setLayerParam(opOf('b').id, { mode: 'fill', power: 25, speed: 3000, hatchSpacingMm: 0.2, hatchAngleDeg: 45 });
+    const before = burn();
+    select('a');
+    if (path === 'make-unique') useStore.getState().makeOperationUniqueForObjects(['a'], shared);
+    else useStore.getState().fillSelectionSeparately();
+    log(`P2-1 ${path}: shared-before ${fmtBurn(before)} | a now ${fmtOp(opOf('a'))} | b ${fmtOp(opOf('b'))} | after ${fmtBurn(burn())}`);
+  }
+});
+
+// ---------- P2-2: artwork-own mode ----------
+it('P2-2 artwork-own mode', () => {
+  // Variant 1 (more plausible): op is Fill, artwork-own Mode Line; user presses Fill Selection to get the fill back.
+  draw('m');
+  const op = opOf('m').id;
+  useStore.getState().setLayerParam(op, { mode: 'fill' });
+  useStore.getState().setObjectsOperationOverrideForOperation(['m'], op, { power: 20 });
+  useStore.getState().setObjectsOperationOverrideForOperation(['m'], op, { mode: 'line' });
+  const before = burn();
+  const u0 = useStore.getState().undoStack.length;
+  const p0 = useStore.getState().project;
+  select('m');
+  useStore.getState().fillSelectionSeparately();
+  log(`P2-2 v1 op=fill own=line: before ${fmtBurn(before)} | after ${fmtBurn(burn())} | project same=${useStore.getState().project === p0} undo+${useStore.getState().undoStack.length - u0}`);
+  // Variant 2 (auditor's shape): op Line, own Mode Line.
+  resetStore();
+  draw('m');
+  const op2 = opOf('m').id;
+  useStore.getState().setObjectsOperationOverrideForOperation(['m'], op2, { power: 20 });
+  useStore.getState().setObjectsOperationOverrideForOperation(['m'], op2, { mode: 'line' });
+  const b2 = burn();
+  const u1 = useStore.getState().undoStack.length;
+  select('m');
+  useStore.getState().fillSelectionSeparately();
+  const once = burn();
+  useStore.getState().fillSelectionSeparately();
+  log(`P2-2 v2 op=line own=line: before ${fmtBurn(b2)} | after ${fmtBurn(once)} | op ${fmtOp(opOf('m'))} | override ${JSON.stringify(useStore.getState().project.scene.objects[0]?.operationOverride)} | undo+${useStore.getState().undoStack.length - u1} after two presses`);
+});
+
+// ---------- Extra: op with a Fill sub-layer (LightBurn Cut + Scan sub-layer) ----------
+it('extra: op with a Fill sub-layer', () => {
+  draw('s');
+  const op = opOf('s');
+  const subSettings = { ...op, mode: 'fill' as const, power: 20, speed: 3000, hatchSpacingMm: 0.1, output: true };
+  const { id: _i, name: _n, color: _c, visible: _v, subLayers: _s, materialBinding: _m, ...settings } = subSettings as Layer;
+  useStore.getState().setLayerParam(op.id, { power: 80, speed: 600 });
+  const scene = useStore.getState().project.scene;
+  useStore.setState({
+    project: {
+      ...useStore.getState().project,
+      scene: {
+        ...scene,
+        layers: scene.layers.map((l) =>
+          l.id === op.id ? { ...l, subLayers: [{ id: 'sub-1', label: 'Scan', enabled: true, settings: settings as never }] } : l,
+        ),
+      },
+    },
+  });
+  const before = burn();
+  select('s');
+  useStore.getState().fillSelectionSeparately();
+  const after = burn();
+  log(`extra sub-layer: parent before line p80 s600 + fill sub p20 s3000: ${fmtBurn(before)} | after FS parent ${fmtOp(opOf('s'))} subLayers=${opOf('s').subLayers.length}: ${fmtBurn(after)}`);
+});
