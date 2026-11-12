@@ -99,3 +99,29 @@ describe('adjustment dialog keyboard actions', () => {
     expect(useImageEditorStore.getState().session?.doc.data[0]).toBe(255);
   });
 });
+
+// ADR-245 Amendment 2: a neighbourhood filter rendering in the worker shows a
+// bar with Cancel; Cancel stops it and turns Preview off, and OK still applies.
+describe('preview render progress', () => {
+  it('shows the bar only while a render is pending, and Cancel turns Preview off', async () => {
+    expect(host.querySelector('progress')).toBeNull();
+    await act(async () => {
+      useAdjustDialogStore.getState().setPreviewProgress(0.42);
+    });
+    const bar = host.querySelector('progress');
+    expect(bar?.getAttribute('aria-label')).toBe('Preview render progress');
+    expect(bar?.value).toBe(0.42);
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('Rendering preview… 42%');
+    await act(async () => {
+      button('Cancel preview').click();
+    });
+    expect(host.querySelector('progress')).toBeNull();
+    const dialog = useAdjustDialogStore.getState().dialog;
+    expect(dialog?.previewEnabled).toBe(false);
+    expect(dialog?.previewProgress).toBeNull();
+    await act(async () => {
+      button('OK').click();
+    });
+    expect(useImageEditorStore.getState().session?.doc.data[0]).toBe(127);
+  });
+});

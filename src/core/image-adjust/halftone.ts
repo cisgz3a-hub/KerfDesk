@@ -13,6 +13,7 @@ import { RGBA_CHANNELS, type PixelRect, type RgbaBuffer } from '../image-edit';
 import type { SelectionMask } from '../image-select';
 import { clampRectToDoc, lumaByte, MAX_BYTE } from './lut';
 import { modulo } from '../math/wrap';
+import { progressSpan, type FilterProgress } from './filter-progress';
 
 const RGB_CHANNELS = 3;
 // Above half ink, circles can no longer add area without overlapping — the
@@ -40,6 +41,7 @@ export function halftoneScreenInPlace(
   params: HalftoneParams,
   rect: PixelRect | null,
   mask: SelectionMask | null,
+  progress?: FilterProgress,
 ): void {
   const r = clampRectToDoc(doc, rect);
   if (r.width <= 0 || r.height <= 0) return;
@@ -54,6 +56,7 @@ export function halftoneScreenInPlace(
   // Screening reads local luma from a snapshot so written dots never feed
   // back into neighbouring decisions.
   const source = new Uint8ClampedArray(doc.data);
+  const report = progressSpan(progress, 0, 1);
   for (let y = r.y; y < r.y + r.height; y += 1) {
     for (let x = r.x; x < r.x + r.width; x += 1) {
       const idx = y * doc.width + x;
@@ -68,6 +71,7 @@ export function halftoneScreenInPlace(
           : arrayThreshold(thresholds, x, y, screen) < ink;
       writeMono(doc, base, black, alpha);
     }
+    report((y + 1 - r.y) / r.height);
   }
 }
 

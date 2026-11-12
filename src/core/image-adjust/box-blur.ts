@@ -9,6 +9,7 @@
 
 import { RGBA_CHANNELS, type PixelRect, type RgbaBuffer } from '../image-edit';
 import { clamp } from '../math';
+import { progressSpan, type FilterProgress } from './filter-progress';
 
 const RGB_CHANNELS = 3;
 const BOX_PASSES = 3;
@@ -40,14 +41,20 @@ export function extendedBox(sigma: number): ExtendedBox {
 }
 
 /** Blurred RGB floats for the rect, row-major, length rect.w * rect.h * 3. */
-export function boxBlurredRect(doc: RgbaBuffer, sigma: number, rect: PixelRect): Float32Array {
+export function boxBlurredRect(
+  doc: RgbaBuffer,
+  sigma: number,
+  rect: PixelRect,
+  progress?: FilterProgress,
+): Float32Array {
   const box = extendedBox(sigma);
   const reach = BOX_PASSES * (box.radius + 1);
   // The horizontal passes cover the rows the vertical passes read.
   const top = Math.max(0, rect.y - reach);
   const bottom = Math.min(doc.height, rect.y + rect.height + reach);
-  const horizontal = blurRows(doc, rect, { top, bottom }, box, reach);
-  return blurColumns(horizontal, rect, { top, bottom }, box, reach);
+  const span = { top, bottom };
+  const horizontal = blurRows(doc, rect, span, box, reach, progressSpan(progress, 0, 0.5));
+  return blurColumns(horizontal, rect, span, box, reach, progressSpan(progress, 0.5, 1));
 }
 
 type RowSpan = { readonly top: number; readonly bottom: number };
@@ -71,6 +78,7 @@ function blurRows(
   span: RowSpan,
   box: ExtendedBox,
   reach: number,
+  progress: FilterProgress,
 ): Float32Array {
   const length = rect.width + 2 * reach;
   const stride = ROW_BLOCK * RGB_CHANNELS;
@@ -102,6 +110,7 @@ function blurRows(
         out[to + 2] = blurred[from + 2] ?? 0;
       }
     }
+    progress((y0 + block - span.top) / (span.bottom - span.top));
   }
   return out;
 }
@@ -114,6 +123,7 @@ function blurColumns(
   span: RowSpan,
   box: ExtendedBox,
   reach: number,
+  progress: FilterProgress,
 ): Float32Array {
   const rows = rect.height + 2 * reach;
   const stride = Math.min(STRIP_COLUMNS, rect.width) * RGB_CHANNELS;
@@ -135,6 +145,7 @@ function blurColumns(
       const from = (reach + y) * stride;
       out.set(blurred.subarray(from, from + width), y * rowValues + column);
     }
+    progress(Math.min(rect.width, x0 + STRIP_COLUMNS) / rect.width);
   }
   return out;
 }

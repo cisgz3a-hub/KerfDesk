@@ -23,6 +23,8 @@ import {
   unsharpMaskInPlace,
   type CurvePoint,
 } from '../../core/image-adjust';
+// Its own module, not the barrel: image-adjust/index.ts is at its export cap.
+import type { FilterProgress } from '../../core/image-adjust/filter-progress';
 
 export type AdjustmentId =
   | 'brightness-contrast'
@@ -68,7 +70,8 @@ export type AdjustmentSpec = {
   /**
    * Each output pixel depends only on the same input pixel (a LUT or a
    * per-pixel unmix), so the dialog may preview it on a display-sized
-   * sample. Neighbourhood filters preview at full resolution (ADR-245 Amd 1).
+   * sample. Neighbourhood filters preview at full resolution (ADR-245 Amd 1),
+   * in a worker with a progress bar and Cancel (Amd 2).
    */
   readonly pointwise: boolean;
 };
@@ -251,6 +254,8 @@ type RunArgs = {
   readonly rect: PixelRect | null;
   readonly mask: SelectionMask | null;
   readonly curvePoints: readonly CurvePoint[] | undefined;
+  /** Neighbourhood filters report how far they are (the preview worker's bar). */
+  readonly progress: FilterProgress | undefined;
 };
 
 // Record dispatch keeps each runner at trivial complexity and the compiler
@@ -277,9 +282,9 @@ const RUNNERS: Record<AdjustmentId, (args: RunArgs) => void> = {
   desaturate: ({ doc, rect, mask }) => applyLumaLutInPlace(doc, grayscaleLut(), rect, mask),
   'remove-white-background': ({ spec, params, doc, rect, mask }) =>
     removeWhiteBackgroundInPlace(doc, p(spec, params, 'cleanup'), rect, mask),
-  'gaussian-blur': ({ spec, params, doc, rect, mask }) =>
-    gaussianBlurInPlace(doc, p(spec, params, 'sigma'), rect, mask),
-  'unsharp-mask': ({ spec, params, doc, rect, mask }) =>
+  'gaussian-blur': ({ spec, params, doc, rect, mask, progress }) =>
+    gaussianBlurInPlace(doc, p(spec, params, 'sigma'), rect, mask, progress),
+  'unsharp-mask': ({ spec, params, doc, rect, mask, progress }) =>
     unsharpMaskInPlace(
       doc,
       {
@@ -289,18 +294,22 @@ const RUNNERS: Record<AdjustmentId, (args: RunArgs) => void> = {
       },
       rect,
       mask,
+      progress,
     ),
-  'high-pass': ({ spec, params, doc, rect, mask }) =>
-    highPassInPlace(doc, p(spec, params, 'sigma'), rect, mask),
-  median: ({ spec, params, doc, rect, mask }) =>
-    medianInPlace(doc, p(spec, params, 'radius'), rect, mask),
-  halftone: ({ spec, params, doc, rect, mask }) =>
-    halftoneScreenInPlace(doc, screenFrom(spec, params, 'dot'), rect, mask),
-  'line-screen': ({ spec, params, doc, rect, mask }) =>
-    halftoneScreenInPlace(doc, screenFrom(spec, params, 'line'), rect, mask),
+  'high-pass': ({ spec, params, doc, rect, mask, progress }) =>
+    highPassInPlace(doc, p(spec, params, 'sigma'), rect, mask, progress),
+  median: ({ spec, params, doc, rect, mask, progress }) =>
+    medianInPlace(doc, p(spec, params, 'radius'), rect, mask, progress),
+  halftone: ({ spec, params, doc, rect, mask, progress }) =>
+    halftoneScreenInPlace(doc, screenFrom(spec, params, 'dot'), rect, mask, progress),
+  'line-screen': ({ spec, params, doc, rect, mask, progress }) =>
+    halftoneScreenInPlace(doc, screenFrom(spec, params, 'line'), rect, mask, progress),
 };
 
-/** Run one adjustment against the document (rect/mask = selection clamp). */
+/**
+ * Run one adjustment against the document (rect/mask = selection clamp).
+ * `progress` only reports; the pixels are the same with or without it.
+ */
 export function runAdjustment(
   id: AdjustmentId,
   params: Readonly<Record<string, number>>,
@@ -308,8 +317,9 @@ export function runAdjustment(
   rect: PixelRect | null,
   mask: SelectionMask | null,
   curvePoints?: readonly CurvePoint[],
+  progress?: FilterProgress,
 ): void {
-  RUNNERS[id]({ spec: BY_ID[id], params, doc, rect, mask, curvePoints });
+  RUNNERS[id]({ spec: BY_ID[id], params, doc, rect, mask, curvePoints, progress });
 }
 
 function screenFrom(
