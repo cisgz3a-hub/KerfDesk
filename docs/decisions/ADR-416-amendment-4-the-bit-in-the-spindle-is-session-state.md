@@ -115,6 +115,14 @@ Start of the same file would have cut those operations with the last bit of the 
 - A declared bit outlives the project that was open. Opening a project with another Default bit
   does not silently re-declare the bit in the spindle; with nothing declared it still does, as
   before (decision 2).
+- **The boot-bundle baseline is raised** to 2,358,203 bytes (`scripts/boot-bundle-baseline.json`).
+  Main stood 35 bytes under its ceiling, and this change adds between 1 and 2 KiB gzip of boot
+  code: CI measured 2,304 KiB against a 2,303 KiB ceiling. The exact byte count was not measured.
+  The selector, its messages and the in-app Zero Z question belong to the Machine rail, which
+  loads at boot. They are not loaded lazily: an operator at a bit-change hold needs the control
+  beside Zero Z at once. The value is the one #1804 (ADR-245 Amendment 2) sets for its own 437
+  bytes, so the two changes merge in either order; the baseline's history is kept in the S9 row
+  of the performance audit's `P3-SWEEP.md`, which #1804 updates.
 
 ### Verification
 
