@@ -17,7 +17,8 @@ import { portableProjectAssets } from './portable-project-assets';
 import type { PagedRasterAssetReader } from '../import/paged-raster-hydration';
 import { createProjectSaveWriteCoordinator } from '../state/project-save-write-coordinator';
 import { describePendingProProject } from '../state/pending-pro-project';
-import { pushProjectLoadNotices } from '../state/project-load-notices';
+import { pushFoldedNotice, type Notice } from '../state/folded-notice';
+import { PROJECT_NOTICES_TOAST_KEY, projectLoadNotices } from '../state/project-load-notices';
 import { errorMessage } from '../../core/util/error-message';
 
 type OpenTemplateContext = ProjectOpenCompletionContext & {
@@ -84,13 +85,20 @@ export async function openTemplateFile(
     return;
   }
   ctx.markLoaded(`${file.name.replace(/\.lf2template$/i, '')}.lf2`, { dirty: true });
-  ctx.pushToast(
-    `Started a new project from ${file.name}. Save will ask for a destination.`,
-    'success',
+  // One toast, as File > Open (annoyance audit A5-P2-6, ADR-708).
+  const capability: ReadonlyArray<Notice> =
+    loaded.kind === 'capability-warning'
+      ? [{ message: loadedMachineCapabilityWarningMessage(loaded.activeKind), variant: 'warning' }]
+      : [];
+  pushFoldedNotice(
+    ctx.pushToast,
+    PROJECT_NOTICES_TOAST_KEY,
+    {
+      message: `Started a new project from ${file.name}. Save will ask for a destination.`,
+      variant: 'success',
+    },
+    [...projectLoadNotices(notices, { migration: true, project }), ...capability],
   );
-  pushProjectLoadNotices(notices, ctx.pushToast, { migration: true, project });
-  if (loaded.kind === 'capability-warning')
-    ctx.pushToast(loadedMachineCapabilityWarningMessage(loaded.activeKind), 'warning');
 }
 
 let saveRequest = 0;

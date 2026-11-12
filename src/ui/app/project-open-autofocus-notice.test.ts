@@ -33,9 +33,11 @@ describe('native project Auto-focus repair notice', () => {
       expect(result).toMatchObject({ kind: 'ok', project: { device: { autofocusCommand: '' } } });
       expect(opened).toBe(true);
       expect(setProject).toHaveBeenCalledOnce();
+      // On the "Opened" toast, on its own line (ADR-708).
       expect(pushToast).toHaveBeenCalledWith(
-        expect.stringMatching(/Auto-focus command.*removed.*Review Auto-focus/i),
+        expect.stringMatching(/^Opened .*\n.*Auto-focus command.*removed.*Review Auto-focus/i),
         'warning',
+        { key: 'project-notices' },
       );
     },
   );

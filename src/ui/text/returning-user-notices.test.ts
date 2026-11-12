@@ -45,7 +45,9 @@ function openToasts(name: string): ReadonlyArray<string> {
     {
       setProject: useStore.getState().setProject,
       markLoaded: () => undefined,
-      pushToast: (message) => toasts.push(message),
+      // One toast carries the result and its notes, one a line (ADR-708).
+      pushToast: (message, _variant, options) =>
+        toasts.push(...message.split('\n'), ...(options?.details ?? [])),
     },
     `${name}.lf2`,
     deserializeProject(fileText(name)),
@@ -87,7 +89,7 @@ describe('the notice at open', () => {
     expect(uncertain).toContain('“ANNA” burns 47.46 × 10.27 mm now and burned 63.28 × 13.70 mm');
   });
 
-  it('keeps the three visible toasts: Opened and at most two more', () => {
+  it('says it in one toast of three lines at most: Opened and two more', () => {
     const toasts = openToasts('1.0.27-whole-job');
     expect(toasts.length).toBeLessThanOrEqual(3);
   });

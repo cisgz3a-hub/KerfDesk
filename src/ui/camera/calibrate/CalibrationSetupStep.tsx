@@ -193,7 +193,11 @@ function AddTargetToCanvasButton(props: { readonly settings: CalibrationSettings
     if (useStore.getState().dirty && !jobAwareConfirm(REPLACE_ARTWORK_QUESTION)) return;
     addCalibrationTargetToCanvas(props.settings);
     useCameraCalibrationStore.setState({ targetArea: null, minimized: true });
-    useCameraCalibrationStore.getState().setStep({ kind: 'photo', status: { kind: 'idle' } });
+    // The steps to take next stay in the minimised panel's photo step, where
+    // they are carried out; the toast only confirms (annoyance audit A5-P2-5).
+    useCameraCalibrationStore
+      .getState()
+      .setStep({ kind: 'photo', status: { kind: 'idle' }, canvasTarget: true });
     useToastStore.getState().pushToast(TARGET_ON_CANVAS_MESSAGE, 'success');
   };
   return (
@@ -235,7 +239,10 @@ export function PlacementNote(props: {
 const REPLACE_ARTWORK_QUESTION =
   'Adding the calibration target replaces the current artwork (Undo brings it back). Continue?';
 export const TARGET_ON_CANVAS_MESSAGE =
-  'Calibration target added to the canvas and locked in place. Start from is now Absolute Coordinates. Frame and Start it, leave the sheet where it is, then press Expand on the Camera setup panel at the bottom right to take the photo.';
+  'Calibration target added to the canvas and locked in place. Start from is now Absolute Coordinates. What to do next is in the Camera setup panel at the bottom right.';
+/** Shown by the waiting photo step until the photo is taken. */
+export const TARGET_ON_CANVAS_NEXT_STEPS =
+  'The target is on the canvas, locked in place, and Start from is now Absolute Coordinates. Frame and Start it like any job, leave the sheet where it is, then take the photo here.';
 export const HOME_BEFORE_TARGET_NOTE =
   'Home the machine before engraving the target. Until it is homed, the rings are placed from wherever the head was when the machine was switched on, so the calibration would hold only until the next Home.';
 export const NO_HOMING_TARGET_NOTE =

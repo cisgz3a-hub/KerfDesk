@@ -8,6 +8,7 @@ import { parseSvg, type ParseSvgResult } from '../../io/svg/parse-svg';
 import { parseSvgOffThread } from '../import/document-import-worker-client';
 import { importByteSize, resolveImportBlob, type BlobSourceFile } from '../import/import-file-blob';
 import type { ImportOutcome } from '../state/store';
+import { pushFoldedNotice } from '../state/folded-notice';
 import type { ToastOptions, ToastVariant } from '../state/toast-store';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 import { describeImportBedFit, type ImportBedFitUndo } from './import-bed-fit-notice';
@@ -59,18 +60,26 @@ export async function importSvgFiles(
   }
 }
 
+// One toast a file: the result, with its notes folded under it, so a file with
+// many notes cannot push its first ones out unseen (annoyance audit A5-P2-6,
+// ADR-708). Importing the same file again rewrites its toast.
 function reportSvgImport(
   name: string,
   result: ParseSvgResult,
   outcome: ImportOutcome | null,
-  pushToast: (message: string, variant?: ToastVariant) => void,
+  pushToast: (message: string, variant?: ToastVariant, options?: ToastOptions) => void,
 ): void {
-  for (const toast of describeSvgImport(name, result, outcome)) {
-    pushToast(toast.message, toast.variant);
-  }
+  const [summary, ...notes] = describeSvgImport(name, result, outcome);
+  if (summary !== undefined) pushFoldedNotice(pushToast, svgImportToastKey(name), summary, notes);
 }
 
-/** The toasts an SVG import shows; Remote Control returns the same text (ADR-125 Amd 2). */
+/** The toast slot an SVG file's import result is written to. */
+export function svgImportToastKey(name: string): string {
+  return `svg-import:${name}`;
+}
+
+/** What an SVG import reports, its result first; the app folds the rest under
+ * that result, and Remote Control returns the same text (ADR-125 Amd 2). */
 export function describeSvgImport(
   name: string,
   result: ParseSvgResult,

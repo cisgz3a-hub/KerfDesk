@@ -40,6 +40,8 @@ type SaveSurfacingOptions = {
   readonly onChoosing: () => void;
   /** A destination was chosen; the write can no longer be cancelled. */
   readonly onFinalizing: () => void;
+  /** The file was written. */
+  readonly onSaved?: () => void;
   readonly isCurrent: () => boolean;
 };
 
@@ -109,8 +111,12 @@ export async function saveSurfacingProgram(options: SaveSurfacingOptions): Promi
     options.onFinalizing();
     await writeSurfacingFile(target, program);
     if (!options.isCurrent()) return;
+    // What to do before running the file stays in the Surfacing panel
+    // (SURFACING_BEFORE_RUNNING_NOTE); the toast confirms what was written
+    // (annoyance audit A5-P2-5).
+    options.onSaved?.();
     pushToast(
-      `Saved preflighted surfacing program: ${summary.passes} pass(es) × ${summary.rowsPerPass} rows with the ${tool.name}. Requested total depth ${summary.requestedTotalDepthMm} mm; emitted maximum depth ${summary.emittedMaximumDepthText} mm at 0.001 mm coordinate precision. Zero X/Y at the area's front-left corner and Z on the surface before running; the file lifts to safe Z before spindle start.`,
+      `Saved preflighted surfacing program: ${summary.passes} pass(es) × ${summary.rowsPerPass} rows with the ${tool.name}. Requested total depth ${summary.requestedTotalDepthMm} mm; emitted maximum depth ${summary.emittedMaximumDepthText} mm at 0.001 mm coordinate precision. Before you run it, read the note under Save surfacing G-code.`,
       'success',
     );
   } finally {

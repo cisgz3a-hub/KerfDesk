@@ -24,7 +24,7 @@ export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): J
   const { machine } = props;
   const values = useSurfacingValues(machine, project, projectDocumentEpoch);
 
-  const { save, cancel, phase } = useSurfacingSave(
+  const { save, cancel, phase, saved } = useSurfacingSave(
     {
       platform,
       pushToast,
@@ -65,9 +65,13 @@ export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): J
           )}
         </div>
       )}
+      {/* Stays after a save, where a toast would have gone (A5-P2-5). */}
+      {saved && phase === null && <p role="note">{SURFACING_BEFORE_RUNNING_NOTE}</p>}
     </RailSection>
   );
 }
 
+export const SURFACING_BEFORE_RUNNING_NOTE =
+  "Before you run the saved program: zero X/Y at the area's front-left corner and Z on the surface. The file lifts to safe Z before spindle start.";
 const cancelSaveTitle =
   'Stop preparing the surfacing program. No file is touched until you choose one.';

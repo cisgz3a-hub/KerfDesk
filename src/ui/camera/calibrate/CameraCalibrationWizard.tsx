@@ -10,7 +10,7 @@
 
 import { assertNever } from '../../../core/scene';
 import { CameraWizardFrame } from './CameraWizardFrame';
-import { CalibrationSetupStep } from './CalibrationSetupStep';
+import { CalibrationSetupStep, TARGET_ON_CANVAS_NEXT_STEPS } from './CalibrationSetupStep';
 import { EngravingStep, PhotoStep } from './CalibrationPhotoSteps';
 import { CalibrationResultStep } from './CalibrationResultStep';
 import { CameraMountStep } from './CameraMountStep';
@@ -132,7 +132,14 @@ function StepBody(props: {
     case 'engraving':
       return <EngravingStep started={step.started} earlierJob={step.earlierJob} />;
     case 'photo':
-      return <PhotoStep status={step.status} take={props.photo.take} cancel={props.photo.cancel} />;
+      return (
+        <PhotoStep
+          status={step.status}
+          take={props.photo.take}
+          cancel={props.photo.cancel}
+          {...(step.canvasTarget === true ? { beforePhoto: TARGET_ON_CANVAS_NEXT_STEPS } : {})}
+        />
+      );
     case 'result':
       return <CalibrationResultStep result={step.result} save={props.photo.save} />;
     case 'nudge-setup':

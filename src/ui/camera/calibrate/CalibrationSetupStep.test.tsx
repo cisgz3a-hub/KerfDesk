@@ -9,7 +9,13 @@ import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
 import { useLaserStore } from '../../state/laser-store';
 import { resetStore } from '../../state/test-helpers';
-import { HOME_BEFORE_TARGET_NOTE, NO_HOMING_TARGET_NOTE } from './CalibrationSetupStep';
+import { useToastStore } from '../../state/toast-store';
+import {
+  HOME_BEFORE_TARGET_NOTE,
+  NO_HOMING_TARGET_NOTE,
+  TARGET_ON_CANVAS_MESSAGE,
+  TARGET_ON_CANVAS_NEXT_STEPS,
+} from './CalibrationSetupStep';
 import { CameraCalibrationWizard } from './CameraCalibrationWizard';
 import {
   DEFAULT_CALIBRATION_SETTINGS,
@@ -53,8 +59,27 @@ describe('calibration target step', () => {
     expect(jobPlacement.startFrom).toBe('absolute');
     expect(useCameraCalibrationStore.getState()).toMatchObject({
       minimized: true,
-      step: { kind: 'photo', status: { kind: 'idle' } },
+      step: { kind: 'photo', status: { kind: 'idle' }, canvasTarget: true },
     });
+  });
+
+  // Annoyance audit A5-P2-5: the steps to take next were a toast that left.
+  it('keeps what to do next in the waiting photo step, and the toast points there', async () => {
+    await mountControl(<CameraCalibrationWizard />);
+    await clickControl(document.body, 'Add target to canvas');
+
+    const next = document.body.querySelector('[role="dialog"] [role="status"]');
+    expect(next?.textContent).toBe(`Next: ${TARGET_ON_CANVAS_NEXT_STEPS}`);
+    expect(TARGET_ON_CANVAS_NEXT_STEPS).toContain('Frame and Start it like any job');
+    const toast = useToastStore.getState().toasts.at(-1);
+    expect(toast).toMatchObject({ variant: 'success', message: TARGET_ON_CANVAS_MESSAGE });
+    expect(TARGET_ON_CANVAS_MESSAGE).toMatch(/What to do next is in the Camera setup panel/);
+
+    // Once the photo is being taken, the step no longer says to burn first.
+    await act(async () =>
+      useCameraCalibrationStore.getState().setStep({ kind: 'photo', status: { kind: 'idle' } }),
+    );
+    expect(document.body.textContent).not.toContain(TARGET_ON_CANVAS_NEXT_STEPS);
   });
 
   it('asks for Home before the target on an unhomed machine, without blocking it', async () => {

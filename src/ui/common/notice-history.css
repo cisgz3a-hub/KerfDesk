@@ -1,0 +1,101 @@
+/* The status bar's Notices control and its list (ADR-708). */
+
+.lf-notice-history__button {
+  font-size: 12px;
+  padding: 1px 10px;
+  white-space: nowrap;
+}
+
+/* Over the canvas's own space, below dialogs and below the Live Motion popup,
+   which holds the Abort control and always stacks on top. */
+.lf-notice-history {
+  position: fixed;
+  z-index: var(--lf-z-menu);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-height: 0;
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius-md);
+  background: var(--lf-bg-1);
+  color: var(--lf-text);
+  font-family: var(--lf-font);
+  font-size: var(--lf-text-sm);
+  line-height: 1.4;
+  box-shadow: var(--lf-shadow);
+}
+
+.lf-notice-history__header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border-bottom: 1px solid var(--lf-border);
+}
+
+.lf-notice-history__hint {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--lf-text-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.lf-notice-history__close {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--lf-radius-md);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.lf-notice-history__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+
+.lf-notice-history__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--lf-warning);
+  overflow-wrap: anywhere;
+  /* The text can be selected and copied into a support request. */
+  user-select: text;
+}
+
+.lf-notice-history__item + .lf-notice-history__item {
+  border-top: 1px solid var(--lf-border);
+}
+
+.lf-notice-history__item--error {
+  border-left-color: var(--lf-danger);
+}
+
+.lf-notice-history__meta {
+  color: var(--lf-text-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.lf-notice-history__message {
+  white-space: pre-line;
+}
+
+.lf-notice-history__details {
+  margin: 2px 0 0;
+  padding-left: 18px;
+}
+
+.lf-notice-history__details > li + li {
+  margin-top: 4px;
+}

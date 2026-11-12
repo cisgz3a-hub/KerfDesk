@@ -13,7 +13,7 @@ import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
-import { SurfacingPanel } from './SurfacingPanel';
+import { SURFACING_BEFORE_RUNNING_NOTE, SurfacingPanel } from './SurfacingPanel';
 import type { SurfacingWorkerInput } from './surfacing-worker-protocol';
 
 // Exercise real generation/preflight/chunk output here; client protocol and
@@ -276,6 +276,31 @@ describe('SurfacingPanel save path', () => {
         ),
       }),
     );
+  });
+
+  // Annoyance audit A5-P2-5: what to do before running the file was the tail
+  // of a toast that left; it now stays under the Save button.
+  it('keeps the before-you-run steps in the panel after a save, and the toast points there', async () => {
+    const { platform } = mockPlatform();
+    await clickSave(platform);
+
+    expect(host?.querySelector('[role="note"]')?.textContent).toBe(SURFACING_BEFORE_RUNNING_NOTE);
+    expect(SURFACING_BEFORE_RUNNING_NOTE).toContain(
+      "zero X/Y at the area's front-left corner and Z on the surface",
+    );
+    const saved = useToastStore
+      .getState()
+      .toasts.find((toast) => toast.message.startsWith('Saved preflighted surfacing program'));
+    expect(saved?.message).toMatch(
+      /Before you run it, read the note under Save surfacing G-code\.$/,
+    );
+    expect(saved?.message).not.toContain('front-left corner');
+  });
+
+  it('shows no before-you-run steps when the picker is cancelled', async () => {
+    const { platform } = mockPlatform(true);
+    await clickSave(platform);
+    expect(host?.querySelector('[role="note"]')).toBeNull();
   });
 
   // Rule 7 / ADR-228: `no-go-zone-collision` and `out-of-bed` are the two

@@ -54,7 +54,10 @@ export type CalibrationStep =
       readonly started: boolean;
       readonly earlierJob: StreamerState | null;
     }
-  | { readonly kind: 'photo'; readonly status: PhotoStatus }
+  // `canvasTarget`: the target was put on the canvas for the operator to
+  // engrave like any job, so the waiting photo step says what to do first
+  // (annoyance audit A5-P2-5). Taking the photo sets a new step without it.
+  | { readonly kind: 'photo'; readonly status: PhotoStatus; readonly canvasTarget?: true }
   | { readonly kind: 'result'; readonly result: CalibrationResult }
   // The quick nudge fix (ADR-663 Amendment 2): burn one ring, photograph it,
   // move the saved camera onto it.

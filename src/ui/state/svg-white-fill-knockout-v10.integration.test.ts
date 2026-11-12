@@ -280,7 +280,9 @@ describe('V2-P2-1: a logo saved before the knock-out', () => {
       {
         setProject: (project) => useStore.getState().setProject(project),
         markLoaded: () => undefined,
-        pushToast: (message) => toasts.push(message),
+        // One toast carries the result and its notes, one a line (ADR-708).
+        pushToast: (message, _variant, options) =>
+          toasts.push(...message.split('\n'), ...(options?.details ?? [])),
       },
       'logo.lf2',
       deserializeProject(saved.json),
