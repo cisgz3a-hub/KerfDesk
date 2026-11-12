@@ -34,4 +34,4 @@ C2's rules apply:
 - security findings stay redacted until fixed;
 - fix PRs use auto-merge with the MERGE method, plus Auto-fix.
 
-**Status:** started 2026-11-12. E1 and E2 ledgered ([LEDGER.md](LEDGER.md)). E3 waits for #1833 (rotary) to merge.
+**Status:** DONE 2026-11-12. E1, E2 and E3 ledgered; see the [round result](LEDGER.md#round-result-2026-11-12).
