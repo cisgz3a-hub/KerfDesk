@@ -36,6 +36,15 @@ import { bedWiderThanHomedArea } from './homed-area-bed';
 import { frameRouteNoGoWarnings } from './laser-frame-motion-plan';
 import { loadLastMachineSelection } from './last-machine-persistence';
 import { useLaserStore } from './laser-store';
+import { useToastStore } from './toast-store';
+import {
+  focusMovedByHome,
+  HOME_MOVED_FOCUS_JOB_WARNING,
+  HOME_MOVED_FOCUS_REMINDER,
+} from './home-moved-focus';
+import { useCameraStore } from './camera-store';
+import { demotedPolicyWarnings } from '../laser/start-job-readiness-policy';
+import { machineSnapshot } from '../laser/start-machine-snapshot';
 import { resolveManualMotionLimits } from './manual-motion-limits';
 import { resolveNativeBedFrame, selectNativeBedEvidence } from './native-bed-frame';
 import { useStore } from './store';
@@ -101,6 +110,27 @@ describe('Falcon A1 Pro with its published banner and full $$', () => {
       bedHeight: 268,
       accelMmPerSec2: 1000,
     });
+  });
+
+  // The A1 Pro firmware moves Z while it homes X and Y: on the maintainer's
+  // machine a typed `$HX` then `$HY` lost the Auto-focus height (ADR-322
+  // Amendment 5). Home says so, and Job Review warns until it is set again.
+  it('reminds that Home moved the laser height, and Job Review warns until it is set again', async () => {
+    const device = useA1Pro();
+    const port = await connectA1Pro(device);
+    useToastStore.setState({ toasts: [] });
+    expect(focusMovedByHome(useLaserStore.getState())).toBe(false);
+
+    await homeThroughDriver(port);
+    expect(focusMovedByHome(useLaserStore.getState())).toBe(true);
+    expect(useToastStore.getState().toasts.map((toast) => toast.message)).toContain(
+      HOME_MOVED_FOCUS_REMINDER,
+    );
+    // Home itself still sends no Z word.
+    expect(port.outbound().some((line) => /\bZ-?\d/.test(line))).toBe(false);
+    const { project } = useStore.getState();
+    const snapshot = machineSnapshot(project, useLaserStore.getState(), useCameraStore.getState());
+    expect(demotedPolicyWarnings(project, snapshot)).toContain(HOME_MOVED_FOCUS_JOB_WARNING);
   });
 
   // 1.0.28 offered 363 x 273 at every connect; a profile that took it keeps

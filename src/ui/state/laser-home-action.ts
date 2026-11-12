@@ -19,6 +19,13 @@ import { NO_WORK_OFFSET } from './host-recorded-origin';
 import { reopenHomeAlarmReplyWindow } from './laser-home-alarm-reply';
 import { requestTerminalOwnedActiveWcsReadback } from './terminal-owned-wcs-readback';
 import { hasPendingControllerWrite } from './laser-start-queue-fence';
+import {
+  focusMovedByHome,
+  homeMovedFocusPatch,
+  HOME_MOVED_FOCUS_REMINDER,
+  HOME_MOVED_FOCUS_TOAST_KEY,
+} from './home-moved-focus';
+import { useToastStore } from './toast-store';
 import type { LaserState } from './laser-store';
 import {
   assertAutofocusIdle,
@@ -163,6 +170,8 @@ export async function runHomeAction(
     // Homing re-establishes machine zero, so any prior G92 Z0 now points at a
     // different physical height — work Z0 must be re-set (Codex audit P1).
     workZZeroEvidence: null,
+    // Some machines move Z while homing X and Y (ADR-322 Amendment 5).
+    ...homeMovedFocusPatch(state),
     frameVerification: null,
     framedRun: null,
     frameTrace: null,
@@ -230,6 +239,11 @@ async function executeHomeSequence(
   await waitForFreshIdle(refs, { kind: 'home', requiredReports: 1 });
   assertHomeCurrent(get(), refs, epochs);
   confirmHome(set, get, epochs);
+  if (focusMovedByHome(get())) {
+    useToastStore.getState().pushToast(HOME_MOVED_FOCUS_REMINDER, 'warning', {
+      key: HOME_MOVED_FOCUS_TOAST_KEY,
+    });
+  }
 }
 
 // Home establishes machine position, not the absence of G92/G54 offsets: a

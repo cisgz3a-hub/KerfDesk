@@ -10,6 +10,7 @@ import { cameraMovedStartWarning } from '../camera/helpers/camera-moved-start-wa
 import type { useCameraStore } from '../state/camera-store';
 import type { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import { focusMovedByHome } from '../state/home-moved-focus';
 import { connectedLaserModuleEvidence } from '../state/laser-module-probe';
 import { registrationOutlinePlacement } from '../state/registration-outline-run';
 import { laserStatusReportFieldsOff } from '../state/status-report-fields';
@@ -36,6 +37,8 @@ export function machineSnapshot(
     motionOperationActive: laser.motionOperation !== null,
     controllerOperationActive: laser.controllerOperation !== null,
     autofocusBusy: laser.autofocusBusy,
+    // A Home moved Z since the height was last set (ADR-322 Amendment 5).
+    focusMovedByHome: focusMovedByHome(laser),
     workOriginActive: laser.workOriginActive,
     workOriginRestored: isRestoredWorkOrigin(laser),
     workZZeroEvidence: laser.workZZeroEvidence,

@@ -1899,6 +1899,16 @@ the completed physical Frame is the spatial source of truth.
    finish, then retry. `error:20` means the firmware has no probe input or does not support the
    command.
 
+#### Edge — Home moves the focus height on a Falcon A1 Pro (ADR-322 Amendment 5)
+1. The A1 Pro firmware moves Z while it homes X and Y, so a Home after Auto-focus loses the height.
+   KerfDesk itself sends only `$HX`, `$HY` and the settle marker.
+2. After a completed Home a warning toast says: `Home moved the laser's height: this machine's homing
+   also moves Z. Move the head over your material and run Auto-focus again before you burn.`
+3. Until a successful Auto-focus or a Z jog, Job Review lists a warning on laser jobs that the height
+   has not been set since the last Home. It never blocks Frame or Start. A reconnect clears it.
+4. KerfDesk does not re-focus by itself: after Home the head is at the front-left corner, which may
+   not be over the material.
+
 #### Edge — the file kept a photo behind its trace (ADR-673 Amendment 1)
 1. KerfDesk 1.0.27 and earlier marked a picture kept after Trace as the trace's source and never
    engraved it. Such a file opens with the marker dropped and the photo still out of the job: its
