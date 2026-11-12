@@ -917,6 +917,10 @@ the full license text.
 Package metadata licence: MIT
 Applicable terms are preserved in full below.
 
+Upstream origin: its QR decoder ports ZXing ("Zebra Crossing",
+https://github.com/zxing/zxing), Copyright the ZXing authors, licensed under
+the Apache License, Version 2.0, whose full text appears in this file.
+
 LICENSE
 MIT License
 

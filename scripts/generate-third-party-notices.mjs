@@ -14,9 +14,12 @@ import {
   OPENCLIPART_ASSETS,
   OUTLINE_FONTS,
   REPO_ROOT,
+  DESKTOP_MCP_VIEW_PACKAGES,
+  collectBundledBuildPackages,
   collectElectronPackage,
   collectProductionPackages,
   sha256File,
+  verifyDesktopMcpViewPackages,
   verifyOpenClipartAssets,
 } from './third-party-closure.mjs';
 
@@ -112,6 +115,26 @@ function dependencySections(rootDir) {
   return collectProductionPackages(rootDir).map((dependency) => dependencySection(dependency));
 }
 
+// Development packages whose code the build copies into the app (O11-P3-1).
+function bundledBuildSections(rootDir) {
+  return collectBundledBuildPackages(rootDir).map((dependency) =>
+    [`Shipped in: ${dependency.shippedIn}`, dependencySection(dependency)].join('\n'),
+  );
+}
+
+// Phone-service packages bundled into the desktop MCP workspace view (O11-P3-2).
+function desktopMcpViewSections(rootDir) {
+  verifyDesktopMcpViewPackages(rootDir);
+  return DESKTOP_MCP_VIEW_PACKAGES.map((entry) =>
+    [
+      `--- Package: ${entry.name}@${entry.version} (${entry.license}) ---`,
+      'Shipped in: desktop MCP workspace view (bundled from services/remote-control)',
+      `License source: LICENSE, byte-identical (SHA-256 ${entry.licenseSha256}) to the`,
+      `${entry.sameLicenseAs} LICENSE reproduced in full in this file.`,
+    ].join('\n'),
+  );
+}
+
 function electronSection(rootDir) {
   const electron = collectElectronPackage(rootDir);
   return [
@@ -145,6 +168,8 @@ function pdfResourceLicenseSections(rootDir) {
     'wasm/LICENSE_OPENJPEG',
     'wasm/LICENSE_PDFJS_JBIG2',
     'wasm/LICENSE_PDFJS_OPENJPEG',
+    'wasm/LICENSE_PDFJS_QCMS',
+    'wasm/LICENSE_QCMS',
   ].map(
     (file) =>
       '--- PDF.js bundled resource: ' +
@@ -164,8 +189,9 @@ export function buildThirdPartyNotice(rootDir = REPO_ROOT) {
     "The application's own first-party software and documentation are",
     'proprietary, all rights reserved (see LICENSE and eula.txt). This file',
     'covers the complete installed dependency closure reported by',
-    '`pnpm licenses list --prod`, the Electron package license, bundled',
-    'fonts, and the eight pinned OpenClipart CC0 assets.',
+    '`pnpm licenses list --prod`, the development packages the build bundles',
+    'into the app, the Electron package license, bundled fonts, and the eight',
+    'pinned OpenClipart CC0 assets.',
     '',
     'Desktop artifacts also embed the Electron/Chromium runtime. Its upstream',
     'Electron package license is reproduced below; Electron/Chromium',
@@ -186,6 +212,7 @@ export function buildThirdPartyNotice(rootDir = REPO_ROOT) {
       .trim(),
     fs.readFileSync(path.join(rootDir, 'docs/licensing/meerk40t-lihuiyu.txt'), 'utf8').trim(),
     fs.readFileSync(path.join(rootDir, 'docs/licensing/meerk40t-moshi.txt'), 'utf8').trim(),
+    fs.readFileSync(path.join(rootDir, 'docs/licensing/meerk40t-ruida.txt'), 'utf8').trim(),
     '== Bundled fonts ==',
     ...outlineFontSections(rootDir),
     ...cncStrokeFontSections(),
@@ -195,6 +222,9 @@ export function buildThirdPartyNotice(rootDir = REPO_ROOT) {
     ...openClipartSections(rootDir),
     '== pnpm production dependency closure ==',
     ...dependencySections(rootDir),
+    '== Development packages the build bundles into the app ==',
+    ...bundledBuildSections(rootDir),
+    ...desktopMcpViewSections(rootDir),
     ...offlineEngineNotices(rootDir),
     '== Electron desktop runtime package ==',
     electronSection(rootDir),
