@@ -54,6 +54,17 @@ describe('parseStlBlob', () => {
     });
   });
 
+  // Oracle audit O8-P2-2: the streamed reader truncated "12,5" to 12 too.
+  it('refuses a streamed decimal-comma vertex instead of truncating it', async () => {
+    const text =
+      'solid x\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\n' +
+      'vertex 12,5 0 0\nvertex 0 3 4\nendloop\nendfacet\nendsolid x\n';
+
+    const result = await parseStlBlob(new NodeBlob([text]) as unknown as Blob);
+
+    expect(result.kind).toBe('error');
+  });
+
   it('uses a finite-preserving buffer for streamed ASCII overflow coordinates', async () => {
     const text =
       'solid x\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\n' +

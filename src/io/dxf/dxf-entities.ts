@@ -11,6 +11,7 @@ import {
   type Vec2,
 } from '../../core/scene';
 import { CLOSURE_EPS_MM } from '../../core/scene/polyline-closure';
+import { parseDecimalReal } from '../../core/util';
 import type { DxfTag } from './dxf-tags';
 import {
   classifyExtrusion,
@@ -339,8 +340,9 @@ export function allNumbers(tags: ReadonlyArray<DxfTag>, code: number): ReadonlyA
     .filter((value) => Number.isFinite(value));
 }
 
+// The whole value or nothing: a decimal-comma "12,5" is not read as 12 (O8-P2-2).
 function parseNumber(value: string, fallback = 0): number {
-  const parsed = Number.parseFloat(value);
+  const parsed = parseDecimalReal(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
@@ -367,7 +369,7 @@ export const DXF_COORDINATE_MAGNITUDE_MM = 1_000_000;
 export function hasUnreadableGeometry(tags: ReadonlyArray<DxfTag>, scale: number): boolean {
   for (const tag of tags) {
     if (!DXF_GEOMETRY_CODES.has(tag.code)) continue;
-    const value = Number.parseFloat(tag.value);
+    const value = parseDecimalReal(tag.value);
     if (!Number.isFinite(value)) return true;
     if (
       DXF_SCALED_LENGTH_CODES.has(tag.code) &&
