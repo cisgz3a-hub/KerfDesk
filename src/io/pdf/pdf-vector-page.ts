@@ -1,5 +1,6 @@
 import { curveSubpathBounds, type Vec2 } from '../../core/scene';
 import { applySvgMatrix, type SvgMatrix } from '../svg/svg-curve-transform';
+import { hairlineSafeStrokeWidth } from '../svg/hairline-stroke';
 import { multiplySvgMatrix } from '../svg/svg-transform-attribute';
 
 type Operators = Readonly<Record<string, number>>;
@@ -153,7 +154,7 @@ function paintedPath(
     '" stroke="' +
     (stroke ? state.stroke : 'none') +
     '" stroke-width="' +
-    state.width +
+    hairlineSafeStrokeWidth(String(state.width)) +
     '"/>'
   );
 }

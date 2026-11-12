@@ -102,10 +102,15 @@ describe('normalizedSweep (ADR-700 Amd 2)', () => {
       [TURN, 0],
       [-1, 2],
       [5, -9],
-      [0, 3 * TURN],
       [2, 2 - TURN],
     ];
     for (const [start, end] of cases) expect(normalizedSweep(start, end)).toBe(looped(start, end));
+  });
+
+  it('drops whole turns from an ELLIPSE sweep, as ARC does', () => {
+    expect(normalizedSweep(0, TURN + Math.PI / 2)).toBeCloseTo(Math.PI / 2, 12);
+    expect(normalizedSweep(1, 1 + 2 * TURN)).toBe(TURN);
+    expect(normalizedSweep(0.3, 0.3 + TURN * (1 + 1e-15))).toBe(TURN);
   });
 
   it('works out any parameters in one step, within one turn', () => {

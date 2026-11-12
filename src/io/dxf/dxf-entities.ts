@@ -23,6 +23,7 @@ import {
 } from './dxf-ocs';
 import {
   bulgeSegment,
+  counterClockwiseSweep,
   isFullEllipseSweep,
   normalizedSweep,
   sampleArc,
@@ -100,20 +101,21 @@ function arcInOcs(tags: ReadonlyArray<DxfTag>, scale: number): EntityConversion 
 /**
  * An ARC's counter-clockwise sweep, in radians, in (0, 2π]: DXF arcs run from
  * the start angle to the end angle, so angles a whole number of turns apart
- * mean the same arc. A sweep within one turn keeps its former value exactly;
- * a larger one is reduced in degrees, where whole turns are exact, and equal
- * angles mean a full circle.
+ * mean the same arc. The shared rule (counterClockwiseSweep) works in degrees,
+ * where whole turns are exact: equal angles, or angles a rounding hair from a
+ * whole turn apart, mean a full circle. A partial sweep within one turn keeps
+ * its former value exactly.
  */
 export function arcSweep(startDeg: number, endDeg: number): number {
-  const sweepDeg = endDeg - startDeg;
-  if (!Number.isFinite(sweepDeg)) return FULL_TURN;
-  if (sweepDeg > -360 && sweepDeg <= 360) {
+  const sweepDeg = counterClockwiseSweep(startDeg, endDeg, 360);
+  if (sweepDeg === 360) return FULL_TURN;
+  if (Math.abs(endDeg - startDeg) < 360) {
+    // Within one turn the sweep keeps its former value bit for bit.
     let sweep = endDeg * DEGREES_TO_RADIANS - startDeg * DEGREES_TO_RADIANS;
     while (sweep <= 0) sweep += FULL_TURN; // at most twice: |sweep| < one turn
     return sweep;
   }
-  const wrapped = sweepDeg % 360;
-  return (wrapped <= 0 ? wrapped + 360 : wrapped) * DEGREES_TO_RADIANS;
+  return sweepDeg * DEGREES_TO_RADIANS;
 }
 
 type BulgeVertex = { x: number; y: number; bulge: number };

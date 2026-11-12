@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parseSvg } from '../svg/parse-svg';
+import { HAIRLINE_STROKE_WIDTH } from '../svg/hairline-stroke';
 import { convertPostscript } from './convert-postscript';
 import { PS_LIMITS } from './ps-vm';
 
@@ -18,6 +19,8 @@ function ok(text: string | Uint8Array) {
 function pathData(svg: string): string[] {
   return [...svg.matchAll(/ d="([^"]*)"/g)].map((m) => m[1] ?? '');
 }
+
+const PS_TINY_RULE = '%!PS-Adobe-3.0\n0 0 moveto 50 0.0000012 lineto stroke\nshowpage\n';
 
 const EPS = (body: string, box = '0 0 100 100'): string =>
   `%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: ${box}\n%%EndComments\n${body}\nshowpage\n%%EOF\n`;
@@ -91,6 +94,49 @@ describe('artwork with no height or width (audit C2 D1-P2-4)', () => {
 
   it('leaves artwork with both dimensions unchanged', () => {
     expect(ok(PS('0 0 moveto 72 36 lineto stroke')).svg).toContain('viewBox="0 0 72 36"');
+  });
+});
+
+describe('zero-width strokes and tiny rules (E1-P1-3, E1-P3-1)', () => {
+  function colours(text: string): string[] {
+    const result = ok(text);
+    const parsed = parseSvg({ svgText: result.svg, id: 'ps', source: 'hairline.ps' });
+    return (parsed.object?.paths ?? []).map((path) => path.color).sort();
+  }
+  const AI8 = (body: string): string =>
+    '%!PS-Adobe-3.0 EPSF-3.0\n%%Creator: Adobe Illustrator(R) 8.0\n%%BoundingBox: 0 0 100 100\n' +
+    '%%EndProlog\n' +
+    body +
+    '\n';
+
+  it('keeps a 0 setlinewidth hairline beside a stroked path', () => {
+    const body =
+      '0 setlinewidth 1 0 0 setrgbcolor 0 0 moveto 50 0 lineto stroke ' +
+      '2 setlinewidth 0 0 1 setrgbcolor 0 10 moveto 50 10 lineto stroke';
+    expect(colours(EPS(body))).toEqual(['#0000ff', '#ff0000']);
+  });
+
+  it('keeps a 0 setlinewidth hairline beside a fill-only path', () => {
+    const body =
+      '0 setlinewidth 1 0 0 setrgbcolor 0 0 moveto 50 0 lineto stroke ' +
+      '0 0 1 setrgbcolor 0 20 10 10 rectfill';
+    expect(colours(EPS(body))).toEqual(['#0000ff', '#ff0000']);
+  });
+
+  it('keeps an Illustrator 0 w hairline beside a fill', () => {
+    const body = '1 0 0 0 K 0 w 0 0 m 50 0 L S 0 0 0 1 k 0 20 m 10 20 L 10 30 L 0 30 L f';
+    expect(colours(AI8(body))).toHaveLength(2);
+  });
+
+  it('writes a width that rounds to zero as the hairline', () => {
+    const svg = ok(EPS('1e-9 setlinewidth 0 0 moveto 50 50 lineto stroke')).svg;
+    expect(svg).toContain(`stroke-width="${HAIRLINE_STROKE_WIDTH}"`);
+  });
+
+  it('imports a rule whose height is under a millionth of a millimetre', () => {
+    const result = ok(PS_TINY_RULE);
+    const parsed = parseSvg({ svgText: result.svg, id: 'ps', source: 'tiny.ps' });
+    expect(parsed.object).not.toBeNull();
   });
 });
 

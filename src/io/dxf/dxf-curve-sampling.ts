@@ -73,16 +73,28 @@ export function isFullEllipseSweep(startParam: number, endParam: number): boolea
   return normalizedSweep(startParam, endParam) >= FULL_TURN - 1e-9;
 }
 
+/** Relative rounding allowance for a whole turn, and ulps of the inputs. */
+const TURN_TOLERANCE = 1e-12;
+const INPUT_ULPS = 4 * Number.EPSILON;
+
 /**
- * The counter-clockwise sweep from start to end, at most one full turn. A
- * difference of zero or less wraps forward by whole turns, worked out in one
- * step so any parameters end at once (ADR-700 Amd 2); a positive one is kept,
- * capped at a full turn.
+ * The counter-clockwise sweep from `start` to `end` in (0, turn], the one
+ * direction rule DXF ARC (degrees) and ELLIPSE (radians) share. Whole turns
+ * between the two are dropped, so 0 → 450° is a quarter. Equal angles mean a
+ * full turn, and a remainder within rounding of zero or of a whole turn is one:
+ * a circle written as s → s + 360 stays a circle even when the decimal end
+ * angle rounds a hair past it. Worked out in one step, so any inputs end at once.
  */
+export function counterClockwiseSweep(start: number, end: number, turn: number): number {
+  const difference = end - start;
+  if (!Number.isFinite(difference)) return turn;
+  const tolerance = TURN_TOLERANCE * turn + INPUT_ULPS * (Math.abs(start) + Math.abs(end));
+  const remainder = difference % turn;
+  const sweep = remainder < 0 ? remainder + turn : remainder;
+  return sweep <= tolerance || turn - sweep <= tolerance ? turn : sweep;
+}
+
+/** An ELLIPSE's parameter sweep, by the shared rule. */
 export function normalizedSweep(startParam: number, endParam: number): number {
-  const sweep = endParam - startParam;
-  if (!Number.isFinite(sweep)) return FULL_TURN;
-  if (sweep > 0) return Math.min(sweep, FULL_TURN);
-  const wrapped = sweep % FULL_TURN;
-  return wrapped === 0 ? FULL_TURN : wrapped + FULL_TURN;
+  return counterClockwiseSweep(startParam, endParam, FULL_TURN);
 }
