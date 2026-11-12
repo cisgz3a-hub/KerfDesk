@@ -1,0 +1,52 @@
+// T12 refuter: does the real dialog default one angle to 0, show any preview, and warn on 45/45 or 60/60?
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, it } from 'vitest';
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { openShearDialog, ShearDialogHost } from '../t06-main/src/ui/commands/ShearDialog';
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const LOG = 'C:/Users/stolk/kd-t1/zz-t12r/r12dialog.log';
+writeFileSync(LOG, '');
+const out = (s: string) => appendFileSync(LOG, `${s}\n`);
+
+let root: Root | null = null;
+let host: HTMLDivElement;
+beforeEach(async () => {
+  resetStore();
+  host = document.createElement('div');
+  document.body.appendChild(host);
+  await act(async () => {
+    root = createRoot(host);
+    root.render(<ShearDialogHost />);
+  });
+  await act(async () => openShearDialog());
+});
+afterEach(async () => {
+  await act(async () => root?.unmount());
+  root = null;
+  host.remove();
+});
+
+const input = (label: string) =>
+  document.body.querySelector(`input[aria-label="${label} shear angle in degrees"]`) as HTMLInputElement;
+async function type(el: HTMLInputElement, value: string) {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(el, value);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+const button = () => [...document.body.querySelectorAll('button')].find((b) => b.textContent === 'Shear');
+const alert = () => document.body.querySelector('[role="alert"]')?.textContent ?? null;
+
+it('dialog defaults and combined pairs', async () => {
+  out(`defaults H=${input('Horizontal').value} V=${input('Vertical').value}`);
+  out(`dialog text: ${document.body.textContent?.replace(/\s+/g, ' ')}`);
+  out(`canvas/svg/img preview elements in dialog: ${document.body.querySelectorAll('canvas,svg,img').length}`);
+  for (const [h, v] of [['45', '45'], ['30', '60'], ['60', '60'], ['85', '85']]) {
+    await type(input('Horizontal'), h);
+    await type(input('Vertical'), v);
+    out(`${h}/${v}: Shear enabled=${button()?.disabled === false} alert=${JSON.stringify(alert())}`);
+  }
+});

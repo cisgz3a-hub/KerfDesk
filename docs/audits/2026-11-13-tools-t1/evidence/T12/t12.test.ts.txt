@@ -1,0 +1,256 @@
+// T12 Shear auditor: independent oracle W(p) = p + tan·(…) about the stated pivot.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  type ColoredPath,
+  type CurveSubpath,
+  type ImportedSvg,
+  type Project,
+  type SceneObject,
+  type Transform,
+} from '../t06-main/src/core/scene';
+import { flattenCurveSubpath } from '../t06-main/src/core/scene/curve-path';
+import { prepareOutput } from '../t06-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t06-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t06-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t06-main/src/io/project/deserialize-project';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t06-main/src/ui/state/toast-store';
+import { area, bbox, decode, hausdorff, place, sample, segsDist, shearW, type Curve, type V } from './geo12';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t12/t12.log';
+const log: string[] = [];
+const out = (s: string) => { log.push(s); writeFileSync(LOG, log.join('\n')); };
+const f = (n: number, d = 4) => (Number.isFinite(n) ? n.toFixed(d) : String(n));
+const st = () => useStore.getState();
+beforeEach(() => resetStore());
+
+const line = (x: number, y: number) => ({ kind: 'line' as const, to: { x, y } });
+const arc = (rx: number, ry: number, rot: number, large: boolean, sweep: boolean, x: number, y: number) =>
+  ({ kind: 'elliptical-arc' as const, radiusX: rx, radiusY: ry, rotationDeg: rot, largeArc: large, sweep, to: { x, y } });
+
+const SHAPES: Record<string, CurveSubpath> = {
+  square: { start: { x: 0, y: 0 }, segments: [line(20, 0), line(20, 10), line(0, 10), line(0, 0)], closed: true },
+  circle: { start: { x: 0, y: 10 }, segments: [arc(10, 10, 0, false, true, 20, 10), arc(10, 10, 0, false, true, 0, 10)], closed: true },
+  // rotated ellipse rx 12 ry 5 at 30°, centre (15,10), split at its major-axis ends
+  rotEllipse: (() => {
+    const c = { x: 15, y: 10 }, r = Math.PI / 6;
+    const a = { x: c.x + 12 * Math.cos(r), y: c.y + 12 * Math.sin(r) };
+    const b = { x: c.x - 12 * Math.cos(r), y: c.y - 12 * Math.sin(r) };
+    return { start: a, segments: [arc(12, 5, 30, false, true, b.x, b.y), arc(12, 5, 30, false, true, a.x, a.y)], closed: true };
+  })(),
+  cubicBlob: { start: { x: 0, y: 0 }, segments: [{ kind: 'cubic', control1: { x: 10, y: -8 }, control2: { x: 25, y: 5 }, to: { x: 20, y: 15 } }, { kind: 'cubic', control1: { x: 12, y: 22 }, control2: { x: -6, y: 12 }, to: { x: 0, y: 0 } }], closed: true },
+  openArc: { start: { x: 0, y: 0 }, segments: [arc(10, 10, 0, true, false, 10, 10)], closed: false },
+};
+
+const TRANSFORMS: Record<string, Transform> = {
+  identity: { ...IDENTITY_TRANSFORM, x: 50, y: 50 },
+  rot30: { ...IDENTITY_TRANSFORM, x: 50, y: 50, rotationDeg: 30 },
+  mirrorX: { ...IDENTITY_TRANSFORM, x: 50, y: 50, mirrorX: true },
+  scale2x05: { ...IDENTITY_TRANSFORM, x: 50, y: 50, scaleX: 2, scaleY: 0.5 },
+  rot40scaleMirY: { x: 60, y: 40, rotationDeg: 40, scaleX: 1.5, scaleY: 0.7, mirrorX: false, mirrorY: true },
+};
+
+function obj(id: string, curves: CurveSubpath[], transform: Transform): ImportedSvg {
+  const polylines = curves.map((c) => {
+    const r = flattenCurveSubpath(c, { toleranceMm: 0.01, segmentBudget: 2_000_000 });
+    if (r.kind !== 'ok') throw new Error('flatten');
+    return { points: [...r.polyline.points], closed: c.closed };
+  });
+  const paths: ColoredPath[] = [{ color: '#ff0000', polylines, curves }];
+  const all = polylines.flatMap((p) => p.points);
+  return { kind: 'imported-svg', id, source: `${id}.svg`, bounds: bbox(all), transform, operationIds: ['L'], paths } as unknown as ImportedSvg;
+}
+function load(objects: SceneObject[], mode: 'line' | 'fill' = 'line'): void {
+  const base = createProject();
+  const layer = { ...createLayer({ id: 'L', color: '#ff0000', name: 'L', mode }), speed: 777, power: 30 };
+  const project: Project = { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers: [layer], groups: [] } };
+  useStore.setState({ project, selectedObjectId: objects[0]!.id, additionalSelectedIds: new Set(objects.slice(1).map((o) => o.id)), undoStack: [], redoStack: [] } as any);
+}
+function shear(ax: number, ay: number): string {
+  useToastStore.setState({ toasts: [] } as any);
+  st().shearSelection(ax, ay);
+  return ((useToastStore.getState() as any).toasts ?? []).map((t: any) => t.message).join(' | ');
+}
+const worldCurve = (o: ImportedSvg, i = 0) => sample(o.paths[0]!.curves![i] as unknown as Curve).map((p) => place(p, o.transform as any));
+const worldPoly = (o: ImportedSvg, i = 0) => { const pl = o.paths[0]!.polylines[i]!; const pts = pl.points.map((p) => place(p, o.transform as any)); return pl.closed ? [...pts, pts[0]!] : pts; };
+// Pivot as the app's dialog states it: centre of the selection's box (transformed local bounds corners).
+function pivotOf(objs: ImportedSvg[]): V {
+  const pts = objs.flatMap((o) => o.paths[0]!.curves!.flatMap((_, i) => worldCurve(o, i)));
+  const b = bbox(pts);
+  return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
+}
+function burn() {
+  const p = prepareOutput(st().project);
+  if (!p.ok) return { ok: false, why: JSON.stringify((p as any).preflight ?? p).slice(0, 300), segs: [] as Array<[V, V]>, lit: 0 };
+  const g = emitPreparedGcode(p).gcode;
+  const d = decode(g);
+  // Machine Y = 400 - scene Y (bed 400 mm, front-left origin): verified on unsheared art.
+  return { ok: true, why: '', lit: d.lit, segs: d.segs.map(([a, b]) => [{ x: a.x, y: 400 - a.y }, { x: b.x, y: 400 - b.y }] as [V, V]) };
+}
+
+it('core oracle matrix: shapes × transforms × angles', () => {
+  out('== core oracle (dev in mm; curves = stored curves placed; polys = stored polylines placed) ==');
+  const angles: Array<[number, number]> = [[15, 0], [0, -30], [85, 0], [-85, 0], [20, -10], [60, 60], [44, 45], [45, 44.99], [45, 45], [85, 85]];
+  for (const [sn, shape] of Object.entries(SHAPES)) {
+    for (const [tn, tr] of Object.entries(TRANSFORMS)) {
+      for (const [ax, ay] of angles) {
+        const o = obj('a', [shape], tr);
+        load([o]);
+        const before = worldCurve(o);
+        const c = pivotOf([o]);
+        const msg = shear(ax, ay);
+        const r = st().project.scene.objects[0] as ImportedSvg;
+        if (r === o) { out(`${sn} ${tn} (${ax},${ay}): UNCHANGED toast="${msg}"`); continue; }
+        const oracle = before.map((p) => shearW(p, c, ax, ay));
+        let dc = NaN, dp = NaN, ar = NaN;
+        try { dc = hausdorff(worldCurve(r), oracle); } catch (e) { dc = NaN; }
+        dp = hausdorff(worldPoly(r), oracle);
+        const kx = Math.tan((ax * Math.PI) / 180), ky = Math.tan((ay * Math.PI) / 180);
+        ar = shape.closed ? area(worldCurve(r)) / area(before) : NaN;
+        const kinds = (r.paths[0]!.curves![0]!.segments as any[]).map((s) => s.kind[0]).join('');
+        const ob = bbox(oracle), rb = bbox(worldPoly(r));
+        out(`${sn} ${tn} (${ax},${ay}): devCurves ${f(dc)} devPolys ${f(dp)} areaRatio ${f(ar)} (det ${f(1 - kx * ky)}) segs ${kinds} oracleW ${f(ob.maxX - ob.minX, 2)}x${f(ob.maxY - ob.minY, 2)} resW ${f(rb.maxX - rb.minX, 2)}x${f(rb.maxY - rb.minY, 2)} toast="${msg}"`);
+      }
+    }
+  }
+});
+
+it('G-code of sheared art vs oracle; undo/redo; save/reopen', () => {
+  out('\n== burn / history / file ==');
+  for (const [sn, tn, ax, ay] of [['circle', 'rot40scaleMirY', 30, 0], ['rotEllipse', 'scale2x05', 0, 40], ['cubicBlob', 'mirrorX', 85, 0], ['circle', 'identity', 60, 60]] as const) {
+    const o = obj('a', [SHAPES[sn]!], TRANSFORMS[tn]!);
+    load([o]);
+    const before = worldCurve(o);
+    const c = pivotOf([o]);
+    const b0 = burn();
+    const p0 = JSON.stringify(st().project);
+    shear(ax, ay);
+    const pS = JSON.stringify(st().project);
+    const oracle = before.map((p) => shearW(p, c, ax, ay));
+    const b1 = burn();
+    // map: compare g-code to scene by best Y mapping (identity or flip about some line): report bboxes
+    const gpts = b1.segs.flatMap((s) => s);
+    const gb = bbox(gpts), ob = bbox(oracle);
+    let maxO = 0; for (const p of oracle) maxO = Math.max(maxO, segsDist(b1.segs, p));
+    out(`${sn} ${tn} (${ax},${ay}): burn ok ${b1.ok} ${b1.why} gcodeBox x ${f(gb.minX, 2)}..${f(gb.maxX, 2)} y ${f(gb.minY, 2)}..${f(gb.maxY, 2)} oracleBox x ${f(ob.minX, 2)}..${f(ob.maxX, 2)} y ${f(ob.minY, 2)}..${f(ob.maxY, 2)} maxOracle→burn ${f(maxO)} lit ${f(b1.lit, 2)} (pre ${f(b0.lit, 2)})`);
+    st().undo();
+    out(`  undo exact: ${JSON.stringify(st().project) === p0}`);
+    st().redo();
+    out(`  redo exact: ${JSON.stringify(st().project) === pS}`);
+    const text = serializeProject(st().project);
+    const re = deserializeProject(text) as any;
+    if (re.kind !== 'ok') { out(`  reopen: ${re.kind} ${re.reason ?? ''}`); continue; }
+    const r0 = st().project.scene.objects[0] as ImportedSvg;
+    const r1 = re.project.scene.objects[0] as ImportedSvg;
+    const d = hausdorff(worldCurve(r0), worldCurve(r1));
+    useStore.setState({ project: re.project } as any);
+    const b2 = burn();
+    let maxR = 0; for (const p of oracle) maxR = Math.max(maxR, segsDist(b2.segs, p));
+    out(`  reopen: curve dev ${f(d, 6)}; transform same ${JSON.stringify(r0.transform) === JSON.stringify(r1.transform)}; reopened burn maxOracle→burn ${f(maxR)} lit ${f(b2.lit, 2)}`);
+  }
+});
+
+import { createCncTabAnchorPositionResolver } from '../t06-main/src/core/cnc/cnc-tab-anchors';
+import { createRectangle } from '../t06-main/src/core/shapes/primitives/create-rectangle';
+
+function inside(poly: V[], p: V): boolean {
+  let c = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i]!, b = poly[j]!;
+    if ((a.y > p.y) !== (b.y > p.y) && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) c = !c;
+  }
+  return c;
+}
+
+it('fill, tabs, inputs, mixed selection', () => {
+  out('\n== fill / tabs / inputs ==');
+  // Fill: rotated ellipse on a scaled object, X shear 30.
+  {
+    const o = obj('a', [SHAPES.circle!], TRANSFORMS.rot40scaleMirY!);
+    load([o], 'fill');
+    const before = worldCurve(o);
+    const c = pivotOf([o]);
+    const b0 = burn();
+    shear(30, 0);
+    const oracle = before.map((p) => shearW(p, c, 30, 0));
+    const b1 = burn();
+    let worstOut = 0, n = 0;
+    for (const [a, b] of b1.segs) for (const p of [a, b]) { n++; if (!inside(oracle, p)) { let d = Infinity; for (let i = 0; i + 1 < oracle.length; i++) { const q = oracle[i]!, r = oracle[i + 1]!; const ab = { x: r.x - q.x, y: r.y - q.y }; const L = ab.x ** 2 + ab.y ** 2; const t = L ? Math.max(0, Math.min(1, ((p.x - q.x) * ab.x + (p.y - q.y) * ab.y) / L)) : 0; d = Math.min(d, Math.hypot(q.x + t * ab.x - p.x, q.y + t * ab.y - p.y)); } worstOut = Math.max(worstOut, d); } }
+    out(`fill circle rot40scaleMirY (30,0): ok ${b1.ok} ${b1.why} lit ${f(b1.lit, 2)} (pre ${f(b0.lit, 2)}) oracle area ${f(Math.abs(area(oracle)), 2)} (pre ${f(Math.abs(area(before)), 2)}) endpoints ${n} worst outside oracle ${f(worstOut)}`);
+  }
+  // Fill at combined (60,60): mirrored, area x2
+  {
+    const o = obj('a', [SHAPES.square!], TRANSFORMS.identity!);
+    load([o], 'fill');
+    const b0 = burn();
+    shear(60, 60);
+    const b1 = burn();
+    out(`fill square (60,60): lit ${f(b1.lit, 2)} vs pre ${f(b0.lit, 2)} ratio ${f(b1.lit / b0.lit, 3)}`);
+    load([obj('a', [SHAPES.square!], TRANSFORMS.identity!)], 'fill');
+    const msg = shear(45, 45);
+    const b2 = burn();
+    const r = st().project.scene.objects[0] as ImportedSvg;
+    const pts = worldPoly(r);
+    out(`fill square (45,45): toast="${msg}" ok ${b2.ok} ${b2.why} lit ${f(b2.lit, 2)} area ${f(area(pts), 4)} bounds ${JSON.stringify(r.bounds)}`);
+    load([obj('a', [SHAPES.circle!], TRANSFORMS.identity!)], 'line');
+    const msg2 = shear(45, 45);
+    const b3 = burn();
+    out(`line circle (45,45): toast="${msg2}" ok ${b3.ok} lit ${f(b3.lit, 2)} (circle 62.83) area ${f(area(worldCurve(st().project.scene.objects[0] as ImportedSvg)), 4)}`);
+  }
+  // Tabs follow the shear?
+  {
+    const o = { ...obj('a', [SHAPES.square!], TRANSFORMS.rot30!), laserTabAnchors: [{ layerColor: '#ff0000', pathIndex: 0, polylineIndex: 0, pathT: 0.3 }, { layerColor: '#ff0000', pathIndex: 0, polylineIndex: 0, pathT: 0.8 }] } as any;
+    load([o]);
+    const c = pivotOf([o]);
+    const loc0 = createCncTabAnchorPositionResolver(o);
+    const w0 = o.laserTabAnchors.map((a: any) => loc0(a)!);
+    const msg = shear(30, -15);
+    const r = st().project.scene.objects[0] as any;
+    const loc1 = createCncTabAnchorPositionResolver(r);
+    const w1 = r.laserTabAnchors.map((a: any) => loc1(a)!);
+    const d = w0.map((p: V, i: number) => Math.hypot(shearW(p, c, 30, -15).x - w1[i].x, shearW(p, c, 30, -15).y - w1[i].y));
+    out(`tabs rot30 (30,-15): toast="${msg}" anchors ${JSON.stringify(r.laserTabAnchors.map((a: any) => +a.pathT.toFixed(4)))} tab dev from W(tab) ${d.map((x: number) => f(x)).join(', ')}`);
+  }
+  // Inputs
+  {
+    load([obj('a', [SHAPES.square!], TRANSFORMS.identity!)]);
+    const p0 = st().project;
+    for (const [ax, ay] of [[NaN, 0], [Infinity, 0], [0, -Infinity], [85.0001, 0], [-0, 0], [1e-12, 0]] as Array<[number, number]>) {
+      const msg = shear(ax, ay);
+      out(`input (${ax},${ay}): changed ${st().project !== p0} undo ${st().undoStack.length} toast="${msg}"`);
+    }
+  }
+  // Mixed selection: path square + drawn rectangle 100 mm right: pivot?
+  {
+    const sq = obj('a', [SHAPES.square!], TRANSFORMS.identity!);
+    const rect = { ...createRectangle({ id: 'rect', color: '#ff0000', spec: { widthMm: 10, heightMm: 40, cornerRadiusMm: 0 } }), transform: { ...IDENTITY_TRANSFORM, x: 150, y: 20 }, operationIds: ['L'] } as any;
+    load([sq, rect]);
+    const before = worldCurve(sq);
+    const msg = shear(30, 0);
+    const r = st().project.scene.objects[0] as ImportedSvg;
+    const after = worldCurve(r);
+    const own = pivotOf([sq]);
+    // selection box incl. rectangle (local bounds corners)
+    const rb = rect.bounds; const rc = [{ x: rb.minX, y: rb.minY }, { x: rb.maxX, y: rb.maxY }].map((p: V) => place(p, rect.transform));
+    const all = bbox([...before, ...rc]);
+    const selC = { x: (all.minX + all.maxX) / 2, y: (all.minY + all.maxY) / 2 };
+    const dOwn = hausdorff(after, before.map((p) => shearW(p, own, 30, 0)));
+    const dSel = hausdorff(after, before.map((p) => shearW(p, selC, 30, 0)));
+    out(`mixed selection (path + drawn rect): toast="${msg}" dev vs pivot=editable-only centre ${f(dOwn)}; vs whole-selection centre ${f(dSel)} (sel centre ${f(selC.x, 2)},${f(selC.y, 2)}; editable centre ${f(own.x, 2)},${f(own.y, 2)})`);
+    // locked one in selection
+    const lk = { ...obj('b', [SHAPES.square!], { ...IDENTITY_TRANSFORM, x: 100, y: 100 }), locked: true } as any;
+    load([obj('a', [SHAPES.square!], TRANSFORMS.identity!), lk]);
+    const msg2 = shear(30, 0);
+    out(`selection with a locked path: toast="${msg2}" lockedChanged ${st().project.scene.objects[1] !== lk}`);
+    // only a drawn rectangle
+    load([rect]);
+    const msg3 = shear(30, 0);
+    out(`only drawn rectangle: toast="${msg3}" undo ${st().undoStack.length}`);
+  }
+});

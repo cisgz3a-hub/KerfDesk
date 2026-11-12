@@ -1,0 +1,161 @@
+// T12 auditor's own geometry: SVG endpoint arcs (F.6.5/F.6.6 incl. rotation +
+// radius correction), cubic sampling, transform placement, distance metrics.
+// Independent of the app's affine-curves / curve-flatten code.
+export type V = { x: number; y: number };
+export type Seg =
+  | { kind: 'line'; to: V }
+  | { kind: 'cubic'; control1: V; control2: V; to: V }
+  | { kind: 'elliptical-arc'; radiusX: number; radiusY: number; rotationDeg: number; largeArc: boolean; sweep: boolean; to: V };
+export type Curve = { start: V; segments: ReadonlyArray<Seg>; closed: boolean };
+export type T = { x: number; y: number; scaleX: number; scaleY: number; rotationDeg: number; mirrorX: boolean; mirrorY: boolean };
+
+export function place(p: V, t: T): V {
+  let x = p.x * t.scaleX * (t.mirrorX ? -1 : 1);
+  let y = p.y * t.scaleY * (t.mirrorY ? -1 : 1);
+  const r = (t.rotationDeg * Math.PI) / 180;
+  return { x: x * Math.cos(r) - y * Math.sin(r) + t.x, y: x * Math.sin(r) + y * Math.cos(r) + t.y };
+}
+
+// SVG F.6.5 endpoint -> centre parameterisation.
+export function arcParams(p1: V, s: Extract<Seg, { kind: 'elliptical-arc' }>) {
+  let rx = Math.abs(s.radiusX), ry = Math.abs(s.radiusY);
+  const p2 = s.to;
+  if ((p1.x === p2.x && p1.y === p2.y) || rx === 0 || ry === 0) return null;
+  const phi = (s.rotationDeg * Math.PI) / 180;
+  const c = Math.cos(phi), sn = Math.sin(phi);
+  const dx = (p1.x - p2.x) / 2, dy = (p1.y - p2.y) / 2;
+  const x1 = c * dx + sn * dy, y1 = -sn * dx + c * dy;
+  const lam = (x1 * x1) / (rx * rx) + (y1 * y1) / (ry * ry);
+  if (lam > 1) { rx *= Math.sqrt(lam); ry *= Math.sqrt(lam); }
+  const num = rx * rx * ry * ry - rx * rx * y1 * y1 - ry * ry * x1 * x1;
+  const den = rx * rx * y1 * y1 + ry * ry * x1 * x1;
+  let k = Math.sqrt(Math.max(0, num / den));
+  if (s.largeArc === s.sweep) k = -k;
+  const cx1 = (k * rx * y1) / ry, cy1 = (-k * ry * x1) / rx;
+  const cx = c * cx1 - sn * cy1 + (p1.x + p2.x) / 2;
+  const cy = sn * cx1 + c * cy1 + (p1.y + p2.y) / 2;
+  const ang = (ux: number, uy: number, vx: number, vy: number) => Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+  const t1 = ang(1, 0, (x1 - cx1) / rx, (y1 - cy1) / ry);
+  let dt = ang((x1 - cx1) / rx, (y1 - cy1) / ry, (-x1 - cx1) / rx, (-y1 - cy1) / ry);
+  if (!s.sweep && dt > 0) dt -= 2 * Math.PI;
+  if (s.sweep && dt < 0) dt += 2 * Math.PI;
+  return { cx, cy, rx, ry, phi, t1, dt, lam };
+}
+
+export function sample(curve: Curve, n = 600): V[] {
+  const pts: V[] = [curve.start];
+  let cur = curve.start;
+  for (const s of curve.segments) {
+    if (s.kind === 'line') {
+      for (let i = 1; i <= 50; i++) pts.push({ x: cur.x + ((s.to.x - cur.x) * i) / 50, y: cur.y + ((s.to.y - cur.y) * i) / 50 });
+    } else if (s.kind === 'cubic') {
+      for (let i = 1; i <= n; i++) {
+        const t = i / n, u = 1 - t;
+        pts.push({
+          x: u * u * u * cur.x + 3 * u * u * t * s.control1.x + 3 * u * t * t * s.control2.x + t * t * t * s.to.x,
+          y: u * u * u * cur.y + 3 * u * u * t * s.control1.y + 3 * u * t * t * s.control2.y + t * t * t * s.to.y,
+        });
+      }
+    } else {
+      const a = arcParams(cur, s);
+      if (a === null) pts.push(s.to);
+      else {
+        const c = Math.cos(a.phi), sn = Math.sin(a.phi);
+        for (let i = 1; i <= n; i++) {
+          const t = a.t1 + (a.dt * i) / n;
+          const ex = a.rx * Math.cos(t), ey = a.ry * Math.sin(t);
+          pts.push({ x: a.cx + c * ex - sn * ey, y: a.cy + sn * ex + c * ey });
+        }
+      }
+    }
+    cur = s.to;
+  }
+  if (curve.closed) for (let i = 1; i <= 50; i++) pts.push({ x: cur.x + ((curve.start.x - cur.x) * i) / 50, y: cur.y + ((curve.start.y - cur.y) * i) / 50 });
+  return pts;
+}
+
+export function segDist(pts: V[], p: V): number {
+  let best = Infinity;
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const a = pts[i]!, b = pts[i + 1]!;
+    const abx = b.x - a.x, aby = b.y - a.y;
+    const L = abx * abx + aby * aby;
+    const t = L === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / L));
+    best = Math.min(best, Math.hypot(a.x + t * abx - p.x, a.y + t * aby - p.y));
+  }
+  return best;
+}
+
+/** Symmetric max deviation (Hausdorff on dense samples). */
+export function hausdorff(a: V[], b: V[]): number {
+  let m = 0;
+  for (const p of a) m = Math.max(m, segDist(b, p));
+  for (const p of b) m = Math.max(m, segDist(a, p));
+  return m;
+}
+
+/** Ordered max deviation: same parameter order, i-th to i-th (only when both sampled identically). */
+export function area(pts: V[]): number {
+  let s = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i]!, q = pts[(i + 1) % pts.length]!;
+    s += p.x * q.y - q.x * p.y;
+  }
+  return s / 2;
+}
+
+export function bbox(pts: V[]) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of pts) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); }
+  return { minX, minY, maxX, maxY };
+}
+
+export function shearW(p: V, c: V, ax: number, ay: number): V {
+  const kx = Math.tan((ax * Math.PI) / 180), ky = Math.tan((ay * Math.PI) / 180);
+  return { x: p.x + kx * (p.y - c.y), y: p.y + ky * (p.x - c.x) };
+}
+
+// G-code decoder: lit moves = laser on and S>0 on G1/G2/G3.
+export function decode(gcode: string) {
+  let x = 0, y = 0, s = 0, g = 0, on = false;
+  const segs: Array<[V, V]> = [];
+  let lit = 0;
+  for (const raw of gcode.split('\n')) {
+    const line = raw.replace(/;.*$/, '').replace(/\(.*?\)/g, '').toUpperCase();
+    const w = new Map<string, number>();
+    for (const m of line.matchAll(/([A-Z])\s*(-?\d*\.?\d+)/g)) {
+      if (m[1] === 'M') { const n = Number(m[2]); if (n === 3 || n === 4) on = true; if (n === 5) on = false; }
+      else if (m[1] === 'G') { const n = Number(m[2]); if (n >= 0 && n <= 3) g = n; }
+      else w.set(m[1]!, Number(m[2]));
+    }
+    if (w.has('S')) s = w.get('S')!;
+    const nx = w.get('X') ?? x, ny = w.get('Y') ?? y;
+    if ((w.has('X') || w.has('Y')) && on && s > 0 && g >= 1) {
+      if (g === 1) { segs.push([{ x, y }, { x: nx, y: ny }]); lit += Math.hypot(nx - x, ny - y); }
+      else {
+        const c = { x: x + (w.get('I') ?? 0), y: y + (w.get('J') ?? 0) };
+        const r = Math.hypot(x - c.x, y - c.y);
+        const a0 = Math.atan2(y - c.y, x - c.x), a1 = Math.atan2(ny - c.y, nx - c.x);
+        let d = a1 - a0;
+        if (g === 3 && d <= 0) d += 2 * Math.PI;
+        if (g === 2 && d >= 0) d -= 2 * Math.PI;
+        let prev = { x, y };
+        for (let i = 1; i <= 32; i++) { const q = { x: c.x + r * Math.cos(a0 + (d * i) / 32), y: c.y + r * Math.sin(a0 + (d * i) / 32) }; segs.push([prev, q]); prev = q; }
+        lit += Math.abs(d) * r;
+      }
+    }
+    x = nx; y = ny;
+  }
+  return { segs, lit };
+}
+
+export function segsDist(segs: Array<[V, V]>, p: V): number {
+  let best = Infinity;
+  for (const [a, b] of segs) {
+    const abx = b.x - a.x, aby = b.y - a.y;
+    const L = abx * abx + aby * aby;
+    const t = L === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / L));
+    best = Math.min(best, Math.hypot(a.x + t * abx - p.x, a.y + t * aby - p.y));
+  }
+  return best;
+}
