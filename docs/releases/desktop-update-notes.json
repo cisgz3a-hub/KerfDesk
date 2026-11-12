@@ -7,6 +7,6 @@
     "A new 3D Sliced image mode and Fill Ramp for rubber stamps, and a dense trace no longer freezes the window. A recovered job advances its serial number once, and {{time}} jobs can now be confirmed in Job Review.",
     "Fewer interruptions: questions appear inside the app instead of system pop-ups, Run again skips Job Review for an unchanged job you already reviewed, and autosave keeps going during a job. Beginners get a guided first job.",
     "After Abort, a laser without homing gets its origin back by itself. Unlock keeps the position unless the alarm lost it, a Frame placed from a fixed origin survives a clean jog, and a jog stuck on a lost reply is released in place.",
-    "Rotary: Moshi and Ruida .rd jobs match the part's surface speed, ramped Fills scan along X, and the turn-back waits at the axis's own rate. Job Review warns when a move needs more than the rotary max rate ($112/$113)."
+    "Rotary: a tapered Fill burns its whole hatch, Moshi and Ruida .rd jobs match the part's surface speed, and ramped Fills scan along X. Job Review warns when a move needs more than the rotary max rate ($112/$113)."
   ]
 }
