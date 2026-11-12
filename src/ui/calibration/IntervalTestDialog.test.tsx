@@ -90,6 +90,53 @@ describe('IntervalTestDialog', () => {
     }
   });
 
+  // T02-P2-1 (tools audit T1): a 0.01 mm step refused the line pitches of
+  // 400/300/200 DPI, which Cut Settings and the generator accept.
+  it.each([
+    ['0.0635', '0.127'],
+    ['0.0508', '0.1016'],
+    ['0.0847', '0.125'],
+  ])('accepts DPI line pitches %s and %s mm', async (min, max) => {
+    const { host, root, onGenerate } = await renderDialog();
+    try {
+      const intervalMin = input(host, 'Min interval');
+      const intervalMax = input(host, 'Max interval');
+      await act(async () => {
+        intervalMin.value = min;
+        Simulate.change(intervalMin);
+        intervalMax.value = max;
+        Simulate.change(intervalMax);
+      });
+      expect(intervalMin.validity.stepMismatch).toBe(false);
+      expect(intervalMax.validity.stepMismatch).toBe(false);
+      expect(host.querySelector('[role="alert"]')).toBeNull();
+      await clickGenerate(host);
+      expect(onGenerate).toHaveBeenCalledWith(
+        expect.objectContaining({ intervalMinMm: Number(min), intervalMaxMm: Number(max) }),
+      );
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('still refuses an interval below the 0.05 mm floor', async () => {
+    const { host, root, onGenerate } = await renderDialog();
+    try {
+      const intervalMin = input(host, 'Min interval');
+      await act(async () => {
+        intervalMin.value = '0.0499';
+        Simulate.change(intervalMin);
+      });
+      expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+        'Min interval: enter 0.05 or greater.',
+      );
+      await clickGenerate(host);
+      expect(onGenerate).not.toHaveBeenCalled();
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
   // Gained via the kit Dialog migration (ADR-047): the calibration dialogs
   // previously lacked the Escape/focus-trap behavior every other modal had.
   it('closes on Escape', async () => {
