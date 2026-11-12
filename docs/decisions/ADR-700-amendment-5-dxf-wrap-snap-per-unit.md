@@ -33,10 +33,19 @@ short arcs Amendment 4 keeps short (`0 → 360.5°`, `0 → 2π + 0.01`).
    bridged (0.06 mm on a 100 mm radius; E4-P3-1). A small arc across 0° stays small. A circle whose
    printed end rounds short of a whole turn by more than that imports as a near-full open arc, not a
    dot.
-3. **Coarser printing is left as written: a maintainer decision.** ELLIPSE radians at 1 decimal or
-   3 significant digits, and ARC degrees at 3 significant digits, can be off by more than the
-   allowances. Covering them would need allowances wide enough to close genuine short arcs a turn
-   apart, such as `0 → 2π + 0.02`. Such files may still import as a dot.
+3. **Coarser printing imports as its numbers say: a maintainer decision (2026-11-13).** Asked
+   whether a full DXF circle or ellipse whose angles are written with only 1 decimal (or 3
+   significant digits) should import as a full turn, the maintainer chose "No, leave as written".
+   Such angles can be off by more than the allowances, and covering them would need allowances wide
+   enough to close genuine short arcs a turn apart, such as `0 → 2π + 0.02`. These files may import
+   as a short arc or a dot.
+   - The allowances are set by the size of the rounding error, not by the printing, which the
+     importer cannot see. So a coarse file whose rounding happens to land inside the allowance still
+     closes. Of 1,000 start angles, 34.5 % of ELLIPSEs at 3 significant digits close (a start of 1 to
+     10 rad has 2 decimals, the same precision as Decision 1). So do 64.2 % of ARCs at 3 significant
+     digits, almost all written exactly a whole turn apart. No ELLIPSE at 1 decimal closes.
+   - ARC degrees at 1 decimal stay covered. Their error, at most 0.1°, is the same as at 4
+     significant digits for angles of 100° or more, which Decision 1 covers.
 
 ### Consequences
 
@@ -52,5 +61,8 @@ short arcs Amendment 4 keeps short (`0 → 360.5°`, `0 → 2π + 0.01`).
   Every case is within 1 % of a whole turn, and exactly a whole turn when the written angles are at
   least a turn apart. It also keeps short sweeps a turn apart short, and closes the audit's cases
   (`−3.142 → 3.142`, `0 → 6.284`).
+- The same file checks Decision 3 on ARC at 3 significant digits and ELLIPSE at 1 decimal and
+  3 significant digits. Every case outside the allowance imports exactly as written, and at least a
+  tenth of the start angles fall outside it.
 - On Amendment 4's rule, 9 of these tests fail: ARC at 4 significant digits, ELLIPSE at 2 and
   3 decimals and 4 significant digits, and the audit cases.
