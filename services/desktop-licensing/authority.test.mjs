@@ -286,6 +286,7 @@ test('an administrator can revoke and restore a licence and look up a lost key',
     status: 'active',
     updatesUntil: NOW + 365 * 86_400,
     activeDevices: 1,
+    paymentAdjustments: [],
   });
   assert.deepEqual(await f.authority.setLicenseStatus({ licenseId, status: 'revoked' }), {
     licenseId,

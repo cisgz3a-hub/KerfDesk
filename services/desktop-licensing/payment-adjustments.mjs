@@ -147,8 +147,11 @@ export function applyPurchaseAdjustments(tx, authority, order, transactionId, ef
   // A full refund stays authoritative even if another adjustment first revoked Pro.
   const cause = blocking.find((item) => item.action === 'refund') ?? blocking[0];
   if (cause && effect !== 'restore') {
+    // Support already set this licence's status by hand. Its decision stands, but a
+    // refund or chargeback arriving now is a new fact support must see before it ever
+    // restores the licence, so it is kept for review rather than dropped.
     if (license.status !== 'active' && license.revokedBy?.transactionId !== transactionId)
-      return 'none';
+      return 'review';
     tx.put(`license:${license.licenseId}`, {
       ...license,
       status: 'revoked',
@@ -249,7 +252,12 @@ export function receiveAdjustment(authority, adjustment) {
       else
         outcome = applyPurchaseAdjustments(tx, authority, order, adjustment.transactionId, effect);
     }
-    tx.put(recordKey, { ...record, outcome });
+    // A delivery that changes nothing keeps what the earlier one did on record, so a
+    // later same-state update never hides a revocation or review from support.
+    tx.put(recordKey, {
+      ...record,
+      outcome: outcome === 'none' && previous?.outcome !== undefined ? previous.outcome : outcome,
+    });
     if (outcome !== 'none')
       writeAudit(tx, authority, null, {
         route: ROUTE.webhook,

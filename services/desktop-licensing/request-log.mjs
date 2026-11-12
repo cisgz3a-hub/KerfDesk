@@ -10,6 +10,7 @@ import { ROUTE, ROUTES } from './routes.mjs';
 
 const METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
 const CODE = /^[a-z_]{1,64}$/u;
+const ADJUSTMENT = new Set(['none', 'review', 'deferred', 'revoked', 'restored']);
 
 async function responseDetails(response, route) {
   if (response.ok && route !== ROUTE.webhook) return {};
@@ -18,7 +19,13 @@ async function responseDetails(response, route) {
     if (!response.ok) return CODE.test(body?.error?.code ?? '') ? { code: body.error.code } : {};
     if (body?.ignored === true) return { outcome: 'ignored' };
     if (body?.rejected === true) return { outcome: 'rejected' };
-    return { outcome: body?.duplicate === true ? 'duplicate' : 'fulfilled' };
+    if (body?.duplicate === true) return { outcome: 'duplicate' };
+    // A refund or chargeback answers what it did to the licence, never `fulfilled`.
+    if (Object.hasOwn(body ?? {}, 'adjustment'))
+      return {
+        outcome: ADJUSTMENT.has(body.adjustment) ? `adjustment-${body.adjustment}` : 'adjustment',
+      };
+    return { outcome: 'fulfilled' };
   } catch {
     return {};
   }
