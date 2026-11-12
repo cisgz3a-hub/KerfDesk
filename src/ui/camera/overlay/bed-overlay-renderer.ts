@@ -60,6 +60,13 @@ type GpuResources = {
   readonly texture: WebGLTexture;
   readonly vertexArray: WebGLVertexArrayObject;
   readonly locations: ReadonlyMap<UniformName, WebGLUniformLocation | null>;
+  /**
+   * The picture the texture holds, when it is one that cannot change: a held
+   * still or a bridge camera picture. Its redraws (a new view, opacity, or a
+   * second render of the same still) reuse the texture instead of uploading
+   * the same pixels again, which on a GPU-less runner costs 50-60 ms each.
+   */
+  uploaded: TexImageSource | null;
 };
 
 export function createBedOverlayRenderer(canvas: HTMLCanvasElement): BedOverlayRenderer | null {
@@ -145,7 +152,7 @@ function drawFrame(
   clearCanvas(gl);
   gl.activeTexture(gl.TEXTURE0 + FRAME_TEXTURE_UNIT);
   gl.bindTexture(gl.TEXTURE_2D, res.texture);
-  if (!uploadFrame(gl, source)) return;
+  if (!uploadFrame(gl, res, source)) return;
   gl.useProgram(res.program);
   gl.bindVertexArray(res.vertexArray);
   // Blending stays off, so each pass overwrites what the passes before it
@@ -156,16 +163,34 @@ function drawFrame(
   }
 }
 
-function uploadFrame(gl: WebGL2RenderingContext, source: TexImageSource): boolean {
+function uploadFrame(
+  gl: WebGL2RenderingContext,
+  res: GpuResources,
+  source: TexImageSource,
+): boolean {
+  // A video or an image element repaints in place, so it is uploaded on every
+  // draw; a picture that cannot change is uploaded once.
+  if (source === res.uploaded) return true;
   try {
     // Re-specifying level 0 each frame lets the source change size freely
     // (camera renegotiation) without the renderer tracking it.
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    res.uploaded = isFixedPicture(source) ? source : null;
     return true;
   } catch {
     // Tainted cross-origin frames and closed ImageBitmaps throw; skip the frame.
+    res.uploaded = null;
     return false;
   }
+}
+
+// An ImageBitmap's pixels never change once made, and the overlay never writes
+// into an ImageData it has built for a still.
+function isFixedPicture(source: TexImageSource): boolean {
+  return (
+    (typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap) ||
+    (typeof ImageData !== 'undefined' && source instanceof ImageData)
+  );
 }
 
 function clearCanvas(gl: WebGL2RenderingContext): void {
@@ -236,7 +261,7 @@ function createResources(gl: WebGL2RenderingContext): GpuResources | null {
   const locations = new Map(
     UNIFORM_NAMES.map((name) => [name, gl.getUniformLocation(program, name)] as const),
   );
-  return { program, texture, vertexArray, locations };
+  return { program, texture, vertexArray, locations, uploaded: null };
 }
 
 function linkProgram(gl: WebGL2RenderingContext): WebGLProgram | null {

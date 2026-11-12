@@ -18,6 +18,12 @@
 // the camera phase may exceed the larger of twice the budget and the
 // control's own worst plus 20 ms, and never 120 ms; an in-window 4K shrink
 // is 118-243 ms. The two structural checks are the main guard on any runner. Local runs keep the strict budget.
+//
+// From Chrome 157.0.8103.78 this failed on CI with one 117-130 ms task about
+// 220 ms after Alt+C: the overlay drew the held still twice in one task (a
+// new frame, then a rescale verdict) and uploaded the same 1920 px picture
+// both times, 50-60 ms each on a GPU-less runner. The renderer now uploads a
+// picture that cannot change (an ImageBitmap or a still's ImageData) once.
 
 import { Buffer } from 'node:buffer';
 import { readFileSync } from 'node:fs';

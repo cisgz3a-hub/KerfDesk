@@ -147,6 +147,68 @@ describe('createBedOverlayRenderer', () => {
     expect(spy('drawArrays')).toHaveBeenCalledTimes(1);
   });
 
+  // The camera overlay guard on CI (e2e/camera-overlay-mjpeg-ui-thread): a
+  // held still drew twice in one task (a new frame, then a rescale verdict),
+  // uploading the same 1920 px picture twice for one 117-130 ms task.
+  it('uploads a picture that cannot change once, however often it is redrawn', () => {
+    class FakeBitmap {
+      readonly width = 1920;
+    }
+    vi.stubGlobal('ImageBitmap', FakeBitmap);
+    try {
+      const { gl, spy } = fakeWebgl2();
+      const renderer = createBedOverlayRenderer(canvasWith(gl));
+      // Cast: the fake context never reads the picture, only its identity matters.
+      const still = new FakeBitmap() as unknown as TexImageSource;
+      renderer?.draw(still, 3840, 2160, UNIFORMS);
+      renderer?.draw(still, 3840, 2160, UNIFORMS);
+      renderer?.draw(still, 3840, 2160, UNIFORMS);
+      expect(spy('texImage2D')).toHaveBeenCalledTimes(1);
+      expect(spy('drawArrays')).toHaveBeenCalledTimes(3);
+      // A new picture is uploaded; going back to the old one uploads it again.
+      const next = new FakeBitmap() as unknown as TexImageSource;
+      renderer?.draw(next, 3840, 2160, UNIFORMS);
+      renderer?.draw(still, 3840, 2160, UNIFORMS);
+      expect(spy('texImage2D')).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('uploads an element on every draw, since it repaints in place', () => {
+    const { gl, spy } = fakeWebgl2();
+    const renderer = createBedOverlayRenderer(canvasWith(gl));
+    const element = document.createElement('img') as TexImageSource;
+    renderer?.draw(element, 1280, 720, UNIFORMS);
+    renderer?.draw(element, 1280, 720, UNIFORMS);
+    expect(spy('texImage2D')).toHaveBeenCalledTimes(2);
+  });
+
+  it('uploads a held picture again after a failed upload or a restored context', () => {
+    class FakeBitmap {
+      readonly width = 1920;
+    }
+    vi.stubGlobal('ImageBitmap', FakeBitmap);
+    try {
+      const { gl, spy } = fakeWebgl2();
+      const canvas = canvasWith(gl);
+      const renderer = createBedOverlayRenderer(canvas);
+      const still = new FakeBitmap() as unknown as TexImageSource;
+      spy('texImage2D').mockImplementationOnce(() => {
+        throw new DOMException('closed', 'InvalidStateError');
+      });
+      renderer?.draw(still, 3840, 2160, UNIFORMS);
+      renderer?.draw(still, 3840, 2160, UNIFORMS);
+      expect(spy('texImage2D')).toHaveBeenCalledTimes(2);
+      canvas.dispatchEvent(new Event('webglcontextlost', { cancelable: true }));
+      canvas.dispatchEvent(new Event('webglcontextrestored'));
+      renderer?.draw(still, 3840, 2160, UNIFORMS);
+      expect(spy('texImage2D')).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('stops drawing and deletes its GPU objects on dispose', () => {
     const { gl, spy } = fakeWebgl2();
     const renderer = createBedOverlayRenderer(canvasWith(gl));
