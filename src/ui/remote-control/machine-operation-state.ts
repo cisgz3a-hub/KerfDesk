@@ -26,6 +26,8 @@ export type OwnedMachineOperation = {
   jobSettled?: Promise<void>;
   /** A held jog the phone released (or whose heartbeat stopped); settling Idle completes it. */
   holdReleased?: true;
+  /** The PC's warn-only bounds and no-go texts for this operation's jog (ADR-585 Amendment 3). */
+  motionWarnings?: readonly string[];
   review?: {
     readonly id: string;
     readonly revision: string;
@@ -36,6 +38,20 @@ export type OwnedMachineOperation = {
   };
   cleanup: () => void;
 };
+
+/**
+ * Completes a remote jog or hold. Its receipt is `outcome` (if any) followed by the warnings the
+ * PC showed for that jog, word for word. They stay warnings: the jog was sent and completed
+ * (ADR-232). The texts are fixed policy prose with coordinates and a no-go zone's name, never
+ * artwork, so they are projected as policy text (ADR-585 Amendments 2 and 3).
+ */
+export function completeRemoteJog(operation: OwnedMachineOperation, outcome?: string): void {
+  operation.state = 'completed';
+  const warnings = operation.motionWarnings ?? [];
+  const message = [...(outcome === undefined ? [] : [outcome]), ...warnings].join(' ');
+  if (message !== '') operation.message = message;
+  if (warnings.length > 0) operation.policyMessage = true;
+}
 
 export function operationIsTerminal(operation: OwnedMachineOperation): boolean {
   return ['completed', 'cancelled', 'failed', 'unknown'].includes(operation.state);

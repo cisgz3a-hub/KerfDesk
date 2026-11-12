@@ -8,7 +8,7 @@ import {
   useCanvasTextStore,
   type CanvasTextSession,
 } from '../text/canvas-text-store';
-import { canvasMouseToScene, type ViewState } from './view-transform';
+import { canvasMouseToScene, pxToMmForCanvas, type ViewState } from './view-transform';
 import type { OwnedPointerHandlers } from './workspace-pointer-owner';
 import { finishDrawToolOnLeftDoubleClick } from './finish-draw-tool';
 import { finishPen } from './pen-tool';
@@ -57,7 +57,11 @@ export function workspaceTextPointerHandlers(args: TextPointerArgs): OwnedPointe
         if (position === null) return;
         event.preventDefault();
         ui.closeWorkspaceContextBar();
-        const hit = workspaceHitTest(args.project.scene, position);
+        const hit = workspaceHitTest(
+          args.project.scene,
+          position,
+          pxToMmForCanvas(args.canvasRef.current, args.project, args.viewState),
+        );
         const object = args.project.scene.objects.find((candidate) => candidate.id === hit);
         if (object?.kind === 'text') useCanvasTextStore.getState().beginEdit(object);
         else useCanvasTextStore.getState().beginAdd(position);
@@ -136,7 +140,8 @@ function openCanvasObjectEditor(
   // Numbering's clicks name a run; an editor opened now could not save.
   if (ui.artworkNumbering.kind === 'active') return;
   const point = canvasMouseToScene(event, event.currentTarget, app.project, ui);
-  const id = point === null ? null : workspaceHitTest(app.project.scene, point);
+  const pxToMm = pxToMmForCanvas(event.currentTarget, app.project, ui);
+  const id = point === null ? null : workspaceHitTest(app.project.scene, point, pxToMm);
   if (id === null) return;
   app.selectObject(id);
   openEditorForSelectedObject(id);

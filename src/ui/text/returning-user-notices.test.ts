@@ -225,7 +225,9 @@ describe('a whole 1.0.27 job on this build', () => {
   it('keeps a bent record at its size and moves it onto the baseline (ADR-682 D5)', async () => {
     const burn = await burnOf(opened(), 'roboto-bent', 0);
     const was = measured['roboto-bent']?.['ANNA'];
-    expect(burn.width).toBeCloseTo(was?.width ?? NaN, 2);
+    // 1.0.27 burned each bent straight stroke as a chord; since oracle audit
+    // O7-P2-2 it follows the arc, which reaches 6 µm wider on this record.
+    expect(Math.abs(burn.width - (was?.width ?? NaN))).toBeLessThan(0.02);
     expect(Math.abs(burn.minX - (was?.minX ?? NaN))).toBeGreaterThan(1);
   });
 

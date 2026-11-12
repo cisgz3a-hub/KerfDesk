@@ -232,7 +232,12 @@ function skipSpaceAndComments(reader: Reader): void {
   for (;;) {
     const byte = reader.bytes[reader.offset];
     if (byte === 0x23) {
-      while (reader.offset < reader.bytes.length && reader.bytes[reader.offset] !== 0x0a) {
+      // pbm(5): a comment runs to the next carriage return or newline (audit O2-P3-4).
+      while (
+        reader.offset < reader.bytes.length &&
+        reader.bytes[reader.offset] !== 0x0a &&
+        reader.bytes[reader.offset] !== 0x0d
+      ) {
         reader.offset += 1;
       }
     } else if (byte === 0x20 || byte === 0x09 || byte === 0x0a || byte === 0x0d) {
