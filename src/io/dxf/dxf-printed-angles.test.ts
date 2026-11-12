@@ -14,21 +14,40 @@ import {
 import { arcSweep } from './dxf-entities';
 
 const TURN = Math.PI * 2;
-const STARTS = 1000;
+const STARTS = 5000;
 
 type Format = { label: string; write: (value: number) => number };
 
+/** How the writer rounds each angle: to nearest, or always in one direction. */
+const ROUNDINGS: ReadonlyArray<readonly [string, ((value: number) => number) | null]> = [
+  ['nearest', null],
+  ['rounded up', Math.ceil],
+  ['rounded down', Math.floor],
+  ['truncated', Math.trunc],
+];
+
+/** `value` rounded at the given decimal place (10^-place) by `direction`. */
+function directed(value: number, place: number, direction: (value: number) => number): number {
+  const scale = 10 ** place;
+  return direction(value * scale) / scale;
+}
+
 function formats(decimals: readonly number[], significant: readonly number[]): Format[] {
-  return [
+  return ROUNDINGS.flatMap(([rounding, direction]) => [
     ...decimals.map((digits) => ({
-      label: `${digits} decimals`,
-      write: (value: number) => Number(value.toFixed(digits)),
+      label: `${digits} decimals, ${rounding}`,
+      write: (value: number) =>
+        Number((direction === null ? value : directed(value, digits, direction)).toFixed(digits)),
     })),
     ...significant.map((digits) => ({
-      label: `${digits} significant digits`,
-      write: (value: number) => Number(value.toPrecision(digits)),
+      label: `${digits} significant digits, ${rounding}`,
+      write: (value: number) => {
+        if (direction === null || value === 0) return Number(value.toPrecision(digits));
+        const place = digits - 1 - Math.floor(Math.log10(Math.abs(value)));
+        return Number(directed(value, place, direction).toPrecision(digits));
+      },
     })),
-  ];
+  ]);
 }
 
 const range = (from: number, to: number): number[] =>
@@ -151,6 +170,7 @@ describe('the cases the audit measured', () => {
     [0, 6.284],
     [0, 6.29],
     [1.57, 7.854],
+    [3.717, 10.01],
   ])('closes the ELLIPSE %s → %s', (start, end) => {
     expect(normalizedSweep(start, end)).toBe(TURN);
   });
