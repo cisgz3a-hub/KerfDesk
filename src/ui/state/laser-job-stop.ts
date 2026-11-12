@@ -27,6 +27,7 @@ import {
   type RotaryStartTurn,
 } from './job-stop-request';
 import { rotaryOutputAxis } from '../../core/job/rotary-job';
+import { reportedTurnScale } from '../../core/controllers/grbl/reported-turn-units';
 import { useStore } from './store';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { recordControllerRecoveryReset } from './laser-controller-operation';
@@ -484,8 +485,12 @@ function rotaryStartTurnAtStop(state: LaserState): RotaryStartTurn | null {
   const axis = rotaryOutputAxis(device, machine);
   const wco = state.wcoCache;
   if (axis === null || wco === null) return null;
+  const reported = axis === 'A' ? wco.a : wco.z;
+  // O12-P1-1: under `$13=1` grblHAL reports A in inches unless `$376` marks it.
   const value =
-    axis === 'A' ? wco.a : wco.z * (state.controllerSettings?.reportInches === true ? 25.4 : 1);
+    reported === undefined
+      ? undefined
+      : reported * reportedTurnScale(state.controllerSettings, axis);
   return value === undefined || !Number.isFinite(value)
     ? null
     : { axis, machine: value, machineZeroEpoch: state.machineZeroEpoch ?? 0 };
