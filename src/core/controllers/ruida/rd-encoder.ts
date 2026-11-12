@@ -20,7 +20,7 @@ import type { Vec2 } from '../../scene';
 import type { RdReferencePoint } from './rd-file-commands';
 import { writeRdJob } from './rd-job-writer';
 import { planRdMotion, type RdMotionPart } from './rd-motion-plan';
-import { splitRdPartsBySurfaceSpeed } from './rd-rotary-feed';
+import { splitRdPartsBySurfaceSpeed, type RdRotaryDose } from './rd-rotary-feed';
 import { rotaryFeedMatchFor } from '../../output/rotary-surface-feed';
 import {
   isCoord35Encodable,
@@ -61,7 +61,7 @@ export type RdEncodeResult =
       /** The moves the bytes command, per part, for the export's checks. */
       readonly motion: ReadonlyArray<RdMotionPart>;
       /** On a scaled Y rotary: the dose range left by the speed classes (ADR-127 Amd 5). */
-      readonly rotaryDose?: { readonly minDose: number; readonly maxDose: number };
+      readonly rotaryDose?: RdRotaryDose;
     }
   | { readonly ok: false; readonly error: RdEncodeError };
 
@@ -112,7 +112,7 @@ export function encodeRdJob(
 type RotaryMotion =
   | {
       readonly motion: ReadonlyArray<RdMotionPart>;
-      readonly dose?: { readonly minDose: number; readonly maxDose: number };
+      readonly dose?: RdRotaryDose;
     }
   | { readonly error: RdEncodeError };
 
@@ -130,7 +130,10 @@ function rotaryMotion(
   if (split === null) return { error: { kind: 'rotary-too-many-speeds', maxParts: MAX_RD_LAYERS } };
   const speedError = speedRepresentationError(split.parts.map((part) => part.group));
   if (speedError !== null) return { error: speedError };
-  return { motion: split.parts, dose: { minDose: split.minDose, maxDose: split.maxDose } };
+  return {
+    motion: split.parts,
+    dose: { minDose: split.minDose, maxDose: split.maxDose, held: split.held },
+  };
 }
 
 /** Audit RU-2 (lead's product decision): the reference-point mode follows the

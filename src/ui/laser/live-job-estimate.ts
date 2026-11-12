@@ -30,6 +30,7 @@ import {
 } from '../../io/gcode';
 import type { SimilarityTransform } from '../../core/registration';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
+import { withRuidaRotaryRoute } from './ruida-rotary-estimate';
 import {
   costlyCanvasPreparation,
   ordinaryOutputPrefersWorker,
@@ -174,16 +175,22 @@ export function estimateLiveJobFromPrepared(
   // the live tile and Job Review cannot report different durations. ADR-416
   // Decision 4: a CNC job is timed at CNC's own Max feed, as the Start
   // countdown times it, never at the laser's.
+  const machineJob = machineSpaceJob(
+    prepared.job,
+    prepared.project.device,
+    prepared.project.machine,
+  );
+  const device = deviceForActiveHead(prepared.project.device, prepared.project.machine);
   const result = estimateJobDuration(
-    machineSpaceJob(prepared.job, prepared.project.device, prepared.project.machine),
-    deviceForActiveHead(prepared.project.device, prepared.project.machine),
-    {
+    machineJob,
+    device,
+    withRuidaRotaryRoute(machineJob, device, {
       ...(initialPosition === undefined ? {} : { initialPosition }),
       ...(finishPosition === undefined ? {} : { finishPosition }),
       ...(options.onEmittedProgram === undefined
         ? {}
         : { onEmittedProgram: options.onEmittedProgram }),
-    },
+    }),
   );
   return liveEstimateFromDuration(result);
 }
