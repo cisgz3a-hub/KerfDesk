@@ -11,9 +11,10 @@ response; a longest UI block of 200 ms, or a progress bar and Cancel if the work
 Amendment 1 brought every pointwise adjustment inside the S1 budgets but left the six
 neighbourhood filters (Gaussian Blur, Unsharp Mask, High Pass, Median, Halftone and Line
 Screen) on the UI thread. They are defined in document pixels, so each slider step filtered the
-whole active layer before sampling the window: on a 12 MP photo Gaussian Blur blocked the UI
-for about 3 s per step, Halftone about 2 s, and Median at radius 2 about 70 s, because
-`medianInPlace` gathered and sorted every window with a comparator.
+whole active layer before sampling the window. On a 12 MP photo each step blocked the UI for
+0.3-2 s (Amendment 1's runs read about 3 s for Gaussian Blur on a slower afternoon), and
+Median at radius 2 for 36 s in Chrome, because `medianInPlace` gathered and sorted every window
+with a comparator (60-120 s in Node).
 
 ### Decision
 
@@ -73,4 +74,58 @@ for about 3 s per step, Halftone about 2 s, and Median at radius 2 about 70 s, b
 
 ### Measured
 
-Pending: the before/after browser sets are queued behind a quiet-PC gate and land in this section before merge.
+**Setup.** The S5 browser harness (`run5.mjs`, adapted as `run6.mjs`) drove production web bundles in
+installed Chrome at 1440 x 900: main at 93c880722 ("before") and this change ("after"). The photo was
+the audit's 12 MP JPEG (4000 x 3000). Before and after ran on the same PC in the same afternoon.
+
+**What is measured:**
+
+- **shown:** from the slider input to the preview drawn on the canvas.
+- **bar:** from the input to the progress bar appearing.
+- **block:** the longest main-thread task.
+
+Each figure is the median (range) over every kept step.
+
+**Which runs were kept:**
+
+- Other sessions repeatedly drove free memory down to 247-393 MB. The harness watchdog then ended
+  two 6-run sets, so each set was cut to 2 runs: run 0 is dropped and run 1 is kept. Sets ran
+  alternately on the after and before bundles until each had 5 kept runs.
+- Every set started on a quiet gate: no other tooling, harness or Chrome; CPU under 45%; at least
+  2.5 GB free. The memory floor is lowered from the audit's 3 GB because the idle PC sits at about
+  2.7 GB.
+- A run counts only when its calibration before the run was within 15% of the 36 ms floor; kept
+  runs read 36-40 ms. Two runs were dropped for a 43-45 ms calibration.
+- Calibration after a run rose to 41-54 ms after some before-tree runs. The S5 audit attributes
+  this to the app's own work after a commit.
+
+| 12 MP step (steps x kept runs) | Before: shown / block | After: bar / shown / block | Chrome peak, before / after |
+|---|---|---|---|
+| Gaussian Blur radius 3, 4, 5 (3 x 5) | 1,258 (1,112-1,605) / 1,239 (max 1,840) ms | **18 (17-19)** / 1,422 (1,284-1,618) / **0** ms | 1.51 / 1.59 GB |
+| Halftone cell 10, 12, 14 (3 x 5) | 347 (328-482) / 329 (max 463) | **18** / 460 (426-509) / **0** | 1.00 / 1.06 |
+| Unsharp Mask amount 150 (1 x 5) | 1,419 (1,379-1,494) / 1,399 (max 1,475) | **18** / 1,694 (1,553-2,125) / **0** | 1.31 / 1.30 |
+| High Pass radius 6 (1 x 5) | 1,369 (1,344-2,013) / 1,350 (max 1,994) | **18** / 1,658 (1,526-2,270) / **0** | 1.26 / 1.25 |
+| Line Screen pitch 12 (1 x 5) | 372 (327-530) / 354 (max 511) | **18** / 460 (440-568) / **0** | 0.89 / 0.83 |
+| Median radius 2 (before 1 x 3, after 1 x 5) | 35,848 (35,512-36,844) / 35,828 | **18** / 1,910 (1,874-2,397) / **0** | 1.10 / 0.86 |
+
+**Results:**
+
+- Every filter step now answers within the 100 ms budget: the bar appears in 17-19 ms.
+- No main-thread task reached the 50 ms long-task threshold during any step, against blocks of
+  0.3-2.0 s before (and 36 s for Median).
+- The finished preview arrives 0.1-0.3 s later than the old blocking one. Part of that is the
+  120 ms start delay, which coalesces steps, and part is the copy to the worker. Median is 19x
+  sooner.
+- After Cancel, Chrome held at most 0.87 GB, against 1.19 GB before.
+- **Gaussian Blur's peak of 1.59 GB is over the 1.5 GB budget, as main's 1.51 GB already was.** The
+  worker briefly holds the source copy, the blur's float buffers and the filtered document.
+
+The Node bench (12 MP, run 0 dropped, median of 5; calibration 37-48 ms; ratios hold) gives:
+
+- **Median:** the new median takes 2.2 / 3.3 / 5.9 s at radius 1 / 2 / 4. The old one took 60-120 s
+  at radius 2 (calibration 46-65 ms), and its output is identical on the whole 12 MP image.
+- **Filter step at 512 x 512:** every filter took 10-76 ms, so smaller documents stay on the UI
+  thread within the 200 ms budget.
+
+**Not changed:** OK still applies the filter on the UI thread. At 12 MP that blocks for about 0.3-2 s,
+depending on the filter, as before. This amendment covers the preview only.
