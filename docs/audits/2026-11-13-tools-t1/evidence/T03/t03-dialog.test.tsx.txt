@@ -1,0 +1,189 @@
+// @vitest-environment jsdom
+// T03: Tone Calibration through the real host: Generate / Undo / Redo / Cancel,
+// Record + Save, library reopen, project round trip of an applied curve.
+import { describe, expect, it, beforeEach } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { Simulate } from 'react-dom/test-utils';
+import { useStore } from '../t01-main/src/ui/state/store';
+import { PlatformProvider } from '../t01-main/src/ui/app/platform-context';
+const PLATFORM = {} as never;
+import { resetStore } from '../t01-main/src/ui/state/test-helpers';
+import { ToneCalibrationDialogHost } from '../t01-main/src/ui/calibration/ToneCalibrationDialogHost';
+import { openToneCalibration, useToneCalibrationStore } from '../t01-main/src/ui/calibration/tone-calibration-store';
+import {
+  readToneCalibrations,
+  useToneCalibrationLibrary,
+  TONE_CALIBRATIONS_KEY,
+  toneCalibrationMismatches,
+} from '../t01-main/src/ui/calibration/tone-calibration-library';
+import { LAST_TONE_WEDGE_KEY, TONE_WEDGE_DRAFT_KEY } from '../t01-main/src/ui/calibration/tone-calibration-draft';
+import { photoToneCurvesEqual, photoToneCurveLut, fitPhotoToneCurve } from '../t01-main/src/core/raster/photo-tone-curve';
+import { toneWedgeCommandedPercents } from '../t01-main/src/core/job/tone-calibration-wedge';
+import { initialToneRecord } from '../t01-main/src/ui/calibration/ToneRecordStep';
+import { createLayer, IDENTITY_TRANSFORM, type RasterImage } from '../t01-main/src/core/scene';
+import { serializeProject } from '../t01-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t01-main/src/io/project/deserialize-project';
+import { emitGcode } from '../t01-main/src/io/gcode/emit-gcode';
+import { projectForScene, DEFAULT_DEVICE_PROFILE } from './harness';
+import { encodeCanonicalBase64 } from '../t01-main/src/core/relief/depth-map-base64';
+import { encodeBmp24 } from '../t01-main/src/core/raster/encode-bmp';
+
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const out: string[] = [];
+let roots: Root[] = [];
+function cleanup(): void {
+  for (const r of roots) act(() => r.unmount());
+  roots = [];
+  document.body.innerHTML = '';
+}
+function render(el: JSX.Element): void {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  roots.push(root);
+  act(() => root.render(el));
+}
+function button(name: string): HTMLButtonElement {
+  const b = [...document.querySelectorAll('button')].find((x) => x.textContent?.trim() === name);
+  if (!b) throw new Error(`no button ${name}; have ${[...document.querySelectorAll('button')].map((x) => x.textContent).join('|')}`);
+  return b as HTMLButtonElement;
+}
+async function click(el: HTMLElement): Promise<void> {
+  await act(async () => {
+    el.click();
+    await new Promise((r) => setTimeout(r, 0));
+  });
+}
+function setInput(el: HTMLInputElement, v: string): void {
+  act(() => {
+    el.value = v;
+    Simulate.change(el);
+  });
+}
+
+function photo(): RasterImage {
+  const w = 40, h = 40;
+  const luma = new Uint8Array(w * h);
+  for (let i = 0; i < luma.length; i++) luma[i] = (i % w) * 6;
+  const rgba = new Uint8Array(w * h * 4);
+  for (let i = 0; i < luma.length; i++) rgba.set([luma[i]!, luma[i]!, luma[i]!, 255], i * 4);
+  return {
+    kind: 'raster-image', id: 'photo-1', source: 'portrait.png',
+    dataUrl: `data:image/bmp;base64,${encodeCanonicalBase64(encodeBmp24(rgba, w, h))}`,
+    lumaBase64: encodeCanonicalBase64(luma), pixelWidth: w, pixelHeight: h,
+    bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 }, transform: { ...IDENTITY_TRANSFORM, x: 20, y: 20 },
+    color: '#123456', operationIds: ['img-op'], dither: 'stucki', linesPerMm: 8.4666,
+  } as RasterImage;
+}
+
+function seedProjectWithPhoto(): void {
+  const layer = { ...createLayer({ id: 'img-op', color: '#123456', mode: 'image' }), ditherAlgorithm: 'stucki', linesPerMm: 8.4666, power: 42, speed: 2400, imageBidirectional: false, dotWidthCorrectionMm: 0.03 } as never;
+  const s = useStore.getState();
+  useStore.setState({
+    project: { ...s.project, scene: { objects: [photo()], layers: [layer] } },
+    selectedObjectId: 'photo-1',
+    additionalSelectedIds: new Set(),
+    undoStack: [], redoStack: [], dirty: false,
+  } as never);
+}
+
+beforeEach(() => {
+  cleanup();
+  resetStore();
+  try { localStorage.clear(); } catch { /* */ }
+  useToneCalibrationStore.setState({ session: null });
+  useToneCalibrationLibrary.setState({ records: [] });
+});
+
+describe('tone calibration host', () => {
+  it('Generate with a selected photo, Undo, Redo', async () => {
+    seedProjectWithPhoto();
+    const before = useStore.getState().project;
+    act(() => openToneCalibration());
+    render(<PlatformProvider adapter={PLATFORM}><ToneCalibrationDialogHost /></PlatformProvider>);
+    out.push(`seed hint: ${document.body.textContent?.match(/Settings from[^.]*\./)?.[0]}`);
+    await click(button('Generate wedge'));
+    const st = useStore.getState();
+    const wedgeLayer = st.project.scene.layers.find((l) => l.id === 'tone-calibration-wedge');
+    out.push(`after generate: session=${useToneCalibrationStore.getState().session === null ? 'closed' : 'open'} objects=${st.project.scene.objects.length} photoKept=${st.project.scene.objects.some((o) => o.id === 'photo-1')} undo=${st.undoStack.length} dirty=${st.dirty}`);
+    out.push(`wedge op: dither=${wedgeLayer?.ditherAlgorithm} lpmm=${wedgeLayer?.linesPerMm} power=${wedgeLayer?.power} speed=${wedgeLayer?.speed} bidir=${wedgeLayer?.imageBidirectional} dwc=${wedgeLayer?.dotWidthCorrectionMm} curve=${wedgeLayer?.photoToneCurve === undefined ? 'none' : 'PRESENT'}`);
+    out.push(`lastToneWedge=${localStorage.getItem(LAST_TONE_WEDGE_KEY)}`);
+    const generated = st.project;
+    st.undo();
+    out.push(`undo restores scene exactly=${JSON.stringify(useStore.getState().project.scene) === JSON.stringify(before.scene)}`);
+    useStore.getState().redo();
+    out.push(`redo repeats exactly=${JSON.stringify(useStore.getState().project.scene) === JSON.stringify(generated.scene)}`);
+    out.push(`after undo, lastToneWedge still set=${localStorage.getItem(LAST_TONE_WEDGE_KEY) !== null}`);
+  });
+
+  it('Cancel leaves nothing', async () => {
+    seedProjectWithPhoto();
+    const before = useStore.getState().project;
+    act(() => openToneCalibration());
+    render(<PlatformProvider adapter={PLATFORM}><ToneCalibrationDialogHost /></PlatformProvider>);
+    const patches = document.querySelector('input[aria-label="Patches"], input') as HTMLInputElement;
+    setInput(patches, '7');
+    await click(button('Cancel'));
+    out.push(`cancel: session=${useToneCalibrationStore.getState().session === null ? 'closed' : 'open'} sameProject=${useStore.getState().project === before} undo=${useStore.getState().undoStack.length} localStorage keys=${JSON.stringify(Object.keys(localStorage))}`);
+  });
+
+  it('Record, Save, reopen library, apply, project round trip', async () => {
+    localStorage.setItem(LAST_TONE_WEDGE_KEY, JSON.stringify({ patchCount: 11, settings: { ditherAlgorithm: 'jarvis', linesPerMm: 10, power: 30, speed: 3000, negativeImage: false } }));
+    act(() => openToneCalibration({ step: 'record' }));
+    render(<PlatformProvider adapter={PLATFORM}><ToneCalibrationDialogHost /></PlatformProvider>);
+    const sliders = [...document.querySelectorAll('input[type="range"]')] as HTMLInputElement[];
+    const cmd = toneWedgeCommandedPercents(11);
+    const observed = cmd.map((c) => Math.round(100 * (1 - (1 - c / 100) ** 2)));
+    sliders.forEach((s, i) => setInput(s, String(observed[i + 1])));
+    setInput(document.querySelector('input[aria-label="Calibrated material"]') as HTMLInputElement, 'Birch ply 3 mm');
+    await click(button('Save calibration'));
+    const recs = useToneCalibrationLibrary.getState().records;
+    out.push(`saved records=${recs.length} label="${recs[0]?.curve.label}" toast session=${useToneCalibrationStore.getState().session === null ? 'closed' : 'open'}`);
+    const reread = readToneCalibrations();
+    out.push(`reopen (readToneCalibrations): ${reread.length} record(s); curve equal=${reread[0] !== undefined && photoToneCurvesEqual(reread[0].curve, recs[0]!.curve)}; samples=${JSON.stringify(reread[0]?.samples.map((s) => s.observedPercent))}`);
+    const oracleCurve = fitPhotoToneCurve(cmd.map((c, i) => ({ commandedPercent: c, observedPercent: observed[i]! })), 'x');
+    const a = photoToneCurveLut(recs[0]!.curve), b = photoToneCurveLut(oracleCurve);
+    out.push(`saved curve LUT == fit of the recorded values: ${a.every((v, i) => v === b[i])}`);
+    // Save the same material + settings again with different readings: replaces.
+    cleanup();
+    act(() => openToneCalibration({ step: 'record' }));
+    render(<PlatformProvider adapter={PLATFORM}><ToneCalibrationDialogHost /></PlatformProvider>);
+    setInput(document.querySelector('input[aria-label="Calibrated material"]') as HTMLInputElement, 'Birch ply 3 mm');
+    await click(button('Save calibration'));
+    out.push(`same label saved again: records=${useToneCalibrationLibrary.getState().records.length}; persisted=${readToneCalibrations().length}`);
+    // Machine identity: does a record know which machine it was measured on?
+    out.push(`record keys=${Object.keys(useToneCalibrationLibrary.getState().records[0]!).join(',')} settings keys=${Object.keys(useToneCalibrationLibrary.getState().records[0]!.settings).join(',')}`);
+    out.push(`mismatch vs identical settings on another machine: ${JSON.stringify(toneCalibrationMismatches(recs[0]!.settings, { ...recs[0]!.settings }))}`);
+    // Project round trip with the curve in the photo override.
+    seedProjectWithPhoto();
+    const s = useStore.getState();
+    const img = { ...photo(), operationOverride: { byOperation: { 'img-op': { photoToneCurve: recs[0]!.curve } } } } as RasterImage;
+    const project = projectForScene({ objects: [img], layers: s.project.scene.layers } as never, DEFAULT_DEVICE_PROFILE);
+    const g1 = emitGcode(project).gcode;
+    const noCurve = emitGcode(projectForScene({ objects: [photo()], layers: s.project.scene.layers } as never, DEFAULT_DEVICE_PROFILE)).gcode;
+    const loaded = deserializeProject(serializeProject(project));
+    if (loaded.kind !== 'ok') { out.push(`load failed ${loaded.kind} ${'reason' in loaded ? loaded.reason : ''}`); const l0 = deserializeProject(serializeProject(projectForScene({ objects: [photo()], layers: s.project.scene.layers } as never, DEFAULT_DEVICE_PROFILE))); out.push(`uncalibrated load: ${l0.kind} ${'reason' in l0 ? l0.reason : ''}`); return; }
+    const g2 = emitGcode(loaded.project).gcode;
+    out.push(`project round trip: gcode identical=${g1 === g2} len=${g1.length}; differs from uncalibrated=${g1 !== noCurve}`);
+    const tj = JSON.parse(serializeProject(project)); const walk = (o: any): void => { if (o && typeof o === 'object') { if (o.photoToneCurve) { o.photoToneCurve.points = [{ input: 0, output: 0 }, { input: 1, output: 250 }, { input: 2, output: 5 }, { input: 255, output: 255 }]; } for (const v of Object.values(o)) walk(v); } }; walk(tj); const text = JSON.stringify(tj);
+    const r = deserializeProject(text);
+    out.push(`tampered non-monotonic curve: replaced=${text !== serializeProject(project)} load kind=${r.kind}${'reason' in r ? ' ' + String(r.reason).slice(0, 160) : ''}`);
+  });
+
+  it('untouched sliders: curve vs identity', () => {
+    for (const n of [6, 11, 21]) {
+      const cmd = toneWedgeCommandedPercents(n);
+      const rec = initialToneRecord(n);
+      const curve = fitPhotoToneCurve(cmd.map((c, i) => ({ commandedPercent: c, observedPercent: rec.observed[i]! })), 'x');
+      const lut = photoToneCurveLut(curve);
+      let diff = 0, maxd = 0;
+      for (let i = 0; i < 256; i++) { const d = Math.abs(lut[i]! - i); if (d) diff++; maxd = Math.max(maxd, d); }
+      out.push(`untouched ${n} patches: LUT entries != identity: ${diff}, max |diff| ${maxd}`);
+    }
+  });
+
+  it('log', () => writeFileSync('C:/Users/stolk/kd-t1/zz-t03/t03-dialog.log', out.join('\n')));
+});
