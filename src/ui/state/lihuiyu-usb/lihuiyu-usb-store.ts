@@ -34,7 +34,11 @@ import type {
   LihuiyuUsbPhase,
   LihuiyuUsbState,
 } from './lihuiyu-usb-types';
-import { reportLinkMachineWork, type LinkMachineWork } from '../link-machine-work';
+import {
+  reportLinkMachineStatus,
+  reportLinkMachineWork,
+  type LinkMachineWork,
+} from '../link-machine-work';
 
 type Live = {
   readonly link: LhyLink;
@@ -301,6 +305,8 @@ function finishRun(
         : 'Job finished: the board reported its finish and the head returned to its start.',
     tone: 'info',
   });
+  // "After completed job" variable advance (code quality audit C2 D6-P2-1).
+  if (kind === 'job') job.completed?.();
 }
 
 /** The board may already run what it received: reset it. */
@@ -399,6 +405,10 @@ const ACTIVE_WORK: Partial<Record<LihuiyuUsbPhase, LinkMachineWork['activity']>>
 
 useLihuiyuUsbStore.subscribe((state) => {
   const activity = ACTIVE_WORK[state.phase];
+  reportLinkMachineStatus('lihuiyu-usb', {
+    connected: state.phase !== 'disconnected' && state.phase !== 'connecting',
+    framed: state.framed !== null,
+  });
   reportLinkMachineWork(
     'lihuiyu-usb',
     activity === undefined

@@ -2,7 +2,9 @@
 
 Plan and method: [AREAS.md](AREAS.md). Severity: AREAS §Severity (a mark that silently carries the wrong content or cannot be read is P1; an UNSOURCED oracle caps a finding at P2). "Contradicted" counts outside facts that the research verifier found wrong; in O3, O5, O6 and O8 those were claims in the oracle plan, corrected before they could become findings.
 
-Every area read `origin/main` at `5c9441ba8` (batches 1–2) or a later main (batch 3; the date and commit are in each report). The coordinator re-read every P1 in main's code (see below).
+Every area read `origin/main` at `5c9441ba8` (batches 1–2) or a later main (batches 3–4; the date and commit are in each report). The coordinator re-read every P1 in main's code (see below).
+
+**Final status (2026-11-12):** every P1 and P2 fix below has merged to `main`, except O1-P2-1 (#1780, closed unmerged; with the maintainer).
 
 | # | Area | Report | Raised | Refuted | Contradicted | P1 | P2 | P3 |
 |---|---|---|---|---|---|---|---|---|
@@ -24,10 +26,10 @@ Every area read `origin/main` at `5c9441ba8` (batches 1–2) or a later main (ba
 
 | ID | Summary | Coordinator check | Fix |
 |---|---|---|---|
-| O2-P1-1 | **Unclamped and periodic DXF SPLINEs import in the wrong shape** (2.4 mm on a 10 mm closed spline, 27 mm on a 100 mm open uniform cubic), with no note. AutoCAD's default closed spline is periodic, so ordinary files reach it. | **Agree.** Main's `flatten-spline-to-tolerance.ts` `bezierPieces` raises only knots strictly inside the domain, then reads every span's controls as Bézier controls, which holds only for clamped ends. | #1777 (open) |
-| O2-P1-2 | **GeoJSON export fills a hole** when the 0.001 mm grid snap moves one hole vertex across a slanted parent edge. | **Agree.** Main's `fill-region-rings.ts` `ringInside` returns on the first probe that is not on the boundary. | #1779 (open) |
+| O2-P1-1 | **Unclamped and periodic DXF SPLINEs import in the wrong shape** (2.4 mm on a 10 mm closed spline, 27 mm on a 100 mm open uniform cubic), with no note. AutoCAD's default closed spline is periodic, so ordinary files reach it. | **Agree.** Main's `flatten-spline-to-tolerance.ts` `bezierPieces` raises only knots strictly inside the domain, then reads every span's controls as Bézier controls, which holds only for clamped ends. | #1777 (merged) |
+| O2-P1-2 | **GeoJSON export fills a hole** when the 0.001 mm grid snap moves one hole vertex across a slanted parent edge. | **Agree.** Main's `fill-region-rings.ts` `ringInside` returns on the first probe that is not on the boundary. | #1779 (merged) |
 | O5-P1-1 | **A job finished through laser recovery repeats its serial number**: "After completed job" never advances after a clean recovery, so the next Start burns the same serial. | **Agree.** On main `armVariableStreamAdvancement` is called only from `start-job-transmission.ts`; the recovery flow rebuilds variable-text jobs (ADR-443 Amd 2) but arms no advance. | #1790 (merged; ADR-279 Amd 1) |
-| O12-P1-1 | **On grblHAL with `$13=1`, the rotary A turn is read in inches as degrees** when A is not flagged rotary in `$376` (the Falcon A1 Pro ships `$376=0`). Start from line and the turn-back after Abort then aim 25.4× short of the turn the job started from, with no warning. A "not verified" item in v14 Z2 hid it. | **Agree.** On main `abort-rotary-turn.ts` `currentMachineTurn` and `laser-job-stop.ts` `rotaryStartTurnAtStop` scale Z by 25.4 under `reportInches` but return A raw, and `parse-settings.ts` never reads `$376`. **Research:** grblHAL `report.c` `get_axis_values_imperial()` multiplies every axis by `INCH_PER_MM` except an axis above Z whose bit is in `settings.steppers.is_rotary.mask` (fetched 2026-11-12). | #1810 (open) |
+| O12-P1-1 | **On grblHAL with `$13=1`, the rotary A turn is read in inches as degrees** when A is not flagged rotary in `$376` (the Falcon A1 Pro ships `$376=0`). Start from line and the turn-back after Abort then aim 25.4× short of the turn the job started from, with no warning. A "not verified" item in v14 Z2 hid it. | **Agree.** On main `abort-rotary-turn.ts` `currentMachineTurn` and `laser-job-stop.ts` `rotaryStartTurnAtStop` scale Z by 25.4 under `reportInches` but return A raw, and `parse-settings.ts` never reads `$376`. **Research:** grblHAL `report.c` `get_axis_values_imperial()` multiplies every axis by `INCH_PER_MM` except an axis above Z whose bit is in `settings.steppers.is_rotary.mask` (fetched 2026-11-12). | #1810 (merged) |
 | O1-P2-1 | A barcode whose module is narrower than its Fill line interval leaves whole module rows unburned and cannot scan; nothing warned. | Agree: main's only barcode warnings are the Data Matrix 144 × 144 scan check and a 0.2 mm dialog note. | #1780 was **closed unmerged** on 2026-11-11 18:53 UTC; open with the maintainer |
 | O2-P2-1 | A SPLINE defined only by fit points was dropped with a misleading note. | — | #1784 (merged) |
 | O2-P2-2 | An HP-GL file that sets speed, force or pen width was refused completely. | — | #1783 (merged; ADR-357 Amd 5) |
@@ -35,11 +37,11 @@ Every area read `origin/main` at `5c9441ba8` (batches 1–2) or a later main (ba
 | O5-P2-1 | Start from line burned the next serial and said only "a date or time" could differ. | — | #1790 (merged) |
 | O5-P2-2 | Job Review could never confirm a job with a seconds field. | — | #1791 (merged) |
 | O6-P2-1 | Image Gamma runs opposite to LightBurn, and two of three fields did not say so. | — | #1785 (merged) |
-| O7-P2-1 | Basic-Latin text kerned against OpenType's rules (wrong script, first lookup only). | — | #1798 (open; ADR-591 Amd 4) |
-| O7-P2-2 | Bend and path text mapped only the ends of straight strokes, leaving chords. | — | #1800 (open) |
-| O8-P2-1 | Moshi flat-bed speeds ran at a different whole step with no note. | — | #1797 (open) |
-| O8-P2-2 | A decimal comma in DXF and ASCII STL numbers was silently truncated. | — | #1799 (open; ADR-357 Amd 6) |
-| O9-P2-1 | Applying a material preset kept the operation's cross-hatch, scan angle, angle step and fill ramp; saving a preset dropped them. | — | #1795 (open) |
+| O7-P2-1 | Basic-Latin text kerned against OpenType's rules (wrong script, first lookup only). | — | #1798 (merged; ADR-591 Amd 4) |
+| O7-P2-2 | Bend and path text mapped only the ends of straight strokes, leaving chords. | — | #1800 (merged) |
+| O8-P2-1 | Moshi flat-bed speeds ran at a different whole step with no note. | — | #1797 (merged) |
+| O8-P2-2 | A decimal comma in DXF and ASCII STL numbers was silently truncated. | — | #1799 (merged; ADR-357 Amd 6) |
+| O9-P2-1 | Applying a material preset kept the operation's cross-hatch, scan angle, angle step and fill ramp; saving a preset dropped them. | — | #1795 (merged) |
 
 P3s and the items listed for the maintainer are in each area's report.
 

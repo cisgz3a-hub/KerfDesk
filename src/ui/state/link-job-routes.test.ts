@@ -1,8 +1,10 @@
-// The Moshi USB and Ruida network jobs compile as Save and G-code Start do
+// The Moshi USB, Ruida network and K40 USB jobs compile as Save and G-code Start do
 // (ADR-705 Amendment 4, code quality audit C2 D2-P1-1 and D2-P2-1): with the
 // canvas output scope, and carrying the shared job warnings G-code shows.
 import { describe, expect, it } from 'vitest';
+import { LHY_STEPS_PER_MM } from '../../core/controllers/lihuiyu/lhy-motion-plan';
 import { DEFAULT_DEVICE_PROFILE, type ControllerKind } from '../../core/devices';
+import { K40_M2_NANO_PROFILE } from '../../core/devices/lihuiyu-profiles';
 import {
   createLayer,
   createProject,
@@ -16,6 +18,7 @@ import {
 import { prepareOutput } from '../../io/gcode';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { linkJobRequest } from './link-job-request';
+import { prepareLihuiyuUsbJob } from './lihuiyu-usb/lihuiyu-usb-job';
 import { prepareMoshiUsbJob } from './moshi-usb/moshi-usb-job';
 import { prepareRuidaNetworkJob } from './ruida-network/ruida-network-job';
 
@@ -133,5 +136,38 @@ describe('Ruida network job', () => {
     const result = await prepareRuidaNetworkJob(linkJobRequest(p, ABSOLUTE));
     if (!result.ok) throw new Error(result.messages.join(' '));
     for (const warning of expected) expect(result.job.advisories).toContain(warning);
+  });
+});
+
+// The K40 joins the shared request (ADR-703 Amendment 1, code quality audit C2
+// D6-P1-1 and D6-P2-1): a Lihuiyu profile homes rear-left, and an Absolute job
+// runs from the homed head.
+const asK40 = (p: Project): Project => ({
+  ...createProject(K40_M2_NANO_PROFILE),
+  scene: p.scene,
+});
+const HOMED = { x: 0, y: 0 };
+
+describe('K40 USB job', () => {
+  it('burns only the selected artwork when Selected artwork only is on', async () => {
+    const p = asK40(twoSquares('lihuiyu'));
+    const whole = await prepareLihuiyuUsbJob(linkJobRequest(p, ABSOLUTE), HOMED);
+    const scoped = await prepareLihuiyuUsbJob(linkJobRequest(p, ABSOLUTE, SELECTED_A), HOMED);
+    if (!whole.ok || !scoped.ok) throw new Error('expected both jobs to compile');
+    const widthMm = (job: typeof whole.job) =>
+      (job.footprint.bounds.maxX - job.footprint.bounds.minX) / LHY_STEPS_PER_MM;
+    expect(widthMm(whole.job)).toBeCloseTo(100, 0);
+    expect(widthMm(scoped.job)).toBeCloseTo(20, 0);
+  });
+
+  it('carries the job warnings G-code shows and the variable advance', async () => {
+    const p = asK40(kerfSideCase('lihuiyu'));
+    const expected = gcodeJobWarnings(p);
+    expect(expected.length).toBeGreaterThan(0);
+    const request = linkJobRequest(p, ABSOLUTE);
+    const result = await prepareLihuiyuUsbJob(request, HOMED);
+    if (!result.ok) throw new Error(result.messages.join(' '));
+    for (const warning of expected) expect(result.job.advisories).toContain(warning);
+    expect(result.job.completed).toBe(request.completed);
   });
 });

@@ -80,6 +80,7 @@ function RuidaConnectRow({
         <button
           type="button"
           title="Open UDP to the entered controller address and read its status."
+          data-search-target="connect"
           disabled={!disconnected || host.trim() === ''}
           onClick={() => void ruida.connect(network, host.trim())}
         >

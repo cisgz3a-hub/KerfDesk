@@ -18,6 +18,7 @@ import { lhyFootprint, type LhyFootprint } from '../../core/controllers/lihuiyu/
 import type { LhyPoint } from '../../core/controllers/lihuiyu/lhy-motion-plan';
 import { machineSpaceJob, type JobOriginPlacement } from '../../core/job';
 import { rotaryOutputAxis } from '../../core/job/rotary-job';
+import { rotaryFeedMatchFor } from '../../core/output/rotary-surface-feed';
 import type { PreflightIssue, PreflightOptions } from '../../core/preflight';
 import type { OutputScope, Project } from '../../core/scene';
 import { prepareOutput, type PreparedOutput, type PrepareOutputOptions } from '../gcode';
@@ -81,10 +82,15 @@ export function emitPreparedEgvFile(
   }
   const board = lhyBoardSetting(device.lihuiyuBoard);
   const start = options.start ?? { x: 0, y: 0 };
-  const encoded = encodeLhyJob(machineSpaceJob(prepared.job, device, machine), {
+  const machineJob = machineSpaceJob(prepared.job, device, machine);
+  // A Y-port rotary matches the surface speed per burn (ADR-703 Amendment 1).
+  const rotaryFeed = rotaryFeedMatchFor(machineJob, device.maxFeed);
+  const encoded = encodeLhyJob(machineJob, {
     board,
     fullPowerPerMille: device.maxPowerS,
     start,
+    scanningOffsets: device.scanningOffsets,
+    ...(rotaryFeed === undefined ? {} : { rotaryFeed }),
   });
   if (!encoded.ok) return { ok: false, messages: [describeLhyEncodeError(encoded.error)] };
   const footprint = lhyFootprint(encoded.motion, start);

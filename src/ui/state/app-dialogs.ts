@@ -18,8 +18,7 @@ import {
   type AppPromptOptions,
 } from './app-dialog-store';
 import { dontAskAgainIsSet, rememberDontAskAgain } from './dont-ask-again';
-import { isActiveJob } from './laser-store-helpers';
-import { useLaserStore } from './laser-store';
+import { anyMachineJobActive } from './link-machine-work';
 import { useToastStore } from './toast-store';
 
 export type { AppAlertOptions, AppConfirmOptions, AppPromptOptions } from './app-dialog-store';
@@ -27,7 +26,8 @@ export type { AppAlertOptions, AppConfirmOptions, AppPromptOptions } from './app
 /** True when the question is refused: a job is active and its caller named a
  *  refusal, which is shown as a toast. */
 function refusedForJob(refusal: string | undefined): boolean {
-  if (refusal === undefined || !isActiveJob(useLaserStore.getState().streamer)) return false;
+  // A link job counts as a job here too (code quality audit C2 D6-P3-4).
+  if (refusal === undefined || !anyMachineJobActive()) return false;
   useToastStore.getState().pushToast(refusal, 'warning');
   return true;
 }

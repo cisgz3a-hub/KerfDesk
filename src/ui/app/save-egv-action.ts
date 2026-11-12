@@ -8,14 +8,10 @@ import type { Project } from '../../core/scene';
 import { errorMessage } from '../../core/util/error-message';
 import { prepareOutput } from '../../io/gcode';
 import { withTextGlyphCheck } from '../../io/gcode/prepare-output-snapshot';
-import {
-  egvPreparationOptions,
-  emitPreparedEgvFile,
-  type EmitEgvOptions,
-  type EmitEgvResult,
-} from '../../io/egv';
+import { egvPreparationOptions, type EmitEgvOptions } from '../../io/egv';
 import type { SaveTarget } from '../../platform/types';
 import type { ResolvedJobPlacement } from '../job-placement';
+import { emitPreparedEgvWithJobWarnings, type EgvWithJobWarnings } from '../laser/egv-job-warnings';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { outputTextRenderer } from '../text/output-text-renderer';
 import { advanceExportVariables } from './advance-export-variables';
@@ -37,7 +33,7 @@ export async function handleSaveEgv(
   };
   // The picker empties an existing file as it returns (ADR-656), so the job
   // compiles first.
-  let result: EmitEgvResult;
+  let result: EgvWithJobWarnings;
   try {
     result = await emitEgvChecked(ctx.project, options);
   } catch (error) {
@@ -49,9 +45,13 @@ export async function handleSaveEgv(
   if (target !== null) await writeEgvResult(ctx, target, result);
 }
 
-async function emitEgvChecked(project: Project, options: EmitEgvOptions): Promise<EmitEgvResult> {
+async function emitEgvChecked(
+  project: Project,
+  options: EmitEgvOptions,
+): Promise<EgvWithJobWarnings> {
   const prepared = prepareOutput(project, egvPreparationOptions(options));
-  return emitPreparedEgvFile(
+  // With the job warnings Save G-code shows (C2 D6-P2-1).
+  return emitPreparedEgvWithJobWarnings(
     await withTextGlyphCheck(prepared, project, outputTextRenderer),
     options,
   );
@@ -73,13 +73,14 @@ async function pickEgvTarget(ctx: SaveGcodeCtx): Promise<SaveTarget | null> {
 async function writeEgvResult(
   ctx: SaveGcodeCtx,
   target: SaveTarget,
-  result: Extract<EmitEgvResult, { readonly ok: true }>,
+  result: Extract<EgvWithJobWarnings, { readonly ok: true }>,
 ): Promise<void> {
   try {
     await target.write(new Blob([new Uint8Array(result.bytes)]));
     advanceExportVariables(ctx);
     ctx.pushToast(`Saved .egv job to ${target.displayName}`, 'success');
     for (const advisory of result.advisories) ctx.pushToast(advisory.message, 'warning');
+    for (const warning of result.jobWarnings) ctx.pushToast(warning, 'warning');
     ctx.pushToast(EGV_EXPERIMENTAL_WARNING, 'warning');
   } catch (err) {
     ctx.pushToast(`Could not save .egv file: ${errorMessage(err)}`, 'error');

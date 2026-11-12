@@ -32,10 +32,14 @@ permissions:
 # gate's check name and passes only when every other job passed, so a required
 # check of that name, and deploy.yml's trigger on a successful CI run, still
 # mean the whole gate passed. scripts/ci-parallel-gate.test.mjs pins both.
+# Every job has a time limit at about twice its 90th-percentile run time, so
+# a hung job fails within the hour instead of GitHub's 6 hours (code-quality
+# audit C2 D7-P3-1).
 jobs:
   static-checks:
     name: Typecheck, lint and format
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -89,6 +93,7 @@ jobs:
   policy-and-build:
     name: Policy checks and builds
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -153,6 +158,7 @@ jobs:
   windows-native-tests:
     name: Windows native upgrade controls
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -170,6 +176,7 @@ jobs:
   unit-tests:
     name: Unit tests (${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       # Every shard reports, so one failure does not hide another shard's.
       fail-fast: false
@@ -199,6 +206,7 @@ jobs:
   remote-control:
     name: Phone and MCP service
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       KERFDESK_TEST_BROWSER: chromium
     steps:
@@ -225,6 +233,7 @@ jobs:
     # check as passed.
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

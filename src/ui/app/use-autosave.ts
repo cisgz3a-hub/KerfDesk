@@ -31,6 +31,7 @@ import { createAutosaveProjectSnapshot } from '../state/autosave-project-snapsho
 import { useBackgroundSaveHealth } from '../state/background-save-health';
 import { noteProjectCopyOnDisk } from '../state/design-document-copies';
 import { useLaserStore } from '../state/laser-store';
+import { activeLinkMachineWork } from '../state/link-machine-work';
 import { useToastStore } from '../state/toast-store';
 import {
   projectLoadRefused,
@@ -107,8 +108,11 @@ function createSnapshotForAutosave(noteJob: (active: boolean) => void): Autosave
     const s = useStore.getState();
     const ls = useLaserStore.getState();
     const streamer = ls.streamer;
+    // A Moshi, K40 or Ruida link job streams from this window too, so autosave
+    // holds for it as for a laser stream (code quality audit C2 D6-P2-2).
     const isStreaming =
-      streamer !== null && (streamer.status === 'streaming' || streamer.status === 'paused');
+      (streamer !== null && (streamer.status === 'streaming' || streamer.status === 'paused')) ||
+      activeLinkMachineWork() !== null;
     noteJob(isStreaming);
     return {
       project: snapshotProject(s),
