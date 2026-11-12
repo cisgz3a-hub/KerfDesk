@@ -146,6 +146,28 @@ describe('OR-1: M3 output never drains the planner with the beam lit', () => {
     expect(findM3LitPlannerDrains(out)).toEqual([]);
   });
 
+  it('grbl-compatible raster: an S0 gap that rounds to zero length between two burns is not written', () => {
+    // Code quality audit C2, D3 mutant R11. Pixels 0.0004 mm wide: the first
+    // burn ends at X30.0008 and the one-pixel gap at X30.0012, and both round to
+    // X30.001 on the controller grid. Under M3 that gap's `X30.001 S0` would not
+    // move the head, so GRBL would drain its planner with the beam still lit.
+    const out = grblStrategy.emit(
+      {
+        groups: [
+          {
+            ...image(0, [500, 500, 0, 500, 500], 5),
+            bounds: { minX: 30, minY: 30, maxX: 30.002, maxY: 31 },
+          },
+        ],
+      },
+      COMPATIBLE,
+    );
+    expect(out).toMatch(/^M3 S0$/m);
+    expect(findM3LitPlannerDrains(out)).toEqual([]);
+    // The burn runs straight on: nothing sits between the two burns.
+    expect(out).toContain('G1 X30.001 F3000 S500\nG1 X30.002\nM5');
+  });
+
   it('constant-power cut, then an image layer: the image opening follows its first travel', () => {
     const out = grblStrategy.emit(
       { groups: [square('A', 1, false), image(5, TWO_ROW_IMAGE)] },
