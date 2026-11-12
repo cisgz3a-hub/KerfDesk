@@ -52,7 +52,7 @@ Run order puts tools that make or change burns first, then new tools, then the r
 | T11 | Fill repair | Radius Fillet | `tools.radius-fillet` | ledgered: P2 3 (fixed by #1852), P3 6 |
 | T12 | Fill repair | Shear | `tools.shear` | ledgered: P2 1 (fixed by #1853), P3 4 |
 | T13 | Image | Image Studio | `tools.edit-image` | ledgered: P2 2 (fix #1855), P3 2 (known 3) |
-| T14 | Image | Adjust Image | `tools.adjust-image` | |
+| T14 | Image | Adjust Image | `tools.adjust-image` | ledgered: P2 2 (fix #1856), P3 2 (known 3) |
 | T15 | Image | Photo Engraving | `tools.photo-engraving` | |
 | T16 | Image | Apply Mask to Image | `tools.apply-image-mask` | |
 | T17 | Image | Crop Image | `tools.crop-image` | |

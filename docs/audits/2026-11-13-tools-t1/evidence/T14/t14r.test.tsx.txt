@@ -1,0 +1,288 @@
+// T14 refuter: real CommandShell + Tools menu, photos made by the store's own
+// import + Edit > Duplicate (a real way two photos come to share one operation),
+// burn compared with core compileJob per object (not the G-code decoder).
+import { afterEach, it, vi } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { DEFAULT_DEVICE_PROFILE } from '../t13-main/src/core/devices';
+import { IDENTITY_TRANSFORM, type RasterImage, type Scene } from '../t13-main/src/core/scene';
+import { primaryOperationForObject } from '../t13-main/src/core/scene/operation-binding';
+import { effectiveOperationForObject, operationOverrideForObject } from '../t13-main/src/core/effective-output';
+import { compileJob } from '../t13-main/src/core/job/compile-job';
+import type { RasterGroup } from '../t13-main/src/core/job/job';
+import type { PlatformAdapter } from '../t13-main/src/platform/types';
+import { PlatformProvider } from '../t13-main/src/ui/app/platform-context';
+import { useStore } from '../t13-main/src/ui/state/store';
+import { resetStore } from '../t13-main/src/ui/state/test-helpers';
+import { CommandShell } from '../t13-main/src/ui/commands/CommandShell';
+import { buildPhotoEngravingUpdate } from '../t13-main/src/ui/raster/photo-engraving-apply';
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const LOG = 'C:/Users/stolk/kd-t1/zz-t14r/t14r.log';
+const lines: string[] = [];
+const out = (s: string): void => {
+  lines.push(s);
+  writeFileSync(LOG, lines.join('\n'));
+};
+const st = () => useStore.getState();
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+const W = 32;
+const H = 8;
+function photo(id: string, source: string): RasterImage {
+  const luma = new Uint8Array(W * H);
+  for (let y = 0; y < H; y += 1)
+    for (let x = 0; x < W; x += 1) luma[y * W + x] = Math.round((x / (W - 1)) * 200 + y * 5);
+  return {
+    kind: 'raster-image',
+    id,
+    source,
+    dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    pixelWidth: W,
+    pixelHeight: H,
+    lumaBase64: Buffer.from(luma).toString('base64'),
+    bounds: { minX: 0, minY: 0, maxX: W, maxY: H },
+    transform: IDENTITY_TRANSFORM,
+    color: '#808080',
+    dither: 'grayscale',
+    linesPerMm: 1,
+  };
+}
+
+function burnOf(objectId: string): number[] {
+  const scene = st().project.scene;
+  const only: Scene = { ...scene, objects: scene.objects.filter((o) => o.id === objectId) };
+  const job = compileJob(only, st().project.device ?? DEFAULT_DEVICE_PROFILE);
+  const values: number[] = [];
+  for (const g of job.groups) {
+    if (g.kind !== 'raster') continue;
+    const r = g as RasterGroup;
+    for (let y = 0; y < r.pixelHeight; y += 1) {
+      const row = r.rowProvider ? r.rowProvider(y) : null;
+      for (let x = 0; x < r.pixelWidth; x += 1)
+        values.push(row ? Number(row[x]) : Number((r.sValues as ArrayLike<number>)[y * r.pixelWidth + x]));
+    }
+  }
+  return values;
+}
+const diff = (a: number[], b: number[]): number =>
+  a.length !== b.length ? Math.max(a.length, b.length) : a.filter((v, i) => v !== b[i]).length;
+const sum = (a: number[]): number => a.reduce((p, v) => p + v, 0);
+
+function platform(): PlatformAdapter {
+  return {
+    id: 'mock',
+    pickFilesForOpen: vi.fn(async () => []),
+    pickFileForSave: vi.fn(async () => null),
+    serial: { isSupported: () => false, requestPort: vi.fn(async () => null) },
+  } as unknown as PlatformAdapter;
+}
+
+async function renderShell(): Promise<{ host: HTMLDivElement; root: Root }> {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  await act(async () => {
+    root.render(
+      <PlatformProvider adapter={platform()}>
+        <CommandShell />
+      </PlatformProvider>,
+    );
+  });
+  return { host, root };
+}
+
+async function openAdjustImage(host: HTMLElement): Promise<HTMLElement> {
+  const summary = host.querySelector<HTMLElement>('[data-menu-family-summary="tools"]');
+  if (summary === null) throw new Error('no Tools menu');
+  await act(async () => summary.click());
+  const button = host.querySelector<HTMLButtonElement>('button[data-help-id="command:tools.adjust-image"]');
+  if (button === null) throw new Error('no Adjust Image item');
+  await act(async () => button.click());
+  const dialog = document.querySelector<HTMLElement>('[aria-label="Adjust Image"]');
+  if (dialog === null) throw new Error('dialog did not open');
+  return dialog;
+}
+
+async function typeNumber(dialog: HTMLElement, name: string, value: string): Promise<void> {
+  const input = dialog.querySelector<HTMLInputElement>(`input[name="${name}"]`);
+  if (input === null) throw new Error(`no ${name}`);
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+  await act(async () => {
+    input.focus();
+    setter.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () => {
+    input.dispatchEvent(new FocusEvent('blur', { bubbles: false }));
+    input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+  });
+}
+
+async function tick(dialog: HTMLElement, name: string): Promise<void> {
+  const box = dialog.querySelector<HTMLInputElement>(`input[name="${name}"]`);
+  if (box === null) throw new Error(`no ${name}`);
+  await act(async () => box.click());
+}
+
+async function pressOk(dialog: HTMLElement): Promise<void> {
+  const ok = [...dialog.querySelectorAll('button')].find((b) => b.textContent === 'OK');
+  if (!ok) throw new Error('no OK');
+  await act(async () => ok.click());
+}
+
+function setupSharedPair(): { a: string; b: string } {
+  resetStore();
+  st().importRasterImage(photo('A', 'alpha.png'));
+  const a = st().selectedObjectId!;
+  st().duplicateSelection();
+  const b = st().selectedObjectId!;
+  return { a, b };
+}
+
+it('R1: Duplicate shares the operation; OK on B via the real menu changes A', async () => {
+  const { a, b } = setupSharedPair();
+  const objA = st().project.scene.objects.find((o) => o.id === a) as RasterImage;
+  const objB = st().project.scene.objects.find((o) => o.id === b) as RasterImage;
+  out(`R1 layers=${st().project.scene.layers.length} A.ops=${JSON.stringify(objA.operationIds)} B.ops=${JSON.stringify(objB.operationIds)}`);
+  out(`R1 A override=${JSON.stringify(objA.operationOverride ?? null)} B override=${JSON.stringify(objB.operationOverride ?? null)}`);
+  const layer0 = primaryOperationForObject(objA, st().project.scene.layers)!;
+  out(`R1 op mode=${layer0.mode} dither=${layer0.ditherAlgorithm} neg=${layer0.negativeImage}`);
+  const before = burnOf(a);
+  const undo0 = st().undoStack.length;
+  const { host, root } = await renderShell();
+  try {
+    const dialog = await openAdjustImage(host);
+    const text = dialog.textContent ?? '';
+    const titles = [...dialog.querySelectorAll('[title]')].map((e) => e.getAttribute('title')).join(' | ');
+    const words = ['operation', 'shared', 'layer', 'other image', 'also', 'every image', 'all images'];
+    out(`R1 dialog text words: ${words.map((w) => `${w}=${text.toLowerCase().includes(w)}`).join(' ')}`);
+    out(`R1 dialog title words: ${words.map((w) => `${w}=${titles.toLowerCase().includes(w)}`).join(' ')}`);
+    out(`R1 dialog headings: ${[...dialog.querySelectorAll('h2,h3,legend,fieldset')].map((e) => e.textContent).join(' / ')}`);
+    await tick(dialog, 'negativeImage');
+    await pressOk(dialog);
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+  const after = burnOf(a);
+  const opAfter = primaryOperationForObject(objA, st().project.scene.layers)!;
+  const objA2 = st().project.scene.objects.find((o) => o.id === a) as RasterImage;
+  out(`R1 after OK on B: A pixels=${before.length} differ=${diff(before, after)} sumS ${sum(before)} -> ${sum(after)}; op.negativeImage=${opAfter.negativeImage}; A effective neg=${effectiveOperationForObject(opAfter, objA2).negativeImage}; undo +${st().undoStack.length - undo0}`);
+  // Undo restores A
+  st().undo();
+  out(`R1 one Undo: A differ from before=${diff(before, burnOf(a))}`);
+});
+
+it('R2: same edit through Photo engraving apply leaves A untouched', () => {
+  const { a, b } = setupSharedPair();
+  const before = burnOf(a);
+  const s = st();
+  const image = s.project.scene.objects.find((o) => o.id === b) as RasterImage;
+  const operation = primaryOperationForObject(image, s.project.scene.layers)!;
+  const update = buildPhotoEngravingUpdate(
+    s,
+    { projectDocumentEpoch: s.projectDocumentEpoch, image, operation },
+    {
+      imagePatch: { brightness: image.brightness ?? 0, contrast: image.contrast ?? 0, gamma: image.gamma ?? 1 },
+      layerPatch: {
+        ditherAlgorithm: operation.ditherAlgorithm,
+        linesPerMm: operation.linesPerMm,
+        negativeImage: true,
+        passThrough: operation.passThrough,
+        photoToneCurve: operation.photoToneCurve,
+      },
+    },
+  );
+  if (update === null) throw new Error('no update');
+  useStore.setState(update);
+  const bAfter = st().project.scene.objects.find((o) => o.id === b) as RasterImage;
+  out(`R2 Photo engraving on B: A differ=${diff(before, burnOf(a))}; B override keys=${JSON.stringify(Object.keys(operationOverrideForObject(operation, bAfter) ?? {}))}`);
+});
+
+it('R3: after Photo engraving gave B an override, Adjust Image on B leaves A alone', async () => {
+  const { a, b } = setupSharedPair();
+  const s = st();
+  const image = s.project.scene.objects.find((o) => o.id === b) as RasterImage;
+  const operation = primaryOperationForObject(image, s.project.scene.layers)!;
+  const update = buildPhotoEngravingUpdate(
+    s,
+    { projectDocumentEpoch: s.projectDocumentEpoch, image, operation },
+    {
+      imagePatch: { brightness: 5, contrast: 0, gamma: 1 },
+      layerPatch: {
+        ditherAlgorithm: operation.ditherAlgorithm,
+        linesPerMm: operation.linesPerMm,
+        negativeImage: false,
+        passThrough: operation.passThrough,
+        photoToneCurve: operation.photoToneCurve,
+      },
+    },
+  );
+  useStore.setState(update!);
+  const before = burnOf(a);
+  const { host, root } = await renderShell();
+  try {
+    const dialog = await openAdjustImage(host);
+    await tick(dialog, 'negativeImage');
+    await typeNumber(dialog, 'minPower', '20');
+    await pressOk(dialog);
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+  out(`R3 B owns override then Adjust Image OK (Negative, Min 20): A differ=${diff(before, burnOf(a))}`);
+});
+
+it('R4 extra: selection changes while the dialog is open (phone import) -> OK writes B draft onto C', async () => {
+  const { a, b } = setupSharedPair();
+  void a;
+  const { host, root } = await renderShell();
+  try {
+    const dialog = await openAdjustImage(host);
+    const header0 = document.querySelector('[aria-label="Adjust Image"] .lf-subheading')?.textContent;
+    await typeNumber(dialog, 'brightness', '60');
+    await tick(dialog, 'negativeImage');
+    const draftB = (dialog.querySelector('input[name="brightness"]') as HTMLInputElement).value;
+    // What the phone's design import calls (design-imports.ts:317): the new photo becomes the selection.
+    await act(async () => {
+      st().importRasterImage(photo('C', 'charlie.png'), 0);
+    });
+    const c = st().selectedObjectId!;
+    const dialog2 = document.querySelector<HTMLElement>('[aria-label="Adjust Image"]');
+    const header1 = dialog2?.querySelector('.lf-subheading')?.textContent;
+    const shownB = (dialog2?.querySelector('input[name="brightness"]') as HTMLInputElement | null)?.value;
+    const shownNeg = (dialog2?.querySelector('input[name="negativeImage"]') as HTMLInputElement | null)?.checked;
+    out(`R4 before phone import: header=${header0} typed brightness=${draftB}; after: selected=${c} (B=${b}) dialog open=${dialog2 !== null} header=${header1} brightness shown=${shownB} negative shown=${shownNeg}`);
+    const cBefore = burnOf(c);
+    const cObj0 = st().project.scene.objects.find((o) => o.id === c) as RasterImage;
+    if (dialog2) await pressOk(dialog2);
+    const cObj = st().project.scene.objects.find((o) => o.id === c) as RasterImage;
+    const bObj = st().project.scene.objects.find((o) => o.id === b) as RasterImage;
+    const cOp = primaryOperationForObject(cObj, st().project.scene.layers)!;
+    const bOp = primaryOperationForObject(bObj, st().project.scene.layers)!;
+    out(`R4 after OK: C brightness ${cObj0.brightness ?? 'unset'} -> ${cObj.brightness}; C op ${cOp.id} negative=${cOp.negativeImage}; C differ=${diff(cBefore, burnOf(c))}/${cBefore.length}; B brightness=${bObj.brightness ?? 'unset'}; B op ${bOp.id} negative=${bOp.negativeImage}`);
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+});
+
+it('R5 extra: selection cleared while open -> dialog vanishes, then reopens on next raster select', async () => {
+  const { a } = setupSharedPair();
+  const { host, root } = await renderShell();
+  try {
+    await openAdjustImage(host);
+    await act(async () => st().selectObject(null));
+    const gone = document.querySelector('[aria-label="Adjust Image"]') === null;
+    await act(async () => st().selectObject(a));
+    const back = document.querySelector('[aria-label="Adjust Image"]') !== null;
+    out(`R5 cleared selection: dialog gone=${gone}; selecting A again (no command): dialog open=${back}`);
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+});

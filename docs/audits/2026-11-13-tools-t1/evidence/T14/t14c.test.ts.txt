@@ -1,0 +1,21 @@
+import { it, vi } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { IDENTITY_TRANSFORM, type RasterImage } from '../t13-main/src/core/scene';
+import { drawAdjustImagePreview } from '../t13-main/src/ui/raster/AdjustImageDialog.preview';
+
+it('G processed preview latency per draft change, 12 MP photo (Node, no browser)', () => {
+  const W = 4032, H = 3024;
+  const l = new Uint8Array(W * H); for (let i = 0; i < l.length; i++) l[i] = (i * 7 + (i >> 12)) & 255;
+  const image = { kind: 'raster-image', id: 'p', source: 'p.jpg', dataUrl: 'data:,', pixelWidth: W, pixelHeight: H, bounds: { minX: 0, minY: 0, maxX: 300, maxY: 225 },
+    transform: IDENTITY_TRANSFORM, color: '#808080', dither: 'threshold', linesPerMm: 10, lumaBase64: Buffer.from(l).toString('base64') } as RasterImage;
+  vi.stubGlobal('CanvasRenderingContext2D', vi.fn());
+  const canvas = document.createElement('canvas');
+  vi.spyOn(canvas, 'getContext').mockReturnValue({ putImageData: vi.fn() } as unknown as CanvasRenderingContext2D);
+  const times: number[] = [];
+  for (let b = 1; b <= 6; b++) {
+    const t0 = performance.now();
+    drawAdjustImagePreview(canvas, image, { brightness: b, contrast: 10, gamma: 1.2, ditherAlgorithm: 'jarvis', minPower: 0, negativeImage: false, passThrough: false, invertDisplay: false }, 'processed', 80);
+    times.push(Math.round(performance.now() - t0));
+  }
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t14/t14c.log', `12 MP processed-preview redraw ms (first includes base64 decode): ${times.join(', ')}; canvas ${canvas.width}x${canvas.height}`);
+});

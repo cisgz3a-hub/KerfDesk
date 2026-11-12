@@ -1,0 +1,20 @@
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type Project, type RasterImage } from '../t13-main/src/core/scene';
+import { prepareOutput } from '../t13-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t13-main/src/io/gcode/emit-gcode';
+
+it('dump', () => {
+  const W = 8, H = 2;
+  const luma = new Uint8Array(W * H);
+  for (let i = 0; i < luma.length; i++) luma[i] = (i * 37) % 256;
+  const base = createProject();
+  const layer = { ...createLayer({ id: 'img', color: '#808080', name: 'Image', mode: 'image' }), power: 80, minPower: 10, speed: 3000, linesPerMm: 1, ditherAlgorithm: 'grayscale' as const };
+  const image = { kind: 'raster-image', id: 'im', source: 'r.png', dataUrl: 'data:image/png;base64,iVBORw0KGgo=', pixelWidth: W, pixelHeight: H,
+    bounds: { minX: 10, minY: 10, maxX: 10 + W, maxY: 10 + H }, transform: IDENTITY_TRANSFORM, color: '#808080', dither: 'threshold', linesPerMm: 1,
+    lumaBase64: Buffer.from(luma).toString('base64') } as RasterImage;
+  const project: Project = { ...base, scene: { ...base.scene, objects: [image], layers: [layer], groups: [] } };
+  const r = prepareOutput(project);
+  const g = r.ok ? emitPreparedGcode(r).gcode : JSON.stringify(r).slice(0, 2000);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t14/dump.log', `device ${JSON.stringify({ c: base.device.controllerKind, s: base.device.maxPowerS, origin: (base.device as never as { origin: unknown }).origin })}\nluma ${[...luma].join(',')}\n${g}`);
+});
