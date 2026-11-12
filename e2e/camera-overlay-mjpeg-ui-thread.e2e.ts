@@ -232,9 +232,16 @@ async function startCameraWithProbe(page: Page, port: number): Promise<void> {
       zz: { longTasks: number[]; uploads: number; windowShrinks: number; bigPixelReads: number };
     };
     probe.zz = { longTasks: [], uploads: 0, windowShrinks: 0, bigPixelReads: 0 };
+    // ZZ diagnostic (draft PR only): when each long task ran, and upload sizes.
+    const diag = { tasks: [] as number[][], uploadWidths: {} as Record<string, number>, marks: {} as Record<string, number> };
+    (window as unknown as { zzDiag: typeof diag }).zzDiag = diag;
     const upload = WebGL2RenderingContext.prototype.texImage2D;
     WebGL2RenderingContext.prototype.texImage2D = function (this: unknown, ...args: unknown[]) {
       if (args.length === 6) probe.zz.uploads += 1;
+      if (args.length === 6) {
+        const width = String((args[5] as { width?: number } | null)?.width ?? '?');
+        diag.uploadWidths[width] = (diag.uploadWidths[width] ?? 0) + 1;
+      }
       return (upload as (...rest: unknown[]) => void).apply(this, args);
     } as typeof upload;
     const decode = window.createImageBitmap.bind(window);
@@ -256,8 +263,12 @@ async function startCameraWithProbe(page: Page, port: number): Promise<void> {
       } as typeof read;
     }
     new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) probe.zz.longTasks.push(entry.duration);
+      for (const entry of list.getEntries()) {
+        probe.zz.longTasks.push(entry.duration);
+        diag.tasks.push([Math.round(entry.startTime), Math.round(entry.duration)]);
+      }
     }).observe({ type: 'longtask' });
+    diag.marks['cameraStart'] = Math.round(performance.now());
 
     const source = {
       kind: 'machine-rtsp',
@@ -308,10 +319,18 @@ async function readProbe(page: Page): Promise<Probe> {
   });
 }
 
-test('a 4K bridge camera started mid-job, its overlay and Alt+C keep every UI task under 50 ms', async ({
+const zzMark = (page: Page, name: string) =>
+  page.evaluate((name) => {
+    const diag = (window as unknown as { zzDiag?: { marks: Record<string, number> } }).zzDiag;
+    if (diag !== undefined) diag.marks[name] = Math.round(performance.now());
+  }, name);
+
+for (const round of [1, 2, 3]) {
+test(`a 4K bridge camera started mid-job, its overlay and Alt+C keep every UI task under 50 ms (diag ${round})`, async ({
   page,
 }) => {
   test.setTimeout(420_000);
+  partsServed = 0;
   await page.addInitScript({ content: 'window.__PACED_GRBL_CONFIG__ = { blocksPerSecond: 20 };' });
   await page.addInitScript({ content: pacedSerialSource });
   await page.goto('/');
@@ -326,13 +345,33 @@ test('a 4K bridge camera started mid-job, its overlay and Alt+C keep every UI ta
   await startCameraWithProbe(page, port);
   await expect.poll(() => partsServed, { timeout: 60_000 }).toBeGreaterThan(20);
   await expect.poll(async () => (await readProbe(page)).moved, { timeout: 30_000 }).toBe('steady');
+  await zzMark(page, 'movedSteady');
   await page.waitForTimeout(6_000);
   // Alt+C, LightBurn's Update Overlay, during the job.
+  await zzMark(page, 'altC');
   await page.keyboard.press('Alt+c');
   await expect
     .poll(async () => (await readProbe(page)).stillWidth, { timeout: 30_000 })
     .toBe(WIDTH);
+  await zzMark(page, 'stillSeen');
   await page.waitForTimeout(3_000);
+  await zzMark(page, 'end');
+  const zzDiag = await page.evaluate(async () => {
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const im = (path: string) => import(/* @vite-ignore */ path) as Promise<any>;
+    const { useCameraStore } = await im('/src/ui/state/camera-store.ts');
+    const { stillCompanion } = await im('/src/ui/camera/still-capture.ts');
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+    const still = useCameraStore.getState().overlayStill;
+    const companion = still === null ? undefined : stillCompanion(still);
+    return {
+      ...(window as unknown as { zzDiag: object }).zzDiag,
+      displayWidth: companion?.display?.width ?? null,
+      hasCompanion: companion !== undefined,
+      userAgent: navigator.userAgent,
+    };
+  });
+  console.log(`ZZ-DIAG round ${round} ${JSON.stringify(zzDiag)}`);
   // Still a job: everything above was measured while it streamed.
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
 
@@ -356,3 +395,4 @@ test('a 4K bridge camera started mid-job, its overlay and Alt+C keep every UI ta
     JSON.stringify({ camera: probe.longTasks.map(Math.round), jobAlone: control, ceiling }),
   ).toEqual([]);
 });
+}
