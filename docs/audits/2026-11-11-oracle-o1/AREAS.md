@@ -79,4 +79,4 @@ Finding IDs are `O<area>-P<n>-<k>`. Three areas run at a time.
 - **Research:** primary sources only, cited by section or URL; at most one short quotation per source; never paste copyrighted text.
 - **Pushes:** `LICENSE` must say "All rights reserved" before any push. Grep for conflict markers before committing. Each report PR touches only its own file; the coordinator alone edits `LEDGER.md`.
 
-**Status:** started 2026-11-11. Batches 1–3 (O1–O9) reported by 2026-11-12: 92 raised, P1 3, P2 12, P3 63 ([LEDGER.md](LEDGER.md)). Batch 4 (O10–O12) not started.
+**Status:** all four batches (O1–O12) reported by 2026-11-12: 123 raised, 12 refuted, 15 outside facts contradicted by research, P1 4, P2 12, P3 87 ([LEDGER.md](LEDGER.md)). Fix pull requests that were open at the 1.0.32 release freeze merge after it.
