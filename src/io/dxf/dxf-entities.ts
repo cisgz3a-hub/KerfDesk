@@ -102,9 +102,9 @@ function arcInOcs(tags: ReadonlyArray<DxfTag>, scale: number): EntityConversion 
  * An ARC's counter-clockwise sweep, in radians, in (0, 2π]: DXF arcs run from
  * the start angle to the end angle, so angles a whole number of turns apart
  * mean the same arc. The shared rule (counterClockwiseSweep) works in degrees,
- * where whole turns are exact: equal angles, or angles a rounding hair from a
- * whole turn apart, mean a full circle. A partial sweep within one turn keeps
- * its former value exactly.
+ * where whole turns are exact: equal angles, or printed angles that round to
+ * near a whole turn apart, mean a full circle. Any other sweep within one turn
+ * keeps its former value exactly.
  */
 export function arcSweep(startDeg: number, endDeg: number): number {
   const sweepDeg = counterClockwiseSweep(startDeg, endDeg, 360);
