@@ -19,6 +19,7 @@ import { contourEntryPoint, contourExitPoint, type ContourEntryBounds } from './
 import { finalPassCutSegments } from './cut-pass-segments';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
+import { fillSpanLengthMm, fillSpanPoints } from './fill-sweeps';
 import { offsetForEmittedFeed } from './scan-offset';
 import {
   appendCncGroupSteps,
@@ -26,7 +27,7 @@ import {
   createCncSimState,
   type CncSimState,
 } from './toolpath-cnc';
-import { appendTravelStep, dist, polylineLength } from './toolpath-math';
+import { appendTravelStep, polylineLength } from './toolpath-math';
 import { appendRasterGroupSteps } from './toolpath-raster-steps';
 import { visitToolpathStepFacts } from './toolpath-step-facts';
 import type {
@@ -233,11 +234,12 @@ function appendFillSweepSteps(
   for (let i = 0; i < spans.length; i += 1) {
     const span = spans[i];
     if (span === undefined) continue;
+    // A curved run (ADR-694 Amendment 1) is drawn and timed along its curve.
     steps.push({
       kind: 'cut',
       color,
-      polyline: [span.start, span.end],
-      length: dist(span.start, span.end),
+      polyline: fillSpanPoints(span),
+      length: fillSpanLengthMm(span),
     });
     const next = spans[i + 1];
     if (next !== undefined) appendTravelStep(steps, span.end, next.start, 'feed');

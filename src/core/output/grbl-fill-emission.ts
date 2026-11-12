@@ -7,7 +7,11 @@
 import type { DeviceProfile, GrblGcodeDialect } from '../devices';
 import type { FillGroup } from '../job';
 import { expandFillHatchWithRunways } from '../job/fill-runway';
-import { planFillSweeps, type FillSweepPlan } from '../job/fill-sweep-plan';
+import {
+  assertFillPlanKeepsBurn,
+  planFillSweeps,
+  type FillSweepPlan,
+} from '../job/fill-sweep-plan';
 import type { FillSpan } from '../job/fill-sweeps';
 import { offsetForSpeed } from '../job/scan-offset';
 import { formatGcodeCoordinateMm } from '../gcode';
@@ -71,6 +75,7 @@ export function emitScanlineFillGroup(group: FillGroup, groupContext: FillGroupE
   const scanOffsetMm =
     group.bidirectionalScanOffsetMm ?? offsetForSpeed(device.scanningOffsets, feed);
   const sweepPlans = planFillSweeps(group, scanOffsetMm);
+  assertFillPlanKeepsBurn(group, sweepPlans);
   const context: FillSweepEmissionContext = { ...groupContext, s, feed };
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
@@ -188,6 +193,8 @@ function sweepSpanLines(
   for (let i = 0; i < spans.length; i += 1) {
     const span = spans[i];
     if (span === undefined) continue;
+    // A curved run (ADR-694 Amendment 1) burns through its interior points.
+    for (const point of span.via ?? []) moveTo(point.x, point.y, s);
     moveTo(span.end.x, span.end.y, s);
     const next = spans[i + 1];
     if (next !== undefined) moveTo(next.start.x, next.start.y, 0);

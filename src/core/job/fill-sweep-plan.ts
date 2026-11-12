@@ -4,9 +4,19 @@ import { DEFAULT_OVERSCAN_MM, MAX_FILL_OVERSCAN_MM } from './compile-job-default
 import { isEmittableFillSegment } from './fill-emission-resolution';
 import { effectiveFillOverscanMm } from './fill-overscan';
 import type { FillRunwayLengths } from './fill-runway';
-import { FILL_GAP_RAPID_THRESHOLD_MM, groupFillScanlines, type FillSweep } from './fill-sweeps';
+import {
+  FILL_GAP_RAPID_THRESHOLD_MM,
+  fillSpanLengthMm,
+  groupFillScanlines,
+  polylineLengthMm,
+  type FillSweep,
+} from './fill-sweeps';
 import type { FillGroup, FillSegment } from './job';
-import { fillRunsBothWays, scanRowShiftAlongTravelMm, shiftAlongTravel } from './scan-offset';
+import {
+  fillRunsBothWays,
+  scanRowShiftAlongTravelMm,
+  shiftFillRunAlongTravel,
+} from './scan-offset';
 
 /** Laser-off motion mode used to enter and leave a planned fill sweep. */
 export type FillRunwayMotion = 'rapid' | 'feed-matched';
@@ -77,6 +87,35 @@ export function planFillSweeps(group: FillGroup, scanOffsetMm = 0): FillSweepPla
   return scanlines.flatMap((scanline) => feedMatchedPlans(scanline, runwayMm));
 }
 
+/**
+ * ADR-694 Amendment 1: a plan must burn every millimetre the group was compiled
+ * with. A planner that drops hatch runs (as it once dropped every run a taper
+ * warp curved) would burn a fraction of the Fill with no warning, so output
+ * stops instead. Scan offset shifts runs without changing their length.
+ */
+export function assertFillPlanKeepsBurn(
+  group: FillGroup,
+  plans: ReadonlyArray<FillSweepPlan>,
+): void {
+  const compiled = group.segments
+    .filter((segment) =>
+      group.fillRunwayPolicy === 'feed-matched-every-sweep'
+        ? isEmittableFillSegment(segment)
+        : segment.polyline.length >= 2,
+    )
+    .reduce((total, segment) => total + polylineLengthMm(segment.polyline), 0);
+  const planned = plans.reduce(
+    (total, plan) =>
+      total + plan.sweep.spans.reduce((sum, span) => sum + fillSpanLengthMm(span), 0),
+    0,
+  );
+  if (Math.abs(planned - compiled) <= Math.max(1e-3, compiled * 1e-6)) return;
+  throw new Error(
+    `Fill layer ${group.layerId}: the planned hatch burns ${planned.toFixed(3)} mm of the ` +
+      `${compiled.toFixed(3)} mm compiled, so the job would burn short. Output stopped.`,
+  );
+}
+
 function segmentsWithScanOffset(
   segments: ReadonlyArray<FillSegment>,
   scanOffsetMm: number,
@@ -89,15 +128,13 @@ function segmentsWithScanOffset(
 
 /**
  * One fill row moved `shiftMm` along its own travel (ADR-052 Amendment 2), or
- * null when it is not a two-point row.
+ * null when it has fewer than two points. A curve a rotary taper warp made of a
+ * row (ADR-694 Amendment 1) moves as one, along its first-to-last travel.
  */
 export function shiftedFillSegment(segment: FillSegment, shiftMm: number): FillSegment | null {
-  const start = segment.polyline[0];
-  const end = segment.polyline[1];
-  if (start === undefined || end === undefined || segment.polyline.length !== 2) return null;
-  if (shiftMm === 0) return segment;
-  const shifted = shiftAlongTravel(start, end, shiftMm);
-  return { ...segment, polyline: [shifted.from, shifted.to] };
+  const shifted = shiftFillRunAlongTravel(segment.polyline, shiftMm);
+  if (shifted === null) return null;
+  return shifted === segment.polyline ? segment : { ...segment, polyline: shifted };
 }
 
 /** Returns whether a fill group owns feed-matched runway motion. */

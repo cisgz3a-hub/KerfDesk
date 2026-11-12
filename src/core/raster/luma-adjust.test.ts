@@ -123,3 +123,17 @@ describe('lumaAdjustmentLut (ADR-671)', () => {
     expect(reversals).toBe(0);
   });
 });
+
+// O6-P2-1 (ADR-671 Amendment 1): the direction is a stated contract. Higher
+// gamma lightens (level^(1/gamma)), as Photoshop and GIMP Levels do and the
+// opposite of LightBurn's Gamma; the UI tells users so.
+describe('gamma direction', () => {
+  it('lightens midtones above 1 and darkens them below 1', () => {
+    const lighter = lumaAdjustmentLut({ gamma: 2 });
+    const darker = lumaAdjustmentLut({ gamma: 0.5 });
+    expect(lighter?.[128]).toBe(Math.round(255 * Math.sqrt(128 / 255)));
+    expect(lighter?.[128]).toBeGreaterThan(128);
+    expect(darker?.[128]).toBeLessThan(128);
+    expect([lighter?.[0], lighter?.[255], darker?.[0], darker?.[255]]).toEqual([0, 255, 0, 255]);
+  });
+});

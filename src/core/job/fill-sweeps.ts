@@ -16,11 +16,42 @@
 // So consecutive runs that lie on the same infinite line belong to one sweep;
 // a change of line (the next scanline, parallel but offset) starts a new sweep.
 // The sweep direction is taken from the group's first run, preserving the snake
-// fillHatching already chose. Pure-core: no clock, no random, no I/O.
+// fillHatching already chose.
+//
+// A run with more than two points is a hatch line a rotary taper warp
+// (ADR-694 Amendment 1) bent into a curve. It is never dropped: it becomes a
+// sweep of its own whose one span burns through its interior points (`via`).
+// Pure-core: no clock, no random, no I/O.
 
 import type { Vec2 } from '../scene';
 
-export type FillSpan = { readonly start: Vec2; readonly end: Vec2 };
+export type FillSpan = {
+  readonly start: Vec2;
+  readonly end: Vec2;
+  /** Interior points a curved run burns through, from start to end
+   * (ADR-694 Amendment 1). Absent on every straight run. */
+  readonly via?: ReadonlyArray<Vec2>;
+};
+
+/** Every point a span burns through, in order. */
+export function fillSpanPoints(span: FillSpan): ReadonlyArray<Vec2> {
+  return span.via === undefined ? [span.start, span.end] : [span.start, ...span.via, span.end];
+}
+
+/** The burned length of a span, along its curve when it has one. */
+export function fillSpanLengthMm(span: FillSpan): number {
+  return polylineLengthMm(fillSpanPoints(span));
+}
+
+export function polylineLengthMm(points: ReadonlyArray<Vec2>): number {
+  let length = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    const a = points[i - 1] as Vec2;
+    const b = points[i] as Vec2;
+    length += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  return length;
+}
 
 // One scanline's worth of ink spans, ordered along the sweep direction. The
 // gap between spans[i].end and spans[i+1].start is interior (a hole) — the
@@ -49,7 +80,14 @@ export function groupFillScanlines(
   for (const seg of segments) {
     const a = seg.polyline[0];
     const b = seg.polyline[1];
-    if (a === undefined || b === undefined || seg.polyline.length !== 2) continue;
+    if (a === undefined || b === undefined) continue;
+    if (seg.polyline.length > 2) {
+      // A curved run: its own sweep, in its own travel direction.
+      if (group.length > 0) scanlines.push(buildSweeps(group));
+      group = [];
+      scanlines.push([curvedSweep(seg.polyline, seg.reverse)]);
+      continue;
+    }
     const run: Run = { start: a, end: b, reverse: seg.reverse };
     if (group.length === 0 || canJoinGroup(group[0] as Run, run)) {
       group.push(run);
@@ -60,6 +98,12 @@ export function groupFillScanlines(
   }
   if (group.length > 0) scanlines.push(buildSweeps(group));
   return scanlines;
+}
+
+function curvedSweep(polyline: ReadonlyArray<Vec2>, reverse: boolean): FillSweep {
+  const start = polyline[0] as Vec2;
+  const end = polyline[polyline.length - 1] as Vec2;
+  return { reverse, spans: [{ start, end, via: polyline.slice(1, -1) }] };
 }
 
 function canJoinGroup(first: Run, run: Run): boolean {

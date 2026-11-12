@@ -58,7 +58,18 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Chrome
-        run: pnpm exec playwright install --with-deps chrome
+        # --with-deps fetches optional fonts from the Ubuntu archive. When the
+        # runner cannot reach it (2026-11-11 DNS failures), keep the runner
+        # image's preinstalled Google Chrome, which has every library it needs.
+        run: |
+          set +e
+          pnpm exec playwright install --with-deps chrome
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "::warning::playwright install --with-deps chrome failed; using the runner's preinstalled Google Chrome"
+            google-chrome --version
+          fi
 
       - name: Type-check browser tests
         run: pnpm typecheck:e2e
@@ -113,7 +124,18 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Chrome
-        run: pnpm exec playwright install --with-deps chrome
+        # --with-deps fetches optional fonts from the Ubuntu archive. When the
+        # runner cannot reach it (2026-11-11 DNS failures), keep the runner
+        # image's preinstalled Google Chrome, which has every library it needs.
+        run: |
+          set +e
+          pnpm exec playwright install --with-deps chrome
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "::warning::playwright install --with-deps chrome failed; using the runner's preinstalled Google Chrome"
+            google-chrome --version
+          fi
 
       - name: Check cold startup
         # Also leaves Vite's dependency cache warm, as it was for the whole
@@ -159,7 +181,18 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Chrome
-        run: pnpm exec playwright install --with-deps chrome
+        # --with-deps fetches optional fonts from the Ubuntu archive. When the
+        # runner cannot reach it (2026-11-11 DNS failures), keep the runner
+        # image's preinstalled Google Chrome, which has every library it needs.
+        run: |
+          set +e
+          pnpm exec playwright install --with-deps chrome
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "::warning::playwright install --with-deps chrome failed; using the runner's preinstalled Google Chrome"
+            google-chrome --version
+          fi
 
       - name: Check cold startup
         run: pnpm test:e2e:cold

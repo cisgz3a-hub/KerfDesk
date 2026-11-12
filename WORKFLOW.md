@@ -4080,6 +4080,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
      burns D mm round the part at every height, and one turn stays one turn. Rows round the part
      stay level; a stroke along the side leans slightly away from the job's anchor row (2.3° at
      30 mm from it on an Ø80→Ø70 cup), so anchor a Current Position job at its centre.
+   - A Fill's hatch lines bend with the warp. Each bent line burns through its points as one
+     sweep, at every hatch angle and on Y, A or Z (ADR-694 Amendment 1). If a Fill's planned burn is
+     ever shorter than what was compiled, output stops and names the layer instead of burning
+     short. Job Review's row-step check reads a tapered 0° Fill's rows at both ends of the artwork.
    - The preview gives one turn round the top and round the bottom, and checks the artwork against
      one turn where the part is narrowest under it. Job Review's Rotary fact names the taper, for
      example "Chuck, taper Ø80 → Ø70 mm over 100 mm". A taper whose ends differ in radius by more
@@ -9221,17 +9225,26 @@ Simulator-tested only; no real Ruida has run this path.
    finger width, ladder start/step/count (defaults 0.05/0.05/6), and in
    CNC mode the relief tool. Machine-aware defaults follow F-K3.
 2. **Generate** inserts two strips — a tab comb and a slot strip — as
-   one undo step. Rung i carries i+1 index nicks; its joint play is
-   exactly start + i·step, split across tab and notch like production
-   panels.
-3. The operator cuts both strips, presses each rung, and types the
-   winning rung's clearance into the Box Generator.
+   one undo step. The strips carry no index marks: rung 0 sits half a
+   finger from the start, the last rung two fingers from the end
+   (ADR-119 Amendment 1). Rung i's joint play is exactly start + i·step,
+   split across tab and notch like production panels.
+3. The operator cuts both strips on the layer the box will use, presses
+   each rung, and types the winning rung's clearance into the Box
+   Generator.
+
+#### Edge — laser layer without a kerf offset
+
+1. Kerf is compensated by the cutting layer, not the coupon. On a layer
+   whose kerf offset is 0 every rung is loose by about twice the kerf. The
+   ladder start may be negative (a press fit) down to the same bound as
+   the Box Generator, and the laser dialog says so.
 
 #### Error — ladder exceeds the joint limit
 
 1. A ladder whose top rung reaches half the finger width (or half the
-   thickness) reports the count/step fields; **Generate** stays
-   disabled.
+   thickness), or whose first rung is that far below zero, reports the
+   ladder fields; **Generate** stays disabled.
 
 #### Empty
 
