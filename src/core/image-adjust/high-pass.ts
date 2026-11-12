@@ -5,6 +5,7 @@
 import { RGBA_CHANNELS, type PixelRect, type RgbaBuffer } from '../image-edit';
 import type { SelectionMask } from '../image-select';
 import { blurredRect, writeMasked } from './gaussian-blur';
+import type { FilterProgress } from './filter-progress';
 import { clampRectToDoc } from './lut';
 
 const RGB_CHANNELS = 3;
@@ -15,10 +16,11 @@ export function highPassInPlace(
   sigma: number,
   rect: PixelRect | null,
   mask: SelectionMask | null,
+  progress?: FilterProgress,
 ): void {
   const target = clampRectToDoc(doc, rect);
   if (target.width <= 0 || target.height <= 0 || sigma <= 0) return;
-  const blurred = blurredRect(doc, sigma, target);
+  const blurred = blurredRect(doc, sigma, target, progress);
   const values = new Float32Array(blurred.length);
   for (let y = 0; y < target.height; y += 1) {
     for (let x = 0; x < target.width; x += 1) {

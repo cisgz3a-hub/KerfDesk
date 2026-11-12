@@ -7,11 +7,20 @@ import { create } from 'zustand';
 import type { CurvePoint } from '../../core/image-adjust';
 import type { PixelRect, RgbaBuffer } from '../../core/image-edit';
 import {
+  composeFilteredWindow,
   computeWindowPreview,
   previewWindow,
   selectionBounds,
   type AdjustPreviewCache,
+  type AdjustRequest,
+  type PreviewWindow,
 } from './adjust-preview-window';
+import { retireFilterPreviewWorker } from './adjust-filter-worker-client';
+import {
+  previewsInWorker,
+  scheduleFilterPreview,
+  stopFilterPreview,
+} from './adjust-filter-preview';
 import { commitAdjustment } from './editor-adjust-session';
 import {
   adjustmentById,
@@ -19,6 +28,7 @@ import {
   defaultParams,
   type AdjustmentId,
 } from './editor-adjustments';
+import type { EditorSession } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
 
 /**
@@ -40,6 +50,11 @@ export type AdjustDialog = {
   readonly previewEnabled: boolean;
   /** Latest computed preview; null until the first compute lands or off screen. */
   readonly preview: AdjustPreview | null;
+  /**
+   * How far a worker render of a neighbourhood filter is, 0..1; null when
+   * none is pending (ADR-245 Amendment 2). The dialog shows a bar with Cancel.
+   */
+  readonly previewProgress: number | null;
 };
 
 type AdjustDialogState = {
@@ -49,13 +64,16 @@ type AdjustDialogState = {
   readonly setCurvePoints: (points: readonly CurvePoint[]) => void;
   readonly setPreviewEnabled: (enabled: boolean) => void;
   readonly setPreview: (preview: AdjustPreview | null) => void;
+  readonly setPreviewProgress: (progress: number | null) => void;
+  /** Stop a worker render and turn Preview off, so the canvas shows the image as it is. */
+  readonly cancelPreviewRender: () => void;
   /** Reset every slider to its default (the Photoshop Alt-Reset behavior). */
   readonly reset: () => void;
   readonly commit: () => void;
   readonly cancel: () => void;
 };
 
-const EMPTY_DIALOG = { previewEnabled: true, preview: null } as const;
+const EMPTY_DIALOG = { previewEnabled: true, preview: null, previewProgress: null } as const;
 
 function freshDialog(id: AdjustmentId): AdjustDialog {
   return {
@@ -91,11 +109,32 @@ export const useAdjustDialogStore = create<AdjustDialogState>((set, get) => ({
   setCurvePoints: (curvePoints) =>
     set((s) => (s.dialog === null ? s : { dialog: { ...s.dialog, curvePoints } })),
 
-  setPreviewEnabled: (previewEnabled) =>
-    set((s) => (s.dialog === null ? s : { dialog: { ...s.dialog, previewEnabled } })),
+  setPreviewEnabled: (previewEnabled) => {
+    if (!previewEnabled) stopFilterPreview();
+    set((s) =>
+      s.dialog === null
+        ? s
+        : {
+            dialog: {
+              ...s.dialog,
+              previewEnabled,
+              previewProgress: previewEnabled ? s.dialog.previewProgress : null,
+            },
+          },
+    );
+  },
 
   setPreview: (preview) =>
     set((s) => (s.dialog === null ? s : { dialog: { ...s.dialog, preview } })),
+
+  setPreviewProgress: (previewProgress) =>
+    set((s) =>
+      s.dialog === null || s.dialog.previewProgress === previewProgress
+        ? s
+        : { dialog: { ...s.dialog, previewProgress } },
+    ),
+
+  cancelPreviewRender: () => get().setPreviewEnabled(false),
 
   reset: () => set((s) => (s.dialog === null ? s : { dialog: freshDialog(s.dialog.id) })),
 
@@ -134,6 +173,8 @@ export function refreshAdjustPreview(): void {
   if (dialog === null || session === null || !dialog.previewEnabled) return;
   const win = previewWindow(session.doc, view, viewportSize, selectionBounds(session.selection));
   if (win === null) {
+    stopFilterPreview();
+    useAdjustDialogStore.getState().setPreviewProgress(null);
     setPreview(null);
     return;
   }
@@ -142,11 +183,43 @@ export function refreshAdjustPreview(): void {
     params: dialog.params,
     curvePoints: dialog.curvePoints ?? undefined,
   };
+  if (previewsInWorker(request.id, session)) {
+    renderInWorker(session, request, win);
+    return;
+  }
   setPreview({ buffer: computeWindowPreview(previewCache, session, request, win), rect: win.rect });
 }
 
+// A neighbourhood filter on a large document (ADR-245 Amendment 2). Each
+// callback first checks the step still belongs to the open dialog's session;
+// a finished one always clears the bar.
+function renderInWorker(session: EditorSession, request: AdjustRequest, win: PreviewWindow): void {
+  const current = (): boolean =>
+    useAdjustDialogStore.getState().dialog?.previewEnabled === true &&
+    useImageEditorStore.getState().session === session;
+  const { setPreview, setPreviewProgress } = useAdjustDialogStore.getState();
+  scheduleFilterPreview(session, request, win, {
+    progress: (fraction) => {
+      if (current()) setPreviewProgress(Math.round(fraction * 100) / 100);
+    },
+    done: (filtered) => {
+      setPreviewProgress(null);
+      if (!current()) return;
+      setPreview({ buffer: composeFilteredWindow(previewCache, session, win, filtered), rect: win.rect });
+    },
+    fallback: () => {
+      setPreviewProgress(null);
+      if (!current()) return;
+      setPreview({ buffer: computeWindowPreview(previewCache, session, request, win), rect: win.rect });
+    },
+  });
+}
+
 useAdjustDialogStore.subscribe((state) => {
-  if (state.dialog === null) previewCache.current = null;
+  if (state.dialog !== null) return;
+  previewCache.current = null;
+  stopFilterPreview();
+  retireFilterPreviewWorker();
 });
 
 // A closed or different session invalidates the dialog and its preview

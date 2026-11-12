@@ -7,9 +7,11 @@
 // Pointwise adjustments (each output pixel depends only on its own input)
 // run on the sampled window. Neighbourhood filters (blur, median, screens)
 // run at full resolution on a reused scratch copy and are sampled after,
-// so their radius and screen pitch stay in document pixels. At 100% zoom or
-// closer the window is copied, not averaged, and the preview equals the
-// committed composite byte for byte.
+// so their radius and screen pitch stay in document pixels. On a large
+// document that filter runs in a worker instead (adjust-filter-preview.ts,
+// ADR-245 Amendment 2), and composeFilteredWindow composites what it sends
+// back. At 100% zoom or closer the window is copied, not averaged, and the
+// preview equals the committed composite byte for byte.
 
 import type { CurvePoint } from '../../core/image-adjust';
 import { RGBA_CHANNELS, type PixelRect, type RgbaBuffer } from '../../core/image-edit';
@@ -115,6 +117,26 @@ export function computeWindowPreview(
     runAdjustment(id, params, ws.scratch, clip, session.selection, curvePoints);
     sampleWindowInto(ws.scratch, win, ws.working);
   }
+  return composite(ws);
+}
+
+/**
+ * The preview of a neighbourhood filter the worker ran: `filtered` is its
+ * window-sized sample of the filtered active layer over `win`. Composited
+ * exactly as computeWindowPreview composites its own sample.
+ */
+export function composeFilteredWindow(
+  cache: AdjustPreviewCache,
+  session: EditorSession,
+  win: PreviewWindow,
+  filtered: RgbaBuffer,
+): RgbaBuffer {
+  const ws = workspaceFor(cache, session, win, false);
+  ws.working.data.set(filtered.data);
+  return composite(ws);
+}
+
+function composite(ws: Workspace): RgbaBuffer {
   ws.output.data.fill(255);
   compositeLayersInPlace(ws.output, ws.layers);
   return ws.output;

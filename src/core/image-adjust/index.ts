@@ -33,3 +33,4 @@ export type { UnsharpParams } from './unsharp-mask';
 export { unsharpMaskInPlace } from './unsharp-mask';
 export { highPassInPlace } from './high-pass';
 export { medianInPlace } from './median';
+export type { FilterProgress } from './filter-progress';
