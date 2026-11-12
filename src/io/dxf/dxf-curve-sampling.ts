@@ -86,11 +86,12 @@ export const WHOLE_TURN_SNAP = 1e-4;
  * How near a whole turn angles at least a turn apart still mean one, per unit.
  * Printed ARC degrees are off by at most 0.1° at 1 decimal or 4 significant
  * digits (0.18° allowed); printed ELLIPSE radians by under 0.01 at 2 decimals
- * or 4 significant digits (0.0097 rad allowed). Coarser printing is left as
- * written (ADR-700 Amd 5).
+ * or 4 significant digits, whichever way they round (0.00985 rad allowed, which
+ * keeps 2π + 0.0099 short). Coarser printing is left as written (ADR-700 Amd
+ * 5 and 6).
  */
 export const ARC_WRAP_SNAP = 5e-4;
-export const ELLIPSE_WRAP_SNAP = 1.55e-3;
+export const ELLIPSE_WRAP_SNAP = 1.568e-3;
 
 /**
  * The counter-clockwise sweep from `start` to `end` in (0, turn], the one
