@@ -1,6 +1,7 @@
 // What a controller-link job compiles from (ADR-705 Amendment 4, code quality
-// audit C2 D2-P1-1 and D2-P2-3). The Moshi USB and Ruida network panels build
-// their Frame and Start from this one request, so they take what Save and
+// audit C2 D2-P1-1 and D2-P2-3; ADR-703 Amendment 1). The Moshi USB, K40 USB
+// and Ruida network panels build their Frame and Start from this one request,
+// so they take what Save and
 // G-code Start take from the canvas:
 // - the job placement;
 // - the output scope, so "Selected artwork only" and "Anchor from selected

@@ -10,6 +10,7 @@ import { machineSpaceJob, type JobOriginPlacement } from '../../core/job';
 import { rotaryOutputAxis } from '../../core/job/rotary-job';
 import { rotaryAxisUnsupportedMessage } from '../gcode/rotary-axis-emit';
 import type { PreflightIssue, PreflightOptions } from '../../core/preflight';
+import { withoutRepeatedIssues } from '../../core/preflight/without-repeated-issues';
 import type { OutputScope, Project } from '../../core/scene';
 import { prepareOutput, type PreparedOutput, type PrepareOutputOptions } from '../gcode';
 import { runRdPreflight, type RdPreflightFrame } from './rd-preflight';
@@ -93,7 +94,7 @@ export function emitPreparedRdFile(
     ok: true,
     bytes: encoded.bytes,
     footprint,
-    advisories: withoutRepeats([
+    advisories: withoutRepeatedIssues([
       ...(prepared.advisories ?? []),
       ...checks,
       ...rotaryDoseAdvisory(
@@ -114,18 +115,6 @@ function preflightFrame(options: EmitRdOptions): RdPreflightFrame {
       ? 'relative-origin'
       : 'machine');
   return { motionOffset: options.preflightMotionOffset, coordinateMode };
-}
-
-// runPreflight repeats some pre-emit findings (the controlled-travel feed),
-// and several moves of one layer can relabel to the same message.
-function withoutRepeats(issues: ReadonlyArray<PreflightIssue>): ReadonlyArray<PreflightIssue> {
-  const seen = new Set<string>();
-  return issues.filter((issue) => {
-    const key = `${issue.code}\n${issue.message}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
 }
 
 function describeRdEncodeError(error: RdEncodeError): string {

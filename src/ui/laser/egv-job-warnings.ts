@@ -2,11 +2,24 @@
 // audit C2 D6-P2-1), as rd-job-warnings.ts is for .rd. Save .egv and the K40
 // USB job encode through this one function, so both carry the warnings Save
 // G-code and Start show: compile diagnostics ("will NOT be cut", a kerf side
-// assumed), job intent and cut order.
+// assumed), job intent and cut order. On a Y-port rotary they also carry the
+// row check on the K40's 1/1000 in grid, as the Moshiboard job does (ADR-703
+// Amendment 2, C2 verification E2-P2-2).
 
+import { LHY_STEPS_PER_MM } from '../../core/controllers/lihuiyu/lhy-motion-plan';
 import type { PreparedOutput } from '../../io/gcode';
 import { emitPreparedEgvFile, type EmitEgvOptions, type EmitEgvResult } from '../../io/egv';
+import {
+  detectRotaryRowGridWarnings,
+  type RotaryRowGrid,
+} from './job-review/rotary-row-step-warnings';
 import { detectMachineJobWarnings } from './machine-job-warnings';
+
+/** A K40 board places every coordinate on a whole 1/1000 inch step. */
+export const K40_ROW_GRID: RotaryRowGrid = {
+  stepsPerUnit: LHY_STEPS_PER_MM,
+  stepsText: 'K40 position (1/1000 in, 0.0254 mm of machine Y)',
+};
 
 export type EgvWithJobWarnings =
   | (Extract<EmitEgvResult, { readonly ok: true }> & {
@@ -21,7 +34,10 @@ export function emitPreparedEgvWithJobWarnings(
   const result = emitPreparedEgvFile(prepared, options);
   if (!result.ok) return result;
   const jobWarnings = prepared.ok
-    ? detectMachineJobWarnings(prepared.project, null, null, prepared)
+    ? [
+        ...detectMachineJobWarnings(prepared.project, null, null, prepared),
+        ...detectRotaryRowGridWarnings(prepared.project, prepared.job, K40_ROW_GRID),
+      ]
     : [];
   return { ...result, jobWarnings };
 }

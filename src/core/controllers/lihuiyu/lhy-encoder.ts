@@ -15,14 +15,14 @@
 import type { LihuiyuBoardId } from '../../devices/device-profile';
 import type { Job } from '../../job';
 import type { ScanOffsetPoint } from '../../devices/scan-offset-profile';
-import { surfaceMatchedFeed, type RotaryFeedMatch } from '../../output/rotary-surface-feed';
+import type { RotaryFeedMatch } from '../../output/rotary-surface-feed';
 import {
-  LHY_STEPS_PER_MM,
-  planLhyPart,
-  type LhyGroup,
-  type LhyMotionPart,
-  type LhyPoint,
-} from './lhy-motion-plan';
+  lhyLayerBurnSpeed,
+  lhyRotaryBurnSpeed,
+  lhySlowestMmPerSec,
+  type LhyBurnSpeed,
+} from './lhy-burn-speed';
+import { planLhyPart, type LhyGroup, type LhyMotionPart, type LhyPoint } from './lhy-motion-plan';
 import { lhySpeedCode, type LihuiyuBoard } from './lhy-speed-code';
 import { LhyWriter, type LhyDirections } from './lhy-writer';
 
@@ -63,8 +63,19 @@ export type LhyEncodeResult =
         readonly layerId: string;
         readonly count: number;
       }>;
+      /** Per layer: the lowest and highest dose its burns get (ADR-703 Amd 2). */
+      readonly layerDoses: ReadonlyArray<LhyLayerDose>;
+      /** The board's slowest speed, in mm/s; a slower burn runs at it. */
+      readonly slowestMmPerSec: number;
     }
   | { readonly ok: false; readonly error: LhyEncodeError };
+
+export type LhyLayerDose = {
+  readonly layerId: string;
+  readonly minDose: number;
+  readonly maxDose: number;
+  readonly rotary: boolean;
+};
 
 export function encodeLhyJob(job: Job, options: LhyEncodeOptions): LhyEncodeResult {
   const planned = planLhyJob(job, options.scanningOffsets ?? []);
@@ -73,16 +84,21 @@ export function encodeLhyJob(job: Job, options: LhyEncodeOptions): LhyEncodeResu
   const writer = new LhyWriter(options.start ?? { x: 0, y: 0 });
   let power: number | null = null;
   const rotarySpeedChanges: Array<{ readonly layerId: string; readonly count: number }> = [];
+  const doses = new Map<string, LhyLayerDose>();
+  const slowestMmPerSec = lhySlowestMmPerSec(options.board.board, true);
+  const speedCode = (mmPerSec: number): string =>
+    lhySpeedCode(mmPerSec, { ...options.board, suffixC: true });
   for (const part of planned.motion) {
     if (options.board.pwm) {
       const perMille = pwmPerMille(part.group.power, options.fullPowerPerMille);
       if (perMille !== power) writer.pwmPower(perMille);
       power = perMille;
     }
-    const speedCode = (mmPerSec: number): string =>
-      lhySpeedCode(mmPerSec, { ...options.board, suffixC: true });
-    const changes = writePart(writer, part, speedCode, options.rotaryFeed);
-    if (changes > 0) rotarySpeedChanges.push({ layerId: part.group.layerId, count: changes });
+    const burnSpeed = burnSpeedFor(part, options.rotaryFeed, slowestMmPerSec);
+    const written = writePart(writer, part, speedCode, burnSpeed);
+    const layerId = part.group.layerId;
+    if (written.changes > 0) rotarySpeedChanges.push({ layerId, count: written.changes });
+    addLayerDose(doses, layerId, written, options.rotaryFeed !== undefined);
   }
   writer.leaveProgram();
   const start = options.start ?? { x: 0, y: 0 };
@@ -93,6 +109,8 @@ export function encodeLhyJob(job: Job, options: LhyEncodeOptions): LhyEncodeResu
     motion: planned.motion,
     zeroPowerLayers: planned.zeroPowerLayers,
     rotarySpeedChanges,
+    layerDoses: [...doses.values()],
+    slowestMmPerSec,
   };
 }
 
@@ -132,19 +150,51 @@ function groupRefusal(group: Job['groups'][number]): LhyEncodeError | null {
   return null;
 }
 
-/** Writes one part's moves. On a rotary each burn runs at the whole mm/s that
- *  moves the part's surface at the layer speed (surfaceMatchedFeed, as G-code
- *  and Moshi match it); a new speed re-enters program mode, which stops the
- *  head. Returns how many speed changes the rotary match made. */
+type BurnSpeedFor = (from: LhyPoint, to: LhyPoint) => LhyBurnSpeed;
+
+/** How fast each burn of a part runs: the layer speed on a flat bed, or the
+ *  surface-matched class on a rotary, held at the board's slowest speed. */
+function burnSpeedFor(
+  part: LhyMotionPart,
+  rotaryFeed: RotaryFeedMatch | undefined,
+  slowestMmPerSec: number,
+): BurnSpeedFor {
+  const layer = lhyLayerBurnSpeed(part.group.speed, slowestMmPerSec);
+  if (rotaryFeed === undefined) return () => layer;
+  return (from, to) => lhyRotaryBurnSpeed(part.group.speed, from, to, rotaryFeed, slowestMmPerSec);
+}
+
+type WrittenPart = { readonly changes: number; readonly minDose: number; readonly maxDose: number };
+
+/** Widens a layer's dose range by one written part (a layer may have several). */
+function addLayerDose(
+  doses: Map<string, LhyLayerDose>,
+  layerId: string,
+  written: WrittenPart,
+  rotary: boolean,
+): void {
+  const seen = doses.get(layerId);
+  doses.set(layerId, {
+    layerId,
+    minDose: Math.min(written.minDose, seen?.minDose ?? Number.POSITIVE_INFINITY),
+    maxDose: Math.max(written.maxDose, seen?.maxDose ?? 0),
+    rotary,
+  });
+}
+
+/** Writes one part's moves. A burn whose speed differs from the last one
+ *  re-enters program mode, which stops the head; on a rotary those changes are
+ *  counted. Returns them with the dose range the part's burns get. */
 function writePart(
   writer: LhyWriter,
   part: LhyMotionPart,
   speedCode: (mmPerSec: number) => string,
-  rotaryFeed: RotaryFeedMatch | undefined,
-): number {
-  const layerCode = speedCode(part.group.speed / 60);
-  let code = layerCode;
+  burnSpeed: BurnSpeedFor,
+): WrittenPart {
+  let code = speedCode(lhyLayerBurnSpeed(part.group.speed, 0).runsMmPerSec);
   let changes = 0;
+  let minDose = Number.POSITIVE_INFINITY;
+  let maxDose = 0;
   part.steps.forEach((step, index) => {
     const dx = step.x - writer.x;
     const dy = step.y - writer.y;
@@ -155,29 +205,18 @@ function writePart(
       writer.rapidMove(dx, dy);
       return;
     }
-    if (step.burn && rotaryFeed !== undefined) {
-      const next = speedCode(matchedMmPerSec(part.group.speed, writer, step, rotaryFeed));
+    if (step.burn) {
+      const speed = burnSpeed(writer, step);
+      minDose = Math.min(minDose, speed.dose);
+      maxDose = Math.max(maxDose, speed.dose);
+      const next = speedCode(speed.runsMmPerSec);
       if (next !== code && writer.inProgram) changes += 1;
       code = next;
     }
     writer.enterProgram(code, directionsFor(dx, dy));
     writer.programMove(dx, dy, step.burn);
   });
-  return changes;
-}
-
-function matchedMmPerSec(
-  layerMmPerMin: number,
-  from: LhyPoint,
-  to: LhyPoint,
-  match: RotaryFeedMatch,
-): number {
-  const mm = (point: LhyPoint) => ({
-    x: point.x / LHY_STEPS_PER_MM,
-    y: point.y / LHY_STEPS_PER_MM,
-  });
-  const feed = surfaceMatchedFeed(layerMmPerMin, mm(from), mm(to), match);
-  return Math.max(1, Math.round(feed / 60));
+  return { changes, minDose: Number.isFinite(minDose) ? minDose : 1, maxDose: maxDose || 1 };
 }
 
 /** The directions declared on entering program mode: those of the first move,

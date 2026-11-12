@@ -20,6 +20,7 @@ import { machineSpaceJob, type JobOriginPlacement } from '../../core/job';
 import { rotaryOutputAxis } from '../../core/job/rotary-job';
 import { rotaryFeedMatchFor } from '../../core/output/rotary-surface-feed';
 import type { PreflightIssue, PreflightOptions } from '../../core/preflight';
+import { withoutRepeatedIssues } from '../../core/preflight/without-repeated-issues';
 import type { OutputScope, Project } from '../../core/scene';
 import { prepareOutput, type PreparedOutput, type PrepareOutputOptions } from '../gcode';
 import { rotaryAxisUnsupportedMessage } from '../gcode/rotary-axis-emit';
@@ -102,11 +103,11 @@ export function emitPreparedEgvFile(
     bytes: withEgvHeader(encoded.stream),
     stream: encoded.stream,
     footprint,
-    advisories: [
+    advisories: withoutRepeatedIssues([
       ...(prepared.advisories ?? []),
       ...checks,
       ...egvAdvisories(encoded, board, prepared.job),
-    ],
+    ]),
   };
 }
 
