@@ -3,7 +3,9 @@ export type CalibrationDraftField<Key extends string> = {
   readonly label: string;
   readonly min: number;
   readonly max: number | undefined;
-  readonly step: number | undefined;
+  // 'any' accepts every finite value at or above min: line intervals must take
+  // DPI pitches such as 0.0635 mm (400 DPI), which no decimal step lands on.
+  readonly step: number | 'any' | undefined;
 };
 
 /** Keep incomplete text distinct from numeric zero before scene replacement. */
@@ -19,6 +21,7 @@ export function calibrationDraftIssues<Key extends string>(
     if (field.max !== undefined && value > field.max) {
       return [`${field.label}: enter ${field.max} or less.`];
     }
+    if (field.step === 'any') return [];
     const step = field.step ?? 1;
     const steps = (value - field.min) / step;
     if (Math.abs(steps - Math.round(steps)) > 1e-7) {
