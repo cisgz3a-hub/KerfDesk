@@ -42,7 +42,7 @@ Run order puts tools that make or change burns first, then new tools, then the r
 | T01 | Calibrate | Material Test | `tools.material-test` | ledgered: P3 8 |
 | T02 | Calibrate | Interval Test | `tools.interval-test` | ledgered: P2 1 (fix #1845), P3 3 |
 | T03 | Calibrate | Tone Calibration (new since October) | `tools.tone-calibration` | ledgered: P3 5 |
-| T04 | Calibrate | Scan Offset Test | `tools.scan-offset-test` | |
+| T04 | Calibrate | Scan Offset Test | `tools.scan-offset-test` | ledgered: P2 1 (fix #1848), P3 5 |
 | T05 | Calibrate | Focus Test | `tools.focus-test` | |
 | T06 | Fill repair | Fill Selection | `tools.fill-selection` | |
 | T07 | Fill repair | Close Open Fill Contours | `tools.close-open-fill-contours` | |

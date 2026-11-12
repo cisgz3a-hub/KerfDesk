@@ -1,0 +1,42 @@
+// T04: a process recipe saved from a coupon swatch carries the baseline
+// calibration mode and a 0 mm local offset into ordinary artwork.
+import { describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { decodeSwatch, emitProject, generateScanOffsetCalibrationPattern, litMoves, projectForScene } from './harness';
+import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../t01-main/src/core/devices/device-profile';
+import { captureProcessRecipe } from '../t01-main/src/core/material-library/capture-process-recipe';
+import { applyProcessRecipe } from '../t01-main/src/core/material-library/apply-process-recipe';
+import { createLayer, IDENTITY_TRANSFORM, type ImportedSvg } from '../t01-main/src/core/scene';
+
+describe('T04 recipe carry', () => {
+  it('runs', () => {
+    const log: string[] = [];
+    const table = [{ speedMmPerMin: 1000, offsetMm: -0.2 }, { speedMmPerMin: 5000, offsetMm: -0.4 }];
+    for (const status of ['verified', 'pending'] as const) {
+      const device = { ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, scanningOffsets: table, scanOffsetCalibrationStatus: status };
+      const coupon = generateScanOffsetCalibrationPattern({ mode: 'baseline', steps: 1, speedMin: 3000, speedMax: 3000, power: 12, swatchWidthMm: 30, swatchHeightMm: 5, hatchSpacingMm: 0.5 }, device);
+      const couponProject = projectForScene(coupon.scene, device);
+      const recipe = captureProcessRecipe(couponProject, 'scan-offset-calibration-cell-0', { id: 'r1', name: 'Birch fill 3000', description: '', revision: 1 } as never);
+      if (recipe.kind !== 'ok') throw new Error(JSON.stringify(recipe));
+      log.push(`[${status}] recipe step: mode=${recipe.value.steps[0]?.scanOffsetCalibrationMode} settings.bidirectionalScanOffsetMm=${(recipe.value.steps[0]?.settings as Record<string, unknown>)['bidirectionalScanOffsetMm']} allowUncal=${(recipe.value.steps[0]?.settings as Record<string, unknown>)['allowUncalibratedBidirectionalScan']}`);
+      // a fresh job: one 30x5 rectangle on an ordinary fill layer at 3000
+      const art: ImportedSvg = { kind: 'imported-svg', id: 'art', source: 'art.svg', operationIds: ['job'], bounds: { minX: 0, minY: 0, maxX: 30, maxY: 5 }, transform: { ...IDENTITY_TRANSFORM, x: 100, y: 100 }, paths: [{ color: '#ff0000', polylines: [{ closed: true, points: [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 5 }, { x: 0, y: 5 }, { x: 0, y: 0 }] }] }] } as ImportedSvg;
+      const jobLayer = { ...createLayer({ id: 'job', name: 'job', color: '#ff0000', mode: 'fill' }), speed: 3000, power: 12, hatchAngleDeg: 0, hatchSpacingMm: 0.5, fillStyle: 'scanline' as const, fillBidirectional: true, fillCrossHatch: false, fillOverscanMm: 5 };
+      const job = projectForScene({ objects: [art], layers: [jobLayer] } as never, device);
+      const bounds = { minX: 100, minY: 100, maxX: 130, maxY: 105 };
+      const report = (p: typeof job, title: string): void => {
+        const out = emitProject(p);
+        const r = decodeSwatch(bounds, litMoves(out.gcode, device));
+        log.push(`[${status}] ${title}: ok=${out.ok} rows fwd ${r.rows.filter((x) => x.dir === 1).length} rev ${r.rows.filter((x) => x.dir === -1).length} along fwd ${r.alongMeanFwd.toFixed(4)} rev ${r.alongMeanRev.toFixed(4)}`);
+      };
+      report(job, 'ordinary layer');
+      const applied = applyProcessRecipe(job, ['art'], recipe.value);
+      if (applied.kind !== 'ok') throw new Error(JSON.stringify(applied));
+      const layer = applied.value.scene.layers.find((l) => (applied.value.scene.objects[0] as ImportedSvg).operationIds?.includes(l.id));
+      log.push(`[${status}] applied layer: name=${layer?.name} mode=${layer?.scanOffsetCalibrationMode} offset=${layer?.bidirectionalScanOffsetMm} allowUncal=${layer?.allowUncalibratedBidirectionalScan}`);
+      report(applied.value, 'after applying coupon recipe');
+    }
+    writeFileSync('C:/Users/stolk/kd-t1/zz-t04/t04-recipe.log', log.join('\n'));
+    expect(log.length).toBeGreaterThan(0);
+  });
+});

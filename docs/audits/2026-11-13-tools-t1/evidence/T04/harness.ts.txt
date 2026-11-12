@@ -1,0 +1,188 @@
+// T04 audit harness: emit a Scan Offset Test coupon (or any project) through
+// prepareOutput -> G-code and decode each swatch's scan rows independently.
+import { DEFAULT_DEVICE_PROFILE, toSceneCoords, type DeviceProfile } from '../t01-main/src/core/devices';
+import {
+  generateScanOffsetCalibrationPattern,
+  type ScanOffsetCalibrationPattern,
+  type ScanOffsetCalibrationPatternOptions,
+} from '../t01-main/src/core/job/scan-offset-calibration-pattern';
+import { createProject, DEFAULT_PROJECT_OPTIMIZATION, type Project } from '../t01-main/src/core/scene';
+import { prepareOutput } from '../t01-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t01-main/src/io/gcode/emit-gcode';
+
+export type Vec = { x: number; y: number };
+export type LitMove = { from: Vec; to: Vec; f: number; s: number; fWord: string };
+export type Bounds = { minX: number; minY: number; maxX: number; maxY: number };
+
+export function projectForScene(scene: Project['scene'], device: DeviceProfile): Project {
+  const base = createProject(device);
+  return {
+    ...base,
+    device,
+    optimization: { ...DEFAULT_PROJECT_OPTIMIZATION },
+    scene: { ...base.scene, ...scene },
+  };
+}
+
+export function emitProject(project: Project): { gcode: string; preflight: unknown; ok: boolean } {
+  const prepared = prepareOutput(project, {});
+  if (!prepared.ok) return { gcode: '', preflight: (prepared as { preflight?: unknown }).preflight ?? prepared, ok: false };
+  const out = emitPreparedGcode(prepared);
+  return { gcode: out.gcode, preflight: out.preflight, ok: prepared.ok };
+}
+
+export function litMoves(gcode: string, device: DeviceProfile): LitMove[] {
+  let x = 0;
+  let y = 0;
+  let s = 0;
+  let f = 0;
+  let fWord = '';
+  let g = 0;
+  let laserOn = false;
+  const moves: LitMove[] = [];
+  for (const raw of gcode.split('\n')) {
+    const line = raw.replace(/;.*$/, '').replace(/\(.*?\)/g, '').toUpperCase();
+    const words = [...line.matchAll(/([A-Z])\s*(-?\d*\.?\d+)/g)];
+    const map = new Map<string, string>();
+    const ms: number[] = [];
+    for (const [, letter, value] of words) {
+      if (letter === 'M') ms.push(Number(value));
+      else map.set(letter!, value!);
+    }
+    for (const m of ms) {
+      if (m === 3 || m === 4) laserOn = true;
+      if (m === 5) laserOn = false;
+    }
+    const gv = map.get('G');
+    if (gv !== undefined) {
+      const gn = Number(gv);
+      if (gn === 0 || gn === 1 || gn === 2 || gn === 3) g = gn;
+    }
+    if (map.has('F')) {
+      f = Number(map.get('F'));
+      fWord = map.get('F')!;
+    }
+    if (map.has('S')) s = Number(map.get('S'));
+    const nx = map.has('X') ? Number(map.get('X')) : x;
+    const ny = map.has('Y') ? Number(map.get('Y')) : y;
+    if ((map.has('X') || map.has('Y')) && g === 1 && laserOn && s > 0) {
+      moves.push({ from: toSceneCoords({ x, y }, device), to: toSceneCoords({ x: nx, y: ny }, device), f, s, fWord });
+    }
+    x = nx;
+    y = ny;
+  }
+  return moves;
+}
+
+export type RowReport = {
+  y: number;
+  dir: 1 | -1;
+  startX: number;
+  endX: number;
+  alongStart: number; // displacement along travel of the lit start vs design start
+  alongEnd: number;
+};
+
+export type SwatchReport = {
+  rows: RowReport[];
+  fWords: string[];
+  sValues: number[];
+  fwdLeft: number;
+  revLeft: number;
+  fwdRight: number;
+  revRight: number;
+  separation: number; // mean(fwd left) - mean(rev left), scene X
+  alongMeanFwd: number;
+  alongMeanRev: number;
+  alongSpread: number;
+  nonHoriz: number;
+  outsideX: number;
+};
+
+const mean = (xs: number[]): number => (xs.length === 0 ? NaN : xs.reduce((a, b) => a + b, 0) / xs.length);
+
+/** Group lit horizontal moves in a swatch's Y band into rows; one row = one Y. */
+export function decodeSwatch(bounds: Bounds, moves: LitMove[], tolY = 1e-3, xMargin = 3): SwatchReport {
+  const inBand = moves.filter((m) => {
+    const my = (m.from.y + m.to.y) / 2;
+    const mx = (m.from.x + m.to.x) / 2;
+    return my >= bounds.minY - tolY && my <= bounds.maxY + tolY && mx >= bounds.minX - xMargin && mx <= bounds.maxX + xMargin;
+  });
+  const byY = new Map<string, LitMove[]>();
+  let nonHoriz = 0;
+  for (const m of inBand) {
+    if (Math.abs(m.from.y - m.to.y) > 1e-6) {
+      nonHoriz += 1;
+      continue;
+    }
+    const k = m.from.y.toFixed(4);
+    const list = byY.get(k) ?? [];
+    list.push(m);
+    byY.set(k, list);
+  }
+  const rows: RowReport[] = [];
+  const fWords = new Set<string>();
+  const sValues = new Set<number>();
+  for (const [k, list] of byY) {
+    const dx = list.reduce((a, m) => a + (m.to.x - m.from.x), 0);
+    const dir: 1 | -1 = dx >= 0 ? 1 : -1;
+    const xs = list.flatMap((m) => [m.from.x, m.to.x]);
+    const lo = Math.min(...xs);
+    const hi = Math.max(...xs);
+    const startX = dir === 1 ? lo : hi;
+    const endX = dir === 1 ? hi : lo;
+    const designStart = dir === 1 ? bounds.minX : bounds.maxX;
+    const designEnd = dir === 1 ? bounds.maxX : bounds.minX;
+    rows.push({ y: Number(k), dir, startX, endX, alongStart: (startX - designStart) * dir, alongEnd: (endX - designEnd) * dir });
+    for (const m of list) {
+      fWords.add(m.fWord);
+      sValues.add(m.s);
+    }
+  }
+  rows.sort((a, b) => a.y - b.y);
+  const fwd = rows.filter((r) => r.dir === 1);
+  const rev = rows.filter((r) => r.dir === -1);
+  const fwdLeft = mean(fwd.map((r) => r.startX));
+  const revLeft = mean(rev.map((r) => r.endX));
+  const along = rows.flatMap((r) => [r.alongStart, r.alongEnd]);
+  return {
+    rows,
+    fWords: [...fWords],
+    sValues: [...sValues],
+    fwdLeft,
+    revLeft,
+    fwdRight: mean(fwd.map((r) => r.endX)),
+    revRight: mean(rev.map((r) => r.startX)),
+    separation: fwdLeft - revLeft,
+    alongMeanFwd: mean(fwd.flatMap((r) => [r.alongStart, r.alongEnd])),
+    alongMeanRev: mean(rev.flatMap((r) => [r.alongStart, r.alongEnd])),
+    alongSpread: along.length === 0 ? NaN : Math.max(...along) - Math.min(...along),
+    nonHoriz,
+    outsideX: inBand.filter((m) => Math.min(m.from.x, m.to.x) < bounds.minX - 1 || Math.max(m.from.x, m.to.x) > bounds.maxX + 1).length,
+  };
+}
+
+/** Independent table lookup written from ADR-052 alone: linear between points,
+ * from rest below the first, clamped above the last; floored feed. */
+export function oracleOffset(table: ReadonlyArray<{ speedMmPerMin: number; offsetMm: number }>, requested: number, maxFeed: number): number {
+  let f = Math.min(requested, maxFeed);
+  f = f >= 1 ? Math.floor(f) : f;
+  const t = [...table].sort((a, b) => a.speedMmPerMin - b.speedMmPerMin);
+  if (t.length === 0 || f <= 0) return 0;
+  if (f <= t[0]!.speedMmPerMin) return (f / t[0]!.speedMmPerMin) * t[0]!.offsetMm;
+  for (let i = 1; i < t.length; i += 1) {
+    const a = t[i - 1]!;
+    const b = t[i]!;
+    if (f <= b.speedMmPerMin) return a.offsetMm + ((f - a.speedMmPerMin) / (b.speedMmPerMin - a.speedMmPerMin)) * (b.offsetMm - a.offsetMm);
+  }
+  return t[t.length - 1]!.offsetMm;
+}
+
+export function labelTexts(p: ScanOffsetCalibrationPattern): string[] {
+  return p.scene.objects.flatMap((o) =>
+    o.kind === 'imported-svg' && o.id.startsWith('scan-offset-calibration-label-') ? [String((o as { source?: string }).source ?? '')] : [],
+  );
+}
+
+export { generateScanOffsetCalibrationPattern, DEFAULT_DEVICE_PROFILE };
+export type { ScanOffsetCalibrationPatternOptions, ScanOffsetCalibrationPattern, DeviceProfile, Project };

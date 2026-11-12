@@ -1,0 +1,129 @@
+// T04 Scan Offset Test: decode every swatch's forward and reverse rows from
+// emitted G-code and compare with labels, the device table and an independent
+// ADR-052 lookup.
+import { describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  DEFAULT_DEVICE_PROFILE,
+  decodeSwatch,
+  emitProject,
+  generateScanOffsetCalibrationPattern,
+  labelTexts,
+  litMoves,
+  oracleOffset,
+  projectForScene,
+  type DeviceProfile,
+  type ScanOffsetCalibrationPatternOptions,
+} from './harness';
+import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../t01-main/src/core/devices/device-profile';
+
+const log: string[] = [];
+const DIALOG_DEFAULTS: ScanOffsetCalibrationPatternOptions = {
+  mode: 'baseline',
+  steps: 5,
+  speedMin: 1000,
+  speedMax: 5000,
+  power: 12,
+  swatchWidthMm: 50,
+  swatchHeightMm: 10,
+  hatchSpacingMm: 0.5,
+  overscanMm: 5,
+  gapMm: 4,
+};
+const TABLE = [
+  { speedMmPerMin: 1000, offsetMm: 0.1 },
+  { speedMmPerMin: 3000, offsetMm: 0.3 },
+  { speedMmPerMin: 5000, offsetMm: 0.2 },
+];
+const NEG_TABLE = [
+  { speedMmPerMin: 2000, offsetMm: -0.24 },
+  { speedMmPerMin: 4000, offsetMm: 0.16 },
+];
+
+type Case = {
+  title: string;
+  options: ScanOffsetCalibrationPatternOptions;
+  device?: Partial<DeviceProfile>;
+  base?: DeviceProfile;
+  origin?: { x: number; y: number };
+};
+
+const CASES: Case[] = [
+  { title: 'baseline defaults, empty table', options: DIALOG_DEFAULTS },
+  { title: 'baseline defaults, table present (must stay 0)', options: DIALOG_DEFAULTS, device: { scanningOffsets: TABLE } },
+  { title: 'verification defaults, table', options: { ...DIALOG_DEFAULTS, mode: 'verification' }, device: { scanningOffsets: TABLE } },
+  { title: 'verification 7 steps 500..5900 (below/between/above)', options: { ...DIALOG_DEFAULTS, mode: 'verification', steps: 7, speedMin: 500, speedMax: 5900 }, device: { scanningOffsets: TABLE } },
+  { title: 'verification sign-crossing table', options: { ...DIALOG_DEFAULTS, mode: 'verification', steps: 6, speedMin: 1000, speedMax: 5000 }, device: { scanningOffsets: NEG_TABLE } },
+  { title: 'verification empty table', options: { ...DIALOG_DEFAULTS, mode: 'verification' } },
+  { title: 'verification above max feed 9000..12000 on 6000', options: { ...DIALOG_DEFAULTS, mode: 'verification', steps: 3, speedMin: 9000, speedMax: 12000 }, device: { scanningOffsets: TABLE } },
+  { title: 'baseline above max feed 4000..9000', options: { ...DIALOG_DEFAULTS, steps: 4, speedMin: 4000, speedMax: 9000 } },
+  { title: 'verification fractional 1234.5..1234.9', options: { ...DIALOG_DEFAULTS, mode: 'verification', steps: 2, speedMin: 1234.5, speedMax: 1234.9 }, device: { scanningOffsets: TABLE } },
+  { title: 'verification equal speeds 2000x3', options: { ...DIALOG_DEFAULTS, mode: 'verification', steps: 3, speedMin: 2000, speedMax: 2000 }, device: { scanningOffsets: TABLE } },
+  { title: 'baseline 1 step min 1000 max 5000', options: { ...DIALOG_DEFAULTS, steps: 1 } },
+  { title: 'baseline 1e6 steps (cap 10)', options: { ...DIALOG_DEFAULTS, steps: 1e6 } },
+  { title: 'verification 10 steps', options: { ...DIALOG_DEFAULTS, mode: 'verification', steps: 10 }, device: { scanningOffsets: TABLE } },
+  { title: 'verification rear-right origin', options: { ...DIALOG_DEFAULTS, mode: 'verification' }, device: { scanningOffsets: TABLE, origin: 'rear-right' } as Partial<DeviceProfile> },
+  { title: 'verification overscan 0', options: { ...DIALOG_DEFAULTS, mode: 'verification', overscanMm: 0 }, device: { scanningOffsets: TABLE } },
+  { title: 'verification tiny swatch 1x1, interval 0.05', options: { ...DIALOG_DEFAULTS, mode: 'verification', steps: 3, swatchWidthMm: 1, swatchHeightMm: 1, hatchSpacingMm: 0.05 }, device: { scanningOffsets: TABLE } },
+  { title: '4040 baseline empty table', options: DIALOG_DEFAULTS, base: NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE },
+  { title: '4040 verification pending table', options: { ...DIALOG_DEFAULTS, mode: 'verification' }, base: NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, device: { scanningOffsets: TABLE, scanOffsetCalibrationStatus: 'pending' } as Partial<DeviceProfile> },
+  { title: '4040 verification empty table (D8-P3-3)', options: { ...DIALOG_DEFAULTS, mode: 'verification' }, base: NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE },
+  { title: '4040 baseline pending table (must be bidir, 0)', options: DIALOG_DEFAULTS, base: NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, device: { scanningOffsets: TABLE, scanOffsetCalibrationStatus: 'pending' } as Partial<DeviceProfile> },
+  { title: 'baseline origin 3.3,7.7', options: { ...DIALOG_DEFAULTS, origin: { x: 3.3, y: 7.7 } } },
+];
+
+const summary: Record<string, unknown>[] = [];
+
+function runCase(c: Case): void {
+  const device: DeviceProfile = { ...(c.base ?? DEFAULT_DEVICE_PROFILE), ...(c.device ?? {}) };
+  const pattern = generateScanOffsetCalibrationPattern(c.options, device);
+  const out = emitProject(projectForScene(pattern.scene, device));
+  log.push(`\n## ${c.title} ok=${out.ok} cells=${pattern.cells.length}`);
+  if (!out.ok) {
+    log.push(`preflight: ${JSON.stringify(out.preflight).slice(0, 800)}`);
+    summary.push({ title: c.title, ok: false });
+    return;
+  }
+  const labels = labelTexts(pattern);
+  log.push(`labels: ${labels.join(' | ')}`);
+  const moves = litMoves(out.gcode, device);
+  let worstErr = 0;
+  let labelMismatch = 0;
+  let bidirMissing = 0;
+  for (const cell of pattern.cells) {
+    const r = decodeSwatch(cell.bounds, moves.filter((m) => m.s !== 200 || true));
+    // Label-run moves sit below/above the swatch band, so the band filter keeps swatch rows only.
+    const expected =
+      c.options.mode === 'verification' ? oracleOffset(device.scanningOffsets, Number(cell.speed), device.maxFeed) : 0;
+    const label = labels[cell.step]?.replace('calibration-label:', '');
+    const fwd = r.rows.filter((x) => x.dir === 1).length;
+    const rev = r.rows.filter((x) => x.dir === -1).length;
+    const err = Number.isFinite(r.alongMeanFwd) && Number.isFinite(r.alongMeanRev)
+      ? Math.max(Math.abs(r.alongMeanFwd - expected / 2), Math.abs(r.alongMeanRev - expected / 2))
+      : Number.NaN;
+    if (Number.isFinite(err)) worstErr = Math.max(worstErr, err);
+    if (!(r.fWords.length === 1 && r.fWords[0] === label)) labelMismatch += 1;
+    if (rev === 0) bidirMissing += 1;
+    log.push(
+      `step ${cell.step} label "${label}" cell.speed ${cell.speed} | rows ${r.rows.length} (fwd ${fwd} rev ${rev}) | F ${r.fWords.join(',')} S ${r.sValues.join(',')} | ` +
+        `fwdLeft ${r.fwdLeft.toFixed(4)} revLeft ${r.revLeft.toFixed(4)} sep ${r.separation.toFixed(4)} | along fwd ${r.alongMeanFwd.toFixed(4)} rev ${r.alongMeanRev.toFixed(4)} spread ${r.alongSpread.toFixed(4)} | expected table ${expected.toFixed(4)} -> along ${(expected / 2).toFixed(4)} | err ${Number.isFinite(err) ? err.toFixed(5) : 'n/a'} nonHoriz ${r.nonHoriz} outX ${r.outsideX}`,
+    );
+  }
+  summary.push({ title: c.title, ok: true, cells: pattern.cells.length, worstErr, labelMismatch, bidirMissing });
+}
+
+describe('T04 scan offset coupon burn', () => {
+  it('decodes every case', () => {
+    for (const c of CASES) {
+      try {
+        runCase(c);
+      } catch (error) {
+        log.push(`\n## ${c.title} THREW ${(error as Error).message}`);
+        summary.push({ title: c.title, threw: (error as Error).message });
+      }
+    }
+    log.unshift(JSON.stringify(summary, null, 1));
+    writeFileSync('C:/Users/stolk/kd-t1/zz-t04/t04-burn.log', log.join('\n'));
+    expect(summary.length).toBe(CASES.length);
+  });
+});
