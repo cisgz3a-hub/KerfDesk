@@ -21,6 +21,15 @@ function objectBounds(object: SceneObject): Bounds | null {
     : null;
 }
 
+/** True when any number stored anywhere in the value is NaN or infinite. */
+function holdsNonFiniteNumber(value: unknown): boolean {
+  if (typeof value === 'number') return !Number.isFinite(value);
+  // Pixel buffers are image data, not coordinates, and can be millions long.
+  if (typeof value !== 'object' || value === null || ArrayBuffer.isView(value)) return false;
+  const children = Array.isArray(value) ? value : Object.values(value);
+  return children.some(holdsNonFiniteNumber);
+}
+
 /** False when the object stores a coordinate the project loader refuses. */
 export function sceneObjectCoordinatesInRange(object: SceneObject): boolean {
   const bounds = objectBounds(object);
@@ -52,6 +61,14 @@ export function nameRefusedSceneObject(project: Project, reason: string): string
   const object = project.scene.objects[index];
   if (object === undefined) return reason;
   const label = sceneObjectLabel(object, index);
+  // A NaN coordinate fails the same range check; saying it is "past" a limit
+  // sends the operator looking for a far-away object (O8-P3-4).
+  if (holdsNonFiniteNumber(object)) {
+    return (
+      `${label} has a coordinate that is not a number, which a project file cannot hold. ` +
+      'Delete it (or undo the last change to it) and save again.'
+    );
+  }
   if (!sceneObjectCoordinatesInRange(object)) {
     return (
       `${label} has coordinates past the ${LIMIT_TEXT} mm a project file can hold. ` +

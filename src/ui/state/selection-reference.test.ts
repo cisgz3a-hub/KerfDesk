@@ -5,7 +5,8 @@ import { useStore } from './store';
 
 // Every svgObj is a 10 x 10 mm box at its transform origin, so an object's
 // transform x is also its left edge. Objects stack in the order they are
-// seeded, so the last one seeded is the top-most.
+// seeded, so the first one seeded is the bottom of the stack: the first in
+// draw order, which a selection with no click order aligns to (ADR-709).
 
 describe('Align reference follows the order the objects were clicked', () => {
   beforeEach(() => resetStore());
@@ -30,15 +31,26 @@ describe('Align reference follows the order the objects were clicked', () => {
     expect(left('label')).toBe(20);
   });
 
-  it('falls back to the top-most object for a marquee, which has no click order', () => {
+  it('falls back to the first object in draw order for a marquee, which has no click order', () => {
     seed({ plate: 100, label: 20 });
-    click('label', 'plate');
+    click('plate', 'label');
     useStore.getState().selectObjects(['plate', 'label']);
 
     useStore.getState().alignSelection('left');
 
-    expect(left('plate')).toBe(20);
-    expect(left('label')).toBe(20);
+    expect(left('plate')).toBe(100);
+    expect(left('label')).toBe(100);
+  });
+
+  it('takes the draw order, not the order the marquee listed the ids in', () => {
+    seed({ P: 10, Q: 50, R: 90 });
+    useStore.getState().selectObjects(['R', 'Q', 'P']);
+
+    useStore.getState().alignSelection('left');
+
+    expect(left('P')).toBe(10);
+    expect(left('Q')).toBe(10);
+    expect(left('R')).toBe(10);
   });
 
   it('keeps the reference when Shift+click removes another object', () => {
@@ -52,25 +64,25 @@ describe('Align reference follows the order the objects were clicked', () => {
     expect(left('R')).toBe(90);
   });
 
-  it('falls back to the top-most object once Shift+click removes the reference', () => {
+  it('falls back to the first object in draw order once Shift+click removes the reference', () => {
     seed({ P: 10, Q: 50, R: 90 });
     click('R', 'P', 'Q', 'Q');
 
     useStore.getState().alignSelection('left');
 
-    expect(left('P')).toBe(90);
-    expect(left('R')).toBe(90);
+    expect(left('P')).toBe(10);
+    expect(left('R')).toBe(10);
   });
 
-  it('falls back to the top-most object once the reference is deleted', () => {
+  it('falls back to the first object in draw order once the reference is deleted', () => {
     seed({ P: 10, Q: 50, R: 90 });
     click('R', 'Q', 'P');
     useStore.getState().removeSceneObject('P');
 
     useStore.getState().alignSelection('left');
 
-    expect(left('Q')).toBe(90);
-    expect(left('R')).toBe(90);
+    expect(left('Q')).toBe(50);
+    expect(left('R')).toBe(50);
   });
 
   it('keeps the reference through undo and redo', () => {

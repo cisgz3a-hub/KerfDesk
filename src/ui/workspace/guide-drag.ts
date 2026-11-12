@@ -61,8 +61,9 @@ export function beginGuideDrag(args: PointerArgs): GuideDragState | null {
     app.setGuidesDuringInteraction([...guides, guide]);
     return { kind: 'guide', id: guide.id, axis: ruler, created: true };
   }
-  if (workspaceHitTest(args.project.scene, point) !== null) return null;
-  const reach = GUIDE_HIT_PX * pxToMmForCanvas(args.canvas, args.project, args.viewState);
+  const pxToMm = pxToMmForCanvas(args.canvas, args.project, args.viewState);
+  if (workspaceHitTest(args.project.scene, point, pxToMm) !== null) return null;
+  const reach = GUIDE_HIT_PX * pxToMm;
   const hit = guides.find(
     (guide) => Math.abs(guide.positionMm - along(point, guide.axis)) <= reach,
   );

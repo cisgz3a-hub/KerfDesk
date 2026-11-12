@@ -151,3 +151,17 @@ function commandIds(): ReadonlyArray<CommandId> {
   const cnc = buildAppCommands(baseCtx({ machineKind: 'cnc' })).map((command) => command.id);
   return [...new Set([...laser, ...cnc])];
 }
+
+// Oracle audit O10-P3-5: a plain drag stretches a polygon or star to the drag
+// box, as LightBurn does; Shift keeps it regular (draw-tool.ts maps Shift to
+// `regular`, Ctrl/Cmd to `fromCenter`). The tooltips must say so.
+describe('polygon and star drawing help', () => {
+  it.each(['polygon', 'star'] as const)(
+    'names the Shift and Ctrl modifiers for the %s tool',
+    (tool) => {
+      const tooltip = TOOL_HELP[tool].tooltip;
+      expect(tooltip).toContain('Hold Shift for equal');
+      expect(tooltip).toContain('Ctrl to draw from the centre');
+    },
+  );
+});
