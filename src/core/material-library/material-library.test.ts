@@ -43,6 +43,12 @@ describe('material library recipes', () => {
       allowUncalibratedBidirectionalScan: true,
       bidirectionalScanOffsetMm: 0.18,
       fillCrossHatch: true,
+      // The scan pattern is held only while on (ADR-093 Amendment 2).
+      imageScanAngleDeg: 30,
+      imageCrossHatch: true,
+      passAngleStepDeg: 15,
+      fillRampLengthMm: 1,
+      fillRampOuterEdge: true,
     });
 
     const recipe = captureMaterialRecipe(layer);
