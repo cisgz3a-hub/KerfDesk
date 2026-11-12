@@ -18,8 +18,8 @@ const TABLES: readonly OpTable[] = [
   TEXT_OPS,
 ];
 
-export function createPsVm(clock?: () => number): PsVm {
-  const vm = new PsVm(clock);
+export function createPsVm(clock?: () => number, milliseconds?: number): PsVm {
+  const vm = new PsVm(clock, milliseconds);
   installOps(vm.systemdict, ...TABLES);
   const named: Readonly<Record<string, PsDict>> = {
     systemdict: vm.systemdict,

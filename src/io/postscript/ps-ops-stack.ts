@@ -1,5 +1,6 @@
 // Operand-stack, arithmetic, relational and boolean operators (PLRM §8.1).
 
+import { setEntry } from './ps-budget';
 import type { PsVm } from './ps-vm';
 import { PS_MARK, PsError, type PsValue } from './ps-types';
 
@@ -124,12 +125,14 @@ function copyOperator(vm: PsVm): void {
   const top = vm.pop();
   if (typeof top === 'object' && top !== null && top.kind === 'dict') {
     const source = vm.popDict();
-    for (const [key, value] of source.map) top.map.set(key, value);
+    vm.charge(source.map.size);
+    for (const [key, value] of source.map) setEntry(top, key, value);
     vm.push(top);
     return;
   }
   if (typeof top === 'object' && top !== null && top.kind === 'array') {
     const source = vm.popArray();
+    vm.charge(source.items.length);
     source.items.forEach((item, i) => (top.items[i] = item));
     vm.push(top);
     return;
@@ -137,6 +140,7 @@ function copyOperator(vm: PsVm): void {
   if (typeof top !== 'number' || top < 0) throw new PsError('typecheck', 'copy needs a count.');
   const n = Math.trunc(top);
   if (n > vm.operands.length) throw new PsError('stackunderflow', 'copy ran out of operands.');
+  vm.charge(n);
   for (const value of vm.operands.slice(vm.operands.length - n)) vm.push(value);
 }
 
@@ -145,6 +149,7 @@ function rollOperator(vm: PsVm): void {
   const n = vm.popInteger();
   if (n < 0 || n > vm.operands.length) throw new PsError('rangecheck', 'roll is out of range.');
   if (n === 0) return;
+  vm.charge(n);
   const items = vm.operands.splice(vm.operands.length - n, n);
   const shift = ((j % n) + n) % n;
   vm.operands.push(...items.slice(n - shift), ...items.slice(0, n - shift));

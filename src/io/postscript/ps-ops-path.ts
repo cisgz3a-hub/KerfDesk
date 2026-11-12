@@ -3,6 +3,7 @@
 
 import { apply, invert } from './ps-matrix';
 import type { OpTable } from './ps-ops-stack';
+import { pathPointCount } from './ps-budget';
 import type { PsVm } from './ps-vm';
 import { PsError, type Vec } from './ps-types';
 
@@ -175,22 +176,28 @@ function unit(x: number, y: number): { x: number; y: number; len: number } {
 }
 
 function pathBox(vm: PsVm): void {
-  const points = vm.gstate.path.flatMap((s) => [
-    s.start,
-    ...s.segments.flatMap((seg) => (seg.kind === 'line' ? [seg.to] : [seg.c1, seg.c2, seg.to])),
-  ]);
-  if (points.length === 0) throw new PsError('nocurrentpoint', 'pathbbox needs a path.');
+  const path = vm.gstate.path;
+  vm.charge(pathPointCount(path));
+  if (path.length === 0) throw new PsError('nocurrentpoint', 'pathbbox needs a path.');
   const inverse = invert(vm.gstate.ctm);
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const device of points) {
+  const box = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  const include = (device: Vec): void => {
     const p = apply(inverse, device);
-    minX = Math.min(minX, p.x);
-    minY = Math.min(minY, p.y);
-    maxX = Math.max(maxX, p.x);
-    maxY = Math.max(maxY, p.y);
+    if (p.x < box.minX) box.minX = p.x;
+    if (p.y < box.minY) box.minY = p.y;
+    if (p.x > box.maxX) box.maxX = p.x;
+    if (p.y > box.maxY) box.maxY = p.y;
+  };
+  // Walked in place: one pass, no copy of a path that may hold millions of points.
+  for (const subpath of path) {
+    include(subpath.start);
+    for (const seg of subpath.segments) {
+      if (seg.kind !== 'line') {
+        include(seg.c1);
+        include(seg.c2);
+      }
+      include(seg.to);
+    }
   }
-  [minX, minY, maxX, maxY].forEach((n) => vm.push(n));
+  [box.minX, box.minY, box.maxX, box.maxY].forEach((n) => vm.push(n));
 }

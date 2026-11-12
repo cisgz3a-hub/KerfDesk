@@ -1,10 +1,10 @@
 // The interpreter core: operand and dictionary stacks, execution, graphics
 // state and the current path. Operators live in the ps-ops-* tables.
-// Every executed object and every procedure call costs a step, allocations
-// cost their size, every path point counts toward a cap, and the whole run
-// has a time limit, so a hostile or runaway file ends in a clear error, never
-// a hang (ADR-700 Amendment 2).
+// What the run may cost lives in ps-budget.ts: steps for work, caps on
+// created, painted and copied points, and a time limit, so a hostile or
+// runaway file ends in a clear error, never a hang (ADR-700 Amendments 2, 3).
 
+import { PsBudget, PS_LIMITS, pathPointCount } from './ps-budget';
 import { apply, applyDelta, IDENTITY, invert, linearScale } from './ps-matrix';
 import type { PsTokenizer } from './ps-tokenizer';
 import {
@@ -20,18 +20,7 @@ import {
   type Vec,
 } from './ps-types';
 
-export const PS_LIMITS = {
-  steps: 20_000_000,
-  operands: 100_000,
-  callDepth: 256,
-  pathPoints: 2_000_000,
-  /** Wall-clock limit for one file, whatever its steps cost. */
-  milliseconds: 5_000,
-} as const;
-
-/** Steps between two looks at the clock. */
-const CLOCK_INTERVAL = 4096;
-const TOO_LONG = 'The file takes too long to draw; it may loop forever.';
+export { PS_LIMITS } from './ps-budget';
 
 export type ColorSpace =
   | { readonly kind: 'gray' | 'rgb' | 'cmyk' }
@@ -73,14 +62,15 @@ export class PsVm {
   tokenizer: PsTokenizer | null = null;
   /** AI mode: names nobody defined clear the operand stack instead of failing. */
   unknownName: ((name: string) => void) | null = null;
-  private steps = 0;
-  private sinceClock = 0;
+  readonly budget: PsBudget;
   private depth = 0;
   private points = 0;
-  private readonly startedAt: number;
 
-  constructor(private readonly clock: () => number = () => performance.now()) {
-    this.startedAt = clock();
+  constructor(
+    clock: () => number = () => performance.now(),
+    milliseconds: number = PS_LIMITS.milliseconds,
+  ) {
+    this.budget = new PsBudget(clock, milliseconds);
   }
 
   note(code: string, count = 1): void {
@@ -212,15 +202,17 @@ export class PsVm {
     }
   }
 
-  /** Counts work: one step per object, or an allocation's size. */
+  /** Counts work: one step per object, or the size of what an operator walks. */
   charge(cost = 1): void {
-    this.steps += cost;
-    if (this.steps > PS_LIMITS.steps) throw new PsError('budget', TOO_LONG);
-    this.sinceClock += cost;
-    if (this.sinceClock < CLOCK_INTERVAL) return;
-    this.sinceClock = 0;
-    if (this.clock() - this.startedAt > PS_LIMITS.milliseconds)
-      throw new PsError('budget', TOO_LONG);
+    this.budget.charge(cost);
+  }
+
+  /** Saves the graphics state, counting the path it copies. */
+  saveState(): void {
+    if (this.gstack.length >= 256)
+      throw new PsError('limitcheck', 'Too many nested gsave operations.');
+    this.budget.copy(pathPointCount(this.gstate.path));
+    this.gstack.push(copyGState(this.gstate));
   }
 
   // ---- Path construction, in user space; stored in device space ----
@@ -275,6 +267,7 @@ export class PsVm {
   /** Record the current path as painted, then clear it (fill and stroke do). */
   paint(mode: { fill: boolean; stroke: boolean; evenOdd: boolean }): void {
     const subpaths = this.gstate.path.filter((s) => s.segments.length > 0);
+    this.budget.paint(pathPointCount(subpaths));
     const g = this.gstate;
     if (subpaths.length > 0)
       this.painted.push({
