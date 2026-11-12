@@ -19,6 +19,7 @@ import { operatorAbortAlarm, restoreOriginAfterAbort } from './abort-alarm-recov
 import { rotaryTurnSinceAbort } from './abort-rotary-turn';
 import {
   drive,
+  frameUntilPermit,
   harness,
   installRecoveryStressHooks,
   startFramedJob,
@@ -45,12 +46,11 @@ const ROTARY: RotarySetup = {
 
 // Twenty stripes round the part, each its own outline, so the job turns A
 // back and forth through many acknowledged lines before it ends.
-function stripesRoundThePart(): Project {
-  const project = createProject({
-    ...DEFAULT_DEVICE_PROFILE,
-    controllerKind: 'grblhal',
-    rotary: ROTARY,
-  });
+function stripesRoundThePart(
+  rotary: RotarySetup = ROTARY,
+  controllerKind: 'grblhal' | 'grbl-v1.1' = 'grblhal',
+): Project {
+  const project = createProject({ ...DEFAULT_DEVICE_PROFILE, controllerKind, rotary });
   const color = '#ff0000';
   const objects = Array.from({ length: 20 }, (_, index) => ({
     kind: 'imported-svg' as const,
@@ -129,6 +129,53 @@ describe('Abort and re-run on an A rotary, four-axis grblHAL simulator', () => {
       // The re-run's own G92 A0 zeroed the same machine turn as the first run.
       expect(h.simulator.state().aAxis?.g92).toBeCloseTo(firstZero, 3);
       expect(useLaserStore.getState().lastWriteError).toBeNull();
+    },
+    STRESS_TIMEOUT_MS,
+  );
+});
+
+// Code quality audit C2, D3 mutant X10: with `$13=1` stock GRBL reports the Z
+// work offset in inches. The turn a Z-rotary job started from, recorded at
+// Abort, must still come back in millimetres, or the turn-back after Abort
+// aims 25.4 times too short and a resume burns at the wrong angle.
+describe('Abort on a Z rotary, stock GRBL simulator reporting inches ($13=1)', () => {
+  it(
+    'records the start turn in millimetres',
+    async () => {
+      const zRotary: RotarySetup = { ...ROTARY, axis: 'Z', axisConfirmed: 'Z', mmPerRotation: 40 };
+      const h = await harness({
+        simulator: { settings: [[13, '1']], motionMs: 400 },
+        project: stripesRoundThePart(zRotary, 'grbl-v1.1'),
+      });
+      expect(useLaserStore.getState().controllerSettings?.reportInches).toBe(true);
+      useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'front-left' } });
+      // Turn the part 7 mm of Z, then set the XY origin.
+      await drive(useLaserStore.getState().jog({ dz: 7, feed: 1500 }));
+      await tick(1_500);
+      await drive(useLaserStore.getState().jog({ dx: ORIGIN.x, dy: ORIGIN.y, feed: 3_000 }));
+      await tick(1_500);
+      await drive(useLaserStore.getState().setOriginHere());
+      await tick(1_500);
+
+      // The first Frame after the turn writes its own G92 Z0, and Start then
+      // refuses that Frame's permit ("The framed coordinates or machine setup
+      // changed during review"), so frame once more before Start.
+      await frameUntilPermit();
+      const { running } = await startFramedJob(h.repository);
+      await tick(2_500);
+      // The job's G92 Z0 zeroed the turn it started from, 7 mm of Z. Stock GRBL
+      // clears G92 at the Abort's reset, so read it now.
+      const sim = h.simulator.state();
+      const startTurnMm = (sim.g54?.z ?? 0) + (sim.g92?.z ?? 0);
+      expect(startTurnMm).toBeCloseTo(7, 3);
+      await drive(useLaserStore.getState().stopJob('operator'));
+      await drive(running).catch(() => undefined);
+      await tick(1_500);
+
+      const request = operatorAbortAlarm(useLaserStore.getState());
+      expect(request?.rotaryStartTurn?.axis).toBe('Z');
+      // Four-decimal inch reports hold 0.00254 mm.
+      expect(request?.rotaryStartTurn?.machine).toBeCloseTo(startTurnMm, 2);
     },
     STRESS_TIMEOUT_MS,
   );
