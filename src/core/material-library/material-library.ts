@@ -1,8 +1,17 @@
 import { DITHER_ALGORITHMS, type DitherAlgorithm, type Layer, type LayerMode } from '../scene';
 import { isRecord } from '../util/is-record';
 import { isFiniteNumber, finiteOr } from '../util/finite';
+import {
+  isRecipeScanPattern,
+  RECIPE_SCAN_PATTERN_FIELDS,
+  recipeScanPattern,
+  withoutScanPattern,
+  type RecipeScanPattern,
+} from './recipe-scan-pattern';
 
-export type MaterialRecipe = {
+// The scan pattern (Image scan angle and cross-hatch, angle per pass, Fill
+// ramp) is held only while it is on (ADR-093 Amendment 2).
+export type MaterialRecipe = RecipeScanPattern & {
   readonly mode: LayerMode;
   readonly powerMode?: NonNullable<Layer['powerMode']> | undefined;
   readonly minPower: number;
@@ -61,6 +70,7 @@ export const MATERIAL_RECIPE_FIELDS = [
   'negativeImage',
   'passThrough',
   'dotWidthCorrectionMm',
+  ...RECIPE_SCAN_PATTERN_FIELDS,
 ] as const satisfies ReadonlyArray<keyof MaterialRecipe>;
 
 const LAYER_MODES = ['line', 'fill', 'image'] as const satisfies ReadonlyArray<LayerMode>;
@@ -99,6 +109,7 @@ export function captureMaterialRecipe(layer: Layer): MaterialRecipe {
     negativeImage: layer.negativeImage,
     passThrough: layer.passThrough,
     dotWidthCorrectionMm: layer.dotWidthCorrectionMm,
+    ...recipeScanPattern(layer),
   };
 }
 
@@ -111,7 +122,9 @@ export function applyMaterialRecipe(layer: Layer, recipe: MaterialRecipe): Layer
   // it returns the layer to Auto. Keeping the old override would carry one
   // preset's dynamic power into the next preset's cut. A tone curve is
   // measured on one material at one dither, DPI, power and speed, and a recipe
-  // holds none yet, so the old one goes too (ADR-670 Amendment 2).
+  // holds none yet, so the old one goes too (ADR-670 Amendment 2). The scan
+  // pattern is the recipe's, so one it does not hold is turned off: an old
+  // cross-hatch would scan every pass of the preset twice (ADR-093 Amendment 2).
   const {
     bidirectionalScanOffsetMm: _existingOffset,
     powerMode: _existingPowerMode,
@@ -119,7 +132,7 @@ export function applyMaterialRecipe(layer: Layer, recipe: MaterialRecipe): Layer
     ...withoutLocalOffset
   } = layer;
   return {
-    ...withoutLocalOffset,
+    ...withoutScanPattern(withoutLocalOffset),
     ...materialRecipePatch(recipe),
   };
 }
@@ -154,6 +167,7 @@ export function normalizeMaterialRecipe(recipe: MaterialRecipe): MaterialRecipe 
     negativeImage: recipe.negativeImage,
     passThrough: recipe.passThrough,
     dotWidthCorrectionMm: Math.max(0, finiteOr(recipe.dotWidthCorrectionMm, 0)),
+    ...recipeScanPattern(recipe),
   };
 }
 
@@ -162,7 +176,12 @@ export function isMaterialRecipe(value: unknown): value is MaterialRecipe {
     return false;
   }
 
-  return hasRecipeModes(value) && hasRecipeNumbers(value) && hasRecipeBooleans(value);
+  return (
+    hasRecipeModes(value) &&
+    hasRecipeNumbers(value) &&
+    hasRecipeBooleans(value) &&
+    isRecipeScanPattern(value)
+  );
 }
 
 function isLayerMode(value: unknown): value is LayerMode {

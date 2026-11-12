@@ -331,14 +331,13 @@ function measureLineWidth(
   // The pen advance of the shaped glyphs, kerning included, in mm. Tracking
   // falls between glyphs, so a ligature is one glyph and the line's last
   // glyph adds no trailing gap.
-  if (cache !== undefined) {
-    const { advance, glyphs } = shapedRunAdvance(font, line, sizeMm, SHAPING_OPTIONS, cache);
-    return advance + Math.max(0, glyphs - 1) * letterSpacing * sizeMm;
-  }
-  let glyphs = 0;
-  const advance = font.forEachGlyph(line, 0, 0, sizeMm, SHAPING_OPTIONS, () => {
-    glyphs += 1;
-  });
+  const { advance, glyphs } = shapedRunAdvance(
+    font,
+    line,
+    sizeMm,
+    SHAPING_OPTIONS,
+    cache ?? createShapingCache(),
+  );
   return advance + Math.max(0, glyphs - 1) * letterSpacing * sizeMm;
 }
 

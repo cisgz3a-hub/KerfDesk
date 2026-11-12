@@ -173,6 +173,8 @@ export type MachineStartSnapshot = {
   // The Camera panel's "camera may have moved" warning, while it shows for
   // the running camera (ADR-663 Amendment 5).
   readonly cameraMovedWarning?: string | null;
+  // A Home moved Z since the height was last set (ADR-322 Amendment 5).
+  readonly focusMovedByHome?: boolean;
   // The running camera's own calibration (ADR-441 Amendment 9).
   readonly cameraCalibration?: CameraModelRecord | null;
   // Where this project's jig outline last burned from in this session, so the
