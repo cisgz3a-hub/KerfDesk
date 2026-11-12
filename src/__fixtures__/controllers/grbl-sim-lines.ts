@@ -3,7 +3,7 @@
 // only while the main loop reads (grblSimParsesLines in grbl-sim-machine.ts).
 
 import {
-  formatVec3,
+  formatReportedVec3,
   hasGWord,
   leadingGWord,
   parseMotionWords,
@@ -194,11 +194,11 @@ function reduceDollarQuery(
     };
   }
   if (line === '$#') {
-    const wco = formatVec3(totalWco(state));
+    const wco = formatReportedVec3(state.settings, totalWco(state));
     return {
       state,
       effects: [
-        emit(`[G54:${formatVec3(state.g54 ?? SIM_ZERO_VEC3)}]`, opts),
+        emit(`[G54:${formatReportedVec3(state.settings, state.g54 ?? SIM_ZERO_VEC3)}]`, opts),
         emit(`[G92:${wco}]`, opts),
         emit('ok', opts),
       ],

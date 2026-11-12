@@ -15,6 +15,7 @@ import {
 import { useStore } from '../state';
 import { projectAutosaveService } from '../state/autosave-durable';
 import { useConfirmSaveStore } from '../state/confirm-save-store';
+import { PROJECT_NOTICES_TOAST_KEY } from '../state/project-load-notices';
 import { useSaveReadyDialogStore } from '../state/save-ready-dialog-store';
 import { resetStore } from '../state/test-helpers';
 import { openProjectCommand } from './open-project-command';
@@ -113,7 +114,9 @@ describe('Open over unsaved work with no file', () => {
     expect(dialog()).toBeNull();
     expect(useStore.getState()).toMatchObject({ savedName: 'next.lf2', dirty: false });
     expect(useStore.getState().project.notes).toBe('The next project');
-    expect(pushToast).toHaveBeenCalledWith('Opened next.lf2', 'success');
+    expect(pushToast).toHaveBeenCalledWith('Opened next.lf2', 'success', {
+      key: PROJECT_NOTICES_TOAST_KEY,
+    });
   });
 
   it('Cancel leaves the saved project open and untouched', async () => {
