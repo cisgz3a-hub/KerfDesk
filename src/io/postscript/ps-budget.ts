@@ -27,11 +27,12 @@ export const PS_LIMITS = {
 /** Work between two looks at the clock. */
 const CLOCK_INTERVAL = 4096;
 
+/** Large but finite files reach this too, so it names both causes (E1-P3-3). */
 export const PS_STEP_MESSAGE =
-  'The file needs more work than KerfDesk allows; it may loop forever.';
+  'The file needs more work than KerfDesk allows: it is too large to import, or it never finishes.';
 
 export function psTimeMessage(milliseconds: number): string {
-  return `The file took longer than ${Math.round(milliseconds / 1000)} s to read.`;
+  return `The file took longer than ${Math.round(milliseconds / 1000)} s to read; it may be too large for this computer.`;
 }
 
 /** Points in a path: each subpath's start, one per line, three per curve. */
