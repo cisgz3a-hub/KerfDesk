@@ -179,3 +179,56 @@ describe('outlines whose ends meet without the closed flag', () => {
     expect(millimeters[0]?.polylines[0]?.closed).toBe(true);
   });
 });
+
+describe('SPLINE knot vectors (audit O2)', () => {
+  const squareControls = [
+    [0, 0],
+    [10, 0],
+    [10, 10],
+    [0, 10],
+  ] as const;
+
+  function cubicSpline(
+    flags: number,
+    knots: ReadonlyArray<number>,
+    controls: ReadonlyArray<readonly [number, number]>,
+  ) {
+    return tags(
+      [0, 'SPLINE'],
+      [70, flags],
+      [71, 3],
+      ...knots.map((knot) => [40, knot] as const),
+      ...controls.flatMap(([x, y]) => [[10, x] as const, [20, y] as const]),
+    );
+  }
+
+  it('imports an AutoCAD-style periodic closed SPLINE at its true size (O2-P1-1)', () => {
+    // Closed (1) + periodic (2) + planar (8); controls wrapped by the degree;
+    // uniform unclamped knots. The uniform cubic B-spline of a 10 mm square
+    // spans x = 5/12 .. 115/12 (closed form), so 55/6 mm across, not 10 mm.
+    const controls = [...squareControls, ...squareControls.slice(0, 3)];
+    const knots = Array.from({ length: controls.length + 4 }, (_, index) => index);
+    const paths = importedPaths(entitiesDxf(cubicSpline(11, knots, controls)));
+    const polyline = paths[0]?.polylines[0];
+    expect(polyline?.closed).toBe(true);
+    const xs = (polyline?.points ?? []).map((point) => point.x);
+    const ys = (polyline?.points ?? []).map((point) => point.y);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(55 / 6, 1);
+    expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(55 / 6, 1);
+  });
+
+  it('does not treat SPLINE knot values as coordinates (O2-P3-2)', () => {
+    // A clamped line whose parameter runs to 2,000,000: a valid knot vector,
+    // although 2e6 would exceed the coordinate cap if it were a length.
+    const knots = [0, 0, 0, 0, 2e6, 2e6, 2e6, 2e6];
+    const controls = [
+      [0, 0],
+      [10, 0],
+      [20, 0],
+      [30, 0],
+    ] as const;
+    const paths = importedPaths(entitiesDxf(cubicSpline(8, knots, controls)));
+    const xs = (paths[0]?.polylines[0]?.points ?? []).map((point) => point.x);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(30, 6);
+  });
+});

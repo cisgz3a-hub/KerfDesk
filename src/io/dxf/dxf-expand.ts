@@ -7,6 +7,7 @@
 import type { CurveSubpath, Polyline, Vec2 } from '../../core/scene';
 import { aciToHex, DXF_DEFAULT_COLOR, trueColorToHex } from './dxf-colors';
 import {
+  DXF_SPLINE_SCALED_LENGTH_CODES,
   arcToPolyline,
   circleToPolyline,
   ellipseToPolyline,
@@ -198,7 +199,8 @@ function convertReadableEntity(entity: RawEntity, scale: number): EntityConversi
 // Classic POLYLINE carries its geometry in VERTEX children, not its own tags,
 // so check both. Everything else keeps all geometry on entity.tags.
 function hasUnreadableEntityGeometry(entity: RawEntity, scale: number): boolean {
-  if (hasUnreadableGeometry(entity.tags, scale)) return true;
+  const lengthCodes = entity.type === 'SPLINE' ? DXF_SPLINE_SCALED_LENGTH_CODES : undefined;
+  if (hasUnreadableGeometry(entity.tags, scale, lengthCodes)) return true;
   return entity.vertexRuns.some((run) => hasUnreadableGeometry(run, scale));
 }
 
