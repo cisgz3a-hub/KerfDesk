@@ -49,6 +49,7 @@ import {
   rotaryAxisStartWarnings,
 } from './rotary-axis-start-warnings';
 import { cncWorkZeroStartIssue } from './cnc-start-advisories';
+import { HOME_MOVED_FOCUS_JOB_WARNING } from '../state/home-moved-focus';
 import type { MachineStartSnapshot } from './start-job-readiness';
 
 export const CNC_REQUIRES_GRBL_MESSAGE =
@@ -71,6 +72,10 @@ export function demotedPolicyWarnings(
   const noLaserModule =
     machineKind === 'laser' ? laserModuleAbsentJobWarning(machine.laserModuleReport) : null;
   if (noLaserModule !== null) warnings.push(noLaserModule);
+  // ADR-322 Amendment 5: this machine's Home moved Z after the height was set.
+  if (machineKind === 'laser' && machine.focusMovedByHome === true) {
+    warnings.push(HOME_MOVED_FOCUS_JOB_WARNING);
+  }
   warnings.push(
     ...cncOverrideStartIssues(project, machine.ovCache, machine.statusReportFieldsOff ?? null),
   );

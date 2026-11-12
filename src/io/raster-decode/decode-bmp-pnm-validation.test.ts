@@ -21,6 +21,12 @@ describe('invalid headless raster input', () => {
     expect([decoded.data[0], decoded.data[4]]).toEqual([0, 200]);
     expect(() => decodePnm(bytes('P5 1 1 255# no raster follows'))).toThrow('malformed');
   });
+  it('ends a header comment at a carriage return (pbm(5), audit O2-P3-4)', () => {
+    // pbm(5): a comment runs "to but not including the next carriage return or
+    // newline". Classic Mac line ends use CR alone.
+    const file = new Uint8Array([...bytes('P5\r# made on a Mac\r1 1\r255\r'), 66]);
+    expect(decodePnm(file).data[0]).toBe(66);
+  });
   it('rejects a BMP palette that overlaps pixel data', () => {
     const input = new Uint8Array(58);
     const view = new DataView(input.buffer);

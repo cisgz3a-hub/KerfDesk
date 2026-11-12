@@ -7,6 +7,7 @@
 // back to it with an ordinary jog, and Job Review says how far it has turned
 // when no Restore is on offer.
 
+import { reportedTurnScale } from '../../core/controllers/grbl/reported-turn-units';
 import { currentJobStopRequest, type RotaryStartTurn } from '../state/job-stop-request';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { useStore } from '../state/store';
@@ -58,9 +59,9 @@ export function currentMachineTurn(state: TurnState, axis: 'A' | 'Z'): number | 
   const report = state.statusReport;
   if (report === null) return null;
   const wco = report.wco ?? state.wcoCache;
-  if (axis === 'A') return machineA(report, wco);
-  const z = machineZ(report, wco);
-  return z === null ? null : z * (state.controllerSettings?.reportInches === true ? 25.4 : 1);
+  const turn = axis === 'A' ? machineA(report, wco) : machineZ(report, wco);
+  // O12-P1-1: under `$13=1` grblHAL reports A in inches unless `$376` marks it.
+  return turn === null ? null : turn * reportedTurnScale(state.controllerSettings, axis);
 }
 
 type Report = NonNullable<LaserState['statusReport']>;

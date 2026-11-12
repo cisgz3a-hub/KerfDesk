@@ -3,6 +3,7 @@ import { createStreamer, step } from '../../core/controllers/grbl';
 import type { LaserState } from '../state/laser-store';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { reportLinkMachineWork, resetLinkMachineWorkForTests } from '../state/link-machine-work';
 import {
   KEEP_AWAKE_HIDDEN_MESSAGE,
   KEEP_AWAKE_HIDDEN_TOAST,
@@ -60,6 +61,25 @@ describe('installActiveJobWakeLock', () => {
     await flush();
 
     expect(request).toHaveBeenCalledWith('screen');
+    uninstall();
+  });
+
+  // Code quality audit C2 D4-P2-1: a Moshi or K40 job streams from this window.
+  it('keeps awake while a controller-link job runs, and lets go after', async () => {
+    const sentinel = new FakeWakeLockSentinel();
+    const request = vi.fn(async () => sentinel);
+    const uninstall = installActiveJobWakeLock({ document, navigator: fakeNavigator(request) });
+    reportLinkMachineWork('lihuiyu-usb', {
+      controller: 'K40',
+      activity: 'running',
+      advisories: [],
+      abort: async () => undefined,
+    });
+    await flush();
+    expect(request).toHaveBeenCalledWith('screen');
+    resetLinkMachineWorkForTests();
+    await flush();
+    expect(sentinel.release).toHaveBeenCalledTimes(1);
     uninstall();
   });
 

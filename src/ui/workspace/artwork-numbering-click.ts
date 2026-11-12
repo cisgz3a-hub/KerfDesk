@@ -8,7 +8,7 @@ import { workspaceHitTest } from './workspace-hit-test';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { canvasTheme } from '../theme/canvas-theme';
-import { canvasMouseToScene, type ViewState } from './view-transform';
+import { canvasMouseToScene, pxToMmForCanvas, type ViewState } from './view-transform';
 
 export type ArtworkNumberingHit =
   | { readonly kind: 'empty' }
@@ -24,10 +24,12 @@ export type ArtworkNumberingHit =
 export function artworkNumberingHit(args: {
   readonly project: Project;
   readonly point: Vec2;
+  /** Scene millimetres per canvas pixel: a click reaches a line by screen distance. */
+  readonly pxToMm: number;
   readonly nextPosition: number;
   readonly assignedUnitKeys: ReadonlyArray<string>;
 }): ArtworkNumberingHit {
-  const objectId = workspaceHitTest(args.project.scene, args.point);
+  const objectId = workspaceHitTest(args.project.scene, args.point, args.pxToMm);
   if (objectId === null) return { kind: 'empty' };
   const unit = artworkRunUnitForObject(args.project.scene, objectId);
   if (unit === null) return { kind: 'empty' };
@@ -65,6 +67,7 @@ export function handleArtworkNumberingPointerDown(args: {
   const hit = artworkNumberingHit({
     project: args.project,
     point,
+    pxToMm: pxToMmForCanvas(args.canvas, args.project, args.viewState),
     nextPosition: ui.artworkNumbering.nextPosition,
     assignedUnitKeys: ui.artworkNumbering.assignedUnitKeys,
   });

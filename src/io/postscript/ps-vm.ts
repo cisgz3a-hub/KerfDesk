@@ -1,7 +1,9 @@
 // The interpreter core: operand and dictionary stacks, execution, graphics
 // state and the current path. Operators live in the ps-ops-* tables.
-// Every executed object costs one step and every path point counts toward a
-// cap, so a hostile or runaway file ends in a clear error, never a hang.
+// Every executed object and every procedure call costs a step, allocations
+// cost their size, every path point counts toward a cap, and the whole run
+// has a time limit, so a hostile or runaway file ends in a clear error, never
+// a hang (ADR-700 Amendment 2).
 
 import { apply, applyDelta, IDENTITY, invert, linearScale } from './ps-matrix';
 import type { PsTokenizer } from './ps-tokenizer';
@@ -23,7 +25,13 @@ export const PS_LIMITS = {
   operands: 100_000,
   callDepth: 256,
   pathPoints: 2_000_000,
+  /** Wall-clock limit for one file, whatever its steps cost. */
+  milliseconds: 5_000,
 } as const;
+
+/** Steps between two looks at the clock. */
+const CLOCK_INTERVAL = 4096;
+const TOO_LONG = 'The file takes too long to draw; it may loop forever.';
 
 export type ColorSpace =
   | { readonly kind: 'gray' | 'rgb' | 'cmyk' }
@@ -66,8 +74,14 @@ export class PsVm {
   /** AI mode: names nobody defined clear the operand stack instead of failing. */
   unknownName: ((name: string) => void) | null = null;
   private steps = 0;
+  private sinceClock = 0;
   private depth = 0;
   private points = 0;
+  private readonly startedAt: number;
+
+  constructor(private readonly clock: () => number = () => performance.now()) {
+    this.startedAt = clock();
+  }
 
   note(code: string, count = 1): void {
     this.notes.set(code, (this.notes.get(code) ?? 0) + count);
@@ -168,7 +182,7 @@ export class PsVm {
 
   /** Execute an object as the interpreter would after looking it up. */
   execute(value: PsValue): void {
-    this.tick();
+    this.charge();
     if (typeof value !== 'object' || value === null) {
       this.push(value);
       return;
@@ -183,9 +197,11 @@ export class PsVm {
     if (this.depth >= PS_LIMITS.callDepth)
       throw new PsError('budget', 'The file calls procedures too deeply.');
     this.depth += 1;
+    // The call itself costs a step, so a loop over an empty procedure ends.
+    this.charge();
     try {
       for (const item of procedure.items) {
-        this.tick();
+        this.charge();
         if (typeof item !== 'object' || item === null) this.push(item);
         else if (item.kind === 'name' && !item.literal) this.executeName(item.name);
         else if (item.kind === 'operator') item.run(this);
@@ -196,10 +212,15 @@ export class PsVm {
     }
   }
 
-  private tick(): void {
-    this.steps += 1;
-    if (this.steps > PS_LIMITS.steps)
-      throw new PsError('budget', 'The file takes too long to draw; it may loop forever.');
+  /** Counts work: one step per object, or an allocation's size. */
+  charge(cost = 1): void {
+    this.steps += cost;
+    if (this.steps > PS_LIMITS.steps) throw new PsError('budget', TOO_LONG);
+    this.sinceClock += cost;
+    if (this.sinceClock < CLOCK_INTERVAL) return;
+    this.sinceClock = 0;
+    if (this.clock() - this.startedAt > PS_LIMITS.milliseconds)
+      throw new PsError('budget', TOO_LONG);
   }
 
   // ---- Path construction, in user space; stored in device space ----

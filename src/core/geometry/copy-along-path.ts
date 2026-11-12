@@ -11,6 +11,7 @@ import type { ArrayPlacement } from '../scene/array-layout';
 import type { Bounds, Vec2 } from '../scene/scene-object';
 import { pointAtDistance, type PathWalk } from './path-walk';
 import { copyScale, scaledGapDistances } from './copy-along-path-scaled-gap';
+import { curveTangent, type GuideCurve } from './copy-along-path-tangent';
 import { normalizeDegrees } from '../math/wrap';
 
 /** Place a number of copies, copies a set distance apart centre to centre, or a set gap apart edge to edge. */
@@ -34,6 +35,8 @@ export type CopyAlongPathSpec = {
 export type CopyAlongPathGuidePath = {
   readonly walk: PathWalk;
   readonly closed: boolean;
+  /** The canonical curve the walk was flattened from, so a rotated copy turns with the curve, not its chord. */
+  readonly curve?: GuideCurve;
 };
 
 export type CopyAlongPathLayout =
@@ -129,7 +132,7 @@ function resolveCopies(
   spec: CopyAlongPathSpec,
   maxCopies: number,
 ): Resolved | CopyAlongPathShortfall {
-  const along = alongPath(guide, source, spec);
+  const along = alongPath(guide, spec);
   const result =
     spec.mode === 'gap'
       ? scaledGapDistances(guide, source, spec, along.startMm, maxCopies)
@@ -139,8 +142,27 @@ function resolveCopies(
   return result.kind === 'ok' ? { ...result, along } : result;
 }
 
+/**
+ * The direction of travel at a distance along the guide: the tangent of the
+ * canonical curve where the guide has one, otherwise the walk's own edge.
+ */
+export function guideTangentAt(guide: CopyAlongPathGuidePath, distanceMm: number): Vec2 {
+  const edge = edgeAtDistance(guide.walk, distanceMm);
+  const curved =
+    guide.curve === undefined
+      ? null
+      : curveTangent(guide.curve, edge, pointAtDistance(guide.walk, distanceMm));
+  return curved ?? edgeDirection(guide.walk, edge);
+}
+
 /** The direction of travel at a distance along the walk: the edge leaving that point, or the last edge at the very end. */
 export function tangentAtDistance(walk: PathWalk, distanceMm: number): Vec2 {
+  return edgeDirection(walk, edgeAtDistance(walk, distanceMm));
+}
+
+// The edge leaving a distance (the end index of that edge), or the last edge
+// with any length at the very end.
+function edgeAtDistance(walk: PathWalk, distanceMm: number): number {
   const { points, cumulative } = walk;
   const last = points.length - 1;
   let edge = last;
@@ -156,8 +178,12 @@ export function tangentAtDistance(walk: PathWalk, distanceMm: number): Vec2 {
   }
   // At the very end, step back over any repeated closing points.
   while (edge > 1 && (cumulative[edge] ?? 0) - (cumulative[edge - 1] ?? 0) <= 0) edge -= 1;
-  const a = points[edge - 1] as Vec2;
-  const b = points[edge] as Vec2;
+  return edge;
+}
+
+function edgeDirection(walk: PathWalk, edge: number): Vec2 {
+  const a = walk.points[edge - 1] as Vec2;
+  const b = walk.points[edge] as Vec2;
   const length = Math.hypot(b.x - a.x, b.y - a.y);
   return length > 0 ? { x: (b.x - a.x) / length, y: (b.y - a.y) / length } : { x: 1, y: 0 };
 }
@@ -167,38 +193,20 @@ type AlongPath = {
   readonly lengthMm: number;
   readonly startMm: number;
   readonly wrap: (distanceMm: number) => number;
-  /** Least centre-to-centre distance between copies at these two distances. */
-  readonly minStep: (from: number, to: number) => number;
+  /** Centre-to-centre distance between neighbouring copies. Only 'count' and 'spacing' step with it: scaledGapDistances lays out 'gap'. */
+  readonly stepMm: number;
 };
 
-function alongPath(
-  guide: CopyAlongPathGuidePath,
-  source: Bounds,
-  spec: CopyAlongPathSpec,
-): AlongPath {
+function alongPath(guide: CopyAlongPathGuidePath, spec: CopyAlongPathSpec): AlongPath {
   const lengthMm = guide.walk.lengthMm;
   const wrap = (distance: number): number => {
     if (!guide.closed) return distance;
     const wrapped = distance % lengthMm;
     return wrapped > lengthMm - FIT_EPS_MM ? 0 : wrapped;
   };
-  const spacing = finite(spec.spacingMm);
-  const extent = (distance: number): number =>
-    extentAlongPath(source, tangentAtDistance(guide.walk, wrap(distance)), spec.rotateCopies);
-  const minStep =
-    spec.mode === 'gap'
-      ? (from: number, to: number) => Math.max(0, spacing) + (extent(from) + extent(to)) / 2
-      : () => spacing;
   const startMm = Math.max(0, finite(spec.startOffsetMm));
-  return { spec, lengthMm, startMm: guide.closed ? wrap(startMm) : startMm, wrap, minStep };
-}
-
-// How far the copy reaches along the guide: its width when it turns with the
-// guide, otherwise the width of its upright box seen along the travel direction.
-function extentAlongPath(source: Bounds, tangent: Vec2, rotateCopies: boolean): number {
-  const width = Math.max(0, source.maxX - source.minX);
-  const height = Math.max(0, source.maxY - source.minY);
-  return rotateCopies ? width : Math.abs(width * tangent.x) + Math.abs(height * tangent.y);
+  const stepMm = finite(spec.spacingMm);
+  return { spec, lengthMm, startMm: guide.closed ? wrap(startMm) : startMm, wrap, stepMm };
 }
 
 function openDistances(along: AlongPath, maxCopies: number): Distances {
@@ -227,12 +235,7 @@ function closedDistances(along: AlongPath, maxCopies: number): Distances {
   // The last copy keeps at least the asked-for distance from the first one
   // round the seam; whatever is left over goes into that last space.
   const seam = start + length;
-  return stepAlong(
-    along,
-    start,
-    (next) => seam - next >= along.minStep(next, seam) - FIT_EPS_MM,
-    maxCopies,
-  );
+  return stepAlong(along, start, (next) => seam - next >= along.stepMm - FIT_EPS_MM, maxCopies);
 }
 
 // Steps until the next copy no longer fits, or until there would be more
@@ -248,7 +251,7 @@ function stepAlong(
   const distances = [start];
   let current = start;
   for (;;) {
-    const next = nextDistance(along, current);
+    const next = current + along.stepMm;
     if (next - current < MIN_STEP_MM) return { kind: 'no-step' };
     if (!fits(next))
       return { kind: 'ok', count: distances.length, at: (index) => distances[index] ?? 0 };
@@ -256,16 +259,6 @@ function stepAlong(
     distances.push(next);
     current = next;
   }
-}
-
-// The next centre: far enough that the two copies keep the spacing or gap.
-// With a gap and upright copies, the next copy's reach depends on where it
-// lands, so the guess is refined twice.
-function nextDistance(along: AlongPath, current: number): number {
-  let next = current + along.minStep(current, current);
-  if (along.spec.mode !== 'gap') return next;
-  for (let pass = 0; pass < 2; pass += 1) next = current + along.minStep(current, next);
-  return next;
 }
 
 function placementAt(
@@ -278,7 +271,7 @@ function placementAt(
   const dx = point.x - centre.x;
   const dy = point.y - centre.y;
   if (!rotateCopies) return { dx, dy, rotationDeg: 0 };
-  const tangent = tangentAtDistance(guide.walk, distance);
+  const tangent = guideTangentAt(guide, distance);
   const rotationDeg = normalizeDegrees((Math.atan2(tangent.y, tangent.x) * 180) / Math.PI);
   return rotationDeg === 0 ? { dx, dy, rotationDeg: 0 } : { dx, dy, rotationDeg, pivot: point };
 }

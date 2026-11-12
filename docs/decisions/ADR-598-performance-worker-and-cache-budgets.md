@@ -285,7 +285,42 @@ reads the held picture with an overlay-sized copy, and makes and compares the
 moved check's thumbnail (ADR-440 Amendment 11, ADR-663 Amendment 6). The
 window decodes only at full size, which stays off its thread. The guard
 `e2e/camera-overlay-mjpeg-ui-thread.e2e.ts` now runs during a streamed job in a
-1920 × 1080 window. It checks for no long task (on CI, none over the larger
-of 100 ms and the job's own worst task without a camera plus 20 ms, capped at
-120 ms), and for no shrink
-and no camera-sized pixel read in the window.
+1920 × 1080 window. It checks for no long task (on CI, none that is the camera's: Amendment 7),
+and for no shrink and no camera-sized pixel read in the window.
+
+### Amendment 7 — On a GPU-less CI runner, a long task fails the camera guard only when it is the camera's (2026-11-12)
+
+The camera overlay guard of Amendment 6 failed main's Browser smoke on
+`aad6efd64` and `5c351a6b3` with camera-phase tasks of 50–130 ms, while its
+job-only control had none. No camera code changed between the last green main
+(`d52c2856b`) and those commits. Reproduced with SwiftShader WebGL and 2–3×
+CPU throttling, a CPU profile named every task:
+
+- Most were the job's own status renders (`handleStatusLine`, `Workspace`,
+  canvas start markers), with 0–3 % camera script on the stack.
+- One was the overlay's first draw, 74–151 ms. With no GPU, WebGL work (the
+  texture upload, the canvas's drawing buffer, the draw) runs on the UI
+  thread; Chrome runs fast WebGL calls inside their caller's frame, so it
+  showed as `bed-overlay-renderer.ts` script. With a GPU the same draw left no
+  long task.
+- The moved check decoded its saved view reference from base64 on every read,
+  twice per check. It now keeps the last decoded reference.
+
+Decision. The guard takes a CPU profile of the camera phase
+(`e2e/fixtures/long-task-attribution.ts`). A long task fails on CI only when
+camera script is on the stack in at least half of its samples. Samples whose
+deepest app frame is the overlay's WebGL wrapper (`bed-overlay-renderer.ts`)
+are counted as the GPU's; the texture's size is checked instead (no upload
+over 1,920 px). The profile must hold over 1,000 samples, so a dead profiler
+cannot pass the guard. Local runs keep the strict 50 ms budget for every
+task. The CI limit of Amendment 6's follow-up and its job-only control are
+removed. A native shrink, which has no script on the stack, stays caught by
+the structural check for no window shrink.
+
+Verification, on this PC:
+
+| Run | Result |
+|---|---|
+| Guard as committed, GPU | passed; no long task |
+| SwiftShader, 2× throttle, CI rule | passed; first draw 143 ms at 7 % camera script |
+| Same, with the moved check's comparison forced into the window | failed: 444 ms and 290 ms tasks at 94–99 % camera script, naming `checkCameraMovedInWorker` |

@@ -13,7 +13,7 @@
 
 import { useEffect } from 'react';
 import { useLaserStore } from '../state/laser-store';
-import { isActiveJob } from '../state/laser-store-helpers';
+import { anyMachineJobActive, useLinkMachineWorkStore } from '../state/link-machine-work';
 import { createHiddenJobKeepAwakeNotice } from './hidden-job-keep-awake-notice';
 
 const KEEP_AWAKE_UNAVAILABLE_MESSAGE =
@@ -42,19 +42,24 @@ export function installActiveJobWakeLock(
   env: WakeLockEnvironment = { document, navigator },
 ): () => void {
   const controller = createScreenWakeLockController(env);
-  let active = isActiveJob(useLaserStore.getState().streamer);
+  // A Moshi or K40 job streams from this window too, and a Ruida upload does:
+  // sleep would cut them off (code quality audit C2 D4-P2-1).
+  let active = anyMachineJobActive();
   if (active) controller.start();
 
-  const unsubscribe = useLaserStore.subscribe((state) => {
-    const nextActive = isActiveJob(state.streamer);
+  const update = (): void => {
+    const nextActive = anyMachineJobActive();
     if (nextActive === active) return;
     active = nextActive;
     if (active) controller.start();
     else controller.stop();
-  });
+  };
+  const unsubscribeLaser = useLaserStore.subscribe(update);
+  const unsubscribeLinks = useLinkMachineWorkStore.subscribe(update);
 
   return () => {
-    unsubscribe();
+    unsubscribeLaser();
+    unsubscribeLinks();
     controller.dispose();
   };
 }

@@ -11,7 +11,13 @@ import { lhyFootprint } from '../../../core/controllers/lihuiyu/lhy-frame';
 import type { CutGroup } from '../../../core/job';
 import type { FakeUsbDevice } from '../../../__fixtures__/usb/fake-usb-device';
 import { UsbLinkOpenError, type UsbLinkAdapter } from '../../../platform/usb-link-types';
-import { LIHUIYU_FRAME_FIRST, LIHUIYU_HOME_FIRST } from './lihuiyu-usb-messages';
+import { installAbortShortcut } from '../../laser/use-job-shortcuts';
+import {
+  activeLinkMachineWork,
+  anyMachineJobActive,
+  resetLinkMachineWorkForTests,
+} from '../link-machine-work';
+import { LIHUIYU_FRAME_FIRST, LIHUIYU_HOME_FIRST, lihuiyuLinkLost } from './lihuiyu-usb-messages';
 import { LIHUIYU_DRIVER_HELP, lihuiyuUsbOpener } from './lihuiyu-usb-opener';
 import { resetLihuiyuUsbStoreForTests, useLihuiyuUsbStore } from './lihuiyu-usb-store';
 import type { LihuiyuUsbJob } from './lihuiyu-usb-types';
@@ -87,7 +93,10 @@ async function connectedHomed(simulator = new LihuiyuSimulator()): Promise<Lihui
   return simulator;
 }
 
-afterEach(() => resetLihuiyuUsbStoreForTests());
+afterEach(() => {
+  resetLihuiyuUsbStoreForTests();
+  resetLinkMachineWorkForTests();
+});
 
 describe('Lihuiyu USB store', () => {
   it('connects, reads status, and refuses Absolute work before Home and Start before Frame', async () => {
@@ -190,6 +199,43 @@ describe('Lihuiyu USB store', () => {
     await started;
     expect(store().phase).toBe('disconnected');
     expect(store().message).toMatch(/unplugged/);
+    // The session is released, so Disconnect or another program can take it
+    // (code quality audit C2 D4-P3-1).
+    expect(device?.calls.some((call) => call.kind === 'close')).toBe(true);
+    expect(activeLinkMachineWork()).toBeNull();
+  });
+
+  it('says a closed link once, without a doubled full stop', () => {
+    expect(lihuiyuLinkLost('timed out.', false)).toBe(
+      'The USB link to the board closed: timed out.',
+    );
+  });
+
+  // Code quality audit C2 D4-P1-1: a K40 job was invisible to every guard.
+  it('reports its job to the app-wide guards, and Ctrl+. resets the board', async () => {
+    const simulator = await connectedHomed();
+    const job = zigzagJob(16);
+    await store().frame(job);
+    const started = store().start(job);
+    await until(() => (store().sending?.sent ?? 0) >= 3, 'three packets');
+    expect(activeLinkMachineWork()).toMatchObject({
+      controller: 'K40',
+      activity: 'running',
+      advisories: job.advisories,
+    });
+    expect(anyMachineJobActive()).toBe(true);
+    const remove = installAbortShortcut(window);
+    try {
+      const key = new KeyboardEvent('keydown', { key: '.', ctrlKey: true, cancelable: true });
+      window.dispatchEvent(key);
+      expect(key.defaultPrevented).toBe(true);
+      await started;
+      await until(() => store().phase === 'idle', 'idle after the reset');
+    } finally {
+      remove();
+    }
+    expect(simulator.resets).toBe(1);
+    expect(activeLinkMachineWork()).toBeNull();
   });
 
   it('opens the CH341 in EPP mode, reads its version, and frames every packet with 0xA6', async () => {

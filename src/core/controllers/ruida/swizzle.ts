@@ -1,7 +1,8 @@
 // Ruida byte scrambling ("swizzle"). Every payload byte in .rd files and UDP
 // packets is scrambled with this reversible transform (magic 0x88 for RDC644x
-// class controllers). Algorithm per the public MeerK40t / EduTech-wiki
-// reverse-engineering work — clean-room reimplementation, no code copied.
+// class controllers). swizzleByte and unswizzleByte follow MeerK40t's
+// swizzle_byte and unswizzle_byte (MIT, meerk40t/ruida/rdjob.py at 7e82652f)
+// statement for statement; attribution in docs/licensing/meerk40t-ruida.txt.
 // NOT hardware-verified in this repo; the unswizzle inverse is property-tested
 // so at minimum the encoder/decoder pair is internally consistent.
 

@@ -47,7 +47,12 @@ describe('bendTextRender', () => {
     const polyline = path.polylines[0];
     const curve = path.curves?.[0];
     if (polyline === undefined || curve === undefined) throw new Error('Bent geometry missing');
-    const [left, middle, right] = polyline.points;
+    // Bending splits each edge into equal pieces (O7-P2-2); the source's middle
+    // point stays the middle one.
+    const points = polyline.points;
+    const left = points[0];
+    const middle = points[(points.length - 1) / 2];
+    const right = points.at(-1);
     if (left === undefined || middle === undefined || right === undefined) {
       throw new Error('Bent points missing');
     }
@@ -92,7 +97,9 @@ describe('bendTextRender', () => {
     };
     for (const bend of [60, -60, 180]) {
       const bent = bendTextRender(marked, bend);
-      const landed = bent.paths[0]?.polylines[0]?.points[x / 10];
+      // Both edges split into the same number of pieces (O7-P2-2).
+      const points = bent.paths[0]?.polylines[0]?.points ?? [];
+      const landed = points[(x / 10) * ((points.length - 1) / 2)];
       expect(bent.anchor?.x).toBeCloseTo(landed?.x ?? NaN, 12);
       expect(bent.anchor?.y).toBeCloseTo(landed?.y ?? NaN, 12);
     }

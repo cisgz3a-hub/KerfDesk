@@ -2,9 +2,9 @@ import { combinedBBox, type AABB, type SceneObject } from '../../core/scene';
 import { canvasTheme } from '../theme/canvas-theme';
 import type { PathNodeRef } from '../state/path-node-edit-actions';
 import { drawPathNodeHandles } from './draw-path-node-handles';
-import { type Handle, HANDLE_SCREEN_PX, handlesFor, selectionFrameFor } from './handles';
+import { type Handle, HANDLE_SCREEN_PX, selectionFrameFor, visibleHandlesFor } from './handles';
 import { ROTATE_HANDLE_OFFSET_PX, rotateHandlePosition } from './rotate-handle';
-import { aabbHandlePoints } from './selection-handles';
+import { visibleAabbHandlePoints } from './selection-handles';
 import { drawSelectionMoveHandle } from './draw-selection-move-handle';
 import { selectionMoveHandlePosition } from './selection-move-handle';
 import type { ViewTransform } from './view-transform';
@@ -61,7 +61,10 @@ export function drawSelectionSetOverlay(
   ctx.strokeStyle = canvasTheme.selection;
   ctx.lineWidth = 1.5;
   const half = HANDLE_SCREEN_PX / 2;
-  for (const handle of aabbHandlePoints(bbox)) drawSingleHandle(ctx, handle, view, half);
+  // Only the handles the box has room for at this zoom (ADR-196 Amendment 1).
+  for (const handle of visibleAabbHandlePoints(bbox, 1 / view.scale)) {
+    drawSingleHandle(ctx, handle, view, half);
+  }
   if (options.moveHandle !== false) drawMoveHandleFor(ctx, objects, view);
 }
 
@@ -113,7 +116,7 @@ function drawHandles(ctx: CanvasRenderingContext2D, obj: SceneObject, view: View
   ctx.strokeStyle = canvasTheme.selection;
   ctx.lineWidth = 1.5;
   const half = HANDLE_SCREEN_PX / 2;
-  for (const h of handlesFor(obj)) drawSingleHandle(ctx, h, view, half);
+  for (const h of visibleHandlesFor(obj, 1 / view.scale)) drawSingleHandle(ctx, h, view, half);
   drawRotateHandle(ctx, obj, view);
   drawMoveHandleFor(ctx, [obj], view);
 }

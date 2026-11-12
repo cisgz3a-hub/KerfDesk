@@ -11,15 +11,20 @@ import { create } from 'zustand';
 import { useLaserStore } from './laser-store';
 import { isActiveJob } from './laser-store-helpers';
 
-export type LinkMachineSource = 'moshi-usb' | 'ruida-network';
+/** Every controller-link store, in the order the bar picks one. Each must
+ *  report its work here (link-machine-work.test.ts checks the stores); the
+ *  K40 link was missed once (code quality audit C2 D4-P1-1). */
+export const LINK_MACHINE_SOURCES = ['moshi-usb', 'lihuiyu-usb', 'ruida-network'] as const;
+
+export type LinkMachineSource = (typeof LINK_MACHINE_SOURCES)[number];
 
 export type LinkMachineWork = {
-  /** The controller, as the bar names it ("Moshiboard", "Ruida"). */
+  /** The controller, as the bar names it ("Moshiboard", "K40", "Ruida"). */
   readonly controller: string;
-  readonly activity: 'framing' | 'running' | 'homing' | 'paused' | 'stopping';
+  readonly activity: 'framing' | 'running' | 'homing' | 'jogging' | 'paused' | 'stopping';
   /** Warnings the compiled job carries; shown while it runs. */
   readonly advisories: ReadonlyArray<string>;
-  /** The link's own stop: the Moshi estop, the Ruida Stop Process. */
+  /** The link's own stop: the Moshi estop, the K40 reset, the Ruida Stop Process. */
   readonly abort: () => Promise<void>;
 };
 
@@ -45,7 +50,11 @@ export function reportLinkMachineWork(
 export function activeLinkMachineWork(
   state: LinkMachineWorkState = useLinkMachineWorkStore.getState(),
 ): LinkMachineWork | null {
-  return state.works['moshi-usb'] ?? state.works['ruida-network'] ?? null;
+  for (const source of LINK_MACHINE_SOURCES) {
+    const work = state.works[source];
+    if (work !== undefined) return work;
+  }
+  return null;
 }
 
 /** A streamed laser job, or work on any controller link. */

@@ -7,6 +7,9 @@ export type MachineExecutionOwner = {
   readonly onMotionOwner?: (id: LaserMotionOperationId) => void;
   /** A command may have reached the controller once this boundary is crossed. */
   readonly onDispatch?: () => void;
+  /** The warn-only jog bounds and no-go texts the PC just showed for this jog (ADR-232),
+   * so a remote receipt can repeat them word for word (ADR-585 Amendment 3). */
+  readonly onMotionWarnings?: (warnings: readonly string[]) => void;
 };
 
 export function assertMachineExecutionOwner(owner?: MachineExecutionOwner): void {
