@@ -6,10 +6,10 @@
 // rotary layer is split into parts by speed class: every cut is classed by the
 // feed that moves the surface at the layer speed, in geometric steps, and
 // each class becomes its own part at that speed. No mid-layer speed command
-// is relied on, since none is verified on a controller. Amendment 7: within a
-// class, runs of cuts keep their path order and are burned nearest first,
-// each from its nearer end, so the laser-off travel between pieces stays
-// short; the strokes still burn in pieces, which Rotary Setup says.
+// is relied on, since none is verified on a controller. Amendments 7 and 8:
+// within a class, runs of cuts keep their path order and burn in the order
+// rd-rotary-order.ts picks, short in laser-off travel and kind to the
+// rotary's backlash; the strokes still burn in pieces, which Rotary Setup says.
 
 import {
   surfaceFeedDoseRise,
@@ -22,6 +22,7 @@ import {
   type RdMotionPart,
   type RdMotionStep,
 } from './rd-motion-plan';
+import { nextGroup, orderedPieceSteps, type Head } from './rd-rotary-order';
 
 /** Speed classes tried in turn, as the ratio between neighbouring classes. */
 const CLASS_STEPS = [1.05, 1.1, 1.2] as const;
@@ -56,9 +57,8 @@ export function splitRdPartsBySurfaceSpeed(
   return null;
 }
 
-/** A run of consecutive cuts in one speed class, in path order. */
-type Piece = { readonly start: RdMotionStep; readonly cuts: RdMotionStep[] };
-type Class = { readonly key: number; readonly speed: number; readonly pieces: Piece[] };
+type Class = { readonly key: number; readonly speed: number; readonly pieces: OpenPiece[] };
+type OpenPiece = { readonly start: RdMotionStep; readonly cuts: RdMotionStep[] };
 type Held = { readonly layerId: string; readonly speed: number; rise: number };
 
 function splitAll(
@@ -69,16 +69,27 @@ function splitAll(
   const out: RdMotionPart[] = [];
   const spread = { min: Number.POSITIVE_INFINITY, max: 0 };
   const held = new Map<string, Held>();
+  let head: Head = { at: null, dir: 0 };
   for (const part of parts) {
     const classes = classifyPart(part, match, classStep, spread, held);
-    // ADR-127 Amd 7 (C2 verify E1-P2-2): classes in speed order, each
-    // burning its pieces nearest first from where the last class ended, so
-    // the laser-off travel between pieces is as short as this order allows.
-    const ordered = [...classes.values()].sort((a, b) => a.key - b.key);
-    let at: RdMotionStep | null = null;
-    for (const group of ordered) {
-      const { steps, end } = nearestFirstSteps(group.pieces, at);
-      at = end;
+    // ADR-127 Amd 7 and 8 (C2 verify E1-P2-2, E3-P2-2): each class burns
+    // whole, its pieces in the order rd-rotary-order.ts picks, and the next
+    // class is the one that order would go on into from where the last left
+    // the head and the rotary.
+    const left = [...classes.values()].sort((a, b) => a.key - b.key);
+    while (left.length > 0) {
+      const [group] = left.splice(
+        nextGroup(
+          left.map((entry) => entry.pieces),
+          head,
+          part.bounds,
+        ),
+        1,
+      );
+      if (group === undefined) break;
+      const next = orderedPieceSteps(group.pieces, head, part.bounds);
+      head = next.head;
+      const steps = next.steps;
       out.push({
         part: out.length,
         group: { ...part.group, speed: group.speed },
@@ -105,7 +116,7 @@ function classifyPart(
   const layerFeed = part.group.speed;
   const classes = new Map<number, Class>();
   let previous: RdMotionStep | null = null;
-  let open: { key: number; piece: Piece } | null = null;
+  let open: { key: number; piece: OpenPiece } | null = null;
   for (const step of part.steps) {
     if (!step.cut || previous === null) {
       open = null;
@@ -135,53 +146,6 @@ function noteHold(held: Map<string, Held>, layerId: string, speed: number, rise:
   else seen.rise = Math.max(seen.rise, rise);
 }
 
-/** A class's pieces in nearest-first order from `from`, each burned from
- *  whichever end is nearer (a vector stroke marks the same either way) and
- *  reached by a laser-off move unless it starts where the last one ended. */
-function nearestFirstSteps(
-  pieces: ReadonlyArray<Piece>,
-  from: RdMotionStep | null,
-): { readonly steps: RdMotionStep[]; readonly end: RdMotionStep | null } {
-  const left = [...pieces];
-  const steps: RdMotionStep[] = [];
-  let at = from;
-  while (left.length > 0) {
-    const { index, piece } = nearestPiece(left, at);
-    left.splice(index, 1);
-    if (at === null || !samePoint(at, piece.start)) {
-      steps.push({ xUm: piece.start.xUm, yUm: piece.start.yUm, cut: false });
-    }
-    for (const cut of piece.cuts) steps.push(cut);
-    at = piece.cuts[piece.cuts.length - 1] ?? piece.start;
-  }
-  return { steps, end: at };
-}
-
-function nearestPiece(
-  pieces: ReadonlyArray<Piece>,
-  at: RdMotionStep | null,
-): { readonly index: number; readonly piece: Piece } {
-  let best = { index: 0, piece: pieces[0] as Piece, distance: Number.POSITIVE_INFINITY };
-  pieces.forEach((piece, index) => {
-    if (at === null) {
-      if (index === 0) best = { index, piece, distance: 0 };
-      return;
-    }
-    const reversed = reversedPiece(piece);
-    for (const candidate of [piece, reversed]) {
-      const distance = Math.hypot(candidate.start.xUm - at.xUm, candidate.start.yUm - at.yUm);
-      if (distance < best.distance) best = { index, piece: candidate, distance };
-    }
-  });
-  return best;
-}
-
-function reversedPiece(piece: Piece): Piece {
-  const points = [piece.start, ...piece.cuts].reverse();
-  const [start, ...rest] = points;
-  return { start: start ?? piece.start, cuts: rest.map((point) => ({ ...point, cut: true })) };
-}
-
 function classify(
   from: RdMotionStep,
   to: RdMotionStep,
@@ -207,10 +171,6 @@ function classify(
     classDose: held / speed,
     holdRise: surfaceFeedDoseRise(layerFeed, a, b, match),
   };
-}
-
-function samePoint(a: RdMotionStep, b: RdMotionStep): boolean {
-  return a.xUm === b.xUm && a.yUm === b.yUm;
 }
 
 function boundsOf(steps: ReadonlyArray<RdMotionStep>): RdBoundsUm {
