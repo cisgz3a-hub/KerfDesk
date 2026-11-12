@@ -18,6 +18,7 @@ import { RGBA_CHANNELS, type PixelRect, type RgbaBuffer } from '../../core/image
 import { compositeLayersInPlace, type EditorLayer } from '../../core/image-layers';
 import { maskBounds, type SelectionMask } from '../../core/image-select';
 import { adjustmentById, runAdjustment, type AdjustmentId } from './editor-adjustments';
+import { BACKGROUND_LAYER_ID } from './editor-layer-clear';
 import type { EditorSession } from './editor-session';
 import type { EditorView } from './image-editor-types';
 
@@ -103,9 +104,10 @@ export function computeWindowPreview(
   const pointwise = adjustmentById(request.id).pointwise;
   const ws = workspaceFor(cache, session, win, pointwise);
   const { id, params, curvePoints } = request;
+  const overWhite = session.activeLayerId === BACKGROUND_LAYER_ID;
   if (ws.activeBase !== null) {
     ws.working.data.set(ws.activeBase.data);
-    runAdjustment(id, params, ws.working, null, ws.mask, curvePoints);
+    runAdjustment(id, params, ws.working, null, ws.mask, curvePoints, undefined, overWhite);
   } else {
     ws.scratch ??= {
       width: session.doc.width,
@@ -114,7 +116,16 @@ export function computeWindowPreview(
     };
     ws.scratch.data.set(session.doc.data);
     const clip = selectionBounds(session.selection);
-    runAdjustment(id, params, ws.scratch, clip, session.selection, curvePoints);
+    runAdjustment(
+      id,
+      params,
+      ws.scratch,
+      clip,
+      session.selection,
+      curvePoints,
+      undefined,
+      overWhite,
+    );
     sampleWindowInto(ws.scratch, win, ws.working);
   }
   return composite(ws);
