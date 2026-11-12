@@ -185,6 +185,7 @@ export const CNC_STROKE_FONTS = [
     attribution: [
       'Created by Sheldon B. Michaels; SVG font conversion by Windell H. Oskay',
       'Derivative of Nixie One; designer Jovanny Lemonad',
+      'Nixie One: Copyright (c) 2011 by Jovanny Lemonad (http://www.jovanny.ru)',
     ],
   },
   {
@@ -197,6 +198,8 @@ export const CNC_STROKE_FONTS = [
     attribution: [
       'Created by Sheldon B. Michaels; SVG font conversion by Windell H. Oskay',
       'Derivative of Petit Formal Script; designer Impallari Type',
+      'Petit Formal Script: Copyright (c) 2011, Pablo Impallari, Brenda Gallo and Rodrigo ' +
+        'Fuenzalida, with Reserved Font Name Petit Formal Script (not used by this derivative)',
     ],
   },
   {
@@ -209,6 +212,7 @@ export const CNC_STROKE_FONTS = [
     attribution: [
       'Created by Sheldon B. Michaels; SVG font conversion by Windell H. Oskay',
       'Derivative of Covered By Your Grace; designer Kimberly Geswein',
+      'Covered By Your Grace: Copyright (c) 2010, Kimberly Geswein (kimberlygeswein.com)',
     ],
   },
 ];
@@ -287,10 +291,52 @@ export function sha256File(file) {
   return createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
+// LICENSE, LICENCE, LICENSE.md, LICENSE-MIT and the like, plus the COPYING and
+// NOTICE files whose text Apache-2.0 §4(d) and similar terms require to travel
+// with the code (O11-P3-3).
+export const LICENSE_FILE_NAME = /^(?:licen[sc]e|copying|notice)(?:$|[._-])/i;
+
+// Development dependencies whose code the build copies into what ships, so the
+// `--prod` closure never sees them (O11-P3-1, ADR-017 Amendment 3):
+// vite-plugin-pwa's register hook and workbox-window run in the app bundle
+// (src/ui/app/PwaUpdateWatcher.tsx), the six Workbox modules make up the
+// generated service-worker runtime (vite.config.ts `workbox`), and the MCP
+// client is bundled into the desktop's MCP workspace view
+// (electron/mcp/workspace-app-ui.ts, built by services/remote-control).
+export const BUNDLED_BUILD_PACKAGES = [
+  {
+    name: 'vite-plugin-pwa',
+    shippedIn: 'web and desktop app bundle (service-worker register hook)',
+  },
+  { name: 'workbox-window', shippedIn: 'web and desktop app bundle' },
+  { name: 'workbox-cacheable-response', shippedIn: 'service-worker runtime' },
+  { name: 'workbox-core', shippedIn: 'service-worker runtime' },
+  { name: 'workbox-expiration', shippedIn: 'service-worker runtime' },
+  { name: 'workbox-precaching', shippedIn: 'service-worker runtime' },
+  { name: 'workbox-routing', shippedIn: 'service-worker runtime' },
+  { name: 'workbox-strategies', shippedIn: 'service-worker runtime' },
+  { name: '@modelcontextprotocol/client', shippedIn: 'desktop MCP workspace view' },
+];
+
+// Packages bundled into the desktop's MCP workspace view from the phone
+// service's own closure (services/remote-control), which the root install does
+// not contain. Their LICENSE file is byte-identical to the named root package's,
+// whose full text these notices reproduce; the generator checks both the version
+// the phone service pins and the root file's hash.
+export const DESKTOP_MCP_VIEW_PACKAGES = [
+  {
+    name: '@modelcontextprotocol/ext-apps',
+    version: '2.0.3',
+    license: 'MIT (package metadata); LICENSE file: Apache-2.0 with retained MIT terms',
+    sameLicenseAs: '@modelcontextprotocol/server',
+    licenseSha256: '0382b0057770ca05e9c350a50aa3b1c1fea84da0bc81d723bf00b9aa841be58a',
+  },
+];
+
 function packageLicenseFiles(depDir) {
   return fs
     .readdirSync(depDir)
-    .filter((entry) => /^licen[sc]e(?:$|[._-])/i.test(entry))
+    .filter((entry) => LICENSE_FILE_NAME.test(entry))
     .sort(compareText);
 }
 
@@ -356,8 +402,9 @@ function isInside(parent, child) {
   return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
 }
 
-function readPnpmLicenseInventory(rootDir) {
-  const raw = execSync('pnpm licenses list --prod --json', {
+export function readPnpmLicenseInventory(rootDir = REPO_ROOT, scope = '--prod') {
+  if (scope !== '--prod' && scope !== '--dev') throw new Error(`unknown pnpm scope: ${scope}`);
+  const raw = execSync(`pnpm licenses list ${scope} --json`, {
     cwd: rootDir,
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
@@ -385,15 +432,15 @@ function webUrl(...candidates) {
   return null;
 }
 
-export function collectProductionPackages(rootDir = REPO_ROOT) {
+function packagesFromInventory(rootDir, byLicense, keepName) {
   const nodeModules = path.join(rootDir, 'node_modules');
   const packages = new Map();
-  const byLicense = readPnpmLicenseInventory(rootDir);
   for (const [groupLicense, entries] of Object.entries(byLicense).sort(([a], [b]) =>
     compareText(a, b),
   )) {
     if (!Array.isArray(entries)) throw new Error(`invalid pnpm license group: ${groupLicense}`);
     for (const entry of entries) {
+      if (!keepName(entry.name)) continue;
       if (!Array.isArray(entry.paths) || entry.paths.length === 0) {
         throw new Error(`pnpm returned no installed path for ${entry.name}`);
       }
@@ -439,10 +486,57 @@ export function collectProductionPackages(rootDir = REPO_ROOT) {
       }
     }
   }
-  if (packages.size === 0) throw new Error('pnpm reported zero production packages');
   return [...packages.values()].sort(
     (a, b) => compareText(a.name, b.name) || compareText(a.version, b.version),
   );
+}
+
+export function collectProductionPackages(rootDir = REPO_ROOT) {
+  const packages = packagesFromInventory(rootDir, readPnpmLicenseInventory(rootDir), () => true);
+  if (packages.length === 0) throw new Error('pnpm reported zero production packages');
+  return packages;
+}
+
+// The BUNDLED_BUILD_PACKAGES as installed, with their licence texts. Fails when a
+// listed package is missing or installed at more than one version, so a move in
+// the build's bundling surfaces here instead of shipping unlisted code.
+export function collectBundledBuildPackages(rootDir = REPO_ROOT, byLicense = undefined) {
+  const inventory = byLicense ?? readPnpmLicenseInventory(rootDir, '--dev');
+  const wanted = new Map(BUNDLED_BUILD_PACKAGES.map((entry) => [entry.name, entry]));
+  const packages = packagesFromInventory(rootDir, inventory, (name) => wanted.has(name));
+  for (const name of wanted.keys()) {
+    const found = packages.filter((dependency) => dependency.name === name);
+    if (found.length !== 1) {
+      throw new Error(`bundled build package ${name} is installed ${found.length} times`);
+    }
+  }
+  return packages.map((dependency) => ({
+    ...dependency,
+    shippedIn: wanted.get(dependency.name).shippedIn,
+  }));
+}
+
+// DESKTOP_MCP_VIEW_PACKAGES checked against the phone service's pinned versions
+// and the root package whose LICENSE they share.
+export function verifyDesktopMcpViewPackages(rootDir = REPO_ROOT) {
+  const servicesManifest = JSON.parse(
+    fs.readFileSync(path.join(rootDir, 'services/remote-control/package.json'), 'utf8'),
+  );
+  return DESKTOP_MCP_VIEW_PACKAGES.map((entry) => {
+    const pinned = servicesManifest.dependencies?.[entry.name];
+    if (pinned !== entry.version) {
+      throw new Error(
+        `desktop MCP view package ${entry.name} is pinned at ${pinned}, reviewed ${entry.version}`,
+      );
+    }
+    const shared = path.join(rootDir, 'node_modules', entry.sameLicenseAs, 'LICENSE');
+    if (!fs.existsSync(shared) || sha256File(shared) !== entry.licenseSha256) {
+      throw new Error(
+        `${entry.sameLicenseAs} LICENSE no longer matches ${entry.name}'s reviewed text`,
+      );
+    }
+    return entry;
+  });
 }
 
 export function collectElectronPackage(rootDir = REPO_ROOT) {

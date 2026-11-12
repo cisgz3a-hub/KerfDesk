@@ -125,17 +125,12 @@ overrides:
   # Build-only cache correctness update; preserve the parent's ^4.0.0 API.
   # The max-stale advisory is disputed, so this is not a verified security fix.
   'cacheable-request@7.0.4>http-cache-semantics': 4.3.0
-  # GHSA-hp3w-g68c-fv3c (sprintf-js precision DoS) has no patched release.
-  # electron-builder's @electron/get 3.x pulls it via its optional proxy edge
-  # global-agent 3 -> roarr. global-agent 4 drops roarr and keeps the same
-  # CommonJS bootstrap() that @electron/get calls; build-only, no prod change.
-  # 4.1.3 is patched below so proxied HTTPS keeps working.
-  global-agent@<4.0.0: 4.1.3
-# global-agent 4.1.3 only applies TLS options (SNI servername, ca,
-# rejectUnauthorized) when the caller sets `secureEndpoint`, which got 11 in
-# @electron/get never does, so HTTPS through an HTTP CONNECT proxy fails with
-# ERR_TLS_CERT_ALTNAME_INVALID (gajus/global-agent#83). The patch restores
-# 3.0.0's `this.protocol === 'https:'` check, as in the unmerged upstream fix
-# gajus/global-agent#86. Drop it once a fixed release ships.
-patchedDependencies:
-  global-agent@4.1.3: patches/global-agent@4.1.3.patch
+  # electron-builder's @electron/get 3.x reaches sprintf-js through its optional
+  # proxy edge global-agent 3 -> roarr (GHSA-hp3w-g68c-fv3c, withdrawn
+  # 2026-10-22). global-agent 4 drops roarr and keeps the same CommonJS
+  # bootstrap() that @electron/get calls; build-only, no prod change. 4.1.4+
+  # applies TLS options (SNI servername, ca, rejectUnauthorized) for every
+  # https: request again (gajus/global-agent#83, fixed by #86), so HTTPS
+  # through an HTTP CONNECT proxy works without the local patch 4.1.3 needed
+  # (O11-P3-13).
+  global-agent@<4.0.0: 4.1.7

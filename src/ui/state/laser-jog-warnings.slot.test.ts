@@ -95,6 +95,19 @@ describe('jog warning slot', () => {
     );
   });
 
+  // ADR-585 Amendment 3: a remote jog's receipt repeats what the PC showed.
+  it('returns the on-screen text of each finding, which joined is the toast', () => {
+    configureBed([
+      { id: 'clamp', name: 'Clamp', enabled: true, x: 390, y: 0, width: 5, height: 300 },
+    ]);
+
+    const returned = warnJogMotionPolicy(set, get, { dx: 30, feed: 1000 }, { x: 380, y: 10 });
+
+    expect(returned).toHaveLength(2);
+    expect(returned.join(' ')).toBe(toasts()[0]?.message);
+    expect(warnJogMotionPolicy(set, get, { dx: -1, feed: 1000 }, { x: 200, y: 10 })).toEqual([]);
+  });
+
   it('rewrites the slot when the next jog finds something else', () => {
     warnJogMotionPolicy(set, get, { dx: 1, feed: 1000 });
     const first = toasts()[0]?.id;

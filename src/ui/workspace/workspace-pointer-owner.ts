@@ -1,5 +1,14 @@
 import type { MutableRefObject, PointerEvent as ReactPointerEvent } from 'react';
 import type { DragState } from './drag-state';
+import {
+  dragWaitsForTravel,
+  pressAllowsMove,
+  pressReleaseFor,
+  pressTravelFor,
+  type PressRef,
+  type PressRelease,
+  type PressTravel,
+} from './drag-threshold';
 import { capturePointer, releasePointer } from './pointer-capture';
 import type { useWorkspaceDragDeps } from './workspace-drag-deps';
 import { cancelWorkspaceDrag } from './workspace-drag-cancel';
@@ -23,12 +32,14 @@ export type OwnedPointerHandlers = {
 export function createOwnedPointerHandlers(args: {
   readonly getCanvas: () => HTMLCanvasElement | null;
   readonly activePointerId: ActivePointerRef;
+  /** The owning press and its travel (drag-threshold.ts). */
+  readonly press: PressRef;
   readonly drag: DragState | null;
   readonly deps: WorkspaceDragDeps;
   readonly setDrag: SetDrag;
   readonly createDrag: (event: CanvasPointerEvent) => DragState | null;
   readonly move: (event: CanvasPointerEvent) => void;
-  readonly finish: (event: CanvasPointerEvent, drag: DragState) => void;
+  readonly finish: (event: CanvasPointerEvent, drag: DragState, release: PressRelease) => void;
 }): OwnedPointerHandlers {
   const cancel = (event: CanvasPointerEvent, releaseCapture: boolean): void =>
     cancelOwnedPointerDrag({
@@ -46,12 +57,17 @@ export function createOwnedPointerHandlers(args: {
         canvas: args.getCanvas(),
         pointerId: event.pointerId,
         activePointerId: args.activePointerId,
+        press: args.press,
+        pressTravel: pressTravelFor(event),
         deps: args.deps,
         setDrag: args.setDrag,
         createDrag: () => args.createDrag(event),
       }),
     onPointerMove: (event) => {
-      if (pointerOwnsMove(args.activePointerId, args.drag, event.pointerId)) args.move(event);
+      if (!pointerOwnsMove(args.activePointerId, args.drag, event.pointerId)) return;
+      // A press on artwork or a handle drags nothing until it has travelled.
+      const { beginInteraction } = args.deps;
+      if (pressAllowsMove(args.press.current, args.drag, event, beginInteraction)) args.move(event);
     },
     onPointerUp: (event) =>
       finishOwnedPointerDrag({
@@ -61,7 +77,7 @@ export function createOwnedPointerHandlers(args: {
         drag: args.drag,
         deps: args.deps,
         setDrag: args.setDrag,
-        finish: (drag) => args.finish(event, drag),
+        finish: (drag) => args.finish(event, drag, pressReleaseFor(args.press.current, event)),
       }),
     onPointerCancel: (event) => cancel(event, true),
     onLostPointerCapture: (event) => cancel(event, false),
@@ -80,11 +96,14 @@ export function beginOwnedPointerDrag(args: {
   readonly canvas: HTMLCanvasElement | null;
   readonly pointerId: number;
   readonly activePointerId: ActivePointerRef;
+  readonly press: PressRef;
+  readonly pressTravel: PressTravel;
   readonly deps: WorkspaceDragDeps;
   readonly setDrag: SetDrag;
   readonly createDrag: () => DragState | null;
 }): void {
   if (args.activePointerId.current !== null) return;
+  args.press.current = args.pressTravel;
   useUiStore.getState().closeWorkspaceContextBar();
   args.deps.setSnapGuides([]);
   const drag = args.createDrag();
@@ -159,10 +178,17 @@ function initializeDragSurface(drag: DragState, deps: WorkspaceDragDeps): void {
     deps.setSelectionMarquee({ start: drag.startScenePoint, end: drag.startScenePoint });
   } else if (drag.kind === 'measure') {
     deps.setMeasureDraft({ start: drag.startScenePoint, end: drag.startScenePoint });
-  } else if (drag.kind !== 'pan' && drag.kind !== 'draw' && drag.kind !== 'warp-handle') {
+  } else if (
+    drag.kind !== 'pan' &&
+    drag.kind !== 'draw' &&
+    drag.kind !== 'warp-handle' &&
+    !dragWaitsForTravel(drag)
+  ) {
     // Draw commits own one atomic history entry, and a Warp or Deform handle
     // changes no project data; only mutating live drags need the rollback
-    // snapshot used by cancellation and pointer-capture loss.
+    // snapshot used by cancellation and pointer-capture loss. Move, scale and
+    // rotate take theirs when the press has travelled (drag-threshold.ts):
+    // until then they have written nothing to roll back.
     deps.beginInteraction();
   }
 }

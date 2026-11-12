@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { bulgeSegment, sampleArc, sampleCircle, sampleEllipse } from './dxf-curve-sampling';
+import {
+  bulgeSegment,
+  normalizedSweep,
+  sampleArc,
+  sampleCircle,
+  sampleEllipse,
+} from './dxf-curve-sampling';
 
 describe('bulgeSegment', () => {
   it('a quarter-circle bulge stays on the analytic circle', () => {
@@ -75,5 +81,43 @@ describe('sampleEllipse', () => {
     const maxY = Math.max(...points.map((p) => p.y));
     expect(Math.abs(maxY - 20)).toBeLessThanOrEqual(EXTREME_TOLERANCE_MM);
     expect(Math.abs(maxX - 10)).toBeLessThanOrEqual(EXTREME_TOLERANCE_MM);
+  });
+});
+
+describe('normalizedSweep (ADR-700 Amd 2)', () => {
+  const TURN = Math.PI * 2;
+  /** The former loop, for comparison on ordinary parameters. */
+  function looped(start: number, end: number): number {
+    let sweep = end - start;
+    while (sweep <= 0) sweep += TURN;
+    return Math.min(sweep, TURN);
+  }
+
+  it('matches the former loop on ordinary parameters', () => {
+    const cases: Array<[number, number]> = [
+      [0, 1],
+      [1, 0],
+      [0, 0],
+      [0, TURN],
+      [TURN, 0],
+      [-1, 2],
+      [5, -9],
+      [0, 3 * TURN],
+      [2, 2 - TURN],
+    ];
+    for (const [start, end] of cases) expect(normalizedSweep(start, end)).toBe(looped(start, end));
+  });
+
+  it('works out any parameters in one step, within one turn', () => {
+    for (const [start, end] of [
+      [1e20, 0],
+      [0, -1e20],
+      [1e12, 3],
+      [Number.MAX_VALUE, -Number.MAX_VALUE],
+    ] as const) {
+      const sweep = normalizedSweep(start, end);
+      expect(sweep).toBeGreaterThan(0);
+      expect(sweep).toBeLessThanOrEqual(TURN);
+    }
   });
 });

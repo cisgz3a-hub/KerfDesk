@@ -11,6 +11,7 @@ import { SafetyNoticeBanner } from '../laser/SafetyNoticeBanner';
 import { useStore } from '../state';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
+import { activeLinkMachineWork } from '../state/link-machine-work';
 import { unownedControllerMotion } from '../state/unowned-controller-motion';
 import { turnUnownedOutputOff, unownedControllerOutput } from '../state/unowned-controller-output';
 import { saveProjectNow } from './confirm-discard';
@@ -25,6 +26,8 @@ export const machineSoftwareAbort: SoftwareAbort = {
   isMotionLive: () => {
     const s = useLaserStore.getState();
     return (
+      // A Moshi, K40 or Ruida link job (code quality audit C2 D4-P2-2).
+      activeLinkMachineWork() !== null ||
       isActiveJob(s.streamer) ||
       s.controllerOperation !== null ||
       s.motionOperation !== null ||
@@ -36,6 +39,11 @@ export const machineSoftwareAbort: SoftwareAbort = {
   trigger: () => {
     const laser = useLaserStore.getState();
     const machineKind = projectMachineKind();
+    // A link job gets its own stop when the laser store runs nothing, as
+    // Ctrl+. picks it (stopShortcutAction).
+    const link = activeLinkMachineWork();
+    if (link !== null && !isActiveJob(laser.streamer) && laser.motionOperation === null)
+      return link.abort();
     // A laser left on at Idle gets M5, as LASER OFF sends it, not a reset that
     // would clear the work origin (rolling audit v5 J2-P2-1).
     if (unownedControllerOutput(laser, machineKind) !== null) {

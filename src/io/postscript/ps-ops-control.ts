@@ -155,6 +155,7 @@ export const DICT_OPS: OpTable = {
     const count = vm.popInteger();
     const start = vm.popInteger();
     const source = vm.pop();
+    vm.charge(Math.max(0, Math.min(count, MAX_COMPOSITE)));
     if (typeof source === 'object' && source?.kind === 'string')
       vm.push(psString(source.value.slice(start, start + count)));
     else if (typeof source === 'object' && source?.kind === 'array')
@@ -356,6 +357,7 @@ function size(vm: PsVm): number {
   const n = vm.popInteger();
   if (n < 0 || n > MAX_COMPOSITE)
     throw new PsError('limitcheck', 'An array or string is too large.');
+  vm.charge(n); // a large allocation costs what it builds (ADR-700 Amd 2)
   return n;
 }
 

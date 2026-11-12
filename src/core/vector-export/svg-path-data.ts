@@ -2,7 +2,7 @@
 //
 // Two encodings:
 //   * full precision (grid === null): absolute commands, every coordinate
-//     printed with String(value) — the historical exporter's exact form.
+//     printed as its shortest round-trip decimal without an exponent.
 //   * grid (a power-of-ten step): every line/cubic coordinate is snapped to
 //     the grid once, then written as RELATIVE integer grid differences
 //     (l/h/v/c/m). Differences of integers are exact, so relative commands
@@ -189,9 +189,20 @@ function pointText(p: Vec2): string[] {
   return [exactNumber(p.x), exactNumber(p.y)];
 }
 
+// The shortest round-trip decimal, without an exponent: SVG's grammar allows
+// "1e-16", but simple path readers in cutter and CAM tools often do not
+// (audit O2-P3-8). A tiny value keeps every significant digit it had.
 function exactNumber(value: number): string {
   if (!Number.isFinite(value)) throw new Error('Artwork contains a non-finite coordinate.');
-  return String(value);
+  const text = String(value);
+  const exponentAt = text.indexOf('e');
+  if (exponentAt < 0) return text;
+  const exponent = Number(text.slice(exponentAt + 1));
+  const fractionDigits = text.slice(0, exponentAt).split('.')[1]?.length ?? 0;
+  const decimals = fractionDigits - exponent;
+  // Beyond toFixed's range (|value| >= 1e21 or < 1e-83) keep the exact form.
+  if (exponent > 0 || decimals > 100) return text;
+  return value.toFixed(decimals);
 }
 
 /**

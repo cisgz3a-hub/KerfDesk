@@ -17,6 +17,7 @@ import { resetRequiredBlockMessage } from './controller-reset-required';
 import { startControllerCommand } from './laser-interactive-command';
 import { continueControllerOperation } from './laser-controller-operation';
 import { beginOwnedReportUnitsLine } from './owned-report-units';
+import { FOCUS_SET_PATCH } from './home-moved-focus';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -180,6 +181,8 @@ function completionPatch(
       ...(state.controllerOperation?.kind === 'autofocus' ? { controllerOperation: null } : {}),
       workZZeroEvidence: null,
       workZReferenceEpoch: state.workZReferenceEpoch + 1,
+      // A fresh focus height: a Home before it no longer matters (ADR-322 Amd 5).
+      ...FOCUS_SET_PATCH,
     };
   }
   if (result.kind !== 'timeout' && result.kind !== 'motion-uncertain') {

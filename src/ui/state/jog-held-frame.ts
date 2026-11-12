@@ -22,6 +22,7 @@ import {
 } from './laser-motion-operation';
 import type { LaserState } from './laser-store';
 import { isActiveJob } from './laser-store-helpers';
+import { FOCUS_SET_PATCH } from './home-moved-focus';
 
 type JogAxes = { readonly dz?: number; readonly da?: number };
 
@@ -29,7 +30,7 @@ type JogStartPatch = Pick<
   LaserState,
   'motionOperation' | 'frameVerification' | 'framedRun' | 'frameTrace'
 > &
-  Partial<Pick<LaserState, 'completedFrame' | 'completedFrameRunOwner'>>;
+  Partial<Pick<LaserState, 'completedFrame' | 'completedFrameRunOwner' | 'focusMovedByHomeEpoch'>>;
 
 const movesOnlyXy = (axes: JogAxes): boolean => (axes.dz ?? 0) === 0 && (axes.da ?? 0) === 0;
 
@@ -43,7 +44,13 @@ export function jogStartPatch(
   axes: JogAxes,
   options: { readonly voidsFrame?: boolean } = {},
 ): JogStartPatch {
-  const cleared = { frameVerification: null, framedRun: null, frameTrace: null };
+  // A Z jog is how a height is set by hand, so it ends a Home reminder (ADR-322 Amendment 5).
+  const cleared = {
+    frameVerification: null,
+    framedRun: null,
+    frameTrace: null,
+    ...((axes.dz ?? 0) === 0 ? {} : FOCUS_SET_PATCH),
+  };
   const frame = options.voidsFrame === true ? null : frameHeldThroughJog(state, axes);
   if (frame === null) return { motionOperation: operation, ...cleared };
   return {

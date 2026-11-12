@@ -8,16 +8,26 @@ import {
 } from '../scene';
 import type { TextRenderResult } from './text-to-polylines';
 import { coloredPathsBounds } from './colored-paths-bounds';
+import { subdivideColoredPathForWarp } from './warp-subdivision';
 
 export const TEXT_BEND_MIN_DEG = -180;
 export const TEXT_BEND_MAX_DEG = 180;
+// Each piece mapped onto the arc turns at most 1°: a straight piece then sits
+// within 0.004 % of the radius of its arc (O7-P2-2).
+const BEND_PIECE_RAD = Math.PI / 180;
 
 export function bendTextRender(rendered: TextRenderResult, bendDeg: number): TextRenderResult {
   const angleDeg = clampBend(bendDeg);
   const width = rendered.bounds.maxX - rendered.bounds.minX;
   if (Math.abs(angleDeg) < 1e-9 || width <= 0) return rendered;
-  const bend = bendPointMapper(rendered.bounds, (angleDeg * Math.PI) / 180);
-  const paths = rendered.paths.map((path) => bendColoredPath(path, bend));
+  const angleRad = (angleDeg * Math.PI) / 180;
+  const bend = bendPointMapper(rendered.bounds, angleRad);
+  // The map is not affine, so a segment mapped by its ends alone would stay a
+  // straight chord across the arc: split it first.
+  const grid = { maxStepX: (width / Math.abs(angleRad)) * BEND_PIECE_RAD };
+  const paths = rendered.paths.map((path) =>
+    bendColoredPath(subdivideColoredPathForWarp(path, grid), bend),
+  );
   const bounds = coloredPathsBounds(paths);
   return normalizeBentPaths(
     paths,

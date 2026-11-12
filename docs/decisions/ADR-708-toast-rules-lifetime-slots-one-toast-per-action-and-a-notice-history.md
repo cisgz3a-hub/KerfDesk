@@ -50,7 +50,9 @@ Each finding was reproduced on `main` before it was changed.
      Cancel Jog to stop it."
 
    The console log keeps every full sentence, one line per finding per jog, as before. The jog is
-   still sent unchanged. A Frame's route warnings are not jog clicks and stay as they were.
+   still sent unchanged. A Frame's route warnings are not jog clicks and stay as they were. A remote
+   jog's receipt (ADR-585 Amendment 3) repeats the text the PC showed, so it carries this on-screen
+   wording.
 5. **One toast per action** (`folded-notice.ts`). An action's result and its notes are one keyed
    toast:
    - the result is the first line;

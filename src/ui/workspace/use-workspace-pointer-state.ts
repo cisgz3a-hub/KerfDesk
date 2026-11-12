@@ -2,16 +2,21 @@ import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from '
 import { useStore } from '../state/store';
 import { useUiStore } from '../state/ui-store';
 import type { DragState } from './drag-state';
+import type { PressTravel } from './drag-threshold';
 import { clearOwnedPointerDrag } from './workspace-pointer-owner';
 import { clearSnapFeedback } from './workspace-pointer-snap';
 
 export function useWorkspacePointerState(ref: RefObject<HTMLCanvasElement | null>) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const activePointerId = useRef<number | null>(null);
+  // Where the owning press went down and whether it has travelled. A ref, not
+  // state: two pointer moves can arrive before React renders between them.
+  const press = useRef<PressTravel | null>(null);
   const cancelPending = useRef<() => void>(() => undefined);
   const documentEpoch = useStore((state) => state.projectDocumentEpoch);
   const clearDrag = useCallback(() => {
     cancelPending.current();
+    press.current = null;
     clearOwnedPointerDrag({ canvas: ref.current, activePointerId, setDrag });
   }, [ref]);
   const previousEpoch = useRef(documentEpoch);
@@ -25,5 +30,5 @@ export function useWorkspacePointerState(ref: RefObject<HTMLCanvasElement | null
     clearSnapFeedback();
     useStore.getState().setCursorMm(null);
   }, [clearDrag, documentEpoch]);
-  return { drag, setDrag, activePointerId, cancelPending, documentEpoch, clearDrag };
+  return { drag, setDrag, activePointerId, press, cancelPending, documentEpoch, clearDrag };
 }

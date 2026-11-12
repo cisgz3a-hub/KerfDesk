@@ -9,6 +9,7 @@ all rights reserved — see `LICENSE`. Versions up to and including the
 The tables below are a readable summary of selected libraries and bundled
 fonts. The generated `public/third-party-notices.txt` is the release input: it
 enumerates the complete installed `pnpm licenses list --prod` closure, the
+development packages the build bundles into the app (listed below), the
 Electron npm package license, bundled outline/CNC fonts, and all eight pinned
 OpenClipart CC0 assets. Desktop packaging separately fails closed unless the
 artifact retains Electron's native Windows notices and the explicitly bundled
@@ -47,6 +48,13 @@ the status codes and the send order. No MeerK40t source file is bundled. The
 attribution and full permission notice are in `docs/licensing/meerk40t-moshi.txt`
 and are included in the generated release notices.
 
+The Ruida support (ADR-697) follows MeerK40t (MIT) `meerk40t/ruida/rdjob.py` at
+commit `7e82652f75dcab39413492e60ed5b60e5c0ad7b6` for the opcode table, operand
+layouts and record order, and carries over its `swizzle_byte` and
+`unswizzle_byte` byte scrambling statement for statement. The scope and full
+MIT notice are in `docs/licensing/meerk40t-ruida.txt` and are included in the
+generated release notices.
+
 The Blue Noise dither (ADR-649) transcribes the integer error-filter weights
 from Appendix I of Victor Ostromoukhov, "A Simple and Efficient
 Error-Diffusion Algorithm" (SIGGRAPH 2001). The paper states the author's
@@ -59,21 +67,21 @@ generated release notices.
 |---|---|---|
 | react, react-dom | MIT | © Meta Platforms, Inc. and affiliates — https://github.com/facebook/react |
 | zustand | MIT | © 2019 Paul Henschel — https://github.com/pmndrs/zustand |
-| three | MIT | © 2010-2024 three.js authors — https://github.com/mrdoob/three.js |
+| three | MIT | © 2010-2025 three.js authors — https://github.com/mrdoob/three.js |
 | dompurify | MPL-2.0 OR Apache-2.0 | © Cure53 and other contributors — https://github.com/cure53/DOMPurify |
 | @csstools/css-calc 2.1.4, @csstools/css-parser-algorithms 3.0.5, @csstools/css-tokenizer 3.0.4 | MIT | © 2022 Romain Menke, Antonio Laguna — https://github.com/csstools/postcss-plugins |
 | opentype.js | MIT | © 2020 Frederik De Bleser — https://github.com/opentypejs/opentype.js |
 | harfbuzzjs 1.6.3 / HarfBuzz | MIT / Old MIT | HarfBuzz contributors — https://github.com/harfbuzz/harfbuzzjs; native notices included separately |
-| bidi-js 1.1.0 | MIT | Loov Communications — https://github.com/lojjic/bidi-js |
+| bidi-js 1.1.0 | MIT | © 2021 Jason Johnston — https://github.com/lojjic/bidi-js |
 | Unicode 17 script data | Unicode-3.0 | © Unicode, Inc. — https://www.unicode.org/Public/17.0.0/ucd/ |
 | ag-psd 31.0.3 | MIT | Agamnentzar — https://github.com/Agamnentzar/ag-psd |
 | fflate 0.8.3 | MIT | © 2026 Arjun Barrett — https://github.com/101arrowz/fflate |
 | PackingSolver 49bf6c7 and its solver dependencies | MIT, with permissive runtime notices | Florian Fontan and contributors — https://github.com/fontanf/packingsolver |
 | imagetracerjs | Unlicense (public domain) | András Jankovics — https://github.com/jankovicsandras/imagetracerjs |
-| clipper2-ts | BSL-1.0 (Boost Software License 1.0) | Port of Angus Johnson's Clipper2 — https://github.com/ErikSom/Clipper2-ts |
-| lucide-static | ISC | © Lucide Contributors — https://github.com/lucide-icons/lucide |
+| clipper2-ts | BSL-1.0 (Boost Software License 1.0) | Angus Johnson (original Clipper2); TypeScript port by Jeremy Tribby — https://github.com/countertype/clipper2-ts |
+| lucide-static (website icons only: `website/lib/icons.mjs`) | ISC, plus MIT for the icons derived from Feather | © Lucide Icons and Contributors; Feather icons © 2013-present Cole Bemis — https://github.com/lucide-icons/lucide |
 | @tabler/icons 3.43.0 | MIT | © 2020-2026 Paweł Kuna and Tabler Icons contributors — https://github.com/tabler/tabler-icons/tree/v3.43.0 |
-| @modelcontextprotocol/server, @modelcontextprotocol/core 2.3.1 (desktop and MCP relay) | Apache-2.0 and historical MIT, as described by the packages' licence transition notice | Anthropic, PBC and MCP contributors — https://github.com/modelcontextprotocol/typescript-sdk |
+| @modelcontextprotocol/server, @modelcontextprotocol/core 2.3.1 (desktop and MCP relay) | Apache-2.0 and historical MIT, as described by the packages' licence transition notice | © Model Context Protocol a Series of LF Projects, LLC. — https://github.com/modelcontextprotocol/typescript-sdk |
 | zod 4.6.7 | MIT | © Colin McDonnell — https://github.com/colinhacks/zod |
 | ws 8.22.0 (desktop relay connection) | MIT | © Einar Otto Stangvik and contributors — https://github.com/websockets/ws |
 | @cloudflare/workers-oauth-provider 1.2.1 (phone and MCP service) | MIT | © 2025 Cloudflare, Inc. — https://github.com/cloudflare/workers-oauth-provider |
@@ -82,8 +90,21 @@ The MCP packages' `package.json` metadata says Apache-2.0 from 2.3.0 and MIT
 before it, while their actual `LICENSE` files include the Apache-2.0 transition
 notice, full Apache-2.0 terms and retained historical MIT terms. The generated
 release notices reproduce those complete
-files; the metadata label does not replace them. The MCP client and WebSocket
-TypeScript declarations are development-only dependencies.
+files; the metadata label does not replace them. The WebSocket TypeScript
+declarations are development-only.
+
+**Development packages the build bundles.** Some code reaches the shipped app
+from development dependencies, so `pnpm licenses list --prod` does not see it.
+The generated release notices reproduce each one's licence under
+"Development packages the build bundles into the app", and `pnpm license-check`
+checks their licences too (ADR-017 Amendment 3):
+
+| Package | License | Copyright / source | Where it ships |
+|---|---|---|---|
+| vite-plugin-pwa 1.3.0 | MIT | © 2020-present Anthony Fu — https://github.com/vite-pwa/vite-plugin-pwa | update-prompt hook in the app bundle |
+| workbox-window 7.4.1 | MIT | © 2018 Google LLC — https://github.com/GoogleChrome/workbox | app bundle |
+| workbox-core, -precaching, -routing, -strategies, -expiration, -cacheable-response 7.4.1 | MIT | © 2018 Google LLC — https://github.com/GoogleChrome/workbox | generated service-worker runtime |
+| @modelcontextprotocol/client 2.3.1, @modelcontextprotocol/ext-apps 2.0.3 | Apache-2.0 and historical MIT (same LICENSE file as the MCP server package) | © Model Context Protocol a Series of LF Projects, LLC. | the desktop's MCP workspace view |
 
 The offline native engine closure is separately pinned and verified by
 `scripts/offline-engine-assets.mjs`. Its complete notices (including HarfBuzz,
@@ -99,8 +120,10 @@ Its licence gate checks both the installed closure and that generated file.
 The MIT / ISC permission notices ("Permission is hereby granted, free of charge, …
 THE SOFTWARE IS PROVIDED "AS IS"…"), the Apache-2.0 / MPL-2.0 texts (DOMPurify),
 and the Boost Software License 1.0 text (clipper2-ts) apply to their respective
-packages above; full texts ship in each package under `node_modules/<pkg>/LICENSE`
-and in the bundle's `@license` banners. imagetracerjs is released into the public
+packages above. Their full texts ship in the generated `third-party-notices.txt`
+(served with the web app and installed as `legal/third-party-notices.txt` on
+desktop); the web deploy ships no `node_modules`, and only some bundled
+libraries keep an `@license` banner. imagetracerjs is released into the public
 domain under the Unlicense.
 
 ---
@@ -113,14 +136,14 @@ copyright notice and license to accompany the font in any distribution.
 
 | Font | License | Copyright / source attribution |
 |---|---|---|
-| Roboto Regular | Apache-2.0 | Copyright 2011 Google Inc. |
+| Roboto Regular | Apache-2.0 | Copyright 2015 Google Inc. |
 | Poppins Regular | OFL-1.1 | Copyright 2020 The Poppins Project Authors (https://github.com/itfoundry/Poppins); Indian Type Foundry, Jonny Pinhorn, Ninad Kale |
 | Tinos Regular | OFL-1.1 | Copyright 2026 The Tinos Project Authors (https://github.com/googlefonts/tinos); designed by Steve Matteson, Monotype Imaging Inc. |
 | Tinos Bold | OFL-1.1 | Copyright 2026 The Tinos Project Authors (https://github.com/googlefonts/tinos); designed by Steve Matteson, Monotype Imaging Inc. |
-| Inconsolata Regular | OFL-1.1 | Copyright The Inconsolata Project Authors (Raph Levien) |
+| Inconsolata Regular | OFL-1.1 | Copyright 2006 The Inconsolata Project Authors (https://github.com/cyrealtype/Inconsolata); Raph Levien |
 | Courier Prime Regular | OFL-1.1 | Copyright 2015 The Courier Prime Project Authors (https://github.com/quoteunquoteapps/CourierPrime); Alan Dague-Greene |
-| Pacifico Regular | OFL-1.1 | Copyright The Pacifico Project Authors (Vernon Adams) |
-| Dancing Script Regular | OFL-1.1 | Copyright The Dancing Script Project Authors (Pablo Impallari) |
+| Pacifico Regular | OFL-1.1 | Copyright 2018 The Pacifico Project Authors (https://github.com/googlefonts/Pacifico); Vernon Adams |
+| Dancing Script Regular | OFL-1.1 | Copyright 2016 The Dancing Script Project Authors (https://github.com/googlefonts/DancingScript), with Reserved Font Name **Dancing Script**; Pablo Impallari |
 | Great Vibes Regular | OFL-1.1 | Embedded font: Copyright 2010 The Great Vibes Pro Project Authors; upstream OFL: Copyright 2015 The Great Vibes Pro Project Authors (https://github.com/googlefonts/great-vibes); Robert Leuschke |
 | Allura Regular | OFL-1.1 | Copyright 2010 The Allura Project Authors (https://github.com/googlefonts/allura); Robert Leuschke |
 | Alex Brush Regular | OFL-1.1 | Copyright 2011 The Alex Brush Project Authors (https://github.com/googlefonts/alex-brush); Robert Leuschke |
@@ -131,25 +154,27 @@ copyright notice and license to accompany the font in any distribution.
 | Cinzel Decorative Regular | OFL-1.1 | Copyright (c) 2012 Natanael Gama (info@ndiscovered.com), with Reserved Font Name **Cinzel** |
 | Anton Regular | OFL-1.1 | Copyright 2020 The Anton Project Authors (https://github.com/googlefonts/AntonFont); Vernon Adams |
 | Special Elite Regular | Apache-2.0 | Copyright (c) 2010 by Brian J. Bonislawsky DBA Astigmatic (AOETI) |
-| UnifrakturMaguntia Book | OFL-1.1 | Copyright (c) 2010 j. 'mach' wust **with Reserved Font Name UnifrakturMaguntia** |
+| UnifrakturMaguntia Book | OFL-1.1 | Copyright (c) 2010 j. 'mach' wust **with Reserved Font Name UnifrakturMaguntia**; Copyright (c) 2009 Peter Wiegel |
 | Stardos Stencil Regular | OFL-1.1 | Copyright (c) 2011 by Vernon Adams |
 | Saira Stencil One Regular | OFL-1.1 | Copyright 2019 The Saira Stencil Project Authors (https://github.com/Omnibus-Type/Saira); Hector Gatti, Omnibus-Type |
 | Relief SingleLine | OFL-1.1 | Copyright 2021/2022 The Relief SingleLine Project Authors; François Chastanet, Noëlie Dayma, Élisa Garzelli |
-| EMS Nixish | OFL-1.1 | Created by Sheldon B. Michaels; converted by Windell H. Oskay; derivative of Nixie One by Jovanny Lemonad |
-| EMS Decorous Script | OFL-1.1 | Created by Sheldon B. Michaels; converted by Windell H. Oskay; derivative of Petit Formal Script by Impallari Type |
-| EMS Casual Hand | OFL-1.1 | Created by Sheldon B. Michaels; converted by Windell H. Oskay; derivative of Covered By Your Grace by Kimberly Geswein |
+| EMS Nixish | OFL-1.1 | Created by Sheldon B. Michaels; converted by Windell H. Oskay; derivative of Nixie One, Copyright (c) 2011 by Jovanny Lemonad |
+| EMS Decorous Script | OFL-1.1 | Created by Sheldon B. Michaels; converted by Windell H. Oskay; derivative of Petit Formal Script, Copyright (c) 2011 Pablo Impallari, Brenda Gallo and Rodrigo Fuenzalida (Reserved Font Name Petit Formal Script, not used by the derivative) |
+| EMS Casual Hand | OFL-1.1 | Created by Sheldon B. Michaels; converted by Windell H. Oskay; derivative of Covered By Your Grace, Copyright (c) 2010 Kimberly Geswein |
+| Liberation Sans Regular, Bold, Italic, Bold Italic (PDF import fallback only) | OFL-1.1 | Digitized data copyright (c) 2010 Google Corporation, with Reserved Font Arimo, Tinos and Cousine; Copyright (c) 2012 Red Hat, Inc., with Reserved Font Name **Liberation** (release 2.1.5) |
 
 - **Apache-2.0** (Roboto, Special Elite): full text at
   https://www.apache.org/licenses/LICENSE-2.0 — the license and any `NOTICE`
   file must accompany the distribution.
-- **SIL Open Font License 1.1** (the twenty-three OFL fonts): full text at
+- **SIL Open Font License 1.1** (the twenty-three OFL text fonts and the four Liberation Sans PDF fallbacks): full text at
   https://openfontlicense.org — the above copyright/source notices and this
   license must be bundled with the fonts; the fonts may be redistributed but
   not sold on their own, and Reserved Font Names must not be reused for
   modified versions. The four CNC sources, pinned commits, canonical source
   hashes, and complete metadata attribution ship in
   `public/third-party-notices.txt`.
-- **Reserved Font Names declared:** UnifrakturMaguntia, Parisienne, and Cinzel.
+- **Reserved Font Names declared:** UnifrakturMaguntia, Parisienne, Cinzel,
+  Dancing Script, and Liberation (with Arimo, Tinos and Cousine).
   We ship these fonts unmodified under their own names, which the OFL permits;
   a *modified* version may not reuse the reserved name. These declarations
   come from the fonts' copyright records and original distribution licenses.
@@ -166,11 +191,10 @@ before use. Great Vibes and Pinyon Script have different copyright years in
 their embedded font records and upstream license files; both notices are
 preserved without alteration.
 
-> Maintainer follow-up (recommended for belt-and-suspenders): ship the verbatim
-> `OFL.txt` / Apache `LICENSE` files alongside the fonts. The exact copyright
-> strings are no longer a manual check — `generate-third-party-notices.mjs`
-> reads them out of each `.ttf`'s `name` table and fails the build if a
-> copyright record is missing.
+The exact copyright strings are not a manual check:
+`generate-third-party-notices.mjs` reads them out of each `.ttf`'s `name` table
+and fails the build if a copyright record is missing. The calligraphy fonts'
+upstream `OFL.txt` files and the Liberation `LICENSE` are reproduced verbatim.
 
 ## Test-only font fixture
 

@@ -28,6 +28,7 @@ import { inferCurrentMachinePosition } from './infer-machine-position';
 import { resolveNativeBedFrame, selectNativeBedEvidence } from './native-bed-frame';
 import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
+import type { MachineExecutionOwner } from './machine-execution-owner';
 import { useStore } from './store';
 import { useToastStore } from './toast-store';
 
@@ -45,22 +46,50 @@ type JogWarning = { readonly log: string; readonly toast: string };
 export const JOG_POLICY_TOAST_KEY = 'jog-motion-policy';
 
 /** `start` overrides the reported position for a step queued behind running
- *  steps, which starts where they end (ADR-674); null there means unknown. */
+ *  steps, which starts where they end (ADR-674); null there means unknown.
+ *  Returns the warnings it published, in order, so a remote jog's receipt can
+ *  carry the text the PC showed (ADR-585 Amendment 3): the on-screen wording
+ *  of each finding, which the PC joins into its one toast slot (ADR-708). The
+ *  console log keeps the longer sentences. */
 export function warnJogMotionPolicy(
   set: SetFn,
   get: GetFn,
   params: JogParams,
   start?: Point | null,
+): readonly string[] {
+  const warnings = jogMotionPolicyWarnings(get, params, start);
+  publishJogWarnings(set, get, warnings);
+  return warnings.map((warning) => warning.toast);
+}
+
+/** An owned jog's warnings, also handed to its owner so a remote receipt
+ *  repeats them (ADR-585 Amendment 3). Published first, whoever owns the jog:
+ *  `owner?.f?.(warn())` would skip the PC's own warning when there is no owner. */
+export function warnJogAndReport(
+  set: SetFn,
+  get: GetFn,
+  params: JogParams,
+  owner?: MachineExecutionOwner,
 ): void {
+  const warnings = warnJogMotionPolicy(set, get, params);
+  owner?.onMotionWarnings?.(warnings);
+}
+
+function found(warnings: ReadonlyArray<JogWarning | null>): ReadonlyArray<JogWarning> {
+  return warnings.filter((warning): warning is JogWarning => warning !== null);
+}
+
+function jogMotionPolicyWarnings(
+  get: GetFn,
+  params: JogParams,
+  start?: Point | null,
+): ReadonlyArray<JogWarning> {
   const path = resolveJogXyPath(get, params, start);
-  if (path === null) {
-    publishJogWarnings(set, get, [unresolvedJogXyPathWarning(params)]);
-    return;
-  }
+  if (path === null) return found([unresolvedJogXyPathWarning(params)]);
   const device = useStore.getState().project.device;
   const bedPath = bedJogPath(get(), device, path);
-  if (bedPath === null) return;
-  publishJogWarnings(set, get, [
+  if (bedPath === null) return [];
+  return found([
     jogTargetOutsideConfiguredBoundsWarning(device, bedPath.target),
     jogNoGoZoneCrossingWarning(device, bedPath),
   ]);
@@ -192,8 +221,7 @@ function jogNoGoZoneCrossingWarning(device: DeviceProfile, path: JogXyPath): Jog
 // Warn-only (ADR-232): the jog is never refused or changed here. Each finding
 // is logged in full; the screen gets one slot holding this jog's findings, so
 // a second finding cannot overwrite the first and a repeat rewrites in place.
-function publishJogWarnings(set: SetFn, get: GetFn, found: ReadonlyArray<JogWarning | null>): void {
-  const warnings = found.filter((warning): warning is JogWarning => warning !== null);
+function publishJogWarnings(set: SetFn, get: GetFn, warnings: ReadonlyArray<JogWarning>): void {
   if (warnings.length === 0) return;
   useToastStore
     .getState()

@@ -22,7 +22,7 @@ The result is a deliberately tiny runtime tree — **10 packages**, read from `p
 | `dompurify` | `3.4.17` | SVG sanitization (untrusted input) | ADR-017; `PROJECT.md:475` requires ≥ 3.3.2 |
 | `imagetracerjs` | `^1.2.6` | Multi-colour trace fallback, **UI-unreachable** | ADR-123 (`DECISIONS.md:6492`) |
 | `electron-updater` | `6.8.10` | Desktop update feed, **inert** until signing exists | ADR-024/135 |
-| `lucide-static` | `^1.23.0` | Icon assets | **UNDECIDED — no ADR** found for this package |
+| `lucide-static` | `^1.23.0` | Website icons (`website/lib/icons.mjs`); the app no longer imports it | ADR-105; RESEARCH_LOG.md |
 
 Notable *absences*, each deliberate:
 
