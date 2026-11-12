@@ -143,3 +143,32 @@ describe('PDF paths and whole-page fallback', () => {
     expect(result.svg).toContain('40 30 Z');
   });
 });
+
+describe('zero-width strokes (E1-P1-4)', () => {
+  const square = [0, 10, 40, 1, 20, 40, 1, 20, 60, 1, 10, 60];
+
+  function colours(fnArray: number[], argsArray: unknown[][]): string[] {
+    const result = pdfVectorPage({ fnArray, argsArray }, OPS, viewport);
+    expect(result.reason).toBeNull();
+    const object = parseSvg({ svgText: result.svg ?? '', id: 'pdf', source: 'page' }).object;
+    return (object?.paths ?? []).map((path) => path.color).sort();
+  }
+
+  it('keeps a 0 w hairline beside a stroked path', () => {
+    expect(
+      colours(
+        [OPS.setLineWidth, 58, 91, OPS.setLineWidth, 58, 91],
+        [[0], ['#ff0000'], [20, [line], null], [2], ['#0000ff'], [20, [square], null]],
+      ),
+    ).toEqual(['#0000ff', '#ff0000']);
+  });
+
+  it('keeps a 0 w hairline beside a fill-only path', () => {
+    expect(
+      colours(
+        [OPS.setLineWidth, 58, 91, 59, 91],
+        [[0], ['#ff0000'], [20, [line], null], ['#0000ff'], [22, [square], null]],
+      ),
+    ).toEqual(['#0000ff', '#ff0000']);
+  });
+});

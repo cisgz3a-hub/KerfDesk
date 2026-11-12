@@ -43,6 +43,16 @@ describe('arcSweep', () => {
     expect(arcSweep(start, end)).toBe(looped(start, end));
   });
 
+  it.each([
+    [152.2, 512.2],
+    [1.4, 361.40000000000003],
+    [0, 360.00000000000006],
+    [152.2, -207.8],
+    [1.4, -358.6],
+  ])('keeps the full circle %s° → %s° written with rounded decimals', (start, end) => {
+    expect(arcSweep(start, end)).toBe(TURN);
+  });
+
   it('works out any angles in one step, within one turn', () => {
     for (const [start, end] of [
       [1e20, 0],
