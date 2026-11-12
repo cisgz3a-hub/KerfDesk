@@ -11,6 +11,7 @@ import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capabi
 import type { ToastVariant } from '../state/toast-store';
 import type { ProjectOpenCompletionContext } from './project-open-completion';
 import { claimProjectOpenRequest } from './project-open-request-owner';
+import { pickFilesToOpen } from './pick-files-to-open';
 import { pickPreparedSaveTarget } from './pick-prepared-save-target';
 import { portableProjectAssets } from './portable-project-assets';
 import type { PagedRasterAssetReader } from '../import/paged-raster-hydration';
@@ -36,10 +37,16 @@ export async function openProjectTemplate(ctx: OpenTemplateContext): Promise<voi
   );
   const project = ctx.getProject();
   try {
-    const files = await ctx.platform.pickFilesForOpen({
-      accept: ['.lf2template'],
-      multiple: false,
-    });
+    // The Save changes? question may have outlasted the click (ADR-656 Amendment 5).
+    const files = await pickFilesToOpen(
+      ctx.platform,
+      { accept: ['.lf2template'], multiple: false },
+      {
+        title: 'Open template',
+        choice: 'the template to open',
+        stillWanted: owner.isCurrent,
+      },
+    );
     if (!owner.isCurrent()) return;
     const file = files[0];
     if (file === undefined) return;

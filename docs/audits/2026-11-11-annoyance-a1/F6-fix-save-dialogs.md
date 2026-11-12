@@ -60,7 +60,8 @@ So the stack is now at most **Save changes?**, the OS save picker and the OS ope
 **Choose file…** is gone from it for a project validated within 5 s. Before, a large project
 needed that click every time.
 
-**What remains (not fixed here, and the same on `main` for small projects):** the open picker
+**What remained (not fixed in F6, and the same on `main` for small projects; fixed in the
+follow-up below):** the open picker
 runs on the click that answered **Save changes?**. A person who takes more than 5 s in the save
 picker leaves it no activation, so Chromium refuses it and Open ends in the toast "Could not
 open project: Failed to execute 'showOpenFilePicker' on 'Window': Must be handling a user
@@ -70,6 +71,52 @@ then threw the error real Chromium was measured to throw. A fix would ask for a 
 ("Saved. Choose the project to open.") when the activation has lapsed, as
 `pickPreparedSaveTarget` does for saves. The same applies to **Open template** behind the same
 question. A project that already has a file is not affected: it saves with no picker.
+
+## A4-P3-2: the remainder, fixed
+
+**Decision:** [ADR-656 Amendment 5](../../decisions/ADR-656-amendment-5-an-open-that-outlasted-its-click-asks-for-a-fresh-one.md). A follow-up to F6, in its own change.
+
+**Reproduced first, on unchanged code.** Chrome through Playwright against `vite --mode desktop`.
+A project with one imported square and no file. Real key presses (the route, then Enter on
+**Save**), a save picker stub held open for a set time, an open picker stub that recorded
+`navigator.userActivation.isActive` and threw Chromium's `SecurityError` when it was false, and
+plain waits with no page calls. Times are from the start of the route.
+
+| Route | Save picker open for | Open picker asked | `isActive` | Result |
+|---|---|---|---|---|
+| Ctrl+O | 6 s | 7,923 ms | false | "Could not open project: Failed to execute 'showOpenFilePicker' on 'Window': Must be handling a user gesture to show a file picker." |
+| Toolbar **Open** | 6 s | 7,929 ms | false | the same toast |
+| **File → Open template** | 6 s | 8,044 ms | false | "Could not open template: Failed to execute 'showOpenFilePicker' …" |
+| Ctrl+O (control) | 1 s | 2,740 ms | true | the open picker opened |
+
+Not refuted. The brief named two routes; the check found a third. Ctrl+O does not go through
+`openProjectCommand`: `shortcuts.ts` calls `handleOpenProject` itself.
+
+**The fix.** `pickFilesToOpen` (`src/ui/app/pick-files-to-open.ts`) now asks for the file inside
+`handleOpenProject` and `openProjectTemplate`. While the activation is live it opens the picker
+at once. Once it has lapsed it shows the fresh-click dialog that saves already use, titled
+**Open project** or **Open template**: "`<name>` is saved. Choose the project to open." with
+**Cancel** and **Choose file…** (focused). The Open's guards (request epoch, document epoch,
+project revision, `stillAllowed`) are asked again while the dialog waits and at the click.
+
+**The same check after the fix.**
+
+| Route | Save picker open for | What appeared | Open picker |
+|---|---|---|---|
+| Ctrl+O | 6 s | **Open project**, 14 ms after "Saved project to untitled.lf2" | asked on Enter (**Choose file…** had the focus), `isActive` true, no error toast |
+| Toolbar **Open** | 6 s | **Open project**, 13 ms after the save | the same |
+| **File → Open template** | 6 s | **Open template**, 17 ms after the save | the same |
+| Ctrl+O (control) | 1 s | no dialog | asked 2 ms after the save, `isActive` true, as before |
+
+**Also changed.** A file dialog that is still refused for want of a click now reads "The file
+dialog did not open, because too much time had passed since your last click or key press. Try
+again." in place of the browser's exception text (open, save and folder pickers).
+
+**Checks for this follow-up.** Unit: `pick-files-to-open.test.ts` (10 tests),
+`open-after-slow-save.test.ts` (10), `SaveReadyDialog.test.tsx` (4) and the new cases in
+`web-adapter.test.ts` (5), with the suites that open projects and templates. E2E in Chrome:
+`e2e/open-after-slow-save.e2e.ts` (4 tests: quick save with no dialog, slow save with
+**Choose file…**, Cancel, Open template). No shared e2e fixture changed.
 
 ## Checks
 

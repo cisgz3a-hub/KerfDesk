@@ -1,6 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { chromiumDirectory, installChromiumSavePicker } from './chromium-save-picker.test-support';
-import { BROWSER_CANNOT_OPEN_FILES, BROWSER_CANNOT_SAVE_FILES, webAdapter } from './web-adapter';
+import {
+  chromiumDirectory,
+  installChromiumSavePicker,
+  installTransientActivation,
+  lapseUserActivation,
+} from './chromium-save-picker.test-support';
+import {
+  BROWSER_CANNOT_OPEN_FILES,
+  BROWSER_CANNOT_SAVE_FILES,
+  FILE_DIALOG_NEEDS_A_CLICK,
+  webAdapter,
+} from './web-adapter';
 
 const originalSavePickerDescriptor = Object.getOwnPropertyDescriptor(window, 'showSaveFilePicker');
 const originalDirectoryPickerDescriptor = Object.getOwnPropertyDescriptor(
@@ -253,6 +263,75 @@ describe('webAdapter open picker', () => {
     await expect(
       webAdapter.pickFilesForOpen({ multiple: false, accept: ['.lf2'] }),
     ).rejects.toThrow(BROWSER_CANNOT_OPEN_FILES);
+  });
+
+  describe('a picker refused for want of a click (ADR-656 Amendment 5)', () => {
+    const gestureError = (): DOMException =>
+      new DOMException(
+        "Failed to execute 'showOpenFilePicker' on 'Window': Must be handling a user gesture to show a file picker.",
+        'SecurityError',
+      );
+    let restoreActivation: (() => void) | null = null;
+    afterEach(() => {
+      restoreActivation?.();
+      restoreActivation = null;
+    });
+    const refuse = (picker: 'showOpenFilePicker' | 'showSaveFilePicker', error: unknown): void => {
+      Object.defineProperty(window, picker, {
+        configurable: true,
+        value: vi.fn(async () => {
+          throw error;
+        }),
+      });
+    };
+
+    it('says so in plain words instead of the browser exception text', async () => {
+      restoreActivation = lapseUserActivation();
+      refuse('showOpenFilePicker', gestureError());
+
+      const refused = webAdapter.pickFilesForOpen({ multiple: false, accept: ['.lf2'] });
+
+      await expect(refused).rejects.toThrow(FILE_DIALOG_NEEDS_A_CLICK);
+      await expect(refused).rejects.not.toThrow(/showOpenFilePicker|user gesture/);
+    });
+
+    it('says the same for a save picker', async () => {
+      restoreActivation = lapseUserActivation();
+      refuse('showSaveFilePicker', gestureError());
+
+      await expect(webAdapter.pickFileForSave(saveRequest)).rejects.toThrow(
+        FILE_DIALOG_NEEDS_A_CLICK,
+      );
+    });
+
+    it('recognises the refusal by its text where the activation cannot be read', async () => {
+      refuse('showOpenFilePicker', gestureError());
+
+      await expect(
+        webAdapter.pickFilesForOpen({ multiple: false, accept: ['.lf2'] }),
+      ).rejects.toThrow(FILE_DIALOG_NEEDS_A_CLICK);
+    });
+
+    it('leaves a SecurityError raised during a live click as it came', async () => {
+      const activation = installTransientActivation();
+      restoreActivation = activation.restore;
+      refuse('showOpenFilePicker', new DOMException('Blocked by policy', 'SecurityError'));
+
+      await expect(
+        webAdapter.pickFilesForOpen({ multiple: false, accept: ['.lf2'] }),
+      ).rejects.toThrow('Blocked by policy');
+    });
+
+    it('still reads a dismissed picker as no file', async () => {
+      restoreActivation = lapseUserActivation();
+      const dismissed = new Error('The user aborted a request.');
+      dismissed.name = 'AbortError';
+      refuse('showOpenFilePicker', dismissed);
+
+      await expect(
+        webAdapter.pickFilesForOpen({ multiple: false, accept: ['.lf2'] }),
+      ).resolves.toEqual([]);
+    });
   });
 
   it('remembers the picked handle so Recent Projects can reopen the file', async () => {

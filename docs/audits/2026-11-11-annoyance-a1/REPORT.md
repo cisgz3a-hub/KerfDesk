@@ -294,6 +294,8 @@ A recovery attempt that failed blocks Review for five minutes (`state/recovery/r
 
 **Fix status (F6, ADR-656 Amendment 4):** A4-P3-2 is reduced, not closed. Reproduced as four steps for a large project with no file. It is now at most three (Save changes?, the OS save picker, the OS open picker): a project validated within 5 s opens its save picker by itself. Left open: when the save picker stays open for more than 5 s, the open picker has no click left to run on and Open ends in an error toast; pressing Open again works. That holds for small projects on `main` too. Record: [F6-fix-save-dialogs.md](F6-fix-save-dialogs.md).
 
+**Fix status (follow-up, ADR-656 Amendment 5):** A4-P3-2 is closed. The remainder was reproduced first, with real key presses and a save picker held open for 6 s: Ctrl+O, the toolbar **Open** and **Open template** each asked for the open picker with no click left (`navigator.userActivation.isActive` false) and ended in the error toast. An Open that outlasted its click now shows a small dialog, **Open project** or **Open template** ("`<name>` is saved. Choose the project to open."), with **Choose file…** and **Cancel**. The picker opens inside that click. **Cancel** keeps the saved project. A quick save is unchanged and shows no extra dialog. A picker that is still refused says so in plain words. Record: [F6-fix-save-dialogs.md](F6-fix-save-dialogs.md), "A4-P3-2: the remainder, fixed".
+
 ### A4 checked and sound
 
 - Import size limits are advisories only (ADR-228).
