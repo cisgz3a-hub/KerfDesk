@@ -1,0 +1,254 @@
+// T15 shared helpers: fixtures, fake worker, G-code decoder and an independent oracle.
+import { writeFileSync } from 'node:fs';
+import { act, createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { Simulate } from 'react-dom/test-utils';
+import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../t13-main/src/core/devices';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type Layer, type Project, type RasterImage } from '../t13-main/src/core/scene';
+import { prepareOutput } from '../t13-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t13-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t13-main/src/ui/state/store';
+import { resetStore } from '../t13-main/src/ui/state/test-helpers';
+import { computePhotoEngravingPreview } from '../t13-main/src/ui/raster/photo-engraving-preview';
+import type { PhotoEngravingPreviewInput, PhotoEngravingPreviewResult } from '../t13-main/src/ui/raster/photo-engraving-preview-types';
+import { PhotoEngravingDialogHost } from '../t13-main/src/ui/raster/PhotoEngravingDialogHost';
+import { openPhotoEngraving, usePhotoEngravingStore } from '../t13-main/src/ui/raster/photo-engraving-store';
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+export function logger(path: string): (s: string) => void {
+  const lines: string[] = [];
+  return (s: string) => { lines.push(s); writeFileSync(path, lines.join('\n')); };
+}
+export const st = () => useStore.getState();
+export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+// ---------- fake worker: runs the real worker function on a structured clone ----------
+export const workerLog: { input: PhotoEngravingPreviewInput; result: PhotoEngravingPreviewResult; maxEdge: number }[] = [];
+class FakeWorker {
+  onmessage: ((e: MessageEvent) => void) | null = null;
+  onerror: (() => void) | null = null;
+  onmessageerror: (() => void) | null = null;
+  terminated = false;
+  postMessage(data: { id: number; input: PhotoEngravingPreviewInput; maxEdge: number }): void {
+    const cloned = structuredClone(data);
+    setTimeout(() => {
+      if (this.terminated) return;
+      const result = computePhotoEngravingPreview(cloned.input, cloned.maxEdge);
+      workerLog.push({ input: cloned.input, result, maxEdge: cloned.maxEdge });
+      this.onmessage?.({ data: { id: cloned.id, result } } as MessageEvent);
+    }, 0);
+  }
+  terminate(): void { this.terminated = true; }
+}
+(globalThis as { Worker?: unknown }).Worker = FakeWorker;
+
+// ---------- fixture ----------
+export function photoLuma(W: number, H: number, seed = 7): Uint8Array {
+  let s = seed >>> 0;
+  const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  const l = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const dx = (x - W * 0.45) / W, dy = (y - H * 0.5) / H;
+    let v = 70 + 150 * Math.exp(-(dx * dx + dy * dy) * 6) + (rnd() - 0.5) * 30;
+    if (x > W * 0.85) v = 255; // removed background
+    if (x < W * 0.08 && y < H * 0.25) v = 20 + rnd() * 15; // dark corner (hair)
+    l[y * W + x] = Math.max(0, Math.min(255, Math.round(v)));
+  }
+  return l;
+}
+export const b64 = (u: Uint8Array) => Buffer.from(u).toString('base64');
+export function mkImage(id: string, luma: Uint8Array, W: number, H: number, box: { x: number; y: number; w: number; h: number }, opId = 'img', extra: Partial<RasterImage> = {}): RasterImage {
+  return {
+    kind: 'raster-image', id, source: `${id}.png`, dataUrl: 'data:image/png;base64,iVBORw0KGgo=', pixelWidth: W, pixelHeight: H,
+    bounds: { minX: box.x, minY: box.y, maxX: box.x + box.w, maxY: box.y + box.h }, transform: IDENTITY_TRANSFORM, color: '#808080',
+    dither: 'threshold', linesPerMm: 1, lumaBase64: b64(luma), operationIds: [opId], ...extra,
+  } as RasterImage;
+}
+export function mkLayer(extra: Partial<Layer> = {}, id = 'img'): Layer {
+  return { ...createLayer({ id, color: '#808080', name: 'Photo', mode: 'image' }), power: 80, minPower: 0, speed: 3000, linesPerMm: 10,
+    ditherAlgorithm: 'jarvis', dotWidthCorrectionMm: 0, ...extra } as Layer;
+}
+export function load(objects: RasterImage[], layers: Layer[], device: DeviceProfile = DEFAULT_DEVICE_PROFILE, select: string | null = objects[0]?.id ?? null): void {
+  resetStore();
+  const base = createProject(device);
+  useStore.setState({ project: { ...base, scene: { ...base.scene, objects, layers, groups: [] } }, undoStack: [], redoStack: [], dirty: false, selectedObjectId: select, additionalSelectedIds: new Set() } as never);
+}
+
+// ---------- G-code ----------
+export function gcodeOf(p: Project): string {
+  const r = prepareOutput(p);
+  if (!r.ok) return `NOT OK ${JSON.stringify(r).slice(0, 600)}`;
+  return emitPreparedGcode(r).gcode;
+}
+/** Per scene cell (row 0 = scene top), the S of each pass in order. */
+export function decode(g: string, box: { x: number; y: number }, W: number, H: number, d: number, bedH = 400): { s: Float64Array; passes: Int32Array } {
+  const s = new Float64Array(W * H);
+  const passes = new Int32Array(W * H);
+  let x = 0, y = 0, S = 0, mode = 0;
+  for (const raw of g.split('\n')) {
+    const line = raw.replace(/;.*$/, '').trim(); if (!line) continue;
+    const m = line.match(/^G0?([0-3])(?![0-9])/); if (m) mode = Number(m[1]);
+    const nx = line.match(/X(-?[\d.]+)/), ny = line.match(/Y(-?[\d.]+)/), ns = line.match(/S(-?[\d.]+)/);
+    if (ns) S = Number(ns[1]);
+    const x1 = nx ? Number(nx[1]) : x; const y1 = ny ? Number(ny[1]) : y;
+    if (mode === 1 && S > 0 && nx && Math.abs(y1 - y) < 1e-9) {
+      const row = Math.round((bedH - y - box.y) / d - 0.5);
+      const lo = Math.min(x, x1), hi = Math.max(x, x1);
+      if (row >= 0 && row < H) for (let px = 0; px < W; px++) {
+        const c = box.x + (px + 0.5) * d;
+        if (c > lo && c < hi) { s[row * W + px] = S; passes[row * W + px]++; }
+      }
+    }
+    x = x1; y = y1;
+  }
+  return { s, passes };
+}
+
+// ---------- oracle (from the ADR text and published kernels, not the app) ----------
+export function toneLut(b: number, c: number, g: number): Uint8Array {
+  const lut = new Uint8Array(256);
+  for (let level = 0; level < 256; level++) {
+    let v = Math.min(255, Math.max(0, level + (b / 100) * 255));
+    v = Math.min(255, Math.max(0, (v - 128) * (1 + c / 100) + 128));
+    v = 255 * Math.pow(v / 255, 1 / g);
+    lut[level] = Math.round(v);
+  }
+  return lut;
+}
+export type Curve = { label: string; points: { input: number; output: number }[] };
+export function curveLut(curve: Curve | undefined): Uint8Array {
+  const lut = new Uint8Array(256);
+  for (let level = 0; level < 256; level++) {
+    if (curve === undefined) { lut[level] = level; continue; }
+    const p = curve.points; let v = p[p.length - 1]!.output;
+    if (level <= p[0]!.input) v = p[0]!.output;
+    else for (let i = 1; i < p.length; i++) if (level <= p[i]!.input) { const t = (level - p[i - 1]!.input) / (p[i]!.input - p[i - 1]!.input); v = p[i - 1]!.output + t * (p[i]!.output - p[i - 1]!.output); break; }
+    lut[level] = Math.max(0, Math.min(255, Math.round(v)));
+  }
+  return lut;
+}
+/** Exact area mean onto an integer-factor grid. */
+export function areaMean(l: Uint8Array, W: number, H: number, w: number, h: number): Uint8Array {
+  const fx = W / w, fy = H / h; const o = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let sum = 0; for (let j = 0; j < fy; j++) for (let i = 0; i < fx; i++) sum += l[(y * fy + j) * W + x * fx + i]!;
+    o[y * w + x] = Math.round(sum / (fx * fy));
+  }
+  return o;
+}
+export function unsharp(l: Uint8Array, w: number, h: number, amountPct: number, sigma: number): Uint8Array {
+  if (amountPct === 0) return l;
+  const half = Math.max(1, Math.ceil(sigma * 3)); const k: number[] = []; let sum = 0;
+  for (let i = -half; i <= half; i++) { const v = Math.exp(-(i * i) / (2 * sigma * sigma)); k.push(v); sum += v; }
+  for (let i = 0; i < k.length; i++) k[i]! /= sum;
+  const cl = (v: number, m: number) => Math.max(0, Math.min(m - 1, v));
+  const hz = new Float64Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let s = 0; for (let i = -half; i <= half; i++) s += l[y * w + cl(x + i, w)]! * k[i + half]!; hz[y * w + x] = s; }
+  const o = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let s = 0; for (let j = -half; j <= half; j++) s += hz[cl(y + j, h) * w + x]! * k[j + half]!;
+    const v = l[y * w + x]!; o[y * w + x] = Math.max(0, Math.min(255, Math.round(v + (amountPct / 100) * (v - s))));
+  }
+  return o;
+}
+const KERNELS: Record<string, { k: number[][]; d: number }> = {
+  'floyd-steinberg': { k: [[1, 0, 7], [-1, 1, 3], [0, 1, 5], [1, 1, 1]], d: 16 },
+  jarvis: { k: [[1, 0, 7], [2, 0, 5], [-2, 1, 3], [-1, 1, 5], [0, 1, 7], [1, 1, 5], [2, 1, 3], [-2, 2, 1], [-1, 2, 3], [0, 2, 5], [1, 2, 3], [2, 2, 1]], d: 48 },
+  stucki: { k: [[1, 0, 8], [2, 0, 4], [-2, 1, 2], [-1, 1, 4], [0, 1, 8], [1, 1, 4], [2, 1, 2], [-2, 2, 1], [-1, 2, 2], [0, 2, 4], [1, 2, 2], [2, 2, 1]], d: 42 },
+};
+/** Dither in machine orientation (front-left origin flips Y), returned in scene orientation. */
+export function ditherS(scene: Uint8Array, w: number, h: number, alg: string, sMax: number, sMin: number): Float64Array {
+  const luma = new Uint8Array(w * h); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) luma[(h - 1 - y) * w + x] = scene[y * w + x]!;
+  const o = new Float64Array(w * h);
+  if (alg === 'grayscale') { for (let i = 0; i < luma.length; i++) { const t = (255 - luma[i]!) / 255; o[i] = t <= 0 ? 0 : Math.round(sMin + t * (sMax - sMin)); } }
+  else {
+    const K = KERNELS[alg]!; const buf = Float64Array.from(luma);
+    for (let y = 0; y < h; y++) {
+      const ltr = y % 2 === 0;
+      for (let kx = 0; kx < w; kx++) {
+        const x = ltr ? kx : w - 1 - kx; const i = y * w + x; const old = buf[i]!; const q = old < 128 ? 0 : 255; const e = old - q;
+        o[i] = q === 0 ? sMax : 0;
+        for (const [dx0, dy, wt] of K.k) { const xx = x + (ltr ? dx0! : -dx0!), yy = y + dy!; if (xx < 0 || xx >= w || yy >= h) continue; buf[yy * w + xx] += (e * wt!) / K.d; }
+      }
+    }
+  }
+  const out = new Float64Array(w * h); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) out[y * w + x] = o[(h - 1 - y) * w + x]!;
+  return out;
+}
+/** ADR-685 Auto tones from the text: 0.5 % tails, 255 not counted, b down / c up to a tenth, median hold. */
+export function oracleAutoTones(luma: Uint8Array): { b: number; c: number; g: number; lo: number; hi: number; median: number } | null {
+  const vals = [...luma].filter((v) => v !== 255).sort((a, b) => a - b);
+  const n = vals.length; if (n === 0) return null;
+  const at = (share: number) => { const target = share * n; let seen = 0; const h = new Array(255).fill(0); for (const v of vals) h[v]++; for (let L = 0; L < 255; L++) { seen += h[L]; if (seen >= target && seen > 0) return L; } return 254; };
+  const lo = at(0.005), hi = at(0.995), median = at(0.5);
+  if (hi <= lo) return null;
+  const s = Math.min(2, 255 / (hi - lo));
+  const offset = 128 - 128 / s - lo; // b*2.55 + ... maps lo -> 0
+  const b = Math.floor((offset / 2.55) * 10 + 1e-9) / 10;
+  const c = Math.min(100, Math.ceil((s - 1) * 1000 - 1e-9) / 10);
+  const stretched = (median + b * 2.55 - 128) * (1 + c / 100) + 128;
+  let g = 1;
+  if (median > 0 && median < 255 && stretched > 0 && stretched < 255) g = Math.round(Math.max(0.1, Math.min(5, Math.log(stretched / 255) / Math.log(median / 255))) * 100) / 100;
+  return { b, c, g, lo, hi, median };
+}
+export function diffN(a: ArrayLike<number>, b: ArrayLike<number>, W: number): { n: number; max: number; first: string } {
+  let n = 0, max = 0, first = '';
+  for (let i = 0; i < a.length; i++) { const d = Math.abs(a[i]! - b[i]!); if (d > 1e-9) { n++; if (!first) first = `(${i % W},${Math.floor(i / W)}) got ${a[i]} want ${b[i]}`; } max = Math.max(max, d); }
+  return { n, max, first };
+}
+
+// ---------- dialog driver ----------
+export type Dlg = { root: Root; host: HTMLDivElement };
+export async function mountHost(): Promise<Dlg> {
+  const host = document.createElement('div'); document.body.appendChild(host);
+  let root!: Root;
+  await act(async () => { root = createRoot(host); root.render(createElement(PhotoEngravingDialogHost)); });
+  return { root, host };
+}
+export async function wait(ms = 400): Promise<void> { await act(async () => { await sleep(ms); }); }
+export async function open(): Promise<void> {
+  await act(async () => { openPhotoEngraving(); });
+  await wait(300);
+}
+export const q = <T extends Element = HTMLInputElement>(sel: string) => document.querySelector<T>(sel);
+export const field = (label: string) => q(`input[aria-label="${label}"]`)!;
+export function readFields(): Record<string, string> {
+  const r: Record<string, string> = {};
+  for (const l of ['Photo brightness', 'Photo contrast', 'Photo midtones (gamma)', 'Photo sharpen amount (%)', 'Photo sharpen radius (lines)', 'Photo engraving DPI']) r[l] = field(l)?.value ?? '?';
+  r.processing = q('input[type="radio"]:checked')?.value ?? '?';
+  r.marking = q<HTMLSelectElement>('select[title^="Choose whether"]')?.value ?? '?';
+  return r;
+}
+export async function type(label: string, value: string): Promise<void> {
+  const el = field(label);
+  await act(async () => { el.value = value; Simulate.change(el); });
+  await act(async () => { Simulate.blur(el); });
+}
+export async function recipe(id: string): Promise<void> {
+  const el = q<HTMLSelectElement>('select[aria-label="Material recipe"]')!;
+  await act(async () => { el.value = id; Simulate.change(el); });
+}
+export async function processing(alg: string): Promise<void> {
+  const el = q(`input[type="radio"][value="${alg}"]`)!;
+  await act(async () => { el.click(); });
+}
+export async function marking(light: boolean): Promise<void> {
+  const el = q<HTMLSelectElement>('select[title^="Choose whether"]')!;
+  await act(async () => { el.value = light ? 'light' : 'dark'; Simulate.change(el); });
+}
+export async function applyBtn(): Promise<void> {
+  const btn = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Apply photo settings')!;
+  const form = btn.closest('form')!;
+  await act(async () => { Simulate.submit(form); });
+}
+export async function cancelBtn(): Promise<void> {
+  const btn = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Cancel')!;
+  await act(async () => { Simulate.click(btn); });
+}
+export function dialogState(): { open: boolean; applyDisabled: boolean | null; alert: string | null } {
+  const btn = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Apply photo settings') as HTMLButtonElement | undefined;
+  return { open: usePhotoEngravingStore.getState().session !== null, applyDisabled: btn ? btn.disabled : null, alert: q('[role="alert"]')?.textContent ?? null };
+}
+export async function unmount(d: Dlg): Promise<void> { await act(async () => d.root.unmount()); d.host.remove(); usePhotoEngravingStore.setState({ session: null }); }
+export const DEV = DEFAULT_DEVICE_PROFILE;

@@ -1,0 +1,144 @@
+// T15 B/C: ADR-581 decision 7 binding under phone/MCP-style store writes while the
+// dialog is open; sibling isolation, Undo/Redo, save/reopen, Cancel, no-op Apply.
+import { it } from 'vitest';
+import { act } from 'react';
+import { createLayerSubLayer, type RasterImage } from '../t13-main/src/core/scene';
+import { serializeProject } from '../t13-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t13-main/src/io/project/deserialize-project';
+import { useStore } from '../t13-main/src/ui/state/store';
+import { usePhotoEngravingStore } from '../t13-main/src/ui/raster/photo-engraving-store';
+import { useToastStore } from '../t13-main/src/ui/state/toast-store';
+import {
+  applyBtn, cancelBtn, dialogState, gcodeOf, load, logger, mkImage, mkLayer, mountHost, open, photoLuma, processing, readFields,
+  recipe, st, type, unmount, wait, workerLog,
+} from './t15-common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t15/t15b.log');
+const W = 48, H = 32;
+const boxA = { x: 20, y: 30, w: 4.8, h: 3.2 }, boxB = { x: 60, y: 30, w: 4.8, h: 3.2 }, boxC = { x: 100, y: 30, w: 4.8, h: 3.2 };
+const img = (id: string) => st().project.scene.objects.find((o) => o.id === id) as RasterImage | undefined;
+const toasts = () => (useToastStore.getState() as unknown as { toasts: { message: string }[] }).toasts.map((t) => t.message);
+function fresh(): void {
+  const luma = photoLuma(W, H);
+  load([mkImage('A', luma, W, H, boxA), mkImage('B', photoLuma(W, H, 11), W, H, boxB), mkImage('C', luma, W, H, boxC, 'other')],
+    [mkLayer(), mkLayer({ ditherAlgorithm: 'stucki', color: '#00a000' } as never, 'other')], undefined, 'A');
+  useToastStore.setState({ toasts: [] } as never);
+}
+const snap = () => JSON.stringify(st().project);
+
+it('B binding', async () => {
+  const cases: { name: string; mutate: () => void; restore?: () => void }[] = [
+    { name: 'B1 selection moves to C (remote selectObject)', mutate: () => st().selectObject('C'), restore: () => st().selectObject('A') },
+    { name: 'B1b selection adds C (multi-select)', mutate: () => st().selectObjects(['A', 'C']), restore: () => st().selectObject('A') },
+    { name: 'B1c selection cleared', mutate: () => st().selectObject(null), restore: () => st().selectObject('A') },
+    { name: 'B2 image A deleted (remote)', mutate: () => { const keep = st().project.scene.objects; (globalThis as { keep?: unknown }).keep = keep; useStore.setState((s) => ({ project: { ...s.project, scene: { ...s.project.scene, objects: keep.filter((o) => o.id !== 'A') } } })); },
+      restore: () => { const keep = (globalThis as { keep?: never }).keep!; useStore.setState((s) => ({ project: { ...s.project, scene: { ...s.project.scene, objects: keep } } })); } },
+    { name: 'B3 image A moved (replaced object, same id)', mutate: () => st().setObjectTransform('A', { ...img('A')!.transform, x: 5 } as never) },
+    { name: 'B4 project switched (newProject)', mutate: () => st().newProject() },
+    { name: 'B5 other image B moved (unrelated edit)', mutate: () => st().setObjectTransform('B', { ...img('B')!.transform, x: 7 } as never) },
+    { name: 'B6 operation power changed (remote setLayerParam)', mutate: () => st().setLayerParam('img', { power: 55 }) },
+    { name: 'B7 machine profile changed', mutate: () => st().updateDeviceProfile({ maxPowerS: 255 }) },
+    { name: 'B8 image A swapped for another object with id A (Image Studio replace)', mutate: () => useStore.setState((s) => ({ project: { ...s.project, scene: { ...s.project.scene, objects: s.project.scene.objects.map((o) => (o.id === 'A' ? { ...o, lumaBase64: Buffer.from(photoLuma(W, H, 99)).toString('base64') } : o)) } } })) },
+  ];
+  for (const k of cases) {
+    fresh();
+    const d = await mountHost();
+    await open();
+    await type('Photo brightness', '40');
+    await processing('floyd-steinberg');
+    await wait(400);
+    const before = snap(); const undo0 = st().undoStack.length;
+    const previewsBefore = workerLog.length;
+    await act(async () => { k.mutate(); });
+    await wait(400);
+    const ds = dialogState();
+    const previewsDuring = workerLog.length - previewsBefore;
+    const afterMutate = snap();
+    await applyBtn(); // a submit even though the button may be disabled (e.g. Enter in a field)
+    await wait(50);
+    const ds2 = dialogState();
+    const changedByApply = snap() !== afterMutate;
+    const aAfter = img('A');
+    let line = `${k.name}: dialog open ${ds.open}, Apply disabled ${ds.applyDisabled}, alert "${ds.alert}", previews while stale ${previewsDuring}; after submit: project changed ${changedByApply}, open ${ds2.open}, alert "${ds2.alert}", A.b ${aAfter?.brightness}, B.x ${img('B')?.transform.x}, undo ${st().undoStack.length - undo0}`;
+    if (k.restore && ds2.open) {
+      await act(async () => { k.restore!(); });
+      await wait(400);
+      const ds3 = dialogState();
+      const fields = readFields();
+      await applyBtn(); await wait(50);
+      const a = img('A');
+      line += ` | restored: Apply disabled ${ds3.applyDisabled}, alert "${ds3.alert}", draft b ${fields['Photo brightness']}; Apply -> A.b ${a?.brightness} dither ${a?.operationOverride?.byOperation?.img?.ditherAlgorithm}, C.b ${img('C')?.brightness}, closed ${!dialogState().open}, toasts ${JSON.stringify(toasts())}`;
+    }
+    void before;
+    out(line);
+    await unmount(d);
+  }
+});
+
+it('C isolation, history, files, cancel', async () => {
+  // C1 siblings and other overrides
+  fresh();
+  // A already owns an override for another operation and the photo op has an inherited sub-pass
+  const sub = createLayerSubLayer(st().project.scene.layers[0]!, { id: 'img:s2', label: 'Second pass' } as never);
+  useStore.setState((s) => ({ project: { ...s.project, scene: { ...s.project.scene,
+    layers: s.project.scene.layers.map((l) => (l.id === 'img' ? { ...l, subLayers: [sub] } : l)),
+    objects: s.project.scene.objects.map((o) => (o.id === 'A' ? { ...o, operationOverride: { byOperation: { other: { power: 33 } } } } : o)) } } }));
+  const onlyB = () => gcodeOf({ ...st().project, scene: { ...st().project.scene, objects: st().project.scene.objects.filter((o) => o.id === 'B') } });
+  const onlyAsub = () => gcodeOf({ ...st().project, scene: { ...st().project.scene, objects: st().project.scene.objects.filter((o) => o.id === 'A'),
+    layers: st().project.scene.layers.map((l) => (l.id === 'img' ? { ...l, output: true } : l)) } });
+  const gB0 = onlyB(); const layers0 = JSON.stringify(st().project.scene.layers); const subLayer0 = JSON.stringify(st().project.scene.layers[0]!.subLayers);
+  const gFull0 = gcodeOf(st().project);
+  const p0 = snap();
+  let d = await mountHost();
+  await open();
+  out(`C1 op hint: "${document.querySelector('.lf-photo-engraving__operation')?.textContent}"`);
+  await recipe('slate'); await wait(500); await processing('floyd-steinberg'); await type('Photo engraving DPI', '200'); await wait(400);
+  await applyBtn(); await wait(50);
+  const p1 = snap();
+  const a1 = img('A')!;
+  out(`C1 A override after: ${JSON.stringify(a1.operationOverride)}`);
+  out(`C1 B G-code identical ${onlyB() === gB0}; layers identical ${JSON.stringify(st().project.scene.layers) === layers0}; subLayers identical ${JSON.stringify(st().project.scene.layers[0]!.subLayers) === subLayer0}; full G-code changed ${gcodeOf(st().project) !== gFull0}; undo ${st().undoStack.length}`);
+  void onlyAsub;
+  await unmount(d);
+  // C2 Undo / Redo
+  const gFull1 = gcodeOf(st().project);
+  st().undo();
+  out(`C2 one Undo restores project exactly ${snap() === p0}; G-code back ${gcodeOf(st().project) === gFull0}`);
+  st().redo();
+  out(`C2 Redo restores applied project exactly ${snap() === p1}; G-code ${gcodeOf(st().project) === gFull1}`);
+  // C3 save / reopen
+  const text = serializeProject(st().project);
+  const re = deserializeProject(text) as { kind?: string; ok?: boolean; project?: never };
+  const reProject = (re as { project?: never }).project;
+  out(`C3 reopen raw ${JSON.stringify(re).slice(0,400)}`); out(`C3 reopen kind ${re.kind ?? re.ok}; G-code identical ${reProject ? gcodeOf(reProject) === gFull1 : 'no project'}; A override identical ${reProject ? JSON.stringify((reProject as { scene: { objects: RasterImage[] } }).scene.objects.find((o) => o.id === 'A')!.operationOverride) === JSON.stringify(a1.operationOverride) : '-'}`);
+  // reopen dialog on the reopened project: shows the stored settings
+  if (reProject) { useStore.setState({ project: reProject, selectedObjectId: 'A', additionalSelectedIds: new Set() } as never); }
+  d = await mountHost(); await open();
+  out(`C3 dialog on reopened: ${JSON.stringify(readFields())}`);
+  await unmount(d);
+  // C4 Cancel
+  fresh();
+  const pc = snap();
+  d = await mountHost(); await open();
+  await recipe('anodized'); await wait(500); await type('Photo contrast', '70'); await type('Photo engraving DPI', '400'); await wait(300);
+  await cancelBtn(); await wait(50);
+  out(`C4 Cancel: closed ${!dialogState().open}; project identical ${snap() === pc}; undo ${st().undoStack.length}; dirty ${st().dirty}`);
+  await unmount(d);
+  // C5 Apply with nothing changed
+  fresh();
+  const pn = snap();
+  d = await mountHost(); await open(); await wait(300);
+  await applyBtn(); await wait(50);
+  out(`C5 Apply unchanged: closed ${!dialogState().open}; project identical ${snap() === pn}; undo ${st().undoStack.length}; dirty ${st().dirty}; toasts ${JSON.stringify(toasts())}`);
+  await unmount(d);
+  // C6 Apply on a photo whose op dither is not a photo dither (threshold) and nothing else touched
+  fresh();
+  useStore.setState((s) => ({ project: { ...s.project, scene: { ...s.project.scene, layers: s.project.scene.layers.map((l) => (l.id === 'img' ? { ...l, ditherAlgorithm: 'threshold' } : l)) } } }));
+  const g6 = gcodeOf(st().project);
+  d = await mountHost(); await open(); await wait(300);
+  const f6 = readFields();
+  await applyBtn(); await wait(50);
+  out(`C6 threshold op: dialog shows ${f6.processing}; Apply untouched -> A override ${JSON.stringify(img('A')!.operationOverride)}; burn changed ${gcodeOf(st().project) !== g6}; undo ${st().undoStack.length}`);
+  await unmount(d);
+  void usePhotoEngravingStore;
+});

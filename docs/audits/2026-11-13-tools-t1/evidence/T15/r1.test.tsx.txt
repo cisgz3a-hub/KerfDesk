@@ -1,0 +1,124 @@
+// T15 refuter R1: reachability of a second burn of the same photo, and what
+// Photo engraving + Job Review say about it. Own method: count burned cells per
+// compiled raster group from prepareOutput's job (no G-code decoding).
+import { writeFileSync } from 'node:fs';
+import { act, createElement } from 'react';
+import { createRoot } from 'react-dom/client';
+import { Simulate } from 'react-dom/test-utils';
+import { expect, test } from 'vitest';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type Layer, type RasterImage } from '../t13-main/src/core/scene';
+import { prepareOutput } from '../t13-main/src/io/gcode/prepare-output';
+import { serializeProject } from '../t13-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t13-main/src/io/project/deserialize-project';
+import { useStore } from '../t13-main/src/ui/state/store';
+import { resetStore } from '../t13-main/src/ui/state/test-helpers';
+import { PhotoEngravingDialogHost } from '../t13-main/src/ui/raster/PhotoEngravingDialogHost';
+import { openPhotoEngraving, usePhotoEngravingStore } from '../t13-main/src/ui/raster/photo-engraving-store';
+import { laserOperationDetail } from '../t13-main/src/ui/laser/job-review/job-review-detail-facts';
+import { buildEffectiveOperationReview } from '../t13-main/src/ui/laser/job-review/job-review-effective-operations';
+import type { Job, RasterGroup } from '../t13-main/src/core/job/job';
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+class NoopWorker { onmessage = null; onerror = null; onmessageerror = null; postMessage(): void {} terminate(): void {} }
+(globalThis as { Worker?: unknown }).Worker = NoopWorker;
+
+const out: string[] = [];
+const log = (s: string): void => { out.push(s); writeFileSync('C:/Users/stolk/kd-t1/zz-t15r/r1.log', out.join('\n')); };
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+const W = 80, H = 40;
+function gradientImage(): RasterImage {
+  const l = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) l[y * W + x] = Math.round((255 * x) / (W - 1));
+  return {
+    kind: 'raster-image', id: 'A', source: 'A.png', dataUrl: 'data:image/png;base64,iVBORw0KGgo=', pixelWidth: W, pixelHeight: H,
+    bounds: { minX: 10, minY: 10, maxX: 18, maxY: 14 }, transform: IDENTITY_TRANSFORM, color: '#808080',
+    dither: 'threshold', linesPerMm: 1, lumaBase64: Buffer.from(l).toString('base64'), operationIds: ['portrait'],
+  } as RasterImage;
+}
+function portraitOp(): Layer {
+  return { ...createLayer({ id: 'portrait', color: '#808080', name: 'Portrait', mode: 'image' }), power: 80, minPower: 0,
+    speed: 3000, linesPerMm: 10, ditherAlgorithm: 'floyd-steinberg', dotWidthCorrectionMm: 0 } as Layer;
+}
+function load(): void {
+  resetStore();
+  const base = createProject();
+  useStore.setState({ project: { ...base, scene: { ...base.scene, objects: [gradientImage()], layers: [portraitOp()], groups: [] } },
+    undoStack: [], redoStack: [], dirty: false, selectedObjectId: 'A', additionalSelectedIds: new Set() } as never);
+}
+
+type Stats = { layer: string; passes: number; w: number; h: number; burned: number; leftQ: number; rightQ: number; cells: Set<number> };
+function rasterStats(job: Job): Stats[] {
+  return job.groups.filter((g): g is RasterGroup => g.kind === 'raster').map((g) => {
+    const cells = new Set<number>(); let lq = 0, rq = 0;
+    for (let y = 0; y < g.pixelHeight; y++) {
+      const row = g.rowProvider ? g.rowProvider(y) : g.sValues.subarray(y * g.pixelWidth, (y + 1) * g.pixelWidth);
+      for (let x = 0; x < g.pixelWidth; x++) if ((row[x] ?? 0) > 0) {
+        cells.add(y * g.pixelWidth + x);
+        if (x < g.pixelWidth / 4) lq++; if (x >= (3 * g.pixelWidth) / 4) rq++;
+      }
+    }
+    const q = (g.pixelWidth / 4) * g.pixelHeight;
+    return { layer: g.layerId, passes: g.passes, w: g.pixelWidth, h: g.pixelHeight, burned: cells.size, leftQ: lq / q, rightQ: rq / q, cells };
+  });
+}
+function report(tag: string): Stats[] {
+  const p = prepareOutput(useStore.getState().project);
+  if (!p.ok) throw new Error('prepare failed');
+  const s = rasterStats(p.job);
+  const union = new Set<number>(); for (const g of s) for (const c of g.cells) union.add(c);
+  const total = (s[0]?.w ?? 0) * (s[0]?.h ?? 0);
+  for (const g of s) log(`${tag}: group ${g.layer} passes ${g.passes} grid ${g.w}x${g.h} burned ${g.burned} | dark-side quarter ${(g.leftQ * 100).toFixed(1)}% light-side quarter ${(g.rightQ * 100).toFixed(1)}%`);
+  log(`${tag}: union burned by some pass ${union.size} of ${total} (${((union.size / total) * 100).toFixed(1)}%)`);
+  const scene = useStore.getState().project.scene;
+  for (const l of scene.layers) log(`${tag}: Job Review detail line for "${l.name}": ${laserOperationDetail(l)}`);
+  for (const e of buildEffectiveOperationReview(p.job, scene)) log(`${tag}: Job Review compiled summary (collapsed) ${e.layerId}: ${e.summaries.join(' | ')}`);
+  return s;
+}
+
+async function applyLightMarksThroughDialog(tag: string): Promise<void> {
+  const host = document.createElement('div'); document.body.appendChild(host);
+  const root = createRoot(host);
+  openPhotoEngraving();
+  const session = usePhotoEngravingStore.getState().session;
+  log(`${tag}: dialog opened on operation "${session?.operation.name}"`);
+  await act(async () => { root.render(createElement(PhotoEngravingDialogHost)); });
+  for (let i = 0; i < 40 && host.querySelector('form') === null; i++) await act(async () => { await sleep(50); });
+  const text = host.textContent ?? '';
+  log(`${tag}: dialog operation hint: ${host.querySelector('.lf-photo-engraving__operation')?.textContent}`);
+  log(`${tag}: dialog text mentions "Portrait 2": ${text.includes('Portrait 2')}; mentions "sub": ${/sub[- ]?(pass|layer|operation)/i.test(text)}; mentions "other operation": ${/other operation|also (burn|engrave)|another operation/i.test(text)}`);
+  const marking = [...host.querySelectorAll('select')].find((s) => [...s.options].some((o) => o.value === 'light'));
+  if (!marking) throw new Error('no marking select');
+  await act(async () => { marking.value = 'light'; Simulate.change(marking); });
+  const form = host.querySelector('form'); if (!form) throw new Error('no form');
+  await act(async () => { Simulate.submit(form); await sleep(20); });
+  log(`${tag}: after Apply, dialog open: ${usePhotoEngravingStore.getState().session !== null}`);
+  const img = useStore.getState().project.scene.objects[0] as RasterImage;
+  log(`${tag}: override byOperation = ${JSON.stringify(Object.fromEntries(Object.entries(img.operationOverride?.byOperation ?? {}).map(([k, v]) => [k, v === null ? null : { negativeImage: (v as { negativeImage?: boolean }).negativeImage, ditherAlgorithm: (v as { ditherAlgorithm?: string }).ditherAlgorithm }])))}`);
+  await act(async () => { root.unmount(); });
+  host.remove();
+}
+
+test('R1a: today\'s reachable route - Add operation on the selected photo, then Photo engraving Light marks', async () => {
+  load();
+  report('R1a before add');
+  // The Selected Operation Inspector's "Add operation" button calls this action (SelectedOperationInspector.tsx:161).
+  useStore.getState().addOperationForObjects(['A']);
+  const layers = useStore.getState().project.scene.layers;
+  log(`R1a: after Add operation: operations ${layers.map((l) => `${l.id}/"${l.name}"/${l.mode}/output ${l.output}`).join(', ')}; photo operationIds ${JSON.stringify((useStore.getState().project.scene.objects[0] as RasterImage).operationIds)}`);
+  report('R1a before photo engraving');
+  await applyLightMarksThroughDialog('R1a');
+  const s = report('R1a after Light marks');
+  expect(s.length).toBe(2);
+});
+
+test('R1b: legacy image sub-pass (store action only; no mounted UI) persists through save/reopen', async () => {
+  load();
+  useStore.getState().addLayerSubLayer('portrait');
+  const json = serializeProject(useStore.getState().project);
+  const reopened = deserializeProject(json);
+  const sub = reopened.kind === "ok" ? reopened.project.scene.layers[0]?.subLayers : undefined;
+  log(`R1b: reopened project keeps sub-layers: ${JSON.stringify(sub?.map((x) => ({ id: x.id, label: x.label, enabled: x.enabled, mode: x.settings.mode })))}`);
+  await applyLightMarksThroughDialog('R1b');
+  report('R1b after Light marks');
+});

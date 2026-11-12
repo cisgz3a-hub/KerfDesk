@@ -1,0 +1,14 @@
+import { it } from 'vitest';
+import { computePhotoEngravingPreview } from '../t13-main/src/ui/raster/photo-engraving-preview';
+import { evaluateRasterBudget } from '../t13-main/src/core/raster/raster-budget';
+import { DEV, logger, mkImage, mkLayer, photoLuma } from './t15-common';
+const out = logger('C:/Users/stolk/kd-t1/zz-t15/t15e.log');
+it('E preview cost vs passes', () => {
+  const image = mkImage('A', photoLuma(1000, 750), 1000, 750, { x: 0, y: 0, w: 200, h: 150 });
+  for (const passes of [1, 16, 1, 16]) {
+    const t = performance.now();
+    const r = computePhotoEngravingPreview({ image, layer: mkLayer({ passes }), device: DEV, sceneObjects: [image] });
+    out(`E passes ${passes}: ${r.kind} ${r.kind === 'ok' ? r.scanPasses : ''} in ${Math.round(performance.now() - t)} ms`);
+  }
+  out(`E budget 2000x1500 passes 17: ${JSON.stringify(evaluateRasterBudget(2000, 1500, { ditherAlgorithm: 'jarvis', passes: 17, streamedRows: false })).slice(0, 300)}`);
+});
