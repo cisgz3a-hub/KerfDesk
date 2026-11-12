@@ -1,0 +1,435 @@
+// @vitest-environment jsdom
+// T09 refuter: own method. Burn measured with compileJob (not the G-code decoder the
+// auditor used), per operation and per white outline in machine coordinates.
+import { beforeEach, it } from 'vitest';
+import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { gunzipSync } from 'node:zlib';
+import { toMachineCoords } from '../t06-main/src/core/devices';
+import { compileJob } from '../t06-main/src/core/job/compile-job';
+import {
+  applyTransform,
+  pathUsesOperation,
+  type ColoredPath,
+  type Project,
+  type SceneObject,
+  type Vec2,
+} from '../t06-main/src/core/scene';
+import {
+  countBurningImportedWhites,
+  svgImportGroups,
+  isSavedFillPart,
+} from '../t06-main/src/core/geometry/burning-imported-white';
+import { burnInside, importSvg } from '../t06-main/src/__fixtures__/white-fill-burn';
+import { parseSvg } from '../t06-main/src/io/svg/parse-svg';
+import { deserializeProject } from '../t06-main/src/io/project/deserialize-project';
+import {
+  burningWhiteOpenNotice,
+  burningWhiteReviewWarnings,
+} from '../t06-main/src/ui/state/saved-white-notice';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t06-main/src/ui/state/toast-store';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t09r/t09r-all.log';
+const lines: string[] = [];
+const out = (s: string) => {
+  lines.push(s);
+  writeFileSync(LOG, lines.join('\n'));
+};
+const st = () => useStore.getState();
+beforeEach(() => resetStore());
+
+const svg = (body: string, w = 60, h = 60) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${h}mm" viewBox="0 0 ${w} ${h}">${body}</svg>`;
+
+// Illustrator-style badge: dark disc, an outline ring (stroke) painted next, then a
+// white star on top. The ring sits between the two fills in paint order.
+const STAR = 'M20 8 L23 17 L32 17 L25 23 L28 32 L20 26 L12 32 L15 23 L8 17 L17 17 Z';
+const AI_BADGE = svg(
+  `<defs><style>.cls-1{fill:#231f20;}.cls-2{fill:none;stroke:#231f20;stroke-miterlimit:10;}.cls-3{fill:#fff;}</style></defs>` +
+    `<circle class="cls-1" cx="20" cy="20" r="15"/>` +
+    `<circle class="cls-2" cx="20" cy="20" r="17.5"/>` +
+    `<path class="cls-3" d="${STAR}"/>`,
+);
+// Same art, ring last (no split between the fills).
+const AI_BADGE_RING_LAST = svg(
+  `<defs><style>.cls-1{fill:#231f20;}.cls-2{fill:none;stroke:#231f20;stroke-miterlimit:10;}.cls-3{fill:#fff;}</style></defs>` +
+    `<circle class="cls-1" cx="20" cy="20" r="15"/>` +
+    `<path class="cls-3" d="${STAR}"/>` +
+    `<circle class="cls-2" cx="20" cy="20" r="17.5"/>`,
+);
+
+/** 1.0.29's saved import: the parse as is, white on its own operation, no marks. */
+function olderBuild(text: string): void {
+  importSvg(text);
+  st().undo();
+  const project = st().project;
+  const objects = project.scene.objects.map((object) =>
+    'paths' in object
+      ? { ...object, paths: object.paths.map(({ whiteInk: _w, ...path }) => path) }
+      : object,
+  ) as SceneObject[];
+  useStore.setState({
+    project: { ...project, scene: { ...project.scene, objects } },
+    undoStack: [],
+    redoStack: [],
+  });
+}
+
+function segLen(poly: readonly Vec2[]): number {
+  let n = 0;
+  for (let i = 1; i < poly.length; i += 1)
+    n += Math.hypot(poly[i]!.x - poly[i - 1]!.x, poly[i]!.y - poly[i - 1]!.y);
+  return n;
+}
+
+/** Lit length per operation id, from compileJob. */
+function perOperation(project: Project): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const group of compileJob(project.scene, project.device).groups) {
+    if (!('segments' in group)) continue;
+    const id = (group as { layerId: string }).layerId;
+    const len = group.segments.reduce((s, seg) => s + segLen(seg.polyline), 0);
+    result[id] = (result[id] ?? 0) + len;
+  }
+  for (const k of Object.keys(result)) result[k] = Math.round(result[k]! * 100) / 100;
+  return result;
+}
+
+/** White outlines (paper white, Fill-bound) per object, machine coordinates. */
+function whiteOutlinesByObject(project: Project): Map<string, Vec2[][]> {
+  const map = new Map<string, Vec2[][]>();
+  for (const object of project.scene.objects) {
+    if (!('paths' in object)) continue;
+    const rings = object.paths
+      .filter((p) => p.color.toLowerCase() === '#ffffff')
+      .flatMap((p) =>
+        p.polylines.map((l) =>
+          l.points.map((pt) => toMachineCoords(applyTransform(pt, object.transform), project.device)),
+        ),
+      );
+    if (rings.length > 0) map.set(object.id, rings);
+  }
+  return map;
+}
+
+function describe(project: Project): string {
+  const { scene } = project;
+  return scene.objects
+    .map((o) => {
+      if (!('paths' in o)) return `${o.id}(${o.kind})`;
+      const imp = o.svgImport ? `imp=${o.svgImport.id.slice(0, 6)}:${o.svgImport.mode}` : 'imp=-';
+      const ov = o.operationOverride?.mode ?? '-';
+      const paths = o.paths
+        .map((p) => {
+          const ops = scene.layers.filter((l) => pathUsesOperation(o, p, l)).map((l) => `${l.id.slice(-6)}:${l.mode}${l.output ? '' : ':off'}`);
+          return `${p.color}${p.whiteInk ? '/' + p.whiteInk : ''}[${ops.join(',')}]`;
+        })
+        .join(' ');
+      return `${o.id.slice(-10)} ${imp} ov=${ov} T=(${o.transform.x.toFixed(1)},${o.transform.y.toFixed(1)}) fillPart=${isSavedFillPart(scene, o as never)} ${paths}`;
+    })
+    .join('\n    ');
+}
+
+function lastToast(): string {
+  const t = useToastStore.getState() as unknown as { toasts?: { message: string }[] };
+  return t.toasts?.at(-1)?.message ?? '(none)';
+}
+
+function surfaces(project: Project): string {
+  const notice = burningWhiteOpenNotice(project);
+  const review = burningWhiteReviewWarnings(project);
+  return `count=${countBurningImportedWhites(project.scene)} canLeave=${countBurningImportedWhites(project.scene) > 0} notice=${notice === null ? 'none' : JSON.stringify(notice.slice(0, 60))} reviewRows=${review.length}`;
+}
+
+/** Burned length inside each white outline (taken from `ref`) for `project`. */
+function insidePerWhite(project: Project, ref: Project): string {
+  const parts: string[] = [];
+  for (const [id, rings] of whiteOutlinesByObject(ref)) {
+    parts.push(`${id.slice(-10)}:${burnInside(project, rings).toFixed(0)}`);
+  }
+  return parts.join(' ');
+}
+
+function selectAll(): void {
+  const ids = st().project.scene.objects.map((o) => o.id);
+  useStore.setState({ selectedObjectId: ids[0]!, additionalSelectedIds: new Set(ids.slice(1)) });
+}
+
+function runTool(name: string): { before: Project; after: Project } {
+  const before = st().project;
+  out(`== ${name}`);
+  out(`  before: ${surfaces(before)}`);
+  out(`    ${describe(before)}`);
+  out(`    groups: ${JSON.stringify((before.scene.groups ?? []).map((g) => g.objectIds.length))}`);
+  out(`    per-op lit: ${JSON.stringify(perOperation(before))}`);
+  out(`    burned inside each white (mm): ${insidePerWhite(before, before)}`);
+  const returned = st().leaveSavedWhiteUnburned();
+  const after = st().project;
+  out(`  tool returned ${returned}; toast "${lastToast()}"`);
+  out(`  after: ${surfaces(after)}`);
+  out(`    ${describe(after)}`);
+  out(`    per-op lit: ${JSON.stringify(perOperation(after))}`);
+  out(`    burned inside each ORIGINAL white outline (mm): ${insidePerWhite(after, before)}`);
+  return { before, after };
+}
+
+it('R: repo SVG corpus - how often a non-fill entry splits fills with a later white over an earlier dark', () => {
+  const root = 'C:/Users/stolk/kd-t1/t06-main';
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      if (name === 'node_modules' || name === '.git' || name === 'dist') continue;
+      const p = join(dir, name);
+      const s = statSync(p);
+      if (s.isDirectory()) walk(p);
+      else if (name.toLowerCase().endsWith('.svg')) files.push(p);
+    }
+  };
+  walk(join(root, 'src'));
+  walk(join(root, 'docs'));
+  walk(join(root, 'public'));
+  out(`== R corpus: ${files.length} svg files`);
+  for (const file of files) {
+    let parsed;
+    try {
+      parsed = parseSvg({ svgText: readFileSync(file, 'utf8'), id: 'r', source: 'r.svg' });
+    } catch (e) {
+      out(`  ${file.slice(root.length)}: parse error ${(e as Error).message.slice(0, 60)}`);
+      continue;
+    }
+    const entries = parsed.fragment?.entries ?? [];
+    const seq = entries.map((e) =>
+      e.kind === 'imported-svg'
+        ? `${e.operationOverride?.mode === 'fill' ? 'F' : 'L'}${e.paths.some((p) => p.color.toLowerCase() === '#ffffff' && p.whiteInk === undefined) ? 'w' : ''}`
+        : 'I',
+    );
+    const fillEntries = entries.filter((e) => e.kind === 'imported-svg' && e.operationOverride?.mode === 'fill');
+    // split risk: a paper white in fill entry j whose box overlaps a dark fill in an earlier fill entry i<j
+    let risky = 0;
+    fillEntries.forEach((ej, j) => {
+      if (ej.kind !== 'imported-svg') return;
+      for (const w of ej.paths.filter((p) => p.color.toLowerCase() === '#ffffff' && p.whiteInk === undefined)) {
+        const wb = bbox(w);
+        for (let i = 0; i < j; i += 1) {
+          const ei = fillEntries[i]!;
+          if (ei.kind !== 'imported-svg') continue;
+          if (ei.paths.some((p) => p.color.toLowerCase() !== '#ffffff' && overlap(bbox(p), wb))) risky += 1;
+        }
+      }
+    });
+    const whites = entries.flatMap((e) => (e.kind === 'imported-svg' ? e.paths : [])).filter((p) => p.color.toLowerCase() === '#ffffff').length;
+    if (entries.length > 1 || whites > 0)
+      out(`  ${file.slice(root.length)}: entries ${seq.join(' ')} whites=${whites} crossEntryWhiteOverDark=${risky}`);
+  }
+});
+
+function bbox(p: ColoredPath) {
+  let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity;
+  for (const l of p.polylines) for (const q of l.points) { a = Math.min(a, q.x); b = Math.min(b, q.y); c = Math.max(c, q.x); d = Math.max(d, q.y); }
+  return { a, b, c, d };
+}
+function overlap(x: ReturnType<typeof bbox>, y: ReturnType<typeof bbox>) {
+  return x.a < y.c && y.a < x.c && x.b < y.d && y.b < x.d;
+}
+
+it('P1: Illustrator-style badge, ring between fills, 1.0.29 save', () => {
+  olderBuild(AI_BADGE);
+  runTool('P1-0 original only (no copies)');
+  resetStore();
+
+  olderBuild(AI_BADGE_RING_LAST);
+  selectAll();
+  st().placeSelectionCopies([
+    { dx: 0, dy: 0, rotationDeg: 0 },
+    { dx: 45, dy: 0, rotationDeg: 0 },
+    { dx: 90, dy: 0, rotationDeg: 0 },
+  ]);
+  runTool('P1-C1 control: ring LAST (fills one part), Array x3');
+  resetStore();
+
+  olderBuild(AI_BADGE);
+  selectAll();
+  st().duplicateSelection();
+  runTool('P1-1 ring BETWEEN fills, Duplicate (whole logo selected)');
+  resetStore();
+
+  olderBuild(AI_BADGE);
+  selectAll();
+  st().copySelection();
+  st().pasteClipboard();
+  runTool('P1-2 ring between, Copy + Paste');
+  resetStore();
+
+  olderBuild(AI_BADGE);
+  selectAll();
+  st().placeSelectionCopies([
+    { dx: 0, dy: 0, rotationDeg: 0 },
+    { dx: 45, dy: 0, rotationDeg: 0 },
+    { dx: 90, dy: 0, rotationDeg: 0 },
+  ]);
+  runTool('P1-3 ring between, Array x3');
+  resetStore();
+
+  importSvg(AI_BADGE);
+  selectAll();
+  st().placeSelectionCopies([
+    { dx: 0, dy: 0, rotationDeg: 0 },
+    { dx: 45, dy: 0, rotationDeg: 0 },
+    { dx: 90, dy: 0, rotationDeg: 0 },
+  ]);
+  const fresh = st().project;
+  out(`== P1-C2 control: fresh import on main + Array x3: ${surfaces(fresh)}; per-op ${JSON.stringify(perOperation(fresh))}`);
+  out(`    ${describe(fresh)}`);
+});
+
+function addLineOpFor(ids: string[], power: number): string {
+  useStore.setState({ selectedObjectId: ids[0]!, additionalSelectedIds: new Set(ids.slice(1)) });
+  const before = new Set(st().project.scene.layers.map((l) => l.id));
+  st().addOperationForSelection();
+  const added = st().project.scene.layers.find((l) => !before.has(l.id))!;
+  st().setLayerParam(added.id, { mode: 'line', power });
+  return added.id;
+}
+
+it('P2: Line op on one part; fresh-import control', () => {
+  olderBuild(AI_BADGE);
+  const dark = st().project.scene.objects[0]!.id;
+  const lineA = addLineOpFor([dark], 90);
+  const a = runTool('P2-a older multi-part, Line op (90%) on dark disc part only');
+  out(`  line op ${lineA.slice(-6)}: ${perOperation(a.before)[lineA]} -> ${perOperation(a.after)[lineA]} (circle r15 = ${(2 * Math.PI * 15).toFixed(2)})`);
+  resetStore();
+
+  importSvg(AI_BADGE);
+  const darkFresh = st().project.scene.objects[0]!.id;
+  const lineF = addLineOpFor([darkFresh], 90);
+  out(`== P2-a control: FRESH import on main, Line op on the dark part: ${perOperation(st().project)[lineF]} mm; ${describe(st().project)}`);
+  resetStore();
+
+  olderBuild(AI_BADGE);
+  const objs = st().project.scene.objects;
+  const white = objs[objs.length - 1]!.id;
+  const lineB = addLineOpFor([white], 20);
+  const b = runTool('P2-b older multi-part, Line op (20% score) on white star part only');
+  out(`  line op ${lineB.slice(-6)}: ${perOperation(b.before)[lineB]} -> ${perOperation(b.after)[lineB] ?? 'absent'}; op exists after: ${st().project.scene.layers.some((l) => l.id === lineB)}`);
+});
+
+const SQ = svg(`<rect x="5" y="5" width="30" height="30" fill="#000"/><path d="M20 10 L30 20 L20 30 L10 20 Z" fill="#fff"/>`);
+function opOf(color: string): string {
+  const p = st().project;
+  for (const o of p.scene.objects) {
+    if (!('paths' in o)) continue;
+    for (const path of o.paths)
+      if (path.color.toLowerCase() === color)
+        return p.scene.layers.find((l) => pathUsesOperation(o, path, l))!.id;
+  }
+  throw new Error('no op for ' + color);
+}
+
+it('X: operator switched an older logo to Line', () => {
+  olderBuild(SQ);
+  const d1 = opOf('#000000');
+  st().setLayerParam(d1, { mode: 'line', power: 100 });
+  const x1 = runTool('X1 dark op switched to Line (cut 100 %), white still Fill');
+  out(`  cut op: ${perOperation(x1.before)[d1]} -> ${perOperation(x1.after)[d1]} (square 120, diamond 56.57)`);
+  resetStore();
+
+  olderBuild(SQ);
+  const d2 = opOf('#000000');
+  const w2 = opOf('#ffffff');
+  st().setLayerParam(d2, { mode: 'line', power: 100 });
+  st().setLayerParam(w2, { mode: 'line', power: 15 });
+  const x2 = runTool('X2 both ops Line: black cut 100 %, white score 15 %');
+  out(`  cut op: ${perOperation(x2.before)[d2]} -> ${perOperation(x2.after)[d2]}; score op: ${perOperation(x2.before)[w2]} -> ${perOperation(x2.after)[w2] ?? 'absent'}; score op exists: ${st().project.scene.layers.some((l) => l.id === w2)}`);
+  const layer = st().project.scene.layers.find((l) => l.id === d2)!;
+  out(`  cut op after: mode ${layer.mode} power ${layer.power}`);
+  st().undo();
+  out(`  after Undo: ${surfaces(st().project)} per-op ${JSON.stringify(perOperation(st().project))}`);
+  resetStore();
+
+  olderBuild(SQ);
+  const d3 = opOf('#000000');
+  const w3 = opOf('#ffffff');
+  st().setLayerParam(d3, { mode: 'line', power: 100 });
+  st().setLayerParam(w3, { mode: 'line', power: 15 });
+  selectAll();
+  st().placeSelectionCopies([{ dx: 0, dy: 0, rotationDeg: 0 }, { dx: 45, dy: 0, rotationDeg: 0 }]);
+  const x3 = runTool('X3 same Line/Line logo + Array x2 (copy judged by its ops, Amd 4 D2)');
+  out(`  cut op: ${perOperation(x3.before)[d3]} -> ${perOperation(x3.after)[d3]}; score op: ${perOperation(x3.before)[w3]} -> ${perOperation(x3.after)[w3] ?? 'absent'}`);
+  resetStore();
+
+  olderBuild(SQ);
+  const logo = st().project.scene.objects[0]!.id;
+  const line4 = addLineOpFor([logo], 90);
+  selectAll();
+  st().placeSelectionCopies([{ dx: 0, dy: 0, rotationDeg: 0 }, { dx: 45, dy: 0, rotationDeg: 0 }]);
+  const x4 = runTool('X4 single-part logo + Add operation Line on whole logo (Fill+Line), Array x2');
+  out(`  line op: ${perOperation(x4.before)[line4]} -> ${perOperation(x4.after)[line4]}`);
+  resetStore();
+
+  importSvg(SQ);
+  const d5 = opOf('#000000');
+  st().setLayerParam(d5, { mode: 'line', power: 100 });
+  out(`== X5 control fresh import on main, dark op -> Line: per-op ${JSON.stringify(perOperation(st().project))}; ${surfaces(st().project)}`);
+});
+
+it('L: library asset laser-in-use.svg (Inkscape) as a 1.0.29 import, Array x2', () => {
+  const text = readFileSync('C:/Users/stolk/kd-t1/t06-main/src/ui/library/assets/openclipart/laser-in-use.svg', 'utf8');
+  olderBuild(text);
+  out(`== L laser-in-use objects ${st().project.scene.objects.length}`);
+  const fresh0 = st().project;
+  out(`    ${describe(fresh0)}`);
+  selectAll();
+  st().placeSelectionCopies([{ dx: 0, dy: 0, rotationDeg: 0 }, { dx: 300, dy: 0, rotationDeg: 0 }]);
+  const before = st().project;
+  const w0 = whiteOutlinesByObject(before);
+  const total = (p: Project, ids: string[]) => ids.reduce((s, id) => s + burnInside(p, w0.get(id)!), 0);
+  const isFillObj = (id: string) => { const o = before.scene.objects.find((x) => x.id === id); return o !== undefined && o.kind === "imported-svg" && isSavedFillPart(before.scene, o); };
+  const orig = [...w0.keys()].filter((id) => isFillObj(id) && before.scene.objects.find((o) => o.id === id)?.svgImport !== undefined);
+  const copies = [...w0.keys()].filter((id) => isFillObj(id) && !orig.includes(id));
+  out(`  before: ${surfaces(before)}; inside whites: original ${total(before, orig).toFixed(0)} copies ${total(before, copies).toFixed(0)}`);
+  const r = st().leaveSavedWhiteUnburned();
+  const after = st().project;
+  out(`  tool returned ${r}; toast "${lastToast()}"; after: ${surfaces(after)}; inside whites: original ${total(after, orig).toFixed(0)} copies ${total(after, copies).toFixed(0)}`);
+  out(`  white objects before ${w0.size}; after ${whiteOutlinesByObject(after).size}`);
+});
+
+function openGolden(name: string): void {
+  const text = gunzipSync(
+    readFileSync(`C:/Users/stolk/kd-t1/t06-main/src/__fixtures__/returning-user/${name}.lf2.gz`),
+  ).toString('utf8');
+  const result = deserializeProject(text);
+  if (result.kind !== 'ok') throw new Error('golden did not open');
+  st().setProject(result.project as Project);
+  useStore.setState({ undoStack: [], redoStack: [] });
+}
+
+it('G: real 1.0.29 goldens', () => {
+  openGolden('1.0.29-white-logos');
+  const p = st().project;
+  out(`== G0 golden 1.0.29-white-logos: ${surfaces(p)}`);
+  out(`    ${describe(p)}`);
+  out(`    object keys: ${Object.keys(p.scene.objects.find((o) => o.kind === 'imported-svg') ?? {}).join(',')}`);
+  // G1: the U3 logo (logo-0): black op -> Line cut 100 %, white op -> Line score 15 %
+  const logo = p.scene.objects.find((o) => o.id.endsWith('logo-0'))!;
+  if (!('paths' in logo)) throw new Error('x');
+  const dOp = p.scene.layers.find((l) => pathUsesOperation(logo, logo.paths[0]!, l))!.id;
+  const wOp = p.scene.layers.find((l) => pathUsesOperation(logo, logo.paths[1]!, l))!.id;
+  st().setLayerParam(dOp, { mode: 'line', power: 100 });
+  st().setLayerParam(wOp, { mode: 'line', power: 15 });
+  const g1 = runTool('G1 golden white-logos, U3 logo switched to Line: black cut 100 %, white score 15 %');
+  out(`  cut op ${dOp.slice(-8)}: ${perOperation(g1.before)[dOp]} -> ${perOperation(g1.after)[dOp]}; score op ${wOp.slice(-8)}: ${perOperation(g1.before)[wOp]} -> ${perOperation(g1.after)[wOp] ?? 'absent'}`);
+  resetStore();
+
+  // G2: copies golden; select all, add a Line op (cut every coaster out), then the tool
+  openGolden('1.0.29-white-logo-copies');
+  const q = st().project;
+  out(`== G2-0 golden 1.0.29-white-logo-copies as opened: ${surfaces(q)}`);
+  selectAll();
+  const before = new Set(st().project.scene.layers.map((l) => l.id));
+  st().addOperationForSelection();
+  const added = st().project.scene.layers.find((l) => !before.has(l.id))!;
+  st().setLayerParam(added.id, { mode: 'line', power: 100 });
+  runTool('G2 golden copies + Add operation (Line cut) on all logos, then the tool');
+});
