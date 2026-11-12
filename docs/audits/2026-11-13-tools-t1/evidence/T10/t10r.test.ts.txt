@@ -1,0 +1,385 @@
+﻿// @vitest-environment jsdom
+// T10 refuter: independent checks of T10-P2-1 (move-ends on elliptical arcs).
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  IDENTITY_TRANSFORM,
+  type ColoredPath,
+  type CurveSubpath,
+  type ImportedSvg,
+  type Project,
+  type Transform,
+  type Vec2,
+} from '../t06-main/src/core/scene';
+import { flattenCurveSubpath } from '../t06-main/src/core/scene/curve-path';
+import { compilationPolylines } from '../t06-main/src/core/job/compilation-polylines';
+import { closePathsWithinTolerance } from '../t06-main/src/core/geometry/close-within-tolerance';
+import { exactHoleCurve } from '../t06-main/src/core/parts/part-generator-geometry';
+import { insertCurveNode, deleteCurveSegment } from '../t06-main/src/core/geometry/curve-segment-edit';
+import { optimizeObjectPaths } from '../t06-main/src/core/geometry/shape-optimize/optimize-object';
+import { DEFAULT_SHAPE_OPTIMIZE_OPTIONS } from '../t06-main/src/core/geometry/shape-optimize/shape-optimize-options';
+import { prepareOutput } from '../t06-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t06-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t06-main/src/ui/state/toast-store';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t10r/t10r.log';
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync(LOG, log.join('\n'));
+};
+beforeEach(() => resetStore());
+const f3 = (n: number) => n.toFixed(3);
+
+// ---- my own measures -------------------------------------------------------
+function polyLen(points: ReadonlyArray<Vec2>): number {
+  let s = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    const a = points[i - 1] as Vec2;
+    const b = points[i] as Vec2;
+    s += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  return s;
+}
+function densify(points: ReadonlyArray<Vec2>, step = 0.05): Vec2[] {
+  const o: Vec2[] = [];
+  for (let i = 1; i < points.length; i += 1) {
+    const a = points[i - 1] as Vec2;
+    const b = points[i] as Vec2;
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / step));
+    for (let k = 0; k < n; k += 1) o.push({ x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n });
+  }
+  if (points.length > 0) o.push(points.at(-1) as Vec2);
+  return o;
+}
+function distToPoly(p: Vec2, poly: ReadonlyArray<Vec2>): number {
+  let best = Infinity;
+  for (let i = 1; i < poly.length; i += 1) {
+    const a = poly[i - 1] as Vec2;
+    const b = poly[i] as Vec2;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const l2 = dx * dx + dy * dy;
+    const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
+    best = Math.min(best, Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy));
+  }
+  return best;
+}
+/** Hausdorff-ish: farthest a point of `a` lies from polyline `b`, both ways. */
+function hausdorff(a: ReadonlyArray<Vec2>, b: ReadonlyArray<Vec2>): number {
+  const da = densify(a);
+  const db = densify(b);
+  let m = 0;
+  for (const p of da) m = Math.max(m, distToPoly(p, b));
+  for (const p of db) m = Math.max(m, distToPoly(p, a));
+  return m;
+}
+function flat(curve: CurveSubpath): Vec2[] {
+  const r = flattenCurveSubpath(curve, { toleranceMm: 0.01 });
+  if (r.kind !== 'ok') throw new Error('flatten');
+  return [...r.polyline.points];
+}
+function polylineOfCurve(curve: CurveSubpath) {
+  const pts = flat(curve);
+  return { points: pts, closed: curve.closed };
+}
+function pathOf(curves: CurveSubpath[]): ColoredPath {
+  return { color: '#ff0000', polylines: curves.map(polylineOfCurve), curves };
+}
+const P = (cx: number, cy: number, r: number, deg: number): Vec2 => ({
+  x: cx + r * Math.cos((deg * Math.PI) / 180),
+  y: cy + r * Math.sin((deg * Math.PI) / 180),
+});
+function gapOf(c: CurveSubpath): number {
+  const e = c.segments.at(-1)?.to ?? c.start;
+  return Math.hypot(e.x - c.start.x, e.y - c.start.y);
+}
+const kinds = (c: CurveSubpath) => c.segments.map((s) => s.kind[0]).join('');
+
+function svgObject(id: string, paths: ColoredPath[], transform: Transform = IDENTITY_TRANSFORM): ImportedSvg {
+  const all = paths.flatMap((p) => p.polylines.flatMap((pl) => pl.points));
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: {
+      minX: Math.min(...all.map((p) => p.x)),
+      minY: Math.min(...all.map((p) => p.y)),
+      maxX: Math.max(...all.map((p) => p.x)),
+      maxY: Math.max(...all.map((p) => p.y)),
+    },
+    transform,
+    operationIds: ['L'],
+    paths,
+  } as unknown as ImportedSvg;
+}
+function projectWith(objects: ImportedSvg[]): Project {
+  const base = createProject();
+  const layer = { ...createLayer({ id: 'L', color: '#ff0000', name: 'L', mode: 'line' }), speed: 1234, power: 30 };
+  return { ...base, scene: { ...base.scene, layers: [layer], objects } } as Project;
+}
+// my own G-code reader: total length of G1 moves with X/Y (feed moves)
+function g1Length(gcode: string): { len: number; g1: number } {
+  let x = 0;
+  let y = 0;
+  let mode = 0;
+  let len = 0;
+  let g1 = 0;
+  for (const raw of gcode.split('\n')) {
+    const line = raw.replace(/;.*$/, '').trim().toUpperCase();
+    if (line === '') continue;
+    const g = line.match(/G0*([0-3])(?!\d)/);
+    if (g) mode = Number(g[1]);
+    const mx = line.match(/X(-?[\d.]+)/);
+    const my = line.match(/Y(-?[\d.]+)/);
+    if (!mx && !my) continue;
+    const nx = mx ? Number(mx[1]) : x;
+    const ny = my ? Number(my[1]) : y;
+    if (mode === 1) {
+      len += Math.hypot(nx - x, ny - y);
+      g1 += 1;
+    }
+    x = nx;
+    y = ny;
+  }
+  return { len, g1 };
+}
+function burn(project: Project) {
+  const prepared = prepareOutput(project);
+  const emitted = prepared.ok ? emitPreparedGcode(prepared) : { gcode: '', preflight: (prepared as any).preflight };
+  return { ...g1Length(emitted.gcode), preflight: (emitted as any).preflight, ok: prepared.ok };
+}
+function runStoreClose(project: Project, ids: string[], tol: number, mode: 'bridge' | 'move-ends') {
+  useStore.setState({ project, selectedObjectId: ids[0] ?? null, additionalSelectedIds: new Set(ids.slice(1)) } as any);
+  useToastStore.setState({ toasts: [] } as any);
+  useStore.getState().closeSelectedPathsWithTolerance(tol, mode);
+  const toasts = (useToastStore.getState() as any).toasts ?? [];
+  return { project: useStore.getState().project, toast: toasts.map((t: any) => t.message).join(' | ') };
+}
+
+// ---- A: independent repro of the claim, plus multi-arc cases --------------
+it('A: single arc vs multi-arc, move-ends vs bridge, my own deviation', () => {
+  out('== A: core closePathsWithinTolerance, deviation = two-way max distance (my densified sampler)');
+  const r = 20;
+  const arc = (from: number, to: number, large: boolean): CurveSubpath['segments'][number] => ({
+    kind: 'elliptical-arc', radiusX: r, radiusY: r, rotationDeg: 0, largeArc: large, sweep: true, to: P(0, 0, r, to),
+  });
+  const cases: Array<[string, CurveSubpath]> = [
+    ['1 arc 10..350 (340 deg)', { start: P(0, 0, r, 10), segments: [arc(10, 350, true)], closed: false }],
+    ['1 arc 2..358 (356 deg)', { start: P(0, 0, r, 2), segments: [arc(2, 358, true)], closed: false }],
+    ['1 small arc 0..2 (chord 0.70)', { start: P(0, 0, r, 0), segments: [arc(0, 2, false)], closed: false }],
+    ['2 arcs 10..180..350', { start: P(0, 0, r, 10), segments: [arc(10, 180, false), arc(180, 350, false)], closed: false }],
+    ['2 arcs 10..190..350 (first exact 180)', { start: P(0, 0, r, 10), segments: [arc(10, 190, false), arc(190, 350, false)], closed: false }],
+    ['3 arcs 10..120..240..350', { start: P(0, 0, r, 10), segments: [arc(10, 120, false), arc(120, 240, false), arc(240, 350, false)], closed: false }],
+    ['line + 1 arc (D-ish) ', { start: P(0, 0, r, 350), segments: [{ kind: 'line', to: P(0, 0, r, 340) }, arc(340, 359, false)], closed: false }],
+  ];
+  for (const [name, c] of cases) {
+    const before = flat(c);
+    const gap = gapOf(c);
+    for (const mode of ['move-ends', 'bridge'] as const) {
+      const res = closePathsWithinTolerance([pathOf([c])], IDENTITY_TRANSFORM, gap + 0.01, mode);
+      const after = res.paths[0]?.curves?.[0] as CurveSubpath;
+      const afterPts = flat(after);
+      const compiled = compilationPolylines(res.paths[0] as ColoredPath, IDENTITY_TRANSFORM)[0]?.points ?? [];
+      const compat = res.paths[0]?.polylines[0]?.points ?? [];
+      out(
+        `${name} ${mode}: closed=${res.closed} gap=${f3(gap)} len ${f3(polyLen(before))} -> curve ${f3(polyLen(afterPts))} / compiled ${f3(polyLen(compiled))} (${compiled.length} pts) / compat ${f3(polyLen(compat))}; ` +
+          `dev(before,after)=${f3(hausdorff(before, afterPts))} vs gap/2 ${f3(gap / 2)}; segs ${kinds(c)}->${kinds(after)}`,
+      );
+    }
+  }
+});
+
+// ---- B: a sketch-style / part-generator circle opened by node editing ------
+it('B: node edit opens a 2-arc part hole, then move-ends', () => {
+  out('== B: exactHoleCurve (2 semicircle arcs, as Part generator / sketch circle) opened with Insert node + Delete segment');
+  const hole = exactHoleCurve({ key: 'h', center: { x: 0, y: 0 }, diameterMm: 20 } as any);
+  for (const t of [0.02, 0.5, 0.98]) {
+    const split = insertCurveNode(hole, 0, t);
+    if (split === null) { out(`t=${t}: insert refused`); continue; }
+    const split2 = insertCurveNode(split, 0, t > 0.5 ? 0.99 : 0.97);
+    if (split2 === null) { out(`t=${t}: second insert refused`); continue; }
+    // delete the small middle segment of the split first arc
+    const opened = deleteCurveSegment(split2, 1) ?? [];
+    for (const c of opened) {
+      const gap = gapOf(c);
+      const before = flat(c);
+      const res = closePathsWithinTolerance([pathOf([c])], IDENTITY_TRANSFORM, gap + 0.01, 'move-ends');
+      const after = res.paths[0]?.curves?.[0] as CurveSubpath;
+      out(`t=${t}: open ${kinds(c)} gap=${f3(gap)} len ${f3(polyLen(before))} -> ${f3(polyLen(flat(after)))} dev=${f3(hausdorff(before, flat(after)))} (gap/2 ${f3(gap / 2)})`);
+    }
+  }
+  // Leave only one arc: delete segment 0 of the closed 2-arc hole -> a single semicircle arc, gap 20.
+  const single = deleteCurveSegment(hole, 0) ?? [];
+  for (const c of single) {
+    const gap = gapOf(c);
+    const res = closePathsWithinTolerance([pathOf([c])], IDENTITY_TRANSFORM, gap, 'move-ends');
+    const after = res.paths[0]?.curves?.[0] as CurveSubpath;
+    out(`hole minus one arc: ${kinds(c)} gap=${f3(gap)} tol=${f3(gap)} move-ends len ${f3(polyLen(flat(c)))} -> ${f3(polyLen(flat(after)))}`);
+  }
+});
+
+// ---- C: Optimize Shapes on open near-circles: does it ever leave ONE arc? ---
+it('C: Optimize Shapes output kinds on open arcs, then move-ends', () => {
+  out('== C: Optimize Shapes (default lines-arcs-curves and lines-arcs) on open arcs (polyline input, 0.2 deg steps)');
+  for (const sweep of [90, 150, 179, 200, 270, 300, 330, 350, 355]) {
+    for (const fitWith of ['lines-arcs-curves', 'lines-arcs'] as const) {
+      for (const smooth of [true, false]) {
+        const r = 20;
+        const pts: Vec2[] = [];
+        for (let a = 0; a <= sweep + 1e-9; a += 0.2) pts.push(P(50, 50, r, a));
+        const path: ColoredPath = { color: '#ff0000', polylines: [{ points: pts, closed: false }] };
+        const obj = svgObject('o', [path]);
+        const res = optimizeObjectPaths(obj as any, { ...DEFAULT_SHAPE_OPTIMIZE_OPTIONS, fitWith, smooth });
+        const c = res.paths[0]?.curves?.[0];
+        if (c === undefined) { out(`sweep ${sweep} ${fitWith} smooth=${smooth}: no curves`); continue; }
+        const gap = gapOf(c);
+        const closed = closePathsWithinTolerance(res.paths, IDENTITY_TRANSFORM, gap + 0.01, 'move-ends');
+        const after = closed.paths[0]?.curves?.[0] as CurveSubpath;
+        out(`sweep ${sweep} ${fitWith} smooth=${smooth}: segs ${kinds(c)} gap=${f3(gap)}; move-ends len ${f3(polyLen(flat(c)))} -> ${f3(polyLen(flat(after)))} dev=${f3(hausdorff(flat(c), flat(after)))}`);
+      }
+    }
+  }
+});
+
+// ---- D: store + G-code + preflight when the collapsed arc is the only cut ---
+it('D: store action, G-code and preflight with the arc as only object, and with a second object', () => {
+  out('== D: store closeSelectedPathsWithTolerance(8, move-ends), then prepareOutput/emit; preflight issues');
+  const r = 20;
+  const c: CurveSubpath = {
+    start: P(60, 60, r, 10),
+    segments: [{ kind: 'elliptical-arc', radiusX: r, radiusY: r, rotationDeg: 0, largeArc: true, sweep: true, to: P(60, 60, r, 350) }],
+    closed: false,
+  };
+  const square: CurveSubpath = {
+    start: { x: 120, y: 20 },
+    segments: [{ kind: 'line', to: { x: 140, y: 20 } }, { kind: 'line', to: { x: 140, y: 40 } }, { kind: 'line', to: { x: 120, y: 40 } }, { kind: 'line', to: { x: 120, y: 20 } }],
+    closed: true,
+  };
+  for (const withSquare of [false, true]) {
+    const objects = [svgObject('arc', [pathOf([c])])];
+    if (withSquare) objects.push(svgObject('sq', [pathOf([square])]));
+    const project = projectWith(objects);
+    const b0 = burn(project);
+    const { project: after, toast } = runStoreClose(project, ['arc'], 8, 'move-ends');
+    const b1 = burn(after);
+    const arcObj = after.scene.objects.find((o) => o.id === 'arc') as ImportedSvg;
+    out(
+      `withSquare=${withSquare}: toast "${toast}"; G1 length ${f3(b0.len)} (${b0.g1} moves) -> ${f3(b1.len)} (${b1.g1} moves); prepared ok ${b0.ok}/${b1.ok}; ` +
+        `bounds after ${JSON.stringify(arcObj.bounds)}; preflight after: ${JSON.stringify((b1.preflight?.issues ?? []).map((i: any) => i.code + ': ' + i.message))}`,
+    );
+    const undoLen = useStore.getState().undoStack.length;
+    out(`  undo stack ${undoLen}`);
+  }
+});
+
+// ---- E: an end arc near a half circle: does move-ends stay within gap/2? ----
+it('E: D shape (half-circle arc + diameter line) open at the corner, default tolerance 0.5', () => {
+  out('== E: D shape; arc A->B half circle r 10, line B -> A + (g,0) stops short by g along the chord');
+  for (const r of [10, 25]) {
+    for (const g of [0.1, 0.25, 0.5]) {
+      for (const sweepDeg of [180, 170, 150, 120]) {
+        // arc from angle 180+(180-sweep)/2 ... symmetric about the -y axis, below the chord
+        const half = sweepDeg / 2;
+        const A = P(0, 0, r, 270 - half);
+        const B = P(0, 0, r, 270 + half);
+        const end = { x: A.x + g, y: A.y };
+        const c: CurveSubpath = {
+          start: A,
+          segments: [
+            { kind: 'elliptical-arc', radiusX: r, radiusY: r, rotationDeg: 0, largeArc: sweepDeg > 180, sweep: true, to: B },
+            { kind: 'line', to: end },
+          ],
+          closed: false,
+        };
+        const before = flat(c);
+        const gap = gapOf(c);
+        const res = closePathsWithinTolerance([pathOf([c])], IDENTITY_TRANSFORM, 0.5, 'move-ends');
+        const after = res.paths[0]?.curves?.[0] as CurveSubpath;
+        const a = flat(after);
+        const br = closePathsWithinTolerance([pathOf([c])], IDENTITY_TRANSFORM, 0.5, 'bridge');
+        const bp = flat(br.paths[0]?.curves?.[0] as CurveSubpath);
+        // lowest point of the arc before/after (the arc's apex)
+        const minY = (pts: Vec2[]) => Math.min(...pts.map((p) => p.y));
+        out(
+          `r=${r} sweep=${sweepDeg} gap=${f3(gap)} closed=${res.closed}: move-ends dev=${f3(hausdorff(before, a))} (gap/2 ${f3(gap / 2)}, ratio ${(hausdorff(before, a) / (gap / 2)).toFixed(1)}x) apex y ${f3(minY(before))} -> ${f3(minY(a))}; bridge dev=${f3(hausdorff(before, bp))}`,
+        );
+      }
+    }
+  }
+});
+
+it('E2: Optimize Shapes on a traced D shape, then move-ends at 0.5', () => {
+  out('== E2: polyline D (half circle r 10 sampled 1 deg + diameter line), open short of the start by g, Optimize Shapes default, then move-ends tol 0.5');
+  for (const g of [0.2, 0.4]) {
+    for (const smooth of [true, false]) {
+      const r = 10;
+      const pts: Vec2[] = [];
+      for (let a = 180; a <= 360.0001; a += 1) pts.push(P(50, 50, r, a));
+      for (let x = 50 + r - 1; x > 50 - r + g + 1e-9; x -= 1) pts.push({ x, y: 50 });
+      pts.push({ x: 50 - r + g, y: 50 });
+      const path: ColoredPath = { color: '#ff0000', polylines: [{ points: pts, closed: false }] };
+      const obj = svgObject('d', [path]);
+      const opt = optimizeObjectPaths(obj as any, { ...DEFAULT_SHAPE_OPTIMIZE_OPTIONS, smooth });
+      const c = opt.paths[0]?.curves?.[0];
+      if (c === undefined) { out(`g=${g} smooth=${smooth}: optimize left no curves`); continue; }
+      const first = c.segments[0] as any;
+      const before = flat(c);
+      const res = closePathsWithinTolerance(opt.paths, IDENTITY_TRANSFORM, 0.5, 'move-ends');
+      const a = flat(res.paths[0]?.curves?.[0] as CurveSubpath);
+      out(
+        `g=${g} smooth=${smooth}: segs ${kinds(c)} first ${first.kind} r=${first.radiusX === undefined ? '-' : f3(first.radiusX)} large=${first.largeArc} gap=${f3(gapOf(c))} closed=${res.closed} dev=${f3(hausdorff(before, a))} (gap/2 ${f3(gapOf(c) / 2)}) vs source polyline dev ${f3(hausdorff(pts, a))}`,
+      );
+    }
+  }
+});
+
+it('F: reachable chains end to end through the store and G-code', () => {
+  out('== F: store action + G-code on in-app-produced geometry');
+  // F1: Optimize Shapes (Smooth off) on a small open 150 deg arc r 1 -> one elliptical-arc; close at tol 2.
+  {
+    const pts: Vec2[] = [];
+    for (let a = 0; a <= 150.0001; a += 2) pts.push(P(50, 50, 1, a));
+    const obj = svgObject('s', [{ color: '#ff0000', polylines: [{ points: pts, closed: false }] }]);
+    const opt = optimizeObjectPaths(obj as any, { ...DEFAULT_SHAPE_OPTIMIZE_OPTIONS, smooth: false });
+    const c = opt.paths[0]?.curves?.[0] as CurveSubpath;
+    const optimized = { ...obj, paths: opt.paths } as ImportedSvg;
+    const project = projectWith([optimized]);
+    const b0 = burn(project);
+    const r = runStoreClose(project, ['s'], 2, 'move-ends');
+    const b1 = burn(r.project);
+    out(`F1 optimize(smooth off) r1 150deg: segs ${kinds(c)} gap=${f3(gapOf(c))}; toast "${r.toast}"; G1 ${f3(b0.len)} -> ${f3(b1.len)}; preflight ${JSON.stringify((b1.preflight?.issues ?? []).map((i: any) => i.code))}`);
+  }
+  // F2: Optimize Shapes (Smooth off) on a traced D open by 0.4 mm at the corner; close at default 0.5.
+  {
+    const pts: Vec2[] = [];
+    for (let a = 180; a <= 360.0001; a += 1) pts.push(P(50, 50, 10, a));
+    for (let x = 59; x > 40.4 + 1e-9; x -= 1) pts.push({ x, y: 50 });
+    pts.push({ x: 40.4, y: 50 });
+    const obj = svgObject('d', [{ color: '#ff0000', polylines: [{ points: pts, closed: false }] }]);
+    const opt = optimizeObjectPaths(obj as any, { ...DEFAULT_SHAPE_OPTIMIZE_OPTIONS, smooth: false });
+    const optimized = { ...obj, paths: opt.paths } as ImportedSvg;
+    const project = projectWith([optimized]);
+    for (const mode of ['move-ends', 'bridge'] as const) {
+      const r = runStoreClose(project, ['d'], 0.5, mode);
+      const after = r.project.scene.objects[0] as ImportedSvg;
+      const compiled = compilationPolylines(after.paths[0] as ColoredPath, after.transform)[0]?.points ?? [];
+      const minY = Math.min(...compiled.map((p) => p.y));
+      out(`F2 D optimize(smooth off) ${mode}: toast "${r.toast}"; compiled arc lowest y ${f3(minY)} (true 40.000); dev from traced source ${f3(hausdorff(pts, compiled))}; bounds ${f3(after.bounds.minY)}..${f3(after.bounds.maxY)}`);
+    }
+  }
+  // F3: Part-generator style hole (2 semicircles, dia 6) with one arc deleted -> one half circle; tol 6.
+  {
+    const hole = exactHoleCurve({ key: 'h', center: { x: 30, y: 30 }, diameterMm: 6 } as any);
+    const opened = (deleteCurveSegment(hole, 0) ?? [])[0] as CurveSubpath;
+    const project = projectWith([svgObject('h', [pathOf([opened])])]);
+    const b0 = burn(project);
+    const r = runStoreClose(project, ['h'], 6, 'move-ends');
+    const b1 = burn(r.project);
+    out(`F3 hole minus one arc: segs ${kinds(opened)} gap=${f3(gapOf(opened))}; toast "${r.toast}"; G1 ${f3(b0.len)} -> ${f3(b1.len)}; preflight ${JSON.stringify((b1.preflight?.issues ?? []).map((i: any) => i.code))}`);
+  }
+});

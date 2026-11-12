@@ -1,0 +1,33 @@
+// Refuter T06: does Job Review's warning set flag the cut-power Fill left by Fill Selection?
+import { it } from 'vitest';
+import { appendFileSync, readFileSync } from 'node:fs';
+import { importLightBurnClb } from '../t06-main/src/io/lightburn/clb-import';
+import { IDENTITY_TRANSFORM, primaryOperationForObject } from '../t06-main/src/core/scene';
+import { createRectangle } from '../t06-main/src/core/shapes/primitives';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { detectJobIntentWarnings } from '../t06-main/src/ui/laser/job-intent-warnings';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t06r/r01-fill-selection.log';
+
+it('job intent warnings after Fill Selection vs inspector switch', () => {
+  const file = 'h3mul-main-material-library.clb';
+  const r = importLightBurnClb(readFileSync('C:/Users/stolk/kd-t1/t06-main/src/__fixtures__/lightburn/external/clb/' + file, 'utf8'), file);
+  if (!r.ok) throw new Error(r.reason);
+  for (const path of ['before', 'fill-selection', 'inspector'] as const) {
+    resetStore();
+    useStore.getState().setMaterialLibrary(r.library);
+    useStore.getState().setJobLaserMaterial({ name: 'Basswood', thicknessMm: 2, autoApplyRecipes: true });
+    useStore.getState().drawShape(
+      createRectangle({ id: 'r', color: '#0000ff', spec: { widthMm: 20, heightMm: 10, cornerRadiusMm: 0 }, transform: { ...IDENTITY_TRANSFORM, x: 5, y: 5 } }),
+    );
+    const scene = useStore.getState().project.scene;
+    const op = primaryOperationForObject(scene.objects[0]!, scene.layers)!;
+    if (path === 'fill-selection') {
+      useStore.setState({ selectedObjectId: 'r', additionalSelectedIds: new Set() });
+      useStore.getState().fillSelectionSeparately();
+    } else if (path === 'inspector') useStore.getState().setLayerParam(op.id, { mode: 'fill' });
+    const warnings = detectJobIntentWarnings(useStore.getState().project);
+    appendFileSync(LOG, `REVIEW ${path}: ${warnings.length} job-intent warnings: ${JSON.stringify(warnings).slice(0, 600)}\n`);
+  }
+});

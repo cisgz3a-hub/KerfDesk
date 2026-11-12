@@ -1,0 +1,143 @@
+// T12 refuter: own method. Polyline-only asymmetric "L" (no curves), world points via the
+// scene's own applyTransform (not the shear code), burn via prepareOutput + emit and an
+// independent G-code walker. Logs to r12.log.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  applyTransform,
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  transformedBBox,
+  type ImportedSvg,
+  type Project,
+} from '../t06-main/src/core/scene';
+import { prepareOutput } from '../t06-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t06-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t06-main/src/ui/state/toast-store';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t12r/r12.log';
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync(LOG, log.join('\n'));
+};
+const f = (n: number, d = 3) => (Number.isFinite(n) ? n.toFixed(d) : String(n));
+const st = () => useStore.getState();
+beforeEach(() => resetStore());
+
+// Asymmetric L, CCW in scene coordinates (area 104 mm²). A reflection flips its sign.
+const L_PTS = [
+  { x: 0, y: 0 },
+  { x: 20, y: 0 },
+  { x: 20, y: 4 },
+  { x: 4, y: 4 },
+  { x: 4, y: 10 },
+  { x: 0, y: 10 },
+];
+
+function lObject(): ImportedSvg {
+  return {
+    kind: 'imported-svg',
+    id: 'L',
+    source: 'L.svg',
+    bounds: { minX: 0, minY: 0, maxX: 20, maxY: 10 },
+    transform: { ...IDENTITY_TRANSFORM, x: 100, y: 100 },
+    operationIds: ['lay'],
+    paths: [{ color: '#ff0000', polylines: [{ closed: true, points: L_PTS }] }],
+  } as unknown as ImportedSvg;
+}
+
+function load(mode: 'line' | 'fill'): void {
+  const base = createProject();
+  const layer = { ...createLayer({ id: 'lay', color: '#ff0000', name: 'lay', mode }), speed: 1000, power: 40 };
+  const project: Project = {
+    ...base,
+    optimization: { ...DEFAULT_PROJECT_OPTIMIZATION },
+    scene: { ...base.scene, objects: [lObject()], layers: [layer], groups: [] },
+  };
+  useStore.setState({ project, selectedObjectId: 'L', additionalSelectedIds: new Set(), undoStack: [], redoStack: [] } as never);
+}
+
+function worldPts(o: ImportedSvg) {
+  return o.paths.flatMap((p) => p.polylines.flatMap((pl) => pl.points.map((pt) => applyTransform(pt, o.transform))));
+}
+function signedArea(pts: ReadonlyArray<{ x: number; y: number }>): number {
+  let s = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i]!;
+    const b = pts[(i + 1) % pts.length]!;
+    s += a.x * b.y - b.x * a.y;
+  }
+  return s / 2;
+}
+
+// Independent G-code walker: lit length (G1 with S>0 while M3/M4), lit extents.
+function walk(gcode: string) {
+  let x = 0, y = 0, s = 0, mode = 0, on = false, lit = 0;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const raw of gcode.split('\n')) {
+    const line = raw.replace(/;.*$/, '').replace(/\(.*?\)/g, '').toUpperCase();
+    if (/\bM0?[34]\b/.test(line)) on = true;
+    if (/\bM0?5\b/.test(line)) on = false;
+    const g = line.match(/\bG0?([0-3])\b/);
+    if (g) mode = Number(g[1]);
+    const sx = line.match(/S(-?[\d.]+)/);
+    if (sx) s = Number(sx[1]);
+    const mx = line.match(/X(-?[\d.]+)/);
+    const my = line.match(/Y(-?[\d.]+)/);
+    if (!mx && !my) continue;
+    const nx = mx ? Number(mx[1]) : x;
+    const ny = my ? Number(my[1]) : y;
+    if (mode === 1 && on && s > 0) {
+      lit += Math.hypot(nx - x, ny - y);
+      minX = Math.min(minX, x, nx); maxX = Math.max(maxX, x, nx);
+      minY = Math.min(minY, y, ny); maxY = Math.max(maxY, y, ny);
+    }
+    x = nx; y = ny;
+  }
+  return { lit, w: maxX - minX, h: maxY - minY };
+}
+
+function burn() {
+  const p = prepareOutput(st().project);
+  if (!p.ok) return { ok: false as const, issues: JSON.stringify(p.preflight).slice(0, 400) };
+  const w = walk(emitPreparedGcode(p).gcode);
+  return { ok: true as const, advisories: (p.advisories ?? []).map((a) => (a as { code?: string }).code ?? JSON.stringify(a)).join(','), ...w };
+}
+
+function shear(ax: number, ay: number): string {
+  useToastStore.setState({ toasts: [] } as never);
+  st().shearSelection(ax, ay);
+  return ((useToastStore.getState() as { toasts?: { message: string }[] }).toasts ?? []).map((t) => t.message).join(' | ');
+}
+
+const PAIRS: Array<[number, number]> = [[15, 0], [20, -10], [44, 45], [45, 45], [30, 60], [60, 60], [85, 85], [-45, -45], [45, -45]];
+
+it('combined shear on an L: area sign, canvas bounds, burn, advisories, toast, undo', () => {
+  for (const mode of ['fill', 'line'] as const) {
+    for (const [ax, ay] of PAIRS) {
+      load(mode);
+      const before = st().project.scene.objects[0] as ImportedSvg;
+      const a0 = signedArea(worldPts(before));
+      const bb0 = transformedBBox(before);
+      const b0 = burn();
+      const msg = shear(ax, ay);
+      const after = st().project.scene.objects[0] as ImportedSvg;
+      const a1 = signedArea(worldPts(after));
+      const bb1 = transformedBBox(after);
+      const b1 = burn();
+      const undo = st().undoStack.length;
+      const det = 1 - Math.tan((ax * Math.PI) / 180) * Math.tan((ay * Math.PI) / 180);
+      out(
+        `${mode} ${ax}/${ay} det(oracle)=${f(det, 6)} area ${f(a0)} -> ${f(a1)} ratio ${f(a1 / a0, 6)} ` +
+          `canvas ${f(bb0.maxX - bb0.minX)}x${f(bb0.maxY - bb0.minY)} -> ${f(bb1.maxX - bb1.minX)}x${f(bb1.maxY - bb1.minY)} ` +
+          `burn lit ${b0.ok ? f(b0.lit) : 'REFUSED'} -> ${b1.ok ? `${f(b1.lit)} (${f(b1.w)}x${f(b1.h)}) adv[${b1.advisories}]` : `REFUSED ${b1.issues}`} ` +
+          `undo=${undo} toast="${msg}"`,
+      );
+    }
+  }
+});

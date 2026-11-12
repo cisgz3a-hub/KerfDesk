@@ -1,0 +1,36 @@
+// Partial shear when one sheared sub-path exceeds the flatten budget?
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type CurveSubpath, type ImportedSvg } from '../t06-main/src/core/scene';
+import { flattenCurveSubpath } from '../t06-main/src/core/scene/curve-path';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t06-main/src/ui/state/toast-store';
+
+it('budget', () => {
+  resetStore();
+  const N = 15000;
+  const segs: any[] = [];
+  for (let i = 0; i < N; i++) segs.push({ kind: 'elliptical-arc', radiusX: 1, radiusY: 1, rotationDeg: 0, largeArc: false, sweep: i % 2 === 0, to: { x: 2 * i + 2, y: 0 } });
+  segs.push({ kind: 'line', to: { x: 2 * N, y: 5 } }, { kind: 'line', to: { x: 0, y: 5 } }, { kind: 'line', to: { x: 0, y: 0 } });
+  const wavy: CurveSubpath = { start: { x: 0, y: 0 }, segments: segs, closed: true };
+  const sq: CurveSubpath = { start: { x: 0, y: 10 }, segments: [{ kind: 'line', to: { x: 10, y: 10 } }, { kind: 'line', to: { x: 10, y: 20 } }, { kind: 'line', to: { x: 0, y: 20 } }], closed: true } as any;
+  const fl = (c: CurveSubpath) => flattenCurveSubpath(c, { toleranceMm: 0.05 });
+  const a = fl(wavy) as any, b = fl(sq) as any;
+  const o = { kind: 'imported-svg', id: 'a', source: 'a.svg', bounds: { minX: 0, minY: -1, maxX: N, maxY: 20 }, transform: { ...IDENTITY_TRANSFORM }, operationIds: ['L'],
+    paths: [{ color: '#ff0000', polylines: [a.polyline], curves: [wavy] }, { color: '#00ff00', polylines: [b.polyline], curves: [sq] }] } as unknown as ImportedSvg;
+  const base = createProject();
+  useStore.setState({ project: { ...base, scene: { ...base.scene, objects: [o], layers: [createLayer({ id: 'L', color: '#ff0000' })], groups: [] } }, selectedObjectId: 'a', additionalSelectedIds: new Set(), undoStack: [], redoStack: [] } as any);
+  useToastStore.setState({ toasts: [] } as any);
+  useStore.getState().shearSelection(85, 0);
+  const r = useStore.getState().project.scene.objects[0] as any;
+  const lines: string[] = [];
+  lines.push(`pre flatten segs wavy ${a.segmentCount}`);
+  const k = Math.tan(85 * Math.PI / 180);
+  lines.push(`post: path0 curves same object? ${r.paths[0] === o.paths[0]}; path1 same? ${r.paths[1] === o.paths[1]}`);
+  lines.push(`path1 start ${JSON.stringify(r.paths[1].curves[0].start)} (oracle x = 0 + tan85*(10 - 9.5) = ${k * 0.5})`);
+  const shearedWavy = r.paths[0].curves[0];
+  const fl2 = flattenCurveSubpath(shearedWavy, { toleranceMm: 0.05 }) as any;
+  lines.push(`post flatten wavy: ${fl2.kind} ${fl2.segmentCount ?? fl2.segmentBudget}; toast ${JSON.stringify(useToastStore.getState().toasts.map((t: any) => t.message))}`);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t12/t12b.log', lines.join('\n'));
+});

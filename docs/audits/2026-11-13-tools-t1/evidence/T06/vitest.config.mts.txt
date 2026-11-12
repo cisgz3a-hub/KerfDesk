@@ -1,0 +1,24 @@
+// Refuter T06 config: jsdom (CLB import needs DOMParser), tree's setup file.
+export default {
+  root: 'C:/Users/stolk/kd-t1/zz-t06r',
+  define: {
+    __BUILD_TIME__: JSON.stringify('2026-11-13T00:00:00Z'),
+    __GIT_SHA__: JSON.stringify('856cb3ae1'),
+    __APP_VERSION__: JSON.stringify('0.0.0-refuter'),
+  },
+  server: { fs: { strict: false } },
+  esbuild: { jsx: 'automatic' },
+  resolve: {
+    alias: {
+      'react-dom': 'C:/Users/stolk/kd-t1/t06-main/node_modules/react-dom',
+      react: 'C:/Users/stolk/kd-t1/t06-main/node_modules/react',
+    },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: false,
+    include: ['*.test.ts'],
+    setupFiles: ['C:/Users/stolk/kd-t1/t06-main/src/__fixtures__/jsdom-canvas-setup.ts'],
+    testTimeout: 180000,
+  },
+};

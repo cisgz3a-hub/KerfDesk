@@ -1,0 +1,317 @@
+// T08 Close Fill Contours with Tolerance: the tolerance itself (validity, threshold,
+// world frame), the harm a large tolerance can do (long chords, split outlines,
+// neighbouring objects), Undo/Redo/save-reopen, burned area vs an independent oracle.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  applyTransform,
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  type ColoredPath,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type Transform,
+} from '../t06-main/src/core/scene';
+import { prepareOutput } from '../t06-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t06-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t06-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t06-main/src/io/project/deserialize-project';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { selectedOpenFillContourRepairSummary } from '../t06-main/src/ui/common/fill-diagnostics';
+import { bbox, gridArea, hatchArea, litMoves, totalLen, type LitMove, type Vec } from '../zz-t07/decode';
+
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t08/t08-burn.log', log.join('\n'));
+};
+
+beforeEach(() => resetStore());
+
+const FILL_SPEED = 1500;
+const SPACING = 0.05;
+
+function fillLayer(): Layer {
+  return {
+    ...createLayer({ id: 'F', color: '#0000ff', name: 'F', mode: 'fill' }),
+    speed: FILL_SPEED,
+    power: 30,
+    hatchSpacingMm: SPACING,
+  };
+}
+
+function svgObj(id: string, paths: ColoredPath[], transform: Transform, extra: Partial<ImportedSvg> = {}): ImportedSvg {
+  const all = paths.flatMap((p) => p.polylines.flatMap((pl) => pl.points));
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: {
+      minX: Math.min(...all.map((p) => p.x)),
+      minY: Math.min(...all.map((p) => p.y)),
+      maxX: Math.max(...all.map((p) => p.x)),
+      maxY: Math.max(...all.map((p) => p.y)),
+    },
+    transform,
+    operationIds: ['F'],
+    paths,
+    ...extra,
+  };
+}
+
+const open = (...contours: Vec[][]): ColoredPath => ({
+  color: '#000000',
+  polylines: contours.map((points) => ({ closed: false, points })),
+});
+
+function load(objects: SceneObject[], selected: string[]): void {
+  const base = createProject();
+  const project: Project = {
+    ...base,
+    optimization: { ...DEFAULT_PROJECT_OPTIMIZATION },
+    scene: { ...base.scene, objects, layers: [fillLayer()], groups: [] },
+  };
+  useStore.setState({
+    project,
+    selectedObjectId: selected[0] ?? null,
+    additionalSelectedIds: new Set(selected.slice(1)),
+    undoStack: [],
+    redoStack: [],
+    dirty: false,
+  });
+}
+
+function burn(project: Project) {
+  const prepared = prepareOutput(project);
+  const emitted = prepared.ok ? emitPreparedGcode(prepared) : { gcode: '' };
+  const moves = litMoves(emitted.gcode, project.device).filter((m) => m.f === FILL_SPEED);
+  return { gcode: emitted.gcode, moves, ok: prepared.ok };
+}
+
+const st = () => useStore.getState();
+const summary = (tol: number) =>
+  selectedOpenFillContourRepairSummary(st().project, st().selectedObjectId, st().additionalSelectedIds, tol);
+const f3 = (n: number) => n.toFixed(3);
+const area = (m: ReadonlyArray<LitMove>) => hatchArea(m, SPACING);
+
+function nearSquare(gx: number, gy: number, ox = 0, oy = 0): Vec[] {
+  return [
+    { x: ox, y: oy },
+    { x: ox + 20, y: oy },
+    { x: ox + 20, y: oy + 10 },
+    { x: ox, y: oy + 10 },
+    { x: ox + gx, y: oy + gy },
+  ];
+}
+
+function arc(cx: number, cy: number, r: number, a0deg: number, a1deg: number, n = 96): Vec[] {
+  const pts: Vec[] = [];
+  for (let i = 0; i <= n; i++) {
+    const a = ((a0deg + ((a1deg - a0deg) * i) / n) * Math.PI) / 180;
+    pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+  }
+  return pts;
+}
+
+function apply(tol: number) {
+  const p0 = st().project;
+  const u0 = st().undoStack.length;
+  st().closeSelectedOpenFillContoursWithTolerance(tol);
+  return { changed: st().project !== p0, undoAdded: st().undoStack.length - u0 };
+}
+
+function rot(deg: number, sx: number, sy: number, mirrorX: boolean, tx = 100, ty = 100): Transform {
+  return { x: tx, y: ty, scaleX: sx, scaleY: sy, rotationDeg: deg, mirrorX, mirrorY: false };
+}
+
+it('A threshold: inclusive, world mm, floating equality', () => {
+  out('== A threshold');
+  for (const [gap, tol] of [
+    [1, 1],
+    [1.0001, 1],
+    [0.9999, 1],
+    [5, 5],
+    [5.000001, 5],
+  ] as const) {
+    load([svgObj('a', [open(nearSquare(0, gap))], IDENTITY_TRANSFORM)], ['a']);
+    const s = summary(tol);
+    const r = apply(tol);
+    out(`identity gap ${gap} tol ${tol}: summary reviewed=${s.reviewedCount} safe=${s.safeCount} remaining=${s.remainingCount} | changed=${r.changed} undo+${r.undoAdded}`);
+  }
+  // Nominal equality through a transform: local gap g, uniform scale k, world gap g*k == tol.
+  let refused = 0;
+  let total = 0;
+  const refusedCases: string[] = [];
+  for (const [g, k] of [
+    [0.1, 10],
+    [0.3, 10 / 3],
+    [0.7, 10 / 7],
+    [0.2, 5],
+    [0.6, 2.5],
+    [1.1, 10 / 11],
+  ] as const) {
+    for (const [ox, oy] of [
+      [0, 0],
+      [12.3, 4.5],
+      [-7.7, 33.1],
+      [101.1, 0.3],
+    ] as const) {
+      const t: Transform = { x: 3.3, y: 7.1, scaleX: k, scaleY: k, rotationDeg: 0, mirrorX: false, mirrorY: false };
+      load([svgObj('a', [open(nearSquare(0, g, ox, oy))], t)], ['a']);
+      const w0 = applyTransform({ x: ox, y: oy }, t);
+      const w1 = applyTransform({ x: ox, y: oy + g }, t);
+      const wg = Math.hypot(w0.x - w1.x, w0.y - w1.y);
+      const r = apply(1);
+      total++;
+      if (!r.changed) {
+        refused++;
+        refusedCases.push(`g${g}xk${f3(k)}@(${ox},${oy}) worldGap=${wg.toPrecision(17)}`);
+      }
+    }
+  }
+  out(`nominal world gap 1.000 with tol 1: refused ${refused}/${total}: ${refusedCases.join('; ')}`);
+  // Typed-at-display precision: the dialog never shows the gap, but a user who measured 1.000
+  // gets a refusal when the true gap is 1.0000000000000002.
+
+  // Rotated, mirrored, non-uniform: local gap along x = 0.6 -> world 0.6*2 = 1.2
+  const t = rot(37, 2, 0.5, true);
+  const pts = [
+    { x: 0.6, y: 0 },
+    { x: 20, y: 0 },
+    { x: 20, y: 10 },
+    { x: 0, y: 10 },
+    { x: 0, y: 0 },
+  ];
+  for (const tol of [1, 1.19, 1.2, 1.25]) {
+    load([svgObj('a', [open(pts)], t)], ['a']);
+    const r = apply(tol);
+    const b = burn(st().project);
+    const world = pts.map((p) => applyTransform(p, t));
+    out(`rot37 mirrorX 2x0.5 localGapX 0.6 (world ${f3(Math.hypot(world[0]!.x - world[4]!.x, world[0]!.y - world[4]!.y))}) tol ${tol}: changed=${r.changed} hatch=${f3(area(b.moves))} oracle=${f3(r.changed ? gridArea([world], 'evenodd', 0.02) : 0)}`);
+  }
+  // Same local gap along y -> world 0.6*0.5 = 0.3
+  const ptsY = [{ x: 0, y: 2.4 }, { x: 0, y: 10 }, { x: 20, y: 10 }, { x: 20, y: 0 }, { x: 0, y: 0 }];
+  for (const tol of [1.19, 1.2, 1.21]) {
+    load([svgObj('a', [open(ptsY)], t)], ['a']);
+    const r = apply(tol);
+    const b = burn(st().project);
+    const world = ptsY.map((p) => applyTransform(p, t));
+    out(`rot37 mirrorX 2x0.5 localGapY 2.4 (world ${Math.hypot(world[0]!.x - world[4]!.x, world[0]!.y - world[4]!.y).toPrecision(17)}) tol ${tol}: changed=${r.changed} hatch=${f3(area(b.moves))} oracle=${f3(r.changed ? gridArea([world], 'evenodd', 0.02) : 0)}`);
+  }
+});
+
+it('B invalid tolerances on the store action', () => {
+  out('== B invalid tolerances (gap 0.4 and gap 30 in one selection)');
+  for (const tol of [0, -0, -1, NaN, Infinity, -Infinity, 1e-300, Number.MIN_VALUE, 1e308, Number.MAX_VALUE]) {
+    load(
+      [
+        svgObj('a', [open(nearSquare(0, 0.4))], IDENTITY_TRANSFORM),
+        svgObj('b', [open(nearSquare(0, 9.9, 40, 0).slice(0, 4).concat([{ x: 40 + 15, y: 10 }]))], IDENTITY_TRANSFORM),
+      ],
+      ['a', 'b'],
+    );
+    const s = summary(tol);
+    const r = apply(tol);
+    out(`tol ${tol}: summary open=${s.openCount} safe=${s.safeCount} reviewed=${s.reviewedCount} remaining=${s.remainingCount} | changed=${r.changed} undo+${r.undoAdded}`);
+  }
+});
+
+it('C large tolerance: long chord fills a region the art never enclosed', () => {
+  out('== C open arc (C shape), r=20, 180 deg; ends 40 mm apart');
+  const pts = arc(50, 50, 20, 90, 270);
+  load([svgObj('c', [open(pts)], IDENTITY_TRANSFORM)], ['c']);
+  const b0 = burn(st().project);
+  const s = summary(50);
+  const r = apply(50);
+  const b1 = burn(st().project);
+  out(`summary at 50: open=${s.openCount} safe=${s.safeCount} reviewed=${s.reviewedCount} remaining=${s.remainingCount}`);
+  out(`before hatch=${f3(area(b0.moves))}; after changed=${r.changed} hatch=${f3(area(b1.moves))} halfDisc oracle=${f3(gridArea([pts], 'evenodd', 0.02))} (pi r^2/2=${f3((Math.PI * 400) / 2)}) bbox=${JSON.stringify(bbox(b1.moves))}`);
+  // Open spiral-ish stroke: 300 deg arc, ends 20 mm apart
+  const p2 = arc(50, 50, 20, 0, 300);
+  load([svgObj('d', [open(p2)], IDENTITY_TRANSFORM)], ['d']);
+  apply(25);
+  const b2 = burn(st().project);
+  out(`300deg arc tol 25: hatch=${f3(area(b2.moves))} oracle=${f3(gridArea([p2], 'evenodd', 0.02))}`);
+});
+
+it('D split outline: each piece closes onto its own start, never onto its neighbour', () => {
+  out('== D circle r=20 drawn as 3 open arcs (0-120,120-240,240-360) in ONE path; pieces meet end to start');
+  const pieces = [arc(50, 50, 20, 0, 120), arc(50, 50, 20, 120, 240), arc(50, 50, 20, 240, 360)];
+  load([svgObj('s', [open(...pieces)], IDENTITY_TRANSFORM)], ['s']);
+  for (const tol of [1, 10, 34, 35, 40]) {
+    const s = summary(tol);
+    out(`summary tol ${tol}: open=${s.openCount} safe=${s.safeCount} reviewed=${s.reviewedCount} remaining=${s.remainingCount}`);
+  }
+  const r = apply(40);
+  const b = burn(st().project);
+  const intended = gridArea([arc(50, 50, 20, 0, 360)], 'evenodd', 0.02);
+  const chordClosed = gridArea(pieces, 'evenodd', 0.02);
+  out(`apply 40: changed=${r.changed} hatch=${f3(area(b.moves))} | intended disc=${f3(intended)} | each-piece-own-chord oracle=${f3(chordClosed)} | missing triangle=${f3((3 * Math.sqrt(3) / 4) * 400)}`);
+  const closings = st().project.scene.objects[0]!.paths[0]!.polylines.map((pl) => {
+    const a = pl.points[0]!;
+    const z = pl.points.at(-1)!;
+    return `closed=${pl.closed} start(${f3(a.x)},${f3(a.y)}) last(${f3(z.x)},${f3(z.y)})`;
+  });
+  out(`pieces after: ${closings.join(' | ')}`);
+
+  out('== D2 the same 3 arcs with 0.3 mm gaps between neighbours (a real broken outline)');
+  const g = [arc(50, 50, 20, 0.9, 119.1), arc(50, 50, 20, 120.9, 239.1), arc(50, 50, 20, 240.9, 359.1)];
+  load([svgObj('s2', [open(...g)], IDENTITY_TRANSFORM)], ['s2']);
+  const s2 = summary(1);
+  out(`summary tol 1 (neighbour gaps ~0.63 mm): open=${s2.openCount} closeable=${s2.safeCount + s2.reviewedCount} remaining=${s2.remainingCount}`);
+  const s3 = summary(40);
+  out(`summary tol 40: closeable=${s3.safeCount + s3.reviewedCount} remaining=${s3.remainingCount}`);
+  apply(40);
+  const b3 = burn(st().project);
+  out(`apply 40: hatch=${f3(area(b3.moves))} vs intended ${f3(intended)}`);
+});
+
+it('E two objects whose ends nearly touch each other: never bridged', () => {
+  out('== E two open L-shapes, A end 0.2 mm from B start; each own gap ~28 mm');
+  const A = [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }];
+  const B = [{ x: 20.2, y: 20 }, { x: 0, y: 20 }, { x: 0, y: 0.2 }];
+  load([svgObj('A', [open(A)], IDENTITY_TRANSFORM), svgObj('B', [open(B)], IDENTITY_TRANSFORM)], ['A', 'B']);
+  const s = summary(1);
+  out(`summary tol 1: open=${s.openCount} closeable=${s.safeCount + s.reviewedCount}`);
+  apply(30);
+  const b = burn(st().project);
+  out(`apply 30: hatch=${f3(area(b.moves))} | two triangles oracle=${f3(gridArea([A], 'evenodd', 0.02) + gridArea([B], 'evenodd', 0.02))} | intended square=400`);
+  const objs = st().project.scene.objects.map((o) => ('paths' in o ? `${o.id}:closed=${o.paths[0]!.polylines[0]!.closed} n=${o.paths[0]!.polylines[0]!.points.length}` : ''));
+  out(`objects after: ${objs.join(' ')}`);
+});
+
+it('F Undo/Redo exact; save/reopen same G-code; locked', () => {
+  out('== F history');
+  const t = rot(33, 1.3, 0.7, true);
+  load(
+    [
+      svgObj('a', [open(nearSquare(0, 2))], t),
+      svgObj('b', [open(nearSquare(0, 0.3, 40, 0))], t),
+      svgObj('z', [open(nearSquare(0, 2, 80, 0))], t, { locked: true }),
+    ],
+    ['a', 'b', 'z'],
+  );
+  const s = summary(3);
+  out(`summary tol 3 incl locked: open=${s.openCount} safe=${s.safeCount} reviewed=${s.reviewedCount} remaining=${s.remainingCount}`);
+  const before = serializeProject(st().project);
+  const g0 = burn(st().project).gcode;
+  const r = apply(3);
+  const after = serializeProject(st().project);
+  const g1 = burn(st().project).gcode;
+  st().undo();
+  const undone = serializeProject(st().project);
+  st().redo();
+  const redone = serializeProject(st().project);
+  const reopened = deserializeProject(after);
+  const g2 = reopened.kind === "ok" ? burn(reopened.project).gcode : 'FAIL';
+  const lockedClosed = st().project.scene.objects.find((o) => o.id === 'z');
+  out(`apply: changed=${r.changed} undo+${r.undoAdded} | undo==before ${undone === before} | redo==after ${redone === after} | gcode changed ${g0 !== g1} | reopen gcode same ${g2 === g1} | locked still open ${lockedClosed && 'paths' in lockedClosed ? !lockedClosed.paths[0]!.polylines[0]!.closed : '?'}`);
+  // second apply at the same tolerance: nothing to do -> no undo step
+  const r2 = apply(3);
+  out(`second apply: changed=${r2.changed} undo+${r2.undoAdded}`);
+});

@@ -1,0 +1,103 @@
+// @vitest-environment jsdom
+// T10 dialog: typed tolerance validation, counts, mode radios, submit and Cancel, through the real host + store.
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type ImportedSvg, type Project, type SceneObject } from '../t06-main/src/core/scene';
+import { ClosePathsToleranceDialogHost, openClosePathsToleranceDialog } from '../t06-main/src/ui/commands/ClosePathsToleranceDialog';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t06-main/src/ui/state/toast-store';
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t10/t10-dialog.log', log.join('\n'));
+};
+
+function obj(id: string, gapY: number, extra: Partial<ImportedSvg> = {}): ImportedSvg {
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+    transform: IDENTITY_TRANSFORM,
+    operationIds: ['L'],
+    paths: [{ color: '#ff0000', polylines: [{ closed: false, points: [{ x: 0, y: gapY }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 0 }] }] }],
+    ...extra,
+  };
+}
+
+function setup(objects: SceneObject[], ids: string[]) {
+  resetStore();
+  const base = createProject();
+  const project: Project = { ...base, scene: { ...base.scene, layers: [createLayer({ id: 'L', color: '#ff0000', mode: 'line' })], objects, groups: [] } };
+  useStore.setState({ project, selectedObjectId: ids[0] ?? null, additionalSelectedIds: new Set(ids.slice(1)), undoStack: [], redoStack: [] });
+}
+
+function setValue(input: HTMLInputElement, value: string) {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+it('dialog sweep', async () => {
+  const typedList = ['0.5', '', 'abc', '0', '-0', '-1', 'Infinity', '1e308', '0.5in', '0,5', '0.25', '0.3', '0.05', '5', ' 2 '];
+  for (const typed of typedList) {
+    setup([obj('near', 0.3), obj('mid', 0.75), obj('far', 3), obj('lk', 0.2, { locked: true })], ['near', 'mid', 'far', 'lk']);
+    useToastStore.setState({ toasts: [] });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    openClosePathsToleranceDialog();
+    await act(async () => root.render(<ClosePathsToleranceDialogHost />));
+    const input = document.querySelector('input[type="number"]') as HTMLInputElement;
+    await act(async () => setValue(input, typed));
+    const btn = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Close paths')!;
+    const body = document.querySelector('.lf-dialog-body')?.textContent ?? '';
+    const reported: string[] = [];
+    input.reportValidity = () => {
+      reported.push(JSON.stringify({ under: input.validity.rangeUnderflow, bad: input.validity.badInput }));
+      return false;
+    };
+    const p0 = useStore.getState().project;
+    const form = document.querySelector('form')!;
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    const changed = useStore.getState().project !== p0;
+    const stillOpen = document.querySelector('form') !== null;
+    const closedFlags = (useStore.getState().project.scene.objects as ImportedSvg[]).map((o) => o.paths[0]!.polylines[0]!.closed);
+    out(
+      `typed ${JSON.stringify(typed)} -> value ${JSON.stringify(input.value)} | button disabled=${btn.disabled} | body "${body}" | submit -> changed=${changed} closed=${closedFlags.join(',')} dialogOpen=${stillOpen} reported=${JSON.stringify(reported)} toast="${useToastStore.getState().toasts.map((t) => t.message).join(' | ')}"`,
+    );
+    await act(async () => root.unmount());
+    host.remove();
+    // close the store-driven dialog if still open
+    if (stillOpen) {
+      const r2 = createRoot(document.createElement('div'));
+      await act(async () => r2.render(<ClosePathsToleranceDialogHost />));
+      const cancel = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Cancel');
+      await act(async () => cancel?.click());
+      await act(async () => r2.unmount());
+    }
+  }
+  // mode radio and labels
+  setup([obj('near', 0.3)], ['near']);
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  openClosePathsToleranceDialog();
+  await act(async () => root.render(<ClosePathsToleranceDialogHost />));
+  const radios = [...document.querySelectorAll('input[type="radio"]')] as HTMLInputElement[];
+  out(`radios: ${radios.length}, names=${JSON.stringify(radios.map((r) => r.name))} checked=${radios.map((r) => r.checked).join(',')}; labels: ${[...document.querySelectorAll('label')].map((l) => l.textContent?.trim()).join(' | ')}`);
+  await act(async () => radios[1]!.click());
+  out(`after clicking 2nd radio: checked=${radios.map((r) => r.checked).join(',')}`);
+  const cancel = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Cancel')!;
+  const p0 = useStore.getState().project;
+  await act(async () => cancel.click());
+  out(`Cancel: dialog gone=${document.querySelector('form') === null} project unchanged=${useStore.getState().project === p0} undo=${useStore.getState().undoStack.length}`);
+  await act(async () => root.unmount());
+});

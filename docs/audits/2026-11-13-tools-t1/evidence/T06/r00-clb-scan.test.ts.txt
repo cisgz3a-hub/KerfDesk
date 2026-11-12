@@ -1,0 +1,31 @@
+// Refuter T06: list real CLB corpus presets (material, thickness, mode, op, power, speed, passes).
+import { it } from 'vitest';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { importLightBurnClb } from '../t06-main/src/io/lightburn/clb-import';
+
+const ROOT = 'C:/Users/stolk/kd-t1/t06-main/src/__fixtures__/lightburn/external/clb/';
+const FILES = [
+  'ddlab-laser-settings-current.clb',
+  'ddlab-laser-settings-legacy.clb',
+  'h3mul-main-material-library.clb',
+  'jayson-big-blue-laser.clb',
+];
+
+it('lists presets', () => {
+  const out: string[] = [];
+  for (const file of FILES) {
+    const result = importLightBurnClb(readFileSync(ROOT + file, 'utf8'), file);
+    if (!result.ok) {
+      out.push(`${file}: FAIL ${result.reason}`);
+      continue;
+    }
+    out.push(`# ${file} libraryId=${result.library.libraryId}`);
+    for (const p of result.library.entries) {
+      const r = p.recipe;
+      out.push(
+        `${p.id} | ${p.material ?? p.materialName} | t=${p.thicknessMm ?? '-'} | ${r.mode} | op=${p.operation ?? '-'} | p${r.power} s${r.speed} x${r.passes} sp${r.hatchSpacingMm} | ${p.title ?? ''}`,
+      );
+    }
+  }
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t06r/r00-clb-scan.log', out.join('\n'));
+});

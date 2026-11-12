@@ -1,0 +1,330 @@
+// T06 Fill Selection: ownership, bindings and what burns, through the real store action
+// and the real prepareOutput -> G-code path.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  applyTransform,
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  operationIdsForObject,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type Transform,
+} from '../t06-main/src/core/scene';
+import { effectiveOperationForObject } from '../t06-main/src/core/effective-output';
+import { prepareOutput } from '../t06-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t06-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t06-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t06-main/src/io/project/deserialize-project';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { bbox, gridArea, hatchArea, litMoves, rowsOf, totalLen, type Vec } from './decode';
+
+const log: string[] = [];
+const out = (s: string) => log.push(s);
+const flush = () => writeFileSync('C:/Users/stolk/kd-t1/zz-t06/t06-burn.log', log.join('\n'));
+
+beforeEach(() => resetStore());
+
+function sq(x0: number, y0: number, w: number, h = w): Vec[] {
+  return [
+    { x: x0, y: y0 },
+    { x: x0 + w, y: y0 },
+    { x: x0 + w, y: y0 + h },
+    { x: x0, y: y0 + h },
+  ];
+}
+
+function obj(
+  id: string,
+  contours: ReadonlyArray<{ pts: Vec[]; closed?: boolean }>,
+  opIds: string[] | undefined,
+  extra: Partial<ImportedSvg> = {},
+  transform: Transform = IDENTITY_TRANSFORM,
+): ImportedSvg {
+  const all = contours.flatMap((c) => c.pts);
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: {
+      minX: Math.min(...all.map((p) => p.x)),
+      minY: Math.min(...all.map((p) => p.y)),
+      maxX: Math.max(...all.map((p) => p.x)),
+      maxY: Math.max(...all.map((p) => p.y)),
+    },
+    transform,
+    ...(opIds === undefined ? {} : { operationIds: opIds }),
+    paths: [
+      {
+        color: '#000000',
+        polylines: contours.map((c) => ({ closed: c.closed ?? true, points: c.pts })),
+      },
+    ],
+    ...extra,
+  };
+}
+
+function layer(id: string, mode: 'line' | 'fill', patch: Partial<Layer> = {}): Layer {
+  const colors: Record<string, string> = { L: '#ff0000', F: '#0000ff', C: '#00aa00', E: '#888800' };
+  return { ...createLayer({ id, color: colors[id] ?? '#123456', name: id, mode }), ...patch };
+}
+
+function load(objects: ImportedSvg[], layers: Layer[], selected: string[]): void {
+  const base = createProject();
+  const project: Project = {
+    ...base,
+    optimization: { ...DEFAULT_PROJECT_OPTIMIZATION },
+    scene: { ...base.scene, objects, layers, groups: [] },
+  };
+  useStore.setState({
+    project,
+    selectedObjectId: selected[0] ?? null,
+    additionalSelectedIds: new Set(selected.slice(1)),
+    undoStack: [],
+    redoStack: [],
+    dirty: false,
+  });
+}
+
+function burn(project: Project) {
+  const prepared = prepareOutput(project);
+  const emitted = emitPreparedGcode(prepared);
+  const moves = litMoves(emitted.gcode, project.device);
+  const adv = prepared.ok ? (prepared.advisories ?? []).map((a) => a.code) : [];
+  const blocking = prepared.ok ? [] : prepared.preflight.issues.map((i) => `${i.code}:${i.message}`);
+  return { gcode: emitted.gcode, moves, adv, blocking, ok: prepared.ok };
+}
+
+function inBox(m: { from: Vec; to: Vec }, b: { minX: number; minY: number; maxX: number; maxY: number }) {
+  const p = { x: (m.from.x + m.to.x) / 2, y: (m.from.y + m.to.y) / 2 };
+  return p.x >= b.minX - 0.05 && p.x <= b.maxX + 0.05 && p.y >= b.minY - 0.05 && p.y <= b.maxY + 0.05;
+}
+
+function opsOf(id: string) {
+  const s = useStore.getState().project.scene;
+  const o = s.objects.find((x) => x.id === id)!;
+  return operationIdsForObject(o, s.layers).map((oid) => {
+    const l = s.layers.find((x) => x.id === oid)!;
+    const e = effectiveOperationForObject(l, o);
+    return `${oid}(${e.mode} p${e.power} s${e.speed} sp${e.hatchSpacingMm})`;
+  });
+}
+
+const fill = () => useStore.getState().fillSelectionSeparately();
+const state = () => useStore.getState();
+
+it('A: shared op isolation, unselected bytes unchanged, hatched area', () => {
+  out('== A shared op');
+  load(
+    [obj('a', [{ pts: sq(10, 10, 20) }], ['L']), obj('b', [{ pts: sq(60, 10, 20) }], ['L'])],
+    [layer('L', 'line', { power: 40, speed: 1000 })],
+    ['a'],
+  );
+  const before = burn(state().project);
+  const bBefore = before.moves.filter((m) => inBox(m, { minX: 60, minY: 10, maxX: 80, maxY: 30 }));
+  const layerLBefore = JSON.stringify(state().project.scene.layers.find((l) => l.id === 'L'));
+  fill();
+  const after = burn(state().project);
+  const bAfter = after.moves.filter((m) => inBox(m, { minX: 60, minY: 10, maxX: 80, maxY: 30 }));
+  const aAfter = after.moves.filter((m) => inBox(m, { minX: 10, minY: 10, maxX: 30, maxY: 30 }));
+  const layerLAfter = JSON.stringify(state().project.scene.layers.find((l) => l.id === 'L'));
+  out(`layers after: ${state().project.scene.layers.map((l) => `${l.id}:${l.mode}:${l.name}`).join(', ')}`);
+  out(`a ops ${opsOf('a').join(';')}  b ops ${opsOf('b').join(';')}`);
+  out(`L layer unchanged: ${layerLBefore === layerLAfter}`);
+  out(`b moves before ${bBefore.length} len ${totalLen(bBefore).toFixed(3)} S=${[...new Set(bBefore.map((m) => m.s))]} F=${[...new Set(bBefore.map((m) => m.f))]}`);
+  out(`b moves after  ${bAfter.length} len ${totalLen(bAfter).toFixed(3)} S=${[...new Set(bAfter.map((m) => m.s))]} F=${[...new Set(bAfter.map((m) => m.f))]}`);
+  const sp = state().project.scene.layers.find((l) => l.mode === 'fill')!.hatchSpacingMm;
+  out(`a fill: rows ${rowsOf(aAfter)} hatchArea ${hatchArea(aAfter, sp).toFixed(1)} oracle 400 bbox ${JSON.stringify(bbox(aAfter))}`);
+  out(`adv after ${after.adv.join(',')} blocking ${after.blocking.join(' | ')}`);
+  flush();
+});
+
+function fillAreaCase(name: string, contours: Vec[][], transform: Transform, rule: 'evenodd' | 'nonzero', scaleArea: number) {
+  load([obj('a', contours.map((pts) => ({ pts })), ['L'], {}, transform)], [layer('L', 'line')], ['a']);
+  fill();
+  const r = burn(state().project);
+  const sp = state().project.scene.layers.find((l) => l.mode === 'fill')!.hatchSpacingMm;
+  const o = state().project.scene.objects[0]!;
+  const world = contours.map((c) => c.map((p) => applyTransform(p, o.transform)));
+  const oracle = gridArea(world, rule);
+  const oracleOther = gridArea(world, rule === 'evenodd' ? 'nonzero' : 'evenodd');
+  out(
+    `${name}: hatchArea ${hatchArea(r.moves, sp).toFixed(1)} rows ${rowsOf(r.moves)} oracle(${rule}) ${oracle.toFixed(1)} other-rule ${oracleOther.toFixed(1)} local*scale ${scaleArea.toFixed(1)} litBox ${JSON.stringify(bbox(r.moves), (k, v) => (typeof v === 'number' ? Number(v.toFixed(2)) : v))} worldBox ${JSON.stringify(bboxV(world.flat()))} adv ${r.adv.join(',')} blocking ${r.blocking.join('|')}`,
+  );
+}
+
+function bboxV(ps: Vec[]) {
+  return {
+    minX: +Math.min(...ps.map((p) => p.x)).toFixed(2), minY: +Math.min(...ps.map((p) => p.y)).toFixed(2),
+    maxX: +Math.max(...ps.map((p) => p.x)).toFixed(2), maxY: +Math.max(...ps.map((p) => p.y)).toFixed(2),
+  };
+}
+
+function star(cx: number, cy: number, r: number): Vec[] {
+  const pts: Vec[] = [];
+  for (let k = 0; k < 5; k++) {
+    const a = (Math.PI / 2) + (k * 2 * (2 * Math.PI)) / 5;
+    pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+  }
+  return pts;
+}
+
+it('B: hatch area vs oracle for holes, self-crossing, transforms', () => {
+  out('== B fill areas');
+  const ring = [sq(0, 0, 40), sq(10, 10, 20)];
+  fillAreaCase('ring identity', ring, { ...IDENTITY_TRANSFORM, x: 100, y: 100 }, 'evenodd', 1200);
+  fillAreaCase('ring mirrorX rot30 scale2x1', ring, { ...IDENTITY_TRANSFORM, x: 100, y: 100, scaleX: 2, scaleY: 1, rotationDeg: 30, mirrorX: true }, 'evenodd', 2400);
+  fillAreaCase('ring same-direction inner (nonzero would fill)', [sq(0, 0, 40), sq(10, 10, 20)], { ...IDENTITY_TRANSFORM, x: 100, y: 100 }, 'evenodd', 1200);
+  fillAreaCase('pentagram', [star(20, 20, 20)], { ...IDENTITY_TRANSFORM, x: 100, y: 100 }, 'evenodd', NaN);
+  fillAreaCase('overlapping squares one path', [sq(0, 0, 20), sq(10, 10, 20)], { ...IDENTITY_TRANSFORM, x: 100, y: 100 }, 'evenodd', 600);
+  fillAreaCase('figure-8 bowtie', [[{ x: 0, y: 0 }, { x: 30, y: 20 }, { x: 30, y: 0 }, { x: 0, y: 20 }]], { ...IDENTITY_TRANSFORM, x: 100, y: 100 }, 'evenodd', 300);
+  flush();
+});
+
+it('C: open path and mixed open/closed', () => {
+  out('== C open paths');
+  load(
+    [
+      obj('open', [{ pts: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }], closed: false }], ['L'], {}, { ...IDENTITY_TRANSFORM, x: 100, y: 100 }),
+      obj('closed', [{ pts: sq(0, 0, 20) }], ['L'], {}, { ...IDENTITY_TRANSFORM, x: 150, y: 100 }),
+    ],
+    [layer('L', 'line')],
+    ['open', 'closed'],
+  );
+  const before = burn(state().project);
+  out(`before: lit len ${totalLen(before.moves).toFixed(1)} adv ${before.adv}`);
+  fill();
+  const r = burn(state().project);
+  const openMoves = r.moves.filter((m) => inBox(m, { minX: 100, minY: 100, maxX: 120, maxY: 120 }));
+  out(`after: layers ${state().project.scene.layers.map((l) => `${l.id}:${l.mode}`)} open-object lit moves ${openMoves.length} len ${totalLen(openMoves).toFixed(1)}; total ${totalLen(r.moves).toFixed(1)} adv ${r.adv.join(',')} blocking ${r.blocking.join('|')} ok ${r.ok}`);
+  out(`notice/toast after fill? lastNotice=${JSON.stringify((state() as unknown as { notice?: unknown }).notice ?? null)}`);
+  flush();
+});
+
+it('D: multi-operation artwork (engrave Fill + cut Line) and path-level operations', () => {
+  out('== D multi-op');
+  load(
+    [obj('a', [{ pts: sq(0, 0, 30) }], ['F', 'C'], {}, { ...IDENTITY_TRANSFORM, x: 100, y: 100 })],
+    [layer('F', 'fill', { power: 25, speed: 3000 }), layer('C', 'line', { power: 90, speed: 300 })],
+    ['a'],
+  );
+  const before = burn(state().project);
+  out(`before ops ${opsOf('a').join(';')} lit S values ${[...new Set(before.moves.map((m) => m.s))]} F ${[...new Set(before.moves.map((m) => m.f))]}`);
+  fill();
+  const after = burn(state().project);
+  out(`after ops ${opsOf('a').join(';')} layers ${state().project.scene.layers.map((l) => `${l.id}:${l.mode}`)} lit S ${[...new Set(after.moves.map((m) => m.s))]} F ${[...new Set(after.moves.map((m) => m.f))]}`);
+  const perim = after.moves.filter((m) => m.len > 29.9);
+  out(`cut-like moves (len>=30) before ${before.moves.filter((m) => m.len > 29.9 && m.f === 300).length} after ${perim.filter((m) => m.f === 300).length}; undoStack ${state().undoStack.length}`);
+  // path-level ops
+  const pathLevel: ImportedSvg = {
+    ...obj('p', [{ pts: sq(0, 0, 20) }], undefined, {}, { ...IDENTITY_TRANSFORM, x: 100, y: 100 }),
+    paths: [
+      { color: '#000000', operationIds: ['F'], polylines: [{ closed: true, points: sq(0, 0, 20) }] },
+      { color: '#000000', operationIds: ['C'], polylines: [{ closed: true, points: sq(25, 0, 20) }] },
+    ],
+  };
+  load([pathLevel], [layer('F', 'fill', { power: 25, speed: 3000 }), layer('C', 'line', { power: 90, speed: 300 })], ['p']);
+  fill();
+  out(`path-level after: layers ${state().project.scene.layers.map((l) => `${l.id}:${l.mode}`)} ops ${opsOf('p').join(';')}`);
+  flush();
+});
+
+it('E: overrides (legacy top-level, byOperation mode)', () => {
+  out('== E overrides');
+  load(
+    [
+      obj('a', [{ pts: sq(0, 0, 20) }], ['L'], { operationOverride: { power: 15 } }),
+      obj('c', [{ pts: sq(40, 0, 20) }], ['L']),
+      obj('b', [{ pts: sq(80, 0, 20) }], ['L']),
+    ],
+    [layer('L', 'line', { power: 60, speed: 1200 })],
+    ['a', 'c'],
+  );
+  out(`before a ${opsOf('a')} c ${opsOf('c')} b ${opsOf('b')}`);
+  fill();
+  out(`after  a ${opsOf('a')} c ${opsOf('c')} b ${opsOf('b')}`);
+  const newOp = state().project.scene.layers.find((l) => l.mode === 'fill')!;
+  out(`new op base power ${newOp.power} speed ${newOp.speed} spacing ${newOp.hatchSpacingMm}`);
+  // reverse order: plain object first
+  load(
+    [
+      obj('c', [{ pts: sq(40, 0, 20) }], ['L']),
+      obj('a', [{ pts: sq(0, 0, 20) }], ['L'], { operationOverride: { power: 15 } }),
+      obj('b', [{ pts: sq(80, 0, 20) }], ['L']),
+    ],
+    [layer('L', 'line', { power: 60, speed: 1200 })],
+    ['c', 'a'],
+  );
+  fill();
+  out(`order c-first: a ${opsOf('a')} c ${opsOf('c')}`);
+  // byOperation mode override on the sole unshared op
+  load(
+    [obj('m', [{ pts: sq(0, 0, 20) }], ['L'], { operationOverride: { byOperation: { L: { mode: 'line', power: 30 } } } }, { ...IDENTITY_TRANSFORM, x: 100, y: 100 })],
+    [layer('L', 'line', { power: 60, speed: 1200 })],
+    ['m'],
+  );
+  const mb = burn(state().project);
+  fill();
+  const ma = burn(state().project);
+  out(`byOp mode override: layer L mode now ${state().project.scene.layers[0]!.mode}; effective ${opsOf('m')}; dirty ${state().dirty} undo ${state().undoStack.length}; lit len before ${totalLen(mb.moves).toFixed(1)} after ${totalLen(ma.moves).toFixed(1)} rows after ${rowsOf(ma.moves)}`);
+  // top-level legacy mode override
+  load(
+    [obj('m2', [{ pts: sq(0, 0, 20) }], ['L'], { operationOverride: { mode: 'line' } }, { ...IDENTITY_TRANSFORM, x: 100, y: 100 }), obj('n2', [{ pts: sq(0, 0, 20) }], ['L'], {}, { ...IDENTITY_TRANSFORM, x: 150, y: 100 })],
+    [layer('L', 'line', { power: 60, speed: 1200 })],
+    ['m2'],
+  );
+  fill();
+  const m2 = burn(state().project);
+  out(`top-level mode override, shared op: m2 ${opsOf('m2')}; lit rows ${rowsOf(m2.moves.filter((m) => inBox(m, { minX: 100, minY: 100, maxX: 120, maxY: 120 })))}`);
+  flush();
+});
+
+it('F: locked member, empty manual op, mixed raster', () => {
+  out('== F locked / empty op');
+  load(
+    [obj('a', [{ pts: sq(0, 0, 20) }], ['L'], { locked: true }), obj('b', [{ pts: sq(40, 0, 20) }], ['L'])],
+    [layer('L', 'line'), layer('E', 'fill', { power: 33, speed: 4444 })],
+    ['a'],
+  );
+  fill();
+  out(`locked selected a: ops ${opsOf('a')} undo ${state().undoStack.length}`);
+  out(`empty manual op E survives: ${state().project.scene.layers.some((l) => l.id === 'E')} layers ${state().project.scene.layers.map((l) => l.id)}`);
+  flush();
+});
+
+it('G: undo/redo exactness, save/reopen, cut order', () => {
+  out('== G history/order');
+  load(
+    [
+      obj('outer', [{ pts: sq(0, 0, 60) }], ['L'], {}, { ...IDENTITY_TRANSFORM, x: 100, y: 100 }),
+      obj('inner', [{ pts: sq(20, 20, 20) }], ['L'], {}, { ...IDENTITY_TRANSFORM, x: 100, y: 100 }),
+    ],
+    [layer('L', 'line', { power: 90, speed: 300 })],
+    ['inner'],
+  );
+  const p0 = state().project;
+  const s0 = JSON.stringify(p0);
+  fill();
+  const p1 = state().project;
+  const s1 = JSON.stringify(p1);
+  state().undo();
+  out(`undo exact: ${JSON.stringify(state().project) === s0} same ref ${state().project === p0}`);
+  state().redo();
+  out(`redo exact: ${JSON.stringify(state().project) === s1}`);
+  const g1 = burn(state().project).gcode;
+  const re = deserializeProject(serializeProject(state().project));
+  if ('project' in re) {
+    const g2 = burn(re.project as Project).gcode;
+    out(`save/reopen gcode identical: ${g1 === g2} kind ${re.kind}`);
+  } else out(`reopen failed ${JSON.stringify(re)}`);
+  const r = burn(state().project);
+  const firstCut = r.moves.findIndex((m) => m.f === 300);
+  const lastCut = r.moves.map((m) => m.f === 300).lastIndexOf(true);
+  const fillIdx = r.moves.map((m, i) => (m.f !== 300 ? i : -1)).filter((i) => i >= 0);
+  out(`layer order ${state().project.scene.layers.map((l) => `${l.id}:${l.mode}`)}; cut moves idx ${firstCut}..${lastCut}; fill moves idx ${fillIdx[0]}..${fillIdx.at(-1)}; adv ${r.adv.join(',')}`);
+  flush();
+});
