@@ -100,6 +100,52 @@ describe('findOutOfBoundsCoords', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0]?.reason).toBe('Arc bulges out of bed: Y -5');
   });
+
+  // Code quality audit C2, D3 mutant B03: each side's bulge test must add the
+  // motion offset. Every arc bulges 5 mm past its endpoints, which stay on the
+  // bed; the offset alone decides whether the bulge clears that side.
+  describe.each([
+    {
+      side: 'max X',
+      program: 'G0 X390 Y200\nG3 X390 Y210 I0 J5',
+      inBed: 'G0 X400 Y200\nG3 X400 Y210 I0 J5',
+      out: { x: 7, y: 0 },
+      reason: 'X 402',
+    },
+    {
+      side: 'min X',
+      program: 'G0 X10 Y200\nG2 X10 Y210 I0 J5',
+      inBed: 'G0 X0 Y200\nG2 X0 Y210 I0 J5',
+      out: { x: -7, y: 0 },
+      reason: 'X -2',
+    },
+    {
+      side: 'max Y',
+      program: 'G0 X200 Y390\nG2 X210 Y390 I5 J0',
+      inBed: 'G0 X200 Y400\nG2 X210 Y400 I5 J0',
+      out: { x: 0, y: 7 },
+      reason: 'Y 402',
+    },
+    {
+      side: 'min Y',
+      program: 'G0 X200 Y10\nG3 X210 Y10 I5 J0',
+      inBed: 'G0 X200 Y0\nG3 X210 Y0 I5 J0',
+      out: { x: 0, y: -7 },
+      reason: 'Y -2',
+    },
+  ])('an arc bulging at $side under a motion offset', ({ program, inBed, out, reason }) => {
+    it('flags the bulge the offset pushes off the bed', () => {
+      expect(findOutOfBoundsCoords(program, bed)).toEqual([]);
+      const issues = findOutOfBoundsCoords(program, bed, { motionOffset: out });
+      expect(issues.map((issue) => issue.reason)).toEqual([`Arc bulges out of bed: ${reason}`]);
+    });
+
+    it('accepts a bulge the offset brings back onto the bed', () => {
+      const back = { x: -out.x, y: -out.y };
+      expect(findOutOfBoundsCoords(inBed, bed)).toHaveLength(1);
+      expect(findOutOfBoundsCoords(inBed, bed, { motionOffset: back })).toEqual([]);
+    });
+  });
 });
 
 describe('expectedS', () => {

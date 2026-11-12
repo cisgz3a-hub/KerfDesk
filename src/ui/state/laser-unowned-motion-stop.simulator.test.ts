@@ -146,6 +146,25 @@ describe('Abort for Console motion on GRBL', () => {
     expect(useLaserStore.getState().alarmCode).toBeNull();
     expect(sim.state().machine).toBe('Idle');
   });
+
+  // Code quality audit C2, D3 mutant X07: a page that is closing cannot wait
+  // for a jog cancel to settle, so its Abort sends the reset byte at once.
+  it('resets a Console jog at once when the page is closing', async () => {
+    const sim = await connectIdle({ motionMs: 5_000 });
+    await consoleMotion('$J=G91 X50 F1000', 'Jog');
+    const before = sim.outbound().length;
+
+    void useLaserStore
+      .getState()
+      .stopJob('app-closing')
+      .catch(() => undefined);
+    await pump(0);
+
+    const written = withoutStatusQueries(sim.outbound().slice(before));
+    expect(written[0]).toBe('\x18');
+    expect(written).not.toContain('\x85');
+    await pump(1_000);
+  });
 });
 
 describe('Abort accessory cleanup and controller ownership', () => {
