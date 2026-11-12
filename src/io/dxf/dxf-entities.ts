@@ -23,6 +23,7 @@ import {
 import {
   bulgeSegment,
   isFullEllipseSweep,
+  normalizedSweep,
   sampleArc,
   sampleCircle,
   sampleEllipse,
@@ -279,12 +280,6 @@ export function entityExtrusion(tags: ReadonlyArray<DxfTag>): DxfExtrusion {
     firstNumber(tags, 220),
     firstNumber(tags, 230, 1),
   );
-}
-
-function normalizedSweep(startParam: number, endParam: number): number {
-  let sweep = endParam - startParam;
-  while (sweep <= 0) sweep += FULL_TURN;
-  return Math.min(sweep, FULL_TURN);
 }
 
 // Each X code starts a point; the Y code that follows it completes it.

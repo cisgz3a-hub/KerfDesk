@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parseSvg } from '../svg/parse-svg';
 import { convertPostscript } from './convert-postscript';
+import { PS_LIMITS } from './ps-vm';
 
 const bytes = (text: string): Uint8Array => new TextEncoder().encode(text);
 const golden = (name: string): Uint8Array =>
@@ -165,6 +166,39 @@ describe('PostScript language subset', () => {
   it('stops a file that loops forever instead of hanging', () => {
     const looping = convertPostscript(bytes(EPS('{ 1 pop } loop')));
     expect(looping).toEqual({ kind: 'error', reason: expect.stringMatching(/loop forever/) });
+  });
+
+  describe('bounds every run in work and time (ADR-700 Amd 2)', () => {
+    const tooLong = { kind: 'error', reason: expect.stringMatching(/takes too long/) };
+    const timed = (program: string) => {
+      const started = performance.now();
+      const result = convertPostscript(bytes(program));
+      return { result, ms: performance.now() - started };
+    };
+
+    it.each([
+      ['a procedure with nothing in it', EPS('{} loop')],
+      ['the same inside stopped', EPS('{ {} loop } stopped pop')],
+      ['a counted run of it', EPS('1e15 {} repeat')],
+      ['large allocations', EPS('{ 100000 array pop } loop')],
+      ['large copies', EPS('/s 100000 string def { s 0 100000 getinterval pop } loop')],
+      [
+        'an Illustrator script',
+        '%!PS-Adobe-3.0 EPSF-3.0\n%%Creator: Adobe Illustrator(R) 8.0\n%%EndProlog\n{} loop\n',
+      ],
+    ])('ends %s with the budget error', (_label, program) => {
+      const { result, ms } = timed(program);
+      expect(result).toEqual(tooLong);
+      expect(ms).toBeLessThan(PS_LIMITS.milliseconds);
+    });
+
+    it('ends a run that outlasts the time limit even within the step budget', () => {
+      const program = bytes(EPS('2000000 { 1 pop } repeat 0 0 moveto 1 1 lineto stroke'));
+      expect(convertPostscript(program).kind).toBe('ok');
+      let now = 0;
+      const clock = (): number => (now += 1_000);
+      expect(convertPostscript(program, { clock })).toEqual(tooLong);
+    });
   });
 
   it('rejects files that are not PostScript', () => {

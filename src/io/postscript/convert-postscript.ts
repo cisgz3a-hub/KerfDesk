@@ -32,11 +32,19 @@ const NOTE_TEXT: Readonly<Record<string, (count: number) => string>> = {
   pattern: () => 'Pattern fills were imported as a solid colour.',
 };
 
-export function convertPostscript(bytes: Uint8Array): PostscriptConversion {
+export type PostscriptOptions = {
+  /** Milliseconds for the run's time limit; tests pass a scripted clock. */
+  readonly clock?: () => number;
+};
+
+export function convertPostscript(
+  bytes: Uint8Array,
+  options: PostscriptOptions = {},
+): PostscriptConversion {
   try {
     const text = postscriptText(bytes);
     const illustrator = isIllustratorFile(text);
-    const vm = createPsVm();
+    const vm = createPsVm(options.clock);
     const program = illustrator ? prepareIllustrator(vm, text) : text;
     vm.run(new PsTokenizer(program, (name) => immediate(vm, name)));
     if (vm.painted.length === 0) return { kind: 'error', reason: noPathsReason(illustrator) };
