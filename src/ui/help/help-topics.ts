@@ -119,13 +119,13 @@ export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
   polygon: {
     label: 'Draw polygon',
     tooltip:
-      'Draw a polygon by dragging to set its size on the workspace. The drag snaps like the other drawing tools; hold Alt to place freely. ' +
+      'Draw a polygon by dragging on the workspace; it stretches to fill the drag. Hold Shift for equal sides, Ctrl to draw from the centre. The drag snaps like the other drawing tools; hold Alt to place freely. ' +
       DRAW_BY_POINTER,
   },
   star: {
     label: 'Draw star',
     tooltip:
-      'Draw a star by dragging to set its size on the workspace. The drag snaps like the other drawing tools; hold Alt to place freely. ' +
+      'Draw a star by dragging on the workspace; it stretches to fill the drag. Hold Shift for equal points, Ctrl to draw from the centre. The drag snaps like the other drawing tools; hold Alt to place freely. ' +
       DRAW_BY_POINTER,
   },
   polyline: {

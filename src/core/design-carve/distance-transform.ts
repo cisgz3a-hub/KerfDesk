@@ -4,8 +4,11 @@
 // groove depth, which is why the transform lives next to the carve and not in
 // a generic geometry module.
 //
-// Chamfer 1/sqrt(2) weights overestimate a true Euclidean distance by at most
-// ~4%, invisible at preview resolution and 25x cheaper than an exact EDT.
+// Chamfer 1/sqrt(2) weights overestimate a true Euclidean distance by up to
+// sqrt(4 - 2*sqrt(2)) - 1, about 8.2%, along a line 22.5 degrees off an axis
+// (exact along axes and diagonals). A v-carve preview can therefore show a
+// groove up to 8% deeper than the cut there (Oracle audit O10-P3-3). It is
+// 25x cheaper than an exact EDT; the preview keeps it for now.
 
 import type { CarveGrid } from './carve-input';
 

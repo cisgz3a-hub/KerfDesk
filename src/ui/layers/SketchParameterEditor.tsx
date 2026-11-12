@@ -3,6 +3,7 @@ import type {
   NamedSketchParameter,
 } from '../../core/sketch-constraints/constrained-sketch';
 import type { SketchEditorProps } from './SketchConstraintEditor';
+import { parseEnglishDecimalInput } from './english-decimal-input';
 export function SketchParameterEditor({ sketch, onChange }: SketchEditorProps): JSX.Element {
   function patch(index: number, change: Partial<NamedSketchParameter>): void {
     onChange({
@@ -68,7 +69,7 @@ function SketchParameterRow(props: {
           value={String(p.value)}
           onChange={(event) => {
             const raw = event.currentTarget.value;
-            patch({ value: raw.trim() !== '' && Number.isFinite(Number(raw)) ? Number(raw) : raw });
+            patch({ value: parseEnglishDecimalInput(raw) ?? raw });
           }}
         />
       </label>
