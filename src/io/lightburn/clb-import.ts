@@ -175,7 +175,8 @@ function importedRecipe(
     power,
     // CLB stores speed in mm/s; KerfDesk stores mm/min.
     speed: speedMmSec * 60,
-    passes: numberField(setting, ['numpasses', 'passes', 'passcount']) ?? 1,
+    // Rounded as the .lbrn importer rounds it (lbrn-layers.ts), not floored (O9-P3-2).
+    passes: Math.round(numberField(setting, ['numpasses', 'passes', 'passcount']) ?? 1),
     ...(airAssist === undefined ? {} : { airAssist }),
     hatchAngleDeg: numberField(setting, ['scanangle', 'angle']) ?? 0,
     hatchSpacingMm: interval,
