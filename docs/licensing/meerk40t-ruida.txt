@@ -1,0 +1,42 @@
+MeerK40t Ruida protocol reference
+
+Source: https://github.com/meerk40t/meerk40t
+Commits: 7e82652f75dcab39413492e60ed5b60e5c0ad7b6 (meerk40t/ruida/rdjob.py);
+d511944e08788e88077727f682957759884ff5ca (meerk40t/ruida/udp_transport.py,
+controller.py)
+Original files: meerk40t/ruida/rdjob.py (opcode table, swizzle_byte and
+unswizzle_byte, write_header, write_settings, write_layer_end and the other
+writers, file_sum), udp_transport.py, controller.py
+KerfDesk files: src/core/controllers/ruida/ (swizzle.ts, rd-commands.ts,
+rd-file-commands.ts, rd-job-writer.ts, rd-frame-job.ts, rd-motion-plan.ts,
+rd-numbers.ts, ruida-udp-session.ts, ruida-live-commands.ts),
+electron/ruida-network-wire.ts, electron/ruida-network-bridge.ts
+Carried over: the byte swizzle and its inverse, which follow MeerK40t's
+swizzle_byte and unswizzle_byte statement for statement; the opcode numbers
+and operand layouts; the .rd record order and file checksum; the UDP ports,
+checksum framing and Stop Process datagram. Changes: reimplemented in
+TypeScript for this app's prepared jobs; no MeerK40t user interface, artwork,
+plugins or Python source file is included.
+Licence: MIT.
+
+MIT License
+
+Copyright (c) 2021 meerk40t
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
