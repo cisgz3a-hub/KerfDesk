@@ -11,7 +11,7 @@ import { recoveryRepository } from '../state/recovery';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
 import type { MachineExecutionOwner } from '../state/machine-execution-owner';
-import type { OwnedMachineOperation } from './machine-operation-state';
+import { completeRemoteJog, type OwnedMachineOperation } from './machine-operation-state';
 import type { MachineCommand } from './machine-types';
 import type { RemoteControlOptions } from './types';
 import type { BackgroundMachineAction } from './machine-owned-operation';
@@ -80,6 +80,9 @@ function executionOwner(
       if (operation.committed === false) operation.committed = null;
       operation.state = 'running';
     },
+    onMotionWarnings: (warnings) => {
+      operation.motionWarnings = warnings;
+    },
   };
 }
 async function executeAbort(operation: OwnedMachineOperation): Promise<void> {
@@ -129,7 +132,7 @@ async function executeJog(
   operation.committed = true;
   if (operation.motionSettled === undefined) throw new RemoteFault('unavailable');
   await operation.motionSettled;
-  operation.state = 'completed';
+  completeRemoteJog(operation);
 }
 function remoteJogVector(
   project: Project,

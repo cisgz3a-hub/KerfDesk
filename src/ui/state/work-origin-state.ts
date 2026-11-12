@@ -48,6 +48,9 @@ export type WorkOriginState = BitFileSequenceState &
     /** Counts the times machine zero may have moved unmeasured (machineZeroMovedPatch).
      *  Optional so hand-built test states stay valid; absent reads as 0. */
     readonly machineZeroEpoch?: number;
+    /** The controller session in which a Home moved Z after the laser height was
+     *  last set (home-moved-focus.ts, ADR-322 Amendment 5). Absent reads as none. */
+    readonly focusMovedByHomeEpoch?: number | null;
   };
 
 /**

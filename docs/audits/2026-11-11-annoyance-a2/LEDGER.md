@@ -83,15 +83,15 @@ The rest is friction, and most of it sits at the edges of the product: the phone
 | B5-P2-8 | **A closed or sleeping PC is reported as "may have received that"**, and the stale screen keeps its buttons enabled | Whenever the PC is away | No | open |
 | B5-P2-9 | **During a job the phone can sleep, and the result is a 3.5 s toast** with no lasting record | Every job watched from the phone | No | open |
 | B5-P2-10 | **A CNC tool-change hold shows as "Running"**, with nothing to do | Every bit change | No | open |
-| B6-P2-1 | **A right-click throws away a multi-selection**, then offers Group and Align | Every right-click on a multi-selection | No | open |
-| B6-P2-2 | **Click tolerance is a fixed 2 mm of artwork, not screen pixels**; a press inside any outline grabs it | Every edit at high or low zoom | ADR-196 in part | open |
-| B6-P2-3 | **No drag threshold**: a click that slips one pixel moves the artwork, and snapping can make it jump | Every session | No | open |
+| B6-P2-1 | **A right-click throws away a multi-selection**, then offers Group and Align | Every right-click on a multi-selection | No | fixed (ADR-196 Amd 1) |
+| B6-P2-2 | **Click tolerance is a fixed 2 mm of artwork, not screen pixels**; a press inside any outline grabs it | Every edit at high or low zoom | ADR-196 in part | fixed (ADR-196 Amd 1) |
+| B6-P2-3 | **No drag threshold**: a click that slips one pixel moves the artwork, and snapping can make it jump | Every session | No | fixed (ADR-196 Amd 1) |
 | B6-P2-4 | **Paste always lands at "source + 10 mm"**, so repeated pastes stack exactly and a paste can land off-screen | Every multi-paste | No | open |
 | B6-P2-5 | **The pen tool cannot take back one point**; Esc discards the whole draft | Every pen drawing | No | open |
-| B6-P2-6 | **On a small selected object the resize handles cover the whole body** | Every edit of small parts | No | open |
+| B6-P2-6 | **On a small selected object the resize handles cover the whole body** | Every edit of small parts | No | fixed (ADR-196 Amd 1) |
 | B6-P2-7 | **A decimal comma is refused everywhere** | Every number, comma-locale users | By code comment | open |
 
-P3 findings are tabled per area in [REPORT.md](REPORT.md).
+P3 findings are tabled per area in [REPORT.md](REPORT.md). Fixed so far: B6-P3-9 (ADR-196 Amd 1).
 
 ## Decisions for the maintainer
 
@@ -137,7 +137,7 @@ Each group is one fix session. Wording changes keep G-code byte-identical.
 |---|---|---|
 | G1 CNC bit change | B4-P1-1 | Reproduce on the simulator through the interface first. Bind Zero Z and the probe at a hold to the pending bit; keep "bit in the spindle" as session state |
 | G2 CNC stops and Z | B4-P2-1 (stored Zero Z, read-back), B4-P2-2, B4-P2-4, B4-P3-1, B4-P3-7 | Zero Z as a stored offset; plate numbers on the machine profile; one inline "controller still holds Z0" line |
-| G3 Pointer feel | B6-P2-1, P2-2, P2-3, P2-6, B6-P3-9 | A drag threshold; pick tolerance in pixels; right-click keeps a selection it hits |
+| G3 Pointer feel | B6-P2-1, P2-2, P2-3, P2-6, B6-P3-9 | A drag threshold; pick tolerance in pixels; right-click keeps a selection it hits. **Done (ADR-196 Amendment 1):** all five reproduced and fixed |
 | G4 Paste, pen, numbers | B6-P2-4, P2-5, P2-7, B6-P3-2, P3-3 | Paste at the pointer; pen takes back a point; accept a lone decimal comma |
 | G5 Non-GRBL firmware | B3-P2-1, B3-P2-2 | Own wording for firmware without settings; a per-machine statement of the bed mapping |
 | G6 Phone tracking and words | B5-P2-1, P2-5, P2-6, P2-8, P2-10, P2-3 | Read the operation from status replies; visible reasons; an offline answer; a tool-change title |

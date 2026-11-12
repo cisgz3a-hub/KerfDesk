@@ -27,6 +27,18 @@ export const MOSHI_INT16_MAX = 32767;
 /** Vector speeds are whole mm/s from 1 to 256 (builder.py L392-397). */
 export const MOSHI_VECTOR_SPEED_MAX_MM_S = 256;
 
+/** The vector speed the board runs for a requested mm/s: MeerK40t passes
+ *  `int(speed)` and clamps to 1..256 (builder.py L392-397). */
+export function moshiVectorSpeedMmS(speedMmS: number): number {
+  return Math.min(MOSHI_VECTOR_SPEED_MAX_MM_S, Math.max(1, Math.trunc(speedMmS)));
+}
+
+/** The raster speed the board runs for a requested mm/s: one byte of whole
+ *  cm/s, rounded, at least 1 (builder.py L399-412). */
+export function moshiRasterSpeedCmS(speedMmS: number): number {
+  return Math.max(1, Math.round(speedMmS / 10));
+}
+
 type Stage = 'empty' | 'speed' | 'offset' | 'moves' | 'terminated';
 
 export type MoshiProgramMode = 'vector' | 'raster';
@@ -44,7 +56,7 @@ export class MoshiProgram {
   vectorSpeed(speedMmS: number, normalSpeedMmS: number): void {
     this.expect('empty', 'speed');
     this.mode = 'vector';
-    const speed = Math.min(MOSHI_VECTOR_SPEED_MAX_MM_S, Math.max(1, Math.trunc(speedMmS)));
+    const speed = moshiVectorSpeedMmS(speedMmS);
     this.bytes.push(moshiCommandByte(MOSHI_VECTOR_SPEED));
     this.uint8(speed - 1);
     this.uint8(Math.trunc(normalSpeedMmS) - 1);
@@ -54,7 +66,7 @@ export class MoshiProgram {
   rasterSpeed(speedMmS: number): void {
     this.expect('empty', 'speed');
     this.mode = 'raster';
-    const speedCmS = Math.max(1, Math.round(speedMmS / 10));
+    const speedCmS = moshiRasterSpeedCmS(speedMmS);
     this.bytes.push(moshiCommandByte(MOSHI_RASTER_SPEED));
     this.uint8(speedCmS - 1);
   }

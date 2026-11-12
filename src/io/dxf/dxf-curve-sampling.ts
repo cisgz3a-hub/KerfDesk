@@ -73,8 +73,16 @@ export function isFullEllipseSweep(startParam: number, endParam: number): boolea
   return normalizedSweep(startParam, endParam) >= FULL_TURN - 1e-9;
 }
 
-function normalizedSweep(startParam: number, endParam: number): number {
-  let sweep = endParam - startParam;
-  while (sweep <= 0) sweep += FULL_TURN;
-  return Math.min(sweep, FULL_TURN);
+/**
+ * The counter-clockwise sweep from start to end, at most one full turn. A
+ * difference of zero or less wraps forward by whole turns, worked out in one
+ * step so any parameters end at once (ADR-700 Amd 2); a positive one is kept,
+ * capped at a full turn.
+ */
+export function normalizedSweep(startParam: number, endParam: number): number {
+  const sweep = endParam - startParam;
+  if (!Number.isFinite(sweep)) return FULL_TURN;
+  if (sweep > 0) return Math.min(sweep, FULL_TURN);
+  const wrapped = sweep % FULL_TURN;
+  return wrapped === 0 ? FULL_TURN : wrapped + FULL_TURN;
 }

@@ -5,7 +5,23 @@ export function svgNumber(value: number): string {
   if (!Number.isFinite(value)) throw new Error('Artwork contains a non-finite coordinate.');
   // Local units and transform coefficients can be very small or very large.
   // Rounding either before multiplication changes the physical artwork size.
-  return String(value);
+  // So write the exact shortest round-trip value, but as a plain decimal: a
+  // 90° rotation's cosine is 6.123233995736766e-17, and SVG allows that
+  // exponent while simple cutter and CAM path readers often do not (O8-P3-1).
+  return plainDecimal(value);
+}
+
+function plainDecimal(value: number): string {
+  const text = String(value);
+  const exponentAt = text.indexOf('e');
+  if (exponentAt < 0) return text;
+  const exponent = Number(text.slice(exponentAt + 1));
+  const fractionDigits = text.slice(0, exponentAt).split('.')[1]?.length ?? 0;
+  const decimals = fractionDigits - exponent;
+  // toFixed keeps every digit up to 100 decimals; beyond that (or for
+  // |value| >= 1e21) the exact exponent form is the only lossless spelling.
+  if (exponent > 0 || decimals > 100) return text;
+  return value.toFixed(decimals);
 }
 
 export function xmlText(value: string): string {

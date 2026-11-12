@@ -73,7 +73,22 @@ it('keeps glyph identity through bold, italic and squeeze before a rigid bend', 
 });
 
 it('retains the first glyph edge when reversing a closed guide with a repeated endpoint', async () => {
-  const text = await render('H');
+  const rendered = await render('H');
+  // The first glyph's left edge alone, as one open polyline: path text splits
+  // edges that run along the guide (O7-P2-2), and this edge runs across it, so
+  // its points keep their indices.
+  const stem = rendered.paths[0]!.polylines[0]!.points.filter(
+    (point) => Math.abs(point.x - rendered.bounds.minX) < 1e-9,
+  );
+  const text = {
+    ...rendered,
+    paths: [
+      {
+        ...rendered.paths[0]!,
+        polylines: [{ closed: false, points: stem }, ...rendered.paths[0]!.polylines.slice(1)],
+      },
+    ],
+  };
   const guide = createRectangle({
     id: 'guide',
     color: '#000000',

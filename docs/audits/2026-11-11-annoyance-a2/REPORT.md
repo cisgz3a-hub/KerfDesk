@@ -571,7 +571,7 @@ The waits are in better shape than the editing: almost every wait read has a sta
 | B6-P3-6 | Resizing by a handle never snaps | `workspace/drag-snap.ts:42` | Snap the dragged edge to grid and guides |
 | B6-P3-7 | Zoom stops at 16 times the bed fit, so a large bed cannot be zoomed far; the view is neither kept per project nor reset on Open | `state/ui-store.ts:34-35` | Cap by pixels per mm; fit on Open |
 | B6-P3-8 | Aspect lock is off for typed sizes, on for handle drags, and forgotten each launch | `commands/NumericEditsBar.tsx:115-118` | Remember it as a preference |
-| B6-P3-9 | Plain-clicking one of several selected objects does not narrow the selection to it | `workspace/drag-state.ts:206-208` | Narrow on release without travel |
+| B6-P3-9 | Plain-clicking one of several selected objects does not narrow the selection to it | `workspace/drag-state.ts:206-208` | Narrow on release without travel. **Fixed (ADR-196 Amendment 1)** |
 | B6-P3-10 | The clipboard is KerfDesk's own: Ctrl+V of an SVG, image or text from another program does nothing, with no message | `state/scene-clipboard-actions.ts:57-70` | Route a pasted image or SVG into import |
 | B6-P3-11 | Undo back to the saved state still shows the project as changed | `state/store-actions.ts:184` | Compare with the last saved project |
 

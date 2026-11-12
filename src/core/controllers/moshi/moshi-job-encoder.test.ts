@@ -214,3 +214,62 @@ describe('encodeMoshiJob', () => {
     );
   });
 });
+
+// Oracle audit O8-P2-1 (ADR-705 Amendment 5): the speed byte carries whole
+// mm/s for lines and whole cm/s for images (MeerK40t builder.py L392-412), so a
+// set speed between steps runs at a neighbour. The bytes stay MeerK40t's; the
+// job now says so when the dose leaves 95-105 %, as the rotary note does.
+describe('encodeMoshiJob flat-bed speed steps', () => {
+  const RASTER: RasterGroup = {
+    kind: 'raster',
+    layerId: 'R',
+    color: '#000',
+    power: 100,
+    speed: 6000,
+    passes: 1,
+    airAssist: false,
+    sValues: Uint16Array.from([1000, 0, 1000, 0]),
+    pixelWidth: 4,
+    pixelHeight: 1,
+    bounds: { minX: 10, minY: 10, maxX: 14, maxY: 11 },
+    overscanMm: 0,
+    dotWidthCorrectionMm: 0,
+  };
+
+  function encoded(group: CutGroup | RasterGroup) {
+    const result = encodeMoshiJob({ groups: [group] }, MOSHI_DEVICE);
+    if (!result.ok) throw new Error(result.error.kind);
+    return result;
+  }
+
+  function speedNotes(group: CutGroup | RasterGroup): string[] {
+    return encoded(group).notes.filter((note) => note.includes('of the set dose'));
+  }
+
+  it('says when a line speed runs a whole mm/s slower', () => {
+    // 599 mm/min = 9.98 mm/s; the board runs 9 mm/s, 111 % of the dose.
+    expect(speedNotes({ ...LINE, speed: 599 })).toEqual([
+      'Layer L1: a Moshiboard runs lines in whole mm/s, so 9.98 mm/s runs at 9 mm/s (111 % of the set dose).',
+    ]);
+    // 30 mm/min = 0.5 mm/s is held at the 1 mm/s floor: half the dose.
+    expect(speedNotes({ ...LINE, speed: 30 })[0]).toContain(
+      'runs at 1 mm/s (50 % of the set dose)',
+    );
+  });
+
+  it('says when an image speed rounds to a whole cm/s', () => {
+    // 1000 mm/min = 16.7 mm/s rounds to 2 cm/s: 83 % of the dose, lighter.
+    expect(speedNotes({ ...RASTER, speed: 1000 })).toEqual([
+      'Layer R: a Moshiboard runs images in whole cm/s, so 16.67 mm/s runs at 20 mm/s (83 % of the set dose).',
+    ]);
+  });
+
+  it('stays quiet within 5 % and keeps the bytes', () => {
+    expect(speedNotes(LINE)).toEqual([]); // 25 mm/s exact
+    expect(speedNotes({ ...LINE, speed: 1000 })).toEqual([]); // 16.67 -> 16, 104 %
+    expect(speedNotes(RASTER)).toEqual([]); // 100 mm/s exact
+    const program = decodeMoshiProgram(encoded({ ...LINE, speed: 599 }).programs[0]!.bytes);
+    if (!program.ok) throw new Error(program.error);
+    expect(program.program.speed).toBe(9);
+  });
+});

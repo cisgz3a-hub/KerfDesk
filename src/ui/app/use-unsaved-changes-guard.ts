@@ -20,8 +20,7 @@
 
 import { useEffect } from 'react';
 import { useStore } from '../state';
-import { useLaserStore } from '../state/laser-store';
-import { isActiveJob } from '../state/laser-store-helpers';
+import { anyMachineJobActive } from '../state/link-machine-work';
 import { desktopCloseController } from './desktop-close-runtime';
 import { designStudioHoldsUnappliedDrawing } from '../design-studio/design-kept-drawing-actions';
 
@@ -39,7 +38,8 @@ export function installUnsavedChangesGuard(target: Window): () => void {
     if (desktopCloseController.handleBeforeUnload(e)) return;
     // A Studio drawing not yet applied is unsaved work too (ADR-590 Amendment 1).
     const dirty = useStore.getState().dirty || designStudioHoldsUnappliedDrawing();
-    const jobActive = isActiveJob(useLaserStore.getState().streamer);
+    // A link job counts: the unload stop has already stopped it (C2 D4-P2-3).
+    const jobActive = anyMachineJobActive();
     if (!shouldWarnBeforeUnload({ dirty, jobActive })) return;
     // preventDefault triggers the native prompt in modern browsers; the empty
     // returnValue is the legacy belt-and-suspenders some browsers still require.

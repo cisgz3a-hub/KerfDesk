@@ -1,6 +1,7 @@
 import { RebuiltTabsNote } from './RebuiltTabsNote';
 import { VectorGeometryPreview } from './VectorGeometryPreview';
 import type { SketchSolveResult } from '../../core/sketch-constraints/constrained-sketch';
+import { sketchCollapsedLines } from '../../core/sketch-constraints/sketch-collapsed-lines';
 import type { ConstrainedSketchReview } from '../state/constrained-sketch-actions';
 export function SketchSolveReview(props: {
   readonly result: SketchSolveResult | null;
@@ -24,6 +25,14 @@ export function SketchSolveReview(props: {
           ))}
         </div>
       ) : null}
+      {result?.kind === 'solved'
+        ? sketchCollapsedLines(result.sketch).map((lineId) => (
+            <p key={lineId} role="alert">
+              Line {lineId} has no length after solving. Check its horizontal, vertical and equal
+              relations.
+            </p>
+          ))
+        : null}
       {props.stale ? (
         <p role="alert">The project changed. Review the current sketch again.</p>
       ) : null}

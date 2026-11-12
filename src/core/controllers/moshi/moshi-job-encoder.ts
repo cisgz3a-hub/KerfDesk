@@ -14,7 +14,11 @@
 import type { DeviceProfile } from '../../devices';
 import type { Group, Job } from '../../job';
 import { rotaryFeedMatchFor, type RotaryFeedMatch } from '../../output/rotary-surface-feed';
-import { MOSHI_VECTOR_SPEED_MAX_MM_S } from './moshi-program';
+import {
+  MOSHI_VECTOR_SPEED_MAX_MM_S,
+  moshiRasterSpeedCmS,
+  moshiVectorSpeedMmS,
+} from './moshi-program';
 import { writeHomeProgram, writeRasterProgram, writeVectorProgram } from './moshi-programs';
 import { planRasterGroupSteps } from './moshi-raster-plan';
 import { moshiSurfaceSpeedRuns } from './moshi-rotary-feed';
@@ -126,11 +130,21 @@ function groupPrograms(
       notes.add(
         `Layer ${group.layerId}: ${Math.round(speedMmS)} mm/s is above the Moshi vector limit; it runs at ${MOSHI_VECTOR_SPEED_MAX_MM_S} mm/s.`,
       );
+    else
+      addQuantisedSpeedNote(notes, group.layerId, speedMmS, moshiVectorSpeedMmS(speedMmS), 'mm/s');
     return [{ kind: 'vector', layerId: group.layerId, bytes: writeVectorProgram(steps, speedMmS) }];
   }
   if (speedMmS > MOSHI_RASTER_SPEED_MAX_MM_S)
     notes.add(
       `Layer ${group.layerId}: ${Math.round(speedMmS)} mm/s is above the Moshi raster limit; it runs at ${MOSHI_RASTER_SPEED_MAX_MM_S} mm/s.`,
+    );
+  else
+    addQuantisedSpeedNote(
+      notes,
+      group.layerId,
+      speedMmS,
+      moshiRasterSpeedCmS(speedMmS) * 10,
+      'cm/s',
     );
   return [
     {
@@ -163,6 +177,30 @@ function rotaryVectorPrograms(
     layerId: group.layerId,
     bytes: writeVectorProgram(run.steps, run.speedMmS),
   }));
+}
+
+/** The flat-bed speed byte carries whole mm/s (lines) or whole cm/s (images),
+ *  so a set speed between steps runs at a neighbouring one. Say so when that
+ *  leaves the dose outside 95-105 %, the band the rotary note uses
+ *  (ADR-705 Amendments 1 and 5). Bytes are unchanged. */
+function addQuantisedSpeedNote(
+  notes: Set<string>,
+  layerId: string,
+  requestedMmS: number,
+  runsMmS: number,
+  step: 'mm/s' | 'cm/s',
+): void {
+  if (!(requestedMmS > 0)) return;
+  const dose = requestedMmS / runsMmS;
+  if (dose >= 0.95 && dose <= 1.05) return;
+  const kind = step === 'mm/s' ? 'lines in whole mm/s' : 'images in whole cm/s';
+  notes.add(
+    `Layer ${layerId}: a Moshiboard runs ${kind}, so ${formatMmS(requestedMmS)} mm/s runs at ${runsMmS} mm/s (${percent(dose)} of the set dose).`,
+  );
+}
+
+function formatMmS(speedMmS: number): string {
+  return String(Math.round(speedMmS * 100) / 100);
 }
 
 function percent(share: number): string {

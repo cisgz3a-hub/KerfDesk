@@ -3,6 +3,7 @@ import {
   MATERIAL_RECIPE_FIELDS,
   materialRecipePatch,
 } from '../../core/material-library';
+import { RECIPE_SCAN_PATTERN_FIELDS } from '../../core/material-library/recipe-scan-pattern';
 import { activePhotoToneCurve } from '../../core/raster/photo-tone-curve';
 import type { Layer } from '../../core/scene';
 import type { MaterialExperiment } from '../../core/material-library/material-experiment';
@@ -26,8 +27,8 @@ export function materialRecipeDifferences(
         : [
             {
               setting: SETTING_LABELS[key] ?? key,
-              before: display(before[key]),
-              after: display(after[key]),
+              before: display(before[key], key),
+              after: display(after[key], key),
             },
           ],
     ),
@@ -166,9 +167,14 @@ function RecipeDifferenceTable(props: {
     </table>
   );
 }
-function display(value: unknown): string {
+// A recipe holds its scan pattern only while it is on (ADR-093 Amendment 2).
+const OFF_WHEN_ABSENT: ReadonlySet<string> = new Set(RECIPE_SCAN_PATTERN_FIELDS);
+
+function display(value: unknown, key: string): string {
   return value === undefined
-    ? 'Auto / inherited'
+    ? OFF_WHEN_ABSENT.has(key)
+      ? 'Off'
+      : 'Auto / inherited'
     : typeof value === 'boolean'
       ? value
         ? 'On'
@@ -188,4 +194,9 @@ const SETTING_LABELS: Readonly<Record<string, string>> = {
   linesPerMm: 'Image lines/mm',
   bidirectionalScanOffsetMm: 'Scan offset (mm)',
   powerMode: 'Power mode',
+  imageScanAngleDeg: 'Image scan angle (°)',
+  imageCrossHatch: 'Image cross-hatch',
+  passAngleStepDeg: 'Angle change per pass (°)',
+  fillRampLengthMm: 'Fill ramp length (mm)',
+  fillRampOuterEdge: 'Ramp outer edges',
 };

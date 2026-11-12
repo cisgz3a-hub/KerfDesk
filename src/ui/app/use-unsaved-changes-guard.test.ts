@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useStore } from '../state';
+import { reportLinkMachineWork, resetLinkMachineWorkForTests } from '../state/link-machine-work';
 import { installUnsavedChangesGuard, shouldWarnBeforeUnload } from './use-unsaved-changes-guard';
 import { useDesignStudioStore } from '../design-studio/design-studio-store';
 import {
@@ -55,6 +56,28 @@ describe('installUnsavedChangesGuard', () => {
     expect(event.preventDefault).toHaveBeenCalledTimes(1);
     expect(event.returnValue).toBe('');
     cleanup();
+  });
+
+  // Code quality audit C2 D4-P2-3: the unload stop has already stopped a link
+  // job, so a Leave site? prompt would let Stay keep a stopped job.
+  it('does not prompt while a Moshi, K40 or Ruida link job runs', () => {
+    useStore.setState({ dirty: true });
+    reportLinkMachineWork('moshi-usb', {
+      controller: 'Moshiboard',
+      activity: 'running',
+      advisories: [],
+      abort: async () => undefined,
+    });
+    const { target, fire } = fakeWindow();
+    const cleanup = installUnsavedChangesGuard(target);
+    const event = fakeEvent();
+    try {
+      fire(event);
+      expect(event.preventDefault).not.toHaveBeenCalled();
+    } finally {
+      cleanup();
+      resetLinkMachineWorkForTests();
+    }
   });
 
   it('does not block unload when there are no unsaved changes', () => {

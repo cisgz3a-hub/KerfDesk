@@ -500,7 +500,7 @@ Reviewer answers "what should this UI do?" from `WORKFLOW.md` alone; "why this a
 
 ## ADR-017 — Third-party library evaluation policy; DOMPurify pinned for Phase A
 
-**Status:** Accepted; macOS-target example amended by ADR-248; LGPL programs KerfDesk does not link allowed in the Linux AppImage by ADR-017 Amendment 1; its GPL-3.0 libraries and GConf left out by ADR-017 Amendment 2 | **Date:** 2026-05-26
+**Status:** Accepted; macOS-target example amended by ADR-248; LGPL programs KerfDesk does not link allowed in the Linux AppImage by ADR-017 Amendment 1; its GPL-3.0 libraries and GConf left out by ADR-017 Amendment 2; packages the build bundles made notice and licence-gate inputs by ADR-017 Amendment 3 | **Date:** 2026-05-26
 
 ### Context
 The project source code is MIT-licensed under ADR-120/247 and uses compatible dependencies freely (the dependency-policy half of the original ADR-008 survived ADR-018 and remains unchanged). The user has indicated that "if there is proven MIT code for extra features, we can do research and add it." This is a powerful capability — well-maintained libraries reduce bug surface, and proven implementations are often safer than hand-rolled equivalents.

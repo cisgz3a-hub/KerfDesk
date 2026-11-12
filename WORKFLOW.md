@@ -425,11 +425,20 @@ destination and cannot overwrite the template source.
    (ADR-683). The same holds for a hole another shape on its Fill operation cuts, and inside
    stacked copies that cancel (ADR-683 Amendment 1). In Wireframe, where nothing is filled, every
    shape's interior lets clicks through this way (ADR-683 Amendment 2).
+5. A click reaches a line within 5 screen pixels at any zoom (ADR-196 Amendment 1). Where several
+   lines are that close the nearest is picked, and the one drawn on top when they are equally near.
+   A filled area or an image under the pointer hides the lines beneath it; a line drawn over it is
+   still picked from beside the line.
+6. A click never moves artwork. A press becomes a drag only after the pointer has travelled more
+   than 4 pixels (6 with a pen, 10 by touch), so a click that slips selects and changes nothing
+   else: no move, no undo step, and a completed Frame still stands.
 
 #### Multi — shift+click
 1. Shift+click on additional object.
 2. Both objects are now selected; selection box wraps their combined bounding box.
 3. Resize handles operate on the combined box.
+4. A plain click on one of several selected objects selects that object alone, when the button is
+   released without a drag. Dragging it moves the whole selection and keeps it.
 
 #### Overlapping objects — Alt+click
 1. Alt+click where two or more selectable objects cross or overlap.
@@ -439,7 +448,9 @@ destination and cannot overwrite the template source.
 4. Hidden-layer and locked objects are excluded. Ordinary click selection remains geometry-based.
 
 #### Multi — marquee
-1. Click+drag in empty workspace area.
+1. Click+drag in empty workspace area, or inside an outline that is not selected (ADR-196
+   Amendment 1): a click there selects the outline, a drag draws the box and leaves the outline
+   where it is. To move an outline, drag it by its line, or select it first.
 2. Dashed-blue marquee box follows cursor.
 3. On release, selection is directional (LightBurn-style), keyed on the drag's horizontal direction: dragging left→right is an **enclosing** select (only objects whose bounding box is fully inside the marquee); dragging right→left is a **crossing** select (objects inside or merely touched).
 4. Locked objects inside the marquee are skipped.
@@ -468,11 +479,18 @@ destination and cannot overwrite the template source.
 3. Each notice says how many objects were added. When none qualify, or no closed shape is
    selected, it says why and the selection is kept.
 
+#### Right-click — context bar (ADR-196 Amendment 1)
+1. A stationary right click on an object of the selection, or on the selection's move handle,
+   keeps the whole selection and opens the selection context bar, so Group, Align and Distribute
+   act on what was selected.
+2. On an object that is not selected it selects that object alone.
+3. On empty space it keeps the selection and opens the empty-workspace context bar. On locked
+   artwork it keeps the selection and offers **Unlock** first (ADR-706).
+4. A right-button drag remains a pan and does not change selection.
+
 #### Deselect — Escape or click in empty space
 1. Selection cleared. Status bar updates: `Nothing selected`.
-2. A stationary right click in empty space also clears selection, then opens the empty-workspace
-   context bar. A right-button drag remains a pan and does not change selection.
-3. Single-artwork default (ADR-222): import, Open, undo/redo into a lone-artwork scene, and
+2. Single-artwork default (ADR-222): import, Open, undo/redo into a lone-artwork scene, and
    deleting down to one selectable artwork initially mark it. That default is one-shot; Escape
    or an empty-space click leaves the artwork unmarked until the operator selects it again or the
    scene enters a different lone-artwork state.
@@ -558,7 +576,10 @@ the linked artwork.
 
 #### Move — drag
 1. Drag visible selected geometry, or drag the four-arrow handle at the center of the single or
-   combined selection box. The center handle has a fixed screen-size target at every zoom.
+   combined selection box. The center handle has a fixed screen-size target at every zoom. The
+   drag starts once the pointer has travelled more than 4 pixels and is measured from where the
+   button went down, so the point that was grabbed stays under the pointer (ADR-196 Amendment 1).
+   For a smaller move use the arrow keys or the position boxes.
 2. The center handle takes precedence over artwork below it and the cursor changes to a move cursor.
    Blank space elsewhere inside a hollow object's bounds remains transparent to ordinary selection,
    so large outlines do not become invisible slabs over nested artwork.
@@ -579,6 +600,11 @@ the linked artwork.
 - Shift+drag corner: unlock aspect ratio / stretch.
 - Ctrl/Cmd+drag: scale from center instead of opposite edge.
 - Live mm dimensions shown next to handle while dragging.
+- Handles wait for the same few pixels of travel as a move; so does the rotate handle.
+- Small selections show fewer handles (ADR-196 Amendment 1). A side under 24 screen pixels has no
+  middle handle, and a box under 24 pixels on its shorter side leaves its inside to the artwork: a
+  drag that starts inside it moves it, and a corner handle answers from just outside. A straight
+  line keeps the two handles at its ends, which lengthen it; dragging its middle moves it.
 
 #### Rotate — handle above selection
 - Handle appears 24 screen pixels above the selection box, keeping the same reach at every zoom.
@@ -868,6 +894,12 @@ the linked artwork.
    centre it on X or Y; **Alt+Shift+H** and **Alt+Shift+V** move it together (Move H / V
    Together), as in LightBurn. Both need two or more objects; a group counts as one. Each is one
    undo step. Distribute spacing has no key, as in LightBurn (ADR-499 Amendment 2).
+6. Align, Make Same Width / Height and Move H / V Together keep one object still and move the rest
+   to it, as in LightBurn. That reference is the object last clicked into the selection. A
+   selection made at once (a marquee or Select All), or one whose clicked object was deselected or
+   deleted, has no click order. It then aligns to the first selected object in draw order, the
+   bottom of the stack (ADR-709). Remote `arrange_artwork` keeps the last listed id, and Design
+   Studio aligns to the selection's bounds.
 
 ### F-A6j. Show lengths in inches (ADR-629)
 
@@ -1898,6 +1930,16 @@ the completed physical Frame is the spatial source of truth.
 5. When the controller answers `error:9`, it was in Alarm or Jog: clear the alarm or let the jog
    finish, then retry. `error:20` means the firmware has no probe input or does not support the
    command.
+
+#### Edge — Home moves the focus height on a Falcon A1 Pro (ADR-322 Amendment 5)
+1. The A1 Pro firmware moves Z while it homes X and Y, so a Home after Auto-focus loses the height.
+   KerfDesk itself sends only `$HX`, `$HY` and the settle marker.
+2. After a completed Home a warning toast says: `Home moved the laser's height: this machine's homing
+   also moves Z. Move the head over your material and run Auto-focus again before you burn.`
+3. Until a successful Auto-focus or a Z jog, Job Review lists a warning on laser jobs that the height
+   has not been set since the last Home. It never blocks Frame or Start. A reconnect clears it.
+4. KerfDesk does not re-focus by itself: after Home the head is at the front-left corner, which may
+   not be over the material.
 
 #### Edge — the file kept a photo behind its trace (ADR-673 Amendment 1)
 1. KerfDesk 1.0.27 and earlier marked a picture kept after Trace as the trace's source and never
@@ -4080,6 +4122,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
      burns D mm round the part at every height, and one turn stays one turn. Rows round the part
      stay level; a stroke along the side leans slightly away from the job's anchor row (2.3° at
      30 mm from it on an Ø80→Ø70 cup), so anchor a Current Position job at its centre.
+   - A Fill's hatch lines bend with the warp. Each bent line burns through its points as one
+     sweep, at every hatch angle and on Y, A or Z (ADR-694 Amendment 1). If a Fill's planned burn is
+     ever shorter than what was compiled, output stops and names the layer instead of burning
+     short. Job Review's row-step check reads a tapered 0° Fill's rows at both ends of the artwork.
    - The preview gives one turn round the top and round the bottom, and checks the artwork against
      one turn where the part is narrowest under it. Job Review's Rotary fact names the taper, for
      example "Chuck, taper Ø80 → Ø70 mm over 100 mm". A taper whose ends differ in radius by more

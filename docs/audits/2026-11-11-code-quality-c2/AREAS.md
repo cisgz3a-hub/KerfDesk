@@ -58,4 +58,4 @@ Finding IDs are `D<area>-P<n>-<k>`.
 - **Changes:** anything that could move a toolpath or change what users see is listed for the maintainer, not changed, unless it is a confirmed P1 or P2.
 - **Fix pull requests:** auto-merge with the MERGE method, plus Auto-fix.
 
-**Status:** started 2026-11-11. D1 and D2 ledgered ([LEDGER.md](LEDGER.md)); D3 next. Rolling audit v14 finished the same day.
+**Status:** started 2026-11-11. D1 to D6 ledgered ([LEDGER.md](LEDGER.md)); D7 next. Rolling audit v14 finished on 2026-11-11.
