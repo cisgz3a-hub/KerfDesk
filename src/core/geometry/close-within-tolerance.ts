@@ -4,18 +4,27 @@
 //   bridge     adds a closing line across the gap; every existing point stays.
 //   move-ends  moves both ends to their midpoint, so no new segment appears.
 //              A cubic end keeps its tangent: its control point moves with it.
+//              An elliptical arc at an end is first replaced by the cubics that
+//              trace it, because an arc re-solved between moved ends changes
+//              shape: a single-arc path collapsed to a point, and an end arc
+//              near a half circle bulged many times the gap (tools audit T1,
+//              T10-P2-1 and T10R-P2-1).
 // Curves and their compatibility polylines change together, and a path whose
 // two lists do not pair up one to one is left alone.
 
 import {
   applyTransform,
   type ColoredPath,
+  type CubicPathSegment,
   type CurveSubpath,
+  type EllipticalArcPathSegment,
   type PathSegment,
   type Polyline,
   type Transform,
   type Vec2,
 } from '../scene';
+// Deep import: core/scene's barrel is ratcheted and may only shrink.
+import { endpointArc, pointOnArc, type CenterArc } from '../scene/curve-path';
 import { closeOpenPaths, isCloseablePolyline } from './path-direction-edits';
 import { midpoint, addPoints } from './point-math';
 
@@ -99,7 +108,8 @@ function meetPolyline(polyline: Polyline): Polyline {
   return { ...polyline, closed: true, points: [meet, ...polyline.points.slice(1, -1), meet] };
 }
 
-function meetCurve(curve: CurveSubpath): CurveSubpath {
+function meetCurve(original: CurveSubpath): CurveSubpath {
+  const curve = withEndArcsAsCubics(original);
   const last = curve.segments.at(-1);
   if (last === undefined) return curve;
   const meet = midpoint(curve.start, last.to);
@@ -118,4 +128,52 @@ function meetCurve(curve: CurveSubpath): CurveSubpath {
     return next;
   });
   return { start: meet, segments, closed: true };
+}
+
+/** The subpath with an elliptical arc at either end replaced by its cubics. */
+function withEndArcsAsCubics(curve: CurveSubpath): CurveSubpath {
+  const lastIndex = curve.segments.length - 1;
+  if (lastIndex < 0) return curve;
+  let from = curve.start;
+  const segments = curve.segments.flatMap((segment, index) => {
+    const start = from;
+    from = segment.to;
+    return segment.kind === 'elliptical-arc' && (index === 0 || index === lastIndex)
+      ? arcAsCubics(start, segment)
+      : [segment];
+  });
+  return segments.length === curve.segments.length ? curve : { ...curve, segments };
+}
+
+/** Cubic pieces of at most a quarter turn tracing the arc; a degenerate arc,
+ * which is drawn as its chord, becomes that line. */
+function arcAsCubics(from: Vec2, segment: EllipticalArcPathSegment): PathSegment[] {
+  const arc = endpointArc(from, segment);
+  if (arc === null) return [{ kind: 'line', to: segment.to }];
+  const pieces = Math.max(1, Math.ceil(Math.abs(arc.delta) / (Math.PI / 2) - 1e-9));
+  const step = arc.delta / pieces;
+  const handle = (4 / 3) * Math.tan(step / 4);
+  return Array.from({ length: pieces }, (_, index): CubicPathSegment => {
+    const a = arc.theta1 + step * index;
+    const b = a + step;
+    const p0 = pointOnArc(arc, a);
+    const p3 = index === pieces - 1 ? segment.to : pointOnArc(arc, b);
+    const d0 = arcTangent(arc, a);
+    const d3 = arcTangent(arc, b);
+    return {
+      kind: 'cubic',
+      control1: { x: p0.x + handle * d0.x, y: p0.y + handle * d0.y },
+      control2: { x: p3.x - handle * d3.x, y: p3.y - handle * d3.y },
+      to: p3,
+    };
+  });
+}
+
+/** d/dθ of the arc's point at θ. */
+function arcTangent(arc: CenterArc, theta: number): Vec2 {
+  const cosPhi = Math.cos(arc.rotationRad);
+  const sinPhi = Math.sin(arc.rotationRad);
+  const dx = -arc.radiusX * Math.sin(theta);
+  const dy = arc.radiusY * Math.cos(theta);
+  return { x: dx * cosPhi - dy * sinPhi, y: dx * sinPhi + dy * cosPhi };
 }
