@@ -23,7 +23,7 @@ describe('layout actions', () => {
     expect(ids()).toEqual(['A', 'B', 'C']);
   });
 
-  it('matches the width of the last selected reference and packs the selection together', () => {
+  it('matches the width of the first object in draw order and packs the selection together', () => {
     useStore.getState().importSvgObject(svgObj('A', ['#ff0000']));
     useStore.getState().importSvgObject(svgObj('B', ['#00ff00']));
     const width = (id: string) => {
@@ -31,21 +31,26 @@ describe('layout actions', () => {
       const box = object === undefined ? null : combinedBBox([object]);
       return box === null ? Number.NaN : box.maxX - box.minX;
     };
-    const original = width('B');
+    const box = (id: string) =>
+      combinedBBox(useStore.getState().project.scene.objects.filter((object) => object.id === id));
     useStore.getState().applySelectionTransforms([
       { id: 'A', transform: { ...IDENTITY_TRANSFORM, scaleX: 2 } },
       { id: 'B', transform: { ...IDENTITY_TRANSFORM, x: 500 } },
     ]);
+    const reference = width('A');
+    const referenceBox = box('A');
+    // No click order (ADR-709): A, the bottom of the stack, is the reference
+    // though B is listed last.
     useStore.setState({ selectedObjectId: 'A', additionalSelectedIds: new Set(['B']) });
 
     useStore.getState().matchSelectionSize('width', false);
-    expect(width('A')).toBeCloseTo(original, 9);
+    expect(width('A')).toBeCloseTo(reference, 9);
+    expect(width('B')).toBeCloseTo(reference, 9);
 
     useStore.getState().moveSelectionTogether('horizontal');
-    const scene = useStore.getState().project.scene;
-    const a = combinedBBox(scene.objects.filter((object) => object.id === 'A'));
-    const b = combinedBBox(scene.objects.filter((object) => object.id === 'B'));
+    const a = box('A');
+    const b = box('B');
+    expect(a?.minX).toBeCloseTo(referenceBox?.minX ?? Number.NaN, 9);
     expect(a?.maxX).toBeCloseTo(b?.minX ?? Number.NaN, 9);
-    expect(b?.minX).toBeCloseTo(500 + (combinedBBox([svgObj('B', ['#00ff00'])])?.minX ?? 0), 9);
   });
 });

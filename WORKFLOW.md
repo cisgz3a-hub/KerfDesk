@@ -894,6 +894,12 @@ the linked artwork.
    centre it on X or Y; **Alt+Shift+H** and **Alt+Shift+V** move it together (Move H / V
    Together), as in LightBurn. Both need two or more objects; a group counts as one. Each is one
    undo step. Distribute spacing has no key, as in LightBurn (ADR-499 Amendment 2).
+6. Align, Make Same Width / Height and Move H / V Together keep one object still and move the rest
+   to it, as in LightBurn. That reference is the object last clicked into the selection. A
+   selection made at once (a marquee or Select All), or one whose clicked object was deselected or
+   deleted, has no click order. It then aligns to the first selected object in draw order, the
+   bottom of the stack (ADR-709). Remote `arrange_artwork` keeps the last listed id, and Design
+   Studio aligns to the selection's bounds.
 
 ### F-A6j. Show lengths in inches (ADR-629)
 

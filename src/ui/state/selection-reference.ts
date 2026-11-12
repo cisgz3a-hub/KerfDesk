@@ -7,7 +7,8 @@
 // The record counts only while that selection is still the current one. Every
 // other way of changing the selection (a marquee, Select All, paste, delete, a
 // command that selects its result) builds a new selection, so the record lapses
-// and Align falls back to its stacking-order rule without each of those writers
+// and Align falls back to the first selected object in draw order (the bottom
+// of the stack, as LightBurn 1.7 does; ADR-709) without each of those writers
 // having to know about it: a stale record can never pick the reference. The few
 // actions that keep the clicked object selected on purpose (Shift+click
 // removing another object, undo and redo, a cancelled drag, group and ungroup)
