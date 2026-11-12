@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { createProject } from '../../core/scene';
 import { useStore } from '../state';
-import { RotarySetupHost, RUIDA_ROTARY_NOTE } from './RotarySetupHost';
+import { RotarySetupHost, RUIDA_ROTARY_NOTE, USB_LINK_ROTARY_NOTE } from './RotarySetupHost';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -26,7 +26,9 @@ afterEach(async () => {
   useStore.setState({ project: originalProject });
 });
 
-async function render(controllerKind: 'ruida' | 'grbl-v1.1'): Promise<string> {
+async function render(
+  controllerKind: 'ruida' | 'grbl-v1.1' | 'lihuiyu' | 'moshi',
+): Promise<string> {
   useStore.setState({ project: createProject({ ...DEFAULT_DEVICE_PROFILE, controllerKind }) });
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -47,5 +49,14 @@ describe('Rotary Setup on a Ruida', () => {
 
   it('says nothing of the kind on a G-code controller', async () => {
     expect(await render('grbl-v1.1')).not.toContain('On a Ruida');
+    expect(document.body.textContent).not.toContain(USB_LINK_ROTARY_NOTE);
+  });
+});
+
+// ADR-703 Amendment 1 (code quality audit C2 D6-P1-2): a K40 or Moshiboard
+// sets each stroke's speed in whole mm/s, and a speed change stops the head.
+describe('Rotary Setup on a K40 or Moshiboard', () => {
+  it.each(['lihuiyu', 'moshi'] as const)('says how a %s runs the rotary', async (kind) => {
+    expect(await render(kind)).toContain(USB_LINK_ROTARY_NOTE);
   });
 });

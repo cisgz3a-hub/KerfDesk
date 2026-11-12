@@ -14,7 +14,15 @@
 
 import type { LihuiyuBoardId } from '../../devices/device-profile';
 import type { Job } from '../../job';
-import { planLhyPart, type LhyGroup, type LhyMotionPart, type LhyPoint } from './lhy-motion-plan';
+import type { ScanOffsetPoint } from '../../devices/scan-offset-profile';
+import { surfaceMatchedFeed, type RotaryFeedMatch } from '../../output/rotary-surface-feed';
+import {
+  LHY_STEPS_PER_MM,
+  planLhyPart,
+  type LhyGroup,
+  type LhyMotionPart,
+  type LhyPoint,
+} from './lhy-motion-plan';
 import { lhySpeedCode, type LihuiyuBoard } from './lhy-speed-code';
 import { LhyWriter, type LhyDirections } from './lhy-writer';
 
@@ -37,6 +45,10 @@ export type LhyEncodeOptions = {
   /** Full power for an M3 with hardware PWM, in per mille (the profile's maxPowerS). */
   readonly fullPowerPerMille: number;
   readonly start?: LhyPoint;
+  /** The machine's bidirectional scan-offset table (Fill and Image rows). */
+  readonly scanningOffsets?: ReadonlyArray<ScanOffsetPoint>;
+  /** A Y-port rotary's surface-speed match (ADR-127 Amd 2; ADR-703 Amd 1). */
+  readonly rotaryFeed?: RotaryFeedMatch;
 };
 
 export type LhyEncodeResult =
@@ -46,26 +58,31 @@ export type LhyEncodeResult =
       readonly motion: ReadonlyArray<LhyMotionPart>;
       /** Layers left out because their power is 0 %. */
       readonly zeroPowerLayers: ReadonlyArray<string>;
+      /** On a rotary: speed changes per layer, each a stop of the head. */
+      readonly rotarySpeedChanges: ReadonlyArray<{
+        readonly layerId: string;
+        readonly count: number;
+      }>;
     }
   | { readonly ok: false; readonly error: LhyEncodeError };
 
 export function encodeLhyJob(job: Job, options: LhyEncodeOptions): LhyEncodeResult {
-  const planned = planLhyJob(job);
+  const planned = planLhyJob(job, options.scanningOffsets ?? []);
   if (!planned.ok) return planned;
   if (planned.motion.length === 0) return { ok: false, error: { kind: 'empty-job' } };
   const writer = new LhyWriter(options.start ?? { x: 0, y: 0 });
   let power: number | null = null;
+  const rotarySpeedChanges: Array<{ readonly layerId: string; readonly count: number }> = [];
   for (const part of planned.motion) {
     if (options.board.pwm) {
       const perMille = pwmPerMille(part.group.power, options.fullPowerPerMille);
       if (perMille !== power) writer.pwmPower(perMille);
       power = perMille;
     }
-    writePart(
-      writer,
-      part,
-      lhySpeedCode(part.group.speed / 60, { ...options.board, suffixC: true }),
-    );
+    const speedCode = (mmPerSec: number): string =>
+      lhySpeedCode(mmPerSec, { ...options.board, suffixC: true });
+    const changes = writePart(writer, part, speedCode, options.rotaryFeed);
+    if (changes > 0) rotarySpeedChanges.push({ layerId: part.group.layerId, count: changes });
   }
   writer.leaveProgram();
   const start = options.start ?? { x: 0, y: 0 };
@@ -75,6 +92,7 @@ export function encodeLhyJob(job: Job, options: LhyEncodeOptions): LhyEncodeResu
     stream: writer.stream(),
     motion: planned.motion,
     zeroPowerLayers: planned.zeroPowerLayers,
+    rotarySpeedChanges,
   };
 }
 
@@ -86,7 +104,7 @@ type Planned =
     }
   | { readonly ok: false; readonly error: LhyEncodeError };
 
-function planLhyJob(job: Job): Planned {
+function planLhyJob(job: Job, scanningOffsets: ReadonlyArray<ScanOffsetPoint>): Planned {
   const motion: LhyMotionPart[] = [];
   const zeroPowerLayers: string[] = [];
   for (const group of job.groups) {
@@ -97,7 +115,7 @@ function planLhyJob(job: Job): Planned {
       if (!zeroPowerLayers.includes(laser.layerId)) zeroPowerLayers.push(laser.layerId);
       continue;
     }
-    const part = planLhyPart(laser, motion.length);
+    const part = planLhyPart(laser, motion.length, scanningOffsets);
     if (part !== null) motion.push(part);
   }
   return { ok: true, motion, zeroPowerLayers };
@@ -114,7 +132,19 @@ function groupRefusal(group: Job['groups'][number]): LhyEncodeError | null {
   return null;
 }
 
-function writePart(writer: LhyWriter, part: LhyMotionPart, speedCode: string): void {
+/** Writes one part's moves. On a rotary each burn runs at the whole mm/s that
+ *  moves the part's surface at the layer speed (surfaceMatchedFeed, as G-code
+ *  and Moshi match it); a new speed re-enters program mode, which stops the
+ *  head. Returns how many speed changes the rotary match made. */
+function writePart(
+  writer: LhyWriter,
+  part: LhyMotionPart,
+  speedCode: (mmPerSec: number) => string,
+  rotaryFeed: RotaryFeedMatch | undefined,
+): number {
+  const layerCode = speedCode(part.group.speed / 60);
+  let code = layerCode;
+  let changes = 0;
   part.steps.forEach((step, index) => {
     const dx = step.x - writer.x;
     const dy = step.y - writer.y;
@@ -125,9 +155,29 @@ function writePart(writer: LhyWriter, part: LhyMotionPart, speedCode: string): v
       writer.rapidMove(dx, dy);
       return;
     }
-    writer.enterProgram(speedCode, directionsFor(dx, dy));
+    if (step.burn && rotaryFeed !== undefined) {
+      const next = speedCode(matchedMmPerSec(part.group.speed, writer, step, rotaryFeed));
+      if (next !== code && writer.inProgram) changes += 1;
+      code = next;
+    }
+    writer.enterProgram(code, directionsFor(dx, dy));
     writer.programMove(dx, dy, step.burn);
   });
+  return changes;
+}
+
+function matchedMmPerSec(
+  layerMmPerMin: number,
+  from: LhyPoint,
+  to: LhyPoint,
+  match: RotaryFeedMatch,
+): number {
+  const mm = (point: LhyPoint) => ({
+    x: point.x / LHY_STEPS_PER_MM,
+    y: point.y / LHY_STEPS_PER_MM,
+  });
+  const feed = surfaceMatchedFeed(layerMmPerMin, mm(from), mm(to), match);
+  return Math.max(1, Math.round(feed / 60));
 }
 
 /** The directions declared on entering program mode: those of the first move,

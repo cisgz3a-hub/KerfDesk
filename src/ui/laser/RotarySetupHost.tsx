@@ -19,6 +19,21 @@ export const RUIDA_ROTARY_NOTE =
   "bed. Leave the controller's own rotary function off, or Y may be scaled twice. This has not been " +
   'checked on a Ruida machine yet, so run a test pattern first.';
 
+// A K40 (Lihuiyu) and a Moshiboard turn a Y-port rotary through their own
+// programs: KerfDesk splits each stroke's speed into whole mm/s for the
+// surface (ADR-703 Amendment 1, ADR-705 Amendment 1). Neither board can run a
+// rotary on A or Z.
+export const USB_LINK_ROTARY_NOTE =
+  "On a K40 or Moshiboard, KerfDesk scales Y and sets each stroke's speed for the part's surface in whole " +
+  'mm/s; a speed change stops the head briefly. Use the Y port. This has not been checked on a machine yet, so ' +
+  'run a test pattern first.';
+
+const CONTROLLER_ROTARY_NOTES: Partial<Record<string, string>> = {
+  ruida: RUIDA_ROTARY_NOTE,
+  lihuiyu: USB_LINK_ROTARY_NOTE,
+  moshi: USB_LINK_ROTARY_NOTE,
+};
+
 export function RotarySetupHost(props: { readonly onClose: () => void }): JSX.Element {
   const setup = useStore((s) => s.project.device.rotary);
   const machineFamily = useStore((s) => s.project.device.machineFamily);
@@ -72,7 +87,9 @@ export function RotarySetupHost(props: { readonly onClose: () => void }): JSX.El
       axes={rotaryAxesForController({ controllerKind: controller })}
       artwork={rotaryArtworkExtent(scene)}
       outputDescription={`${controller}${dialect === undefined ? '' : ` / ${dialect}`}`}
-      {...(controller === 'ruida' ? { controllerNote: RUIDA_ROTARY_NOTE } : {})}
+      {...(CONTROLLER_ROTARY_NOTES[controller] === undefined
+        ? {}
+        : { controllerNote: CONTROLLER_ROTARY_NOTES[controller] })}
     />
   );
 }

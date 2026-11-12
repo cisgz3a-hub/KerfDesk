@@ -291,8 +291,9 @@ Verified end-to-end against scripted firmware simulators
   the board's CH341 bridge (ADR-702) with Home, relative jog, a laser-off Frame, Start, Pause,
   Resume, Abort and the status byte; the line-based store still treats Lihuiyu as
   `transport: 'file-only'`. K40 profiles: 300×200 M2 Nano and M3 Nano with hardware PWM. The M2
-  has no software power control (the machine's knob sets power). Simulator-tested only; NOT
-  qualified on a real board.
+  has no software power control (the machine's knob sets power). Fill, Image, output scope, job
+  warnings and the Y-port rotary speed match follow the shared planners (ADR-703 Amendment 1).
+  Simulator-tested only; NOT qualified on a real board.
 - **I.9 — Moshiboard** (ADR-705): EXPERIMENTAL live link over the CH341 USB bridge (ADR-702),
   from MeerK40t's public Moshi module. Frame (a laser-off program), Start, Abort (estop) and Home
   only; frame-first Start unchanged. No file export: no public Moshi file format exists. A
