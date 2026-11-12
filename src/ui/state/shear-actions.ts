@@ -8,6 +8,8 @@ import {
   bakeCurves,
   localBakeMatrix,
   MAX_SHEAR_DEG,
+  SHEAR_FLATTENS_MESSAGE,
+  shearKeepsShape,
   worldShear,
 } from '../../core/geometry/shear-bake';
 import { combinedBBox, polylineToCurveSubpath } from '../../core/scene';
@@ -38,6 +40,10 @@ function inRange(angle: number): boolean {
 
 function shearMutation(state: AppState, ax: number, ay: number): AppState | Partial<AppState> {
   if (!inRange(ax) || !inRange(ay) || (ax === 0 && ay === 0)) return state;
+  if (!shearKeepsShape(ax, ay)) {
+    toast(SHEAR_FLATTENS_MESSAGE);
+    return state;
+  }
   const ids = new Set(selectedObjectIds(state));
   const selected = state.project.scene.objects.filter(
     (object) => ids.has(object.id) && object.locked !== true,

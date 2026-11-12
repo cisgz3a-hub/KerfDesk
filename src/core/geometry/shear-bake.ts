@@ -12,6 +12,28 @@ import { transformCurveSubpathExact, type AffineMatrix } from '../vector-export/
 /** Largest shear angle accepted, short of the degenerate 90 degrees. */
 export const MAX_SHEAR_DEG = 85;
 
+/** Smallest area factor a combined shear may leave (see `shearAreaFactor`). */
+export const MIN_SHEAR_AREA_FACTOR = 0.1;
+
+/**
+ * The area factor of the combined shear, 1 − tan(ax)·tan(ay): both slants are
+ * applied together, so at tan(ax)·tan(ay) = 1 the artwork collapses to a line
+ * and beyond it comes out mirrored and enlarged (tools audit T1, T12-P2-1;
+ * Inkscape's Skew refuses the singular case too). One slant alone gives 1.
+ */
+export function shearAreaFactor(angleXDeg: number, angleYDeg: number): number {
+  return 1 - Math.tan((angleXDeg * Math.PI) / 180) * Math.tan((angleYDeg * Math.PI) / 180);
+}
+
+/** Whether two slants together keep the artwork's shape: not flattened or mirrored. */
+export function shearKeepsShape(angleXDeg: number, angleYDeg: number): boolean {
+  return shearAreaFactor(angleXDeg, angleYDeg) >= MIN_SHEAR_AREA_FACTOR;
+}
+
+/** The message shown when two slants together would flatten or mirror the artwork. */
+export const SHEAR_FLATTENS_MESSAGE =
+  'These two angles together would flatten or mirror the artwork. Make one of them smaller, or shear one direction at a time.';
+
 export function transformAffine(t: Transform): AffineMatrix {
   const rad = (t.rotationDeg * Math.PI) / 180;
   const cos = Math.cos(rad);
