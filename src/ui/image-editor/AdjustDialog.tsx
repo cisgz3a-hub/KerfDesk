@@ -82,6 +82,9 @@ function PanelBody(props: {
         />
         Preview
       </label>
+      {dialog.previewProgress === null ? null : (
+        <PreviewProgress fraction={dialog.previewProgress} onCancel={store.cancelPreviewRender} />
+      )}
       <div style={actionsStyle}>
         <button
           type="button"
@@ -124,6 +127,37 @@ function useLivePreview(dialog: AdjustDialog): void {
     const timer = window.setTimeout(refreshAdjustPreview, PREVIEW_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [dialog.id, dialog.params, dialog.curvePoints, dialog.previewEnabled, view, viewportSize]);
+}
+
+// A neighbourhood filter rendering in the worker (ADR-245 Amendment 2): the
+// slider answers at once and this bar shows the render, with Cancel, which
+// stops it and turns Preview off. OK still applies the filter either way.
+function PreviewProgress(props: {
+  readonly fraction: number;
+  readonly onCancel: () => void;
+}): JSX.Element {
+  const percent = Math.round(props.fraction * 100);
+  return (
+    <div style={progressRowStyle}>
+      <span role="status" aria-live="polite" style={progressLabelStyle}>
+        Rendering preview… {percent}%
+      </span>
+      <progress
+        aria-label="Preview render progress"
+        value={props.fraction}
+        max={1}
+        style={{ flex: 1, minWidth: 0 }}
+      />
+      <button
+        type="button"
+        className="lf-btn"
+        onClick={props.onCancel}
+        title="Stop rendering the preview and turn Preview off"
+      >
+        Cancel preview
+      </button>
+    </div>
+  );
 }
 
 function PaperRemovalHelp(): JSX.Element {
@@ -271,6 +305,21 @@ const previewToggleStyle: React.CSSProperties = {
   gap: 6,
   fontSize: 12,
   color: 'var(--lf-text)',
+};
+
+const progressRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: 8,
+  fontSize: 12,
+  color: 'var(--lf-text)',
+};
+
+const progressLabelStyle: React.CSSProperties = {
+  width: '100%',
+  fontSize: 11,
+  color: 'var(--lf-text-muted)',
 };
 
 const actionsStyle: React.CSSProperties = {

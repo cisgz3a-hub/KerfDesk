@@ -1,7 +1,8 @@
 // Image Studio adjustment preview at display resolution (ADR-245 Amendment 1,
 // perf audit S5-P2-1): at fit view the dialog previews an averaged window,
 // Cancel restores the canvas exactly, and at 100% the preview is pixel-for-
-// pixel what OK applies.
+// pixel what OK applies. Neighbourhood filters on the photo render in a
+// worker behind a progress bar with Cancel (Amendment 2).
 
 import { toolbarCommand } from './fixtures/workspace-ui';
 import { expect, test, type Page } from '@playwright/test';
@@ -62,6 +63,72 @@ test('Image Studio previews Threshold on screen and OK applies what 100% showed'
   await expect(zoomedDialog).toHaveCount(0);
   await expect(editor.getByRole('complementary', { name: 'History panel' })).toContainText(
     'Threshold',
+  );
+  await expect.poll(async () => sameSamples(await samples(page), previewed)).toBe(true);
+});
+
+// ADR-245 Amendment 2: neighbourhood filters on a large photo render in a
+// worker. The dialog shows a progress bar with Cancel at once; Cancel stops
+// the render and turns Preview off; at 100% the finished preview is pixel-for-
+// pixel what OK applies. The worker's script is held back while the bar is
+// checked, so the render cannot finish before Cancel is pressed.
+test('Image Studio renders Halftone in a worker with a progress bar and Cancel', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await installLargePhotoPicker(page);
+  let holdWorker = true;
+  // The worker script only: its client and protocol modules load with the dialog.
+  await page.route(/adjust-filter-worker(?!-client|-protocol)/, async (route) => {
+    while (holdWorker) await new Promise((resolve) => setTimeout(resolve, 50));
+    await route.continue();
+  });
+  await page.goto('/');
+  await (await toolbarCommand(page, 'Import...')).click();
+  await page
+    .getByRole('tablist', { name: 'Edit artwork or operation' })
+    .getByRole('tab', { name: 'Artwork', exact: true })
+    .click();
+  await page.getByRole('button', { name: /^Edit Image/ }).click();
+  const editor = page.getByRole('dialog', { name: /^Image Studio/ });
+  await expect(editor).toContainText(`${PHOTO_WIDTH_PX}×${PHOTO_HEIGHT_PX}`);
+  // The import toast resizes the studio (and its canvas) when it goes.
+  await expect(
+    page.getByRole('button', { name: /^Dismiss success notification: Added image:/ }),
+  ).toHaveCount(0);
+  await expect.poll(async () => (await samples(page)).length).toBeGreaterThan(0);
+  const fit = await settledSamples(page);
+  await editor.getByRole('button', { name: '100%', exact: true }).click();
+  // Two equal reads can still be the fit view before 100% repaints.
+  await expect.poll(async () => sameSamples(await samples(page), fit)).toBe(false);
+  const unzoomed = await settledSamples(page);
+  expect(binaryShare(unzoomed)).toBeLessThan(0.5);
+
+  await page.getByRole('button', { name: 'Filter', exact: true }).click();
+  await page.getByRole('menuitem', { name: /^Halftone \(Dots\)/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Halftone (Dots)', exact: true });
+  const bar = dialog.getByRole('progressbar', { name: 'Preview render progress' });
+  await expect(bar).toBeVisible();
+  await expect(dialog.getByRole('status')).toContainText('Rendering preview');
+
+  // Cancel stops the render and turns Preview off: the canvas shows the photo.
+  await dialog.getByRole('button', { name: 'Cancel preview', exact: true }).click();
+  await expect(bar).toHaveCount(0);
+  const previewToggle = dialog.getByRole('checkbox', { name: 'Preview on canvas' });
+  await expect(previewToggle).not.toBeChecked();
+  await expect.poll(async () => sameSamples(await samples(page), unzoomed)).toBe(true);
+
+  // Preview on again: the worker renders, the bar goes, and OK applies it exactly.
+  holdWorker = false;
+  await previewToggle.check();
+  await expect.poll(async () => binaryShare(await samples(page))).toBeGreaterThan(0.9);
+  await expect(bar).toHaveCount(0);
+  const previewed = await settledSamples(page);
+  await dialog.getByRole('button', { name: 'OK', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(editor.getByRole('complementary', { name: 'History panel' })).toContainText(
+    'Halftone',
   );
   await expect.poll(async () => sameSamples(await samples(page), previewed)).toBe(true);
 });
