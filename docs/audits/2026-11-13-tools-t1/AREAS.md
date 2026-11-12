@@ -45,7 +45,7 @@ Run order puts tools that make or change burns first, then new tools, then the r
 | T04 | Calibrate | Scan Offset Test | `tools.scan-offset-test` | ledgered: P2 1 (fixed by #1848), P3 5 |
 | T05 | Calibrate | Focus Test | `tools.focus-test` | ledgered: P3 4 |
 | T06 | Fill repair | Fill Selection | `tools.fill-selection` | ledgered: P1 1 and P2 1 (fix #1850), P3 9 |
-| T07 | Fill repair | Close Open Fill Contours | `tools.close-open-fill-contours` | |
+| T07 | Fill repair | Close Open Fill Contours | `tools.close-open-fill-contours` | ledgered: P3 5 |
 | T08 | Fill repair | Close Fill Contours with Tolerance | `tools.close-fill-contours-with-tolerance` | |
 | T09 | Fill repair | Leave White Unburned | `tools.leave-white-unburned` | |
 | T10 | Fill repair | Close Paths with Tolerance | `tools.close-paths-with-tolerance` | |
