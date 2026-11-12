@@ -51,8 +51,8 @@ const ALLOWED_LICENSES = new Set([
   '(MIT AND Zlib)',
 ]);
 
-function inventory(scope) {
-  const raw = execSync(`pnpm licenses list ${scope} --json`, {
+function inventory(command) {
+  const raw = execSync(command, {
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
     // pnpm is a .cmd shim on Windows; a shell resolves it on every platform.
@@ -62,7 +62,7 @@ function inventory(scope) {
   return JSON.parse(raw);
 }
 
-const byLicense = inventory('--prod');
+const byLicense = inventory('pnpm licenses list --prod --json');
 
 let packageCount = 0;
 const violations = [];
@@ -85,7 +85,7 @@ let bundledCount = 0;
 if (path.resolve(process.cwd()) === REPO_ROOT) {
   const wanted = new Set(BUNDLED_BUILD_PACKAGES.map(({ name }) => name));
   const seen = new Set();
-  for (const [license, packages] of Object.entries(inventory('--dev'))) {
+  for (const [license, packages] of Object.entries(inventory('pnpm licenses list --dev --json'))) {
     for (const pkg of packages) {
       if (!wanted.has(pkg.name)) continue;
       seen.add(pkg.name);
