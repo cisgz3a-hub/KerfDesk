@@ -54,6 +54,23 @@ describe('parseDxf entities', () => {
     expect(object.bounds.maxX).toBeCloseTo(25.4, 9);
   });
 
+  // AutoCAD DXF Reference, $INSUNITS: 8 = microinches, 12 = nanometers,
+  // 15 = decameters (audit O2-P3-1; these used to fall back to millimetres).
+  it.each([
+    ['8', 1_000_000, 25.4],
+    ['12', 1_000_000, 1],
+    ['15', 1, 10_000],
+  ])('scales $INSUNITS %s by its defined unit', (code, length, expectedMm) => {
+    const result = parse(
+      dxf(
+        headerSection(tags([9, '$INSUNITS'], [70, code])),
+        entitiesSection(tags([0, 'LINE'], [10, '0'], [20, '0'], [11, String(length)], [21, '0'])),
+      ),
+    );
+    expect(okObject(result).bounds.maxX).toBeCloseTo(expectedMm, 6);
+    if (result.kind === 'ok') expect(result.notes.join(' ')).not.toMatch(/Unrecognized/);
+  });
+
   it('imports a CIRCLE as one closed polyline with 2r × 2r bounds', () => {
     const object = okObject(
       parse(dxf(entitiesSection(tags([0, 'CIRCLE'], [10, '50'], [20, '50'], [40, '10'])))),
