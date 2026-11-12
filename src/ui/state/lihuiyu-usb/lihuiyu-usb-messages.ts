@@ -40,5 +40,6 @@ export function lihuiyuLinkLost(reason: string, active: boolean): string {
   const job = active
     ? ' A job the board already holds may keep running without the link — stop the machine with its power switch if needed.'
     : '';
-  return `The USB link to the board closed: ${reason}.${job}`;
+  // A reason that ends its own sentence ("timed out.") gets no second stop.
+  return `The USB link to the board closed: ${reason.replace(/\.+$/, '')}.${job}`;
 }

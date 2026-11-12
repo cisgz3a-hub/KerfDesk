@@ -34,6 +34,7 @@ import type {
   LihuiyuUsbPhase,
   LihuiyuUsbState,
 } from './lihuiyu-usb-types';
+import { reportLinkMachineWork, type LinkMachineWork } from '../link-machine-work';
 
 type Live = {
   readonly link: LhyLink;
@@ -150,6 +151,9 @@ function linkClosed(set: Set, get: Get, closed: Live, reason: string): void {
   live = null;
   closed.cancel = true;
   closed.unsubscribe();
+  // Release the device, so Disconnect or another program can take it (code
+  // quality audit C2 D4-P3-1); an unplugged one rejects, which is fine.
+  void closed.close().catch(() => undefined);
   const active = ['framing', 'running', 'paused', 'stopping'].includes(get().phase);
   set({ ...DISCONNECTED, message: lihuiyuLinkLost(reason, active), tone: 'error' });
 }
@@ -380,3 +384,30 @@ export function resetLihuiyuUsbStoreForTests(): void {
   live = null;
   useLihuiyuUsbStore.setState({ ...DISCONNECTED, message: '', tone: 'info' });
 }
+
+// Active work is reported where the always-mounted guards can see it without
+// loading this store (link-machine-work.ts; ADR-705 Amendment 6). Abort sends
+// the board reset, as the panel's Abort does.
+const ACTIVE_WORK: Partial<Record<LihuiyuUsbPhase, LinkMachineWork['activity']>> = {
+  homing: 'homing',
+  jogging: 'jogging',
+  framing: 'framing',
+  running: 'running',
+  paused: 'paused',
+  stopping: 'stopping',
+};
+
+useLihuiyuUsbStore.subscribe((state) => {
+  const activity = ACTIVE_WORK[state.phase];
+  reportLinkMachineWork(
+    'lihuiyu-usb',
+    activity === undefined
+      ? null
+      : {
+          controller: 'K40',
+          activity,
+          advisories: state.advisories,
+          abort: () => useLihuiyuUsbStore.getState().abort(),
+        },
+  );
+});
