@@ -34,4 +34,4 @@ C2's rules apply:
 - security findings stay redacted until fixed;
 - fix PRs use auto-merge with the MERGE method, plus Auto-fix.
 
-**Status:** started 2026-11-12. E1 first, because its fixes have merged. E2 waits for #1823, and E3 for the open cards.
+**Status:** started 2026-11-12. E1 ledgered ([LEDGER.md](LEDGER.md)). E2 waits for #1823, and E3 for the open cards.
