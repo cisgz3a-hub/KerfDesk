@@ -6,7 +6,7 @@
 
 import type { FrameBounds } from './controller-driver';
 import { buildFramePerimeter } from '../job/frame-perimeter';
-import { assertJogHasAxis, type JogParams } from './grbl/commands';
+import { assertFiniteOptionalAxis, assertJogHasAxis, type JogParams } from './grbl/commands';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 
 const fmt = (n: number): string => n.toFixed(3);
@@ -23,6 +23,12 @@ export function buildRelativeJogCommand(params: JogParams): string {
   const absolute = params.relative === false;
   const includeAxis = (value: number | undefined): value is number =>
     typeof value === 'number' && (absolute || value !== 0);
+  // `toFixed` spells NaN as "NaN" and 1e21 as "1e+21": neither is a G-code
+  // number, so refuse them as the GRBL builder does (O8-P3-2).
+  assertFiniteOptionalAxis(params.dx, 'dx');
+  assertFiniteOptionalAxis(params.dy, 'dy');
+  assertFiniteOptionalAxis(params.dz, 'dz');
+  if (!Number.isFinite(params.feed)) throw new Error('buildJogCommand: feed must be finite.');
   assertJogHasAxis(params);
   // Marlin and Smoothieware keep a rotary on Y (ADR-695): no A word is written.
   if (params.da !== undefined) {
