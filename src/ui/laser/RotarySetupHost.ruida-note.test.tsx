@@ -41,6 +41,8 @@ describe('Rotary Setup on a Ruida', () => {
   it('says the .rd file carries the rotary and the controller rotary stays off', async () => {
     expect(await render('ruida')).toContain(RUIDA_ROTARY_NOTE);
     expect(RUIDA_ROTARY_NOTE).toContain("Leave the controller's own rotary function off");
+    // C2 verify E1-P2-2 (ADR-127 Amd 7): the .rd burns a curved stroke in pieces.
+    expect(RUIDA_ROTARY_NOTE).toContain('a curved stroke is burned in pieces');
   });
 
   it('says nothing of the kind on a G-code controller', async () => {

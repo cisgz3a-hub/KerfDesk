@@ -14,8 +14,10 @@ import { newRotarySetupFor } from './rotary-setup-edit';
 // machine, so the note says so.
 export const RUIDA_ROTARY_NOTE =
   "On a Ruida, KerfDesk writes the rotary into the .rd file itself: it scales Y and sets each stroke's " +
-  "speed for the part's surface. Leave the controller's own rotary function off, or Y may be scaled " +
-  'twice. This has not been checked on a Ruida machine yet, so run a test pattern first.';
+  "speed for the part's surface. A Ruida layer holds one speed, so a curved stroke is burned in " +
+  'pieces, a few speeds at a time, with short moves between them, and takes longer than on a flat ' +
+  "bed. Leave the controller's own rotary function off, or Y may be scaled twice. This has not been " +
+  'checked on a Ruida machine yet, so run a test pattern first.';
 
 export function RotarySetupHost(props: { readonly onClose: () => void }): JSX.Element {
   const setup = useStore((s) => s.project.device.rotary);

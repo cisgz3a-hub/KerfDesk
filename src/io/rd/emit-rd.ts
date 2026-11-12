@@ -3,6 +3,7 @@
 // the post-compile checks a G-code save runs over the moves the file commands.
 
 import { encodeRdJob, type RdEncodeError } from '../../core/controllers/ruida';
+import type { RdRotaryDose } from '../../core/controllers/ruida/rd-rotary-feed';
 import { rdFootprint, type RdFootprint } from '../../core/controllers/ruida/rd-frame-job';
 import { rdReferencePointFor } from '../../core/controllers/ruida/rd-encoder';
 import { machineSpaceJob, type JobOriginPlacement } from '../../core/job';
@@ -95,7 +96,11 @@ export function emitPreparedRdFile(
     advisories: withoutRepeats([
       ...(prepared.advisories ?? []),
       ...checks,
-      ...rotaryDoseAdvisory(encoded.rotaryDose),
+      ...rotaryDoseAdvisory(
+        encoded.rotaryDose,
+        prepared.project.scene.layers,
+        prepared.project.device.maxFeed,
+      ),
     ]),
   };
 }
@@ -142,13 +147,30 @@ function describeRdEncodeError(error: RdEncodeError): string {
   }
 }
 
-// ADR-127 Amd 5: a Ruida layer carries one speed, so a rotary layer runs as
-// several parts and the classes leave a small dose spread; say when it shows.
+// ADR-127 Amd 5 and 7: a Ruida layer carries one speed, so a rotary layer
+// runs as parts at a few surface speeds, and their rounding is named only
+// when it shows. A stroke the Max feed holds back is named as that, with the
+// speed to set (C2 verify E1-P3-2), never put down to the classes.
 function rotaryDoseAdvisory(
-  dose: { readonly minDose: number; readonly maxDose: number } | undefined,
+  dose: RdRotaryDose | undefined,
+  layers: Project['scene']['layers'],
+  maxFeed: number,
 ): ReadonlyArray<PreflightIssue> {
-  if (dose === undefined || (dose.minDose >= 0.95 && dose.maxDose <= 1.05)) return [];
+  if (dose === undefined) return [];
+  const held = dose.held.map((entry) => {
+    const name = layers.find((layer) => layer.id === entry.layerId)?.name ?? entry.layerId;
+    return {
+      code: 'rotary-rd-speed-classes' as const,
+      message:
+        `Layer ${name}: on this rotary its strokes round the part need more feed than the Max ` +
+        `feed (${maxFeed} mm/min), so they are held there and burn up to ` +
+        `${Math.round(entry.rise * 100)} % of the energy you set. For an even burn, set this ` +
+        `layer to ${Math.floor(entry.speed / entry.rise)} mm/min or less.`,
+    };
+  });
+  if (dose.minDose >= 0.95 && dose.maxDose <= 1.05) return held;
   return [
+    ...held,
     {
       code: 'rotary-rd-speed-classes',
       message:

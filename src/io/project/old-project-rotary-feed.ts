@@ -22,6 +22,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { compilationPolylines } from '../../core/job/compilation-polylines';
 import { fillHatchPassRuns } from '../../core/job/scan-pass-angles';
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
 import { maxOf, minOf } from '../../core/util';
@@ -83,8 +84,8 @@ function doseRatio(angle: number, yScale: number, speed: number, maxFeed: number
  *  hatch of each pass, as the compiler runs them (fillHatchPassRuns), and for
  *  a cross-hatch also at that angle plus 90° (fill-hatching-cache.ts); code
  *  quality audit C2 D6 (ADR-127 Amd 6). An offset Fill and a Line follow the
- *  outline, read from an imported outline's own edges and assumed to run round
- *  the part for any other object. */
+ *  outline, read from the object's own paths and assumed to run round the
+ *  part only when it has none (ADR-127 Amd 7). */
 function strokeAngles(operation: Layer, object: SceneObject): number[] {
   if (operation.mode === 'fill' && operation.fillStyle !== 'offset') {
     return fillHatchPassRuns(operation).flatMap((run) => {
@@ -95,11 +96,15 @@ function strokeAngles(operation: Layer, object: SceneObject): number[] {
   return outlineAngles(object);
 }
 
+// Code quality audit C2 verify E1-P2-3 (ADR-127 Amd 7): every object kind that
+// carries paths (outline, shape, pen line, text, trace) is read from its own
+// paths, flattened as the compiler flattens them; only an object with no paths
+// is assumed to run round the part.
 function outlineAngles(object: SceneObject): number[] {
-  if (object.kind !== 'imported-svg') return [ROUND_THE_PART];
+  if (!('paths' in object)) return [ROUND_THE_PART];
   const angles: number[] = [];
   for (const path of object.paths) {
-    for (const polyline of path.polylines) {
+    for (const polyline of compilationPolylines(path, object.transform)) {
       const points = polyline.points.map((point) => applyTransform(point, object.transform));
       for (let i = 1; i < points.length; i += 1) {
         const from = points[i - 1];
@@ -111,7 +116,7 @@ function outlineAngles(object: SceneObject): number[] {
       }
     }
   }
-  return angles;
+  return angles.length > 0 ? angles : [ROUND_THE_PART];
 }
 
 /** The words for the load notice and Job Review. */

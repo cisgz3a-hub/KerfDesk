@@ -20,6 +20,7 @@ import { finishOptionsForJob } from '../../core/output/output-strategy';
 import { machineKindOf, type Vec2 } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
 import { selectExecutablePlanCalculatedBounds } from './executable-plan-calculated-bounds';
+import { withRuidaRotaryRoute } from './ruida-rotary-estimate';
 
 type SuccessfulPreparedOutput = Extract<PreparedOutput, { readonly ok: true }>;
 
@@ -58,13 +59,18 @@ export function buildPreparedJobMetrics(
   // when no rotary is active, so flat jobs are unchanged.
   // ADR-416 Decision 4: a CNC job is timed at CNC's own Max feed, as the Start
   // countdown times it, never at the laser's. Bounds and park read no feed.
+  const timedDevice = deviceForActiveHead(device, prepared.project.machine);
   const duration: JobDurationEstimate =
     timingOptions.unavailableReason === undefined
-      ? estimateJobDuration(framedJob, deviceForActiveHead(device, prepared.project.machine), {
-          ...(initialPosition === undefined ? {} : { initialPosition }),
-          ...(finishPosition === undefined ? {} : { finishPosition }),
-          ...timingOptions,
-        })
+      ? estimateJobDuration(
+          framedJob,
+          timedDevice,
+          withRuidaRotaryRoute(framedJob, timedDevice, {
+            ...(initialPosition === undefined ? {} : { initialPosition }),
+            ...(finishPosition === undefined ? {} : { finishPosition }),
+            ...timingOptions,
+          }),
+        )
       : {
           totalSeconds: 0,
           breakdown: { cutSeconds: 0, travelSeconds: 0 },
