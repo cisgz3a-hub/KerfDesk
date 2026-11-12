@@ -24,7 +24,8 @@ invents.
   - KerfDesk scales only Z by 25.4. A is read as degrees.
   - So with report-inches on, Start from line after an Abort sends `G53 G0 A<start>` with a turn
     25.4 times too small. The re-entry burns round the part, away from the half-burned piece.
-  - This is **O12-P1-1**. The fix is in its own PR.
+  - This is **O12-P1-1**. The fix is
+    [#1810](https://github.com/cisgz3a-hub/KerfDesk/pull/1810).
 - **The two contradictions are both P3.**
   - The "FluidNC's axis rate is not read" note in v14 and ADR-695 Amendment 1 is wrong in the safe
     direction. FluidNC's `$$` lists `$103` and `$113` as proxies of its YAML, and KerfDesk reads
@@ -265,7 +266,7 @@ None of the four rounds' findings is refuted by an outside source.
 
 | Finding | PR | State |
 |---|---|---|
-| O12-P1-1 | see the PR description of this report's PR; branch `claude/o12-p1-1-grblhal-inch-a` | opened with auto-merge **off** (1.0.32 release freeze) |
+| O12-P1-1 | [#1810](https://github.com/cisgz3a-hub/KerfDesk/pull/1810), branch `claude/o12-p1-1-grblhal-inch-a`, ADR-695 Amendment 4. The regression test fails 2 of 4 before the fix | opened with auto-merge **off** (1.0.32 release freeze) |
 
 ## JSON
 
@@ -275,7 +276,7 @@ None of the four rounds' findings is refuted by an outside source.
   "tree": "420c5f547",
   "claims": 39, "verified": 33, "contradicted": 2, "unsourced": 4,
   "findings": [
-    {"id": "O12-P1-1", "severity": "P1", "kind": "wrong clean claim", "corrects": "v14 Z2 not verified ($13=1 with A)", "file": "src/ui/laser/abort-rotary-turn.ts", "line": 57, "oracle": "grblHAL core report.c L104-110", "fix": "claude/o12-p1-1-grblhal-inch-a"},
+    {"id": "O12-P1-1", "severity": "P1", "kind": "wrong clean claim", "corrects": "v14 Z2 not verified ($13=1 with A)", "file": "src/ui/laser/abort-rotary-turn.ts", "line": 57, "oracle": "grblHAL core report.c L104-110", "fix": "#1810"},
     {"id": "O12-P3-1", "severity": "P3", "kind": "contradiction", "corrects": "v14 Z2/Z4, ADR-695 Amd 1 D5 (FluidNC rate not read)", "oracle": "FluidNC SettingsDefinitions.cpp make_proxies + REPRO"},
     {"id": "O12-P3-2", "severity": "P3", "kind": "wrong scope", "corrects": "A2 LEDGER top-three item 3 (FluidNC unverified)", "oracle": "FluidNC INT_PROXY 30/32"},
     {"id": "O12-P3-3", "severity": "P3", "kind": "bad citation", "corrects": "C2 D2 not verified (Marlin M8)", "oracle": "Marlin M7-M9.cpp L25,L40"}
