@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { AnchoredPopover } from '../common/AnchoredPopover';
+import { MACHINE_DETAILS_OPENER } from '../commands/reveal-control';
 import { Icon } from '../kit/icons';
 
 type Props = {
@@ -48,6 +49,7 @@ export function CompactConnectionControls(props: Props): JSX.Element {
           type="button"
           className="lf-btn lf-connection-machine-trigger"
           aria-label={`Machine details: ${props.machineName}`}
+          data-search-opener={MACHINE_DETAILS_OPENER}
           aria-describedby={statusId}
           aria-haspopup="dialog"
           aria-expanded={open}

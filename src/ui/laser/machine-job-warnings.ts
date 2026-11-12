@@ -2,7 +2,9 @@
 // the Save G-code and Start job paths: CNC projects get stock-footprint
 // advisories (H.2) plus dropped-raster advisories (ADR-101 §4); laser
 // projects get dropped-relief plus job-intent warnings. Keeps the machine-kind
-// branch in ONE place so both call sites stay simple.
+// branch in ONE place so both call sites stay simple. The .rd and .egv saves
+// and the Ruida, K40 and Moshiboard link jobs call it too (rd-job-warnings.ts,
+// egv-job-warnings.ts, moshi-usb-job.ts; ADR-703 Amendment 1).
 
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
 import { marlinPowerScaleWarning } from '../../core/devices/marlin-power-scale';

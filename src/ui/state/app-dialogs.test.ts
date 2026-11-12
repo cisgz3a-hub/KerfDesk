@@ -6,6 +6,7 @@ import { appAlert, appConfirm, appPrompt } from './app-dialogs';
 import { dontAskAgainIsSet, forgetDontAskAgain, rememberDontAskAgain } from './dont-ask-again';
 import type { LaserState } from './laser-store';
 import { useLaserStore } from './laser-store';
+import { reportLinkMachineWork, resetLinkMachineWorkForTests } from './link-machine-work';
 import { useToastStore } from './toast-store';
 
 function patchStreamer(streamer: LaserState['streamer']): void {
@@ -24,6 +25,7 @@ const question = { title: 'Delete preset?', message: 'Delete "Birch"?', confirmL
 
 afterEach(() => {
   patchStreamer(null);
+  resetLinkMachineWorkForTests();
   clearAppDialogs();
   forgetDontAskAgain();
   for (const toast of useToastStore.getState().toasts) {
@@ -121,6 +123,23 @@ describe('in-app dialogs while a job is running', () => {
       'Stop the job before opening another project.',
       'Stop the job before renaming the project.',
     ]);
+  });
+
+  // A K40, Moshiboard or Ruida link job is a job too (C2 D6-P3-4).
+  it('fails closed during a link job as during a laser stream', async () => {
+    reportLinkMachineWork('moshi-usb', {
+      controller: 'Moshiboard',
+      activity: 'running',
+      advisories: [],
+      abort: () => Promise.resolve(),
+    });
+    const responder = answerAppDialogs(() => true);
+    await expect(appConfirm({ ...question, refuseDuringJob: 'Stop the job first.' })).resolves.toBe(
+      false,
+    );
+    responder.stop();
+    expect(responder.asked).toEqual([]);
+    expect(toastMessages()).toEqual(['Stop the job first.']);
   });
 
   it('refuses a yes given after a job began while the question was open', async () => {

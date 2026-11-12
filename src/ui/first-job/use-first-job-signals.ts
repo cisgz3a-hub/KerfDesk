@@ -1,6 +1,8 @@
 // Reads the guided first job's signals from real state (ADR-698): the
 // controller connection, the saved Machine Setup marks, the scene, the material
 // library, the same Frame evidence Start uses, and the streamer. Read-only.
+// A Moshi, K40 or Ruida link counts as the laser: its connection, its
+// completed Frame and its running job (code quality audit C2 D6-P2-3).
 
 import { useEffect, useState } from 'react';
 import { machineKindOf, sceneObjectUsesOperation, type Project } from '../../core/scene';
@@ -16,6 +18,12 @@ import {
   loadConfiguredSignatures,
 } from '../state/device-setup-configured-persistence';
 import { useLaserStore } from '../state/laser-store';
+import {
+  activeLinkMachineWork,
+  anyLinkConnected,
+  anyLinkFramed,
+  useLinkMachineWorkStore,
+} from '../state/link-machine-work';
 import { recipeMatchesLayer } from '../state/material-library-actions';
 import type { FirstJobSignals } from './first-job-steps';
 import { useFirstJobGuideStore } from './first-job-guide-store';
@@ -23,7 +31,9 @@ import { useFirstJobGuideStore } from './first-job-guide-store';
 const JOB_RUNNING: ReadonlySet<string> = new Set(['streaming', 'paused', 'tool-change']);
 
 export function useFirstJobSignals(): FirstJobSignals {
-  const connected = useLaserStore((s) => s.connection.kind === 'connected');
+  const laserConnected = useLaserStore((s) => s.connection.kind === 'connected');
+  const linkConnected = useLinkMachineWorkStore(anyLinkConnected);
+  const linkFramed = useLinkMachineWorkStore(anyLinkFramed);
   const project = useStore((s) => s.project);
   const library = useStore((s) => s.materialLibrary);
   const app = useExecutionSignatureAppState();
@@ -38,14 +48,24 @@ export function useFirstJobSignals(): FirstJobSignals {
       if (JOB_RUNNING.has(state.streamer?.status ?? 'idle')) markJobStarted();
     };
     check(useLaserStore.getState());
-    return useLaserStore.subscribe(check);
+    const checkLink = (): void => {
+      if (activeLinkMachineWork()?.activity === 'running') markJobStarted();
+    };
+    checkLink();
+    const stopLaser = useLaserStore.subscribe(check);
+    const stopLink = useLinkMachineWorkStore.subscribe(checkLink);
+    return () => {
+      stopLaser();
+      stopLink();
+    };
   }, [markJobStarted]);
   return {
-    connected,
+    connected: laserConnected || linkConnected,
     machineConfigured: useMachineConfigured(project),
     hasArtwork: project.scene.objects.length > 0,
     materialChosen: materialChosen(project, library),
-    framedReady: framedRunReadinessIssue(currentCompletedFrame(laser), app, laser) === null,
+    framedReady:
+      linkFramed || framedRunReadinessIssue(currentCompletedFrame(laser), app, laser) === null,
     jobStarted: jobStarted || running,
   };
 }

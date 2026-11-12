@@ -33,6 +33,7 @@ export default function MoshiUsbDetails({
         <button
           type="button"
           title="Choose the Moshiboard's USB device and read its status."
+          data-search-target="connect"
           disabled={!disconnected}
           onClick={() => void moshi.connect(open)}
         >

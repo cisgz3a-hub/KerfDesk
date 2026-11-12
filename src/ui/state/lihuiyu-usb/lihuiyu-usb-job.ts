@@ -1,14 +1,14 @@
 // Compiles the project into the job the Lihuiyu USB link sends (ADR-703): the
-// same stream Save .egv writes (emitPreparedEgvFile, preview = save) and the
+// same stream Save .egv writes (emitPreparedEgvWithJobWarnings, preview = save) and the
 // footprint the Frame traces and Start checks. An Absolute job starts from the
 // head's known position (machine coordinates from Home); an origin-relative
 // job starts from its own zero, wherever the head stands.
 
 import { lhyBoardSetting } from '../../../core/controllers/lihuiyu/lhy-encoder';
 import type { LhyPoint } from '../../../core/controllers/lihuiyu/lhy-motion-plan';
-import type { JobPlacementSettings } from '../../../core/job';
-import type { Project } from '../../../core/scene';
-import { egvPreparationOptions, emitPreparedEgvFile, type EmitEgvOptions } from '../../../io/egv';
+import { egvPreparationOptions, type EmitEgvOptions } from '../../../io/egv';
+import { emitPreparedEgvWithJobWarnings } from '../../laser/egv-job-warnings';
+import type { LinkJobRequest } from '../link-job-request';
 import { prepareOutput } from '../../../io/gcode';
 import { withTextGlyphCheck } from '../../../io/gcode/prepare-output-snapshot';
 import { resolveExportJobPlacement } from '../../job-placement';
@@ -23,11 +23,15 @@ export type LihuiyuUsbJobResult =
   | { readonly ok: true; readonly job: LihuiyuUsbJob }
   | { readonly ok: false; readonly messages: ReadonlyArray<string> };
 
+/** The K40 USB job, built from the shared link-job request: the placement, the
+ *  canvas output scope and the variable advance (ADR-703 Amendment 1, code
+ *  quality audit C2 D6-P1-1 and D6-P2-1), as the Moshi and Ruida jobs are.
+ *  `head` is where the head stands after Home, for an Absolute job. */
 export async function prepareLihuiyuUsbJob(
-  project: Project,
-  placement: JobPlacementSettings,
+  request: LinkJobRequest,
   head: LhyPoint | null,
 ): Promise<LihuiyuUsbJobResult> {
+  const { project, placement, outputScope } = request;
   if (placement.startFrom === 'current-position')
     return { ok: false, messages: [LIHUIYU_CURRENT_POSITION_UNSUPPORTED] };
   const absolute = placement.startFrom === 'absolute';
@@ -42,9 +46,10 @@ export async function prepareLihuiyuUsbJob(
       ? {}
       : { preflightMotionOffset: resolved.preflightMotionOffset }),
     ...(absolute && head !== null ? { start: head } : {}),
+    outputScope,
   };
   const prepared = prepareOutput(project, egvPreparationOptions(options));
-  const result = emitPreparedEgvFile(
+  const result = emitPreparedEgvWithJobWarnings(
     await withTextGlyphCheck(prepared, project, outputTextRenderer),
     options,
   );
@@ -57,7 +62,8 @@ export async function prepareLihuiyuUsbJob(
       absolute,
       board: lhyBoardSetting(project.device.lihuiyuBoard),
       framingMmPerMin: project.device.framingFeedMmPerMin,
-      advisories: result.advisories.map((issue) => issue.message),
+      advisories: [...result.advisories.map((issue) => issue.message), ...result.jobWarnings],
+      completed: request.completed,
     },
   };
 }
