@@ -18,7 +18,8 @@ import { LIVE_MOTION_INSET_PROPERTY } from './use-live-motion-inset';
 const ACTIVITY_TEXT: Readonly<Record<LinkMachineWork['activity'], string>> = {
   framing: 'is tracing the Frame (laser off)',
   running: 'is running the job',
-  homing: 'is moving to its 0,0',
+  homing: 'is homing',
+  jogging: 'is jogging the head',
   paused: 'holds the job paused',
   stopping: 'is being stopped',
 };
