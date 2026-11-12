@@ -89,6 +89,14 @@ export function formatVec3(v: SimVec3): string {
   return `${v.x.toFixed(3)},${v.y.toFixed(3)},${v.z.toFixed(3)}`;
 }
 
+/** `$13=1` reports positions in inches, four decimals (gnea/grbl 1.1h
+ * report.c report_util_axis_values, N_DECIMAL_COORDVALUE_INCH): status
+ * reports and the `$#` offsets alike. */
+export function formatReportedVec3(settings: ReadonlyMap<number, string>, v: SimVec3): string {
+  if (settings.get(13) !== '1') return formatVec3(v);
+  return [v.x, v.y, v.z].map((mm) => (mm / 25.4).toFixed(4)).join(',');
+}
+
 /** First G-word on the line (e.g. 0 for G0, 92.1 for G92.1), or null. */
 export function leadingGWord(body: string): number | null {
   const match = /(?:^|\s)[Gg](\d+(?:\.\d+)?)/.exec(body);

@@ -181,4 +181,41 @@ describe('Job Review with a clock-bound variable field', () => {
     expect(confirmed).not.toBeNull();
     expect(confirmed?.bundle.prepared.gcode).toBe(prepared.gcode);
   });
+
+  // Code quality audit C2, D3 mutant J03: Confirm never reuses the displayed
+  // compile of a time-bound job, even when no input changed; it recompiles.
+  it('recompiles a time-bound job at Confirm instead of reusing the shown compile', async () => {
+    useStore.setState({ project: await timeTagProject('{{date}}') });
+    const app = useStore.getState();
+    const laser = useLaserStore.getState();
+    const prepared = await prepareCurrentStartJob(
+      app,
+      laser,
+      useCameraStore.getState(),
+      undefined,
+      false,
+    );
+    if (!prepared.ok) throw new Error(prepared.messages.join(' / '));
+    const capture = captureJobReviewModels();
+    const review = runJobReviewGate({
+      initial: {
+        app,
+        project: app.project,
+        laser,
+        prepared,
+        laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
+      },
+      completedReceipt: null,
+      purpose: 'frame',
+    });
+    await vi.waitFor(() => expect(capture.models).toHaveLength(1), { timeout: 20_000 });
+
+    useJobReviewStore.getState().confirm();
+    const confirmed = await review;
+    capture.stop();
+
+    expect(confirmed).not.toBeNull();
+    expect(confirmed?.bundle.prepared).not.toBe(prepared);
+    expect(confirmed?.bundle.prepared.gcode).toBe(prepared.gcode);
+  });
 });
