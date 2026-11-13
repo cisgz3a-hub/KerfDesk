@@ -1,0 +1,42 @@
+// T23d: hatch rows of the traced plate vs its pixel edges (identity placement).
+import { describe, it, vi } from 'vitest';
+import type { RawImageData } from '../t22-main/src/core/trace';
+import { IDENTITY_TRANSFORM } from '../t22-main/src/core/scene';
+import { useStore } from '../t22-main/src/ui/state';
+import { logger } from './t23-common';
+import { runTrace, seedRaster, setupProject } from './t23-fixture';
+import { burnOfTrace } from './t23-measure';
+
+vi.mock('../t22-main/src/ui/trace/off-thread-trace-decode', async () => {
+  const mask = await import('../t22-main/src/ui/trace/trace-source-mask');
+  const transp = await import('../t22-main/src/ui/trace/raw-image-transparency');
+  return {
+    decodeTraceSourceImage: async (file: File) => {
+      const image = mask.maskTraceSourcePixels(file, (globalThis as { __T23_PIXELS?: RawImageData }).__T23_PIXELS!);
+      return { image, hasTransparency: transp.rawImageHasTransparency(image) };
+    },
+  };
+});
+const log = logger('C:/Users/stolk/kd-t1/zz-t23/t23d.log');
+describe('T23d', () => {
+  it('plate hatch rows', async () => {
+    const seed = seedRaster({ transform: { ...IDENTITY_TRANSFORM, x: 60, y: 80 } });
+    setupProject([seed]);
+    await runTrace(seed, 'Line Art');
+    const p = useStore.getState().project;
+    const t = p.scene.objects.find((o) => o.kind === 'traced-image')!;
+    const b = burnOfTrace(p, t.id);
+    // plate: px x 240..350, y 30..130 -> world x 84..95, y 83..93 ; hole x 87..92, y 86..90
+    const rows = b.segs.filter((s) => Math.abs(s.a.y - s.b.y) < 1e-6 && s.a.y > 82.5 && s.a.y < 93.5 && Math.min(s.a.x, s.b.x) > 83.5 && Math.max(s.a.x, s.b.x) < 95.5);
+    const ys = [...new Set(rows.map((s) => s.a.y.toFixed(3)))].sort();
+    log(`plate rows ${ys.length}: first ${ys.slice(0, 4).join(',')} last ${ys.slice(-4).join(',')}`);
+    for (const y of [ys[0], ys[1], ys[30], ys[ys.length - 1]]) {
+      const r = rows.filter((s) => s.a.y.toFixed(3) === y).map((s) => `${Math.min(s.a.x, s.b.x).toFixed(3)}-${Math.max(s.a.x, s.b.x).toFixed(3)}`);
+      log(`y ${y}: ${r.join(' ')}`);
+    }
+    const head = b.gcode.split('\n').filter((l) => !l.startsWith(';')).slice(0, 40).join(' | ');
+    log(`gcode head: ${head}`);
+    const l = p.scene.layers.find((x) => (x as { mode?: string }).mode === 'fill') as unknown as Record<string, unknown>;
+    log(`fill op: ${JSON.stringify(l).slice(0, 1500)}`);
+  });
+});

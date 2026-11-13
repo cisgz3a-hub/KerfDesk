@@ -1,0 +1,90 @@
+// T23b: every preset on a rotated, non-uniformly scaled source: operation mode, placement and features.
+import { describe, it, vi } from 'vitest';
+import type { RawImageData } from '../t22-main/src/core/trace';
+import { IDENTITY_TRANSFORM } from '../t22-main/src/core/scene';
+import { compilationPolylines } from '../t22-main/src/core/job/compilation-polylines';
+import { useStore } from '../t22-main/src/ui/state';
+import { logger, xf, type P } from './t23-common';
+import { imageWorldBox, isDarkPx, runTrace, seedRaster, setupProject, tracedWorldPaths, worldToPx, W, H } from './t23-fixture';
+import { burnOfTrace, burnRegion, compareRegion, vectorRegion } from './t23-measure';
+
+vi.mock('../t22-main/src/ui/trace/off-thread-trace-decode', async () => {
+  const mask = await import('../t22-main/src/ui/trace/trace-source-mask');
+  const transp = await import('../t22-main/src/ui/trace/raw-image-transparency');
+  return {
+    decodeTraceSourceImage: async (file: File) => {
+      const image = mask.maskTraceSourcePixels(file, (globalThis as { __T23_PIXELS?: RawImageData }).__T23_PIXELS!);
+      return { image, hasTransparency: transp.rawImageHasTransparency(image) };
+    },
+  };
+});
+
+const log = logger('C:/Users/stolk/kd-t1/zz-t23/t23b.log');
+const presets = (process.env.T23_PRESETS ?? 'Smooth,Sharp,Centerline,Line + fill,Edge Detection,Colour layers').split(',');
+
+/** px distance from a fractional pixel point to the nearest dark pixel (0 inside ink). */
+function distToInk(q: P, R = 6): number {
+  const cx = Math.floor(q.x), cy = Math.floor(q.y);
+  let best = R + 1;
+  for (let y = cy - R; y <= cy + R; y++)
+    for (let x = cx - R; x <= cx + R; x++) {
+      if (x < 0 || y < 0 || x >= W || y >= H || !isDarkPx(x, y)) continue;
+      const dx = Math.max(x - q.x, 0, q.x - (x + 1)), dy = Math.max(y - q.y, 0, q.y - (y + 1));
+      best = Math.min(best, Math.hypot(dx, dy));
+    }
+  return best;
+}
+function distToPaper(q: P, R = 6): number {
+  const cx = Math.floor(q.x), cy = Math.floor(q.y);
+  let best = R + 1;
+  for (let y = cy - R; y <= cy + R; y++)
+    for (let x = cx - R; x <= cx + R; x++) {
+      if (x >= 0 && y >= 0 && x < W && y < H && isDarkPx(x, y)) continue;
+      const dx = Math.max(x - q.x, 0, q.x - (x + 1)), dy = Math.max(y - q.y, 0, q.y - (y + 1));
+      best = Math.min(best, Math.hypot(dx, dy));
+    }
+  return best;
+}
+
+describe('T23b presets', () => {
+  for (const preset of presets)
+    it(preset, async () => {
+      const seed = seedRaster({ transform: { ...IDENTITY_TRANSFORM, x: 150, y: 150, scaleX: 2, scaleY: 0.5, rotationDeg: 45 } });
+      setupProject([seed]);
+      const t0 = Date.now();
+      const out = await runTrace(seed, preset);
+      const st = useStore.getState();
+      const traced = st.project.scene.objects.find((o) => o.kind === 'traced-image');
+      log(`\n=== ${preset} (${Date.now() - t0} ms)`);
+      log(`toasts: ${JSON.stringify(out.toasts)}`);
+      if (!traced) { log('NO TRACED OBJECT'); return; }
+      const t = traced as unknown as { traceMode?: string; operationOverride?: unknown; paths: { color: string; fillRule?: string; operationIds?: string[]; polylines: { closed: boolean }[] }[] };
+      log(`traceMode ${t.traceMode}; override ${JSON.stringify(t.operationOverride)}; paths ${t.paths.map((p) => `${p.color} rule=${p.fillRule ?? '-'} n=${p.polylines.length} open=${p.polylines.filter((q) => !q.closed).length}`).join(' ; ')}`);
+      log(`ops: ${st.project.scene.layers.filter((l) => l.id !== 'img-op').map((l) => { const L = l as unknown as Record<string, unknown>; return `${L.name}/${L.color}/${L.mode}/P${L.power}/out=${L.output}`; }).join(', ')}`);
+      // Vertex placement: every flattened vertex mapped back to the source pixels.
+      let n = 0, far = 0, maxD = 0;
+      const o = traced as unknown as { transform: typeof IDENTITY_TRANSFORM; paths: unknown[] };
+      for (const path of o.paths)
+        for (const pl of compilationPolylines(path as never, o.transform))
+          for (const v of pl.points) {
+            const q = worldToPx(xf(v, o.transform), seed);
+            // filled outlines sit on the ink/paper border; centerlines inside ink
+            const d = t.traceMode === 'centerline' || (t.traceMode === 'hybrid' && !pl.closed) ? distToInk(q) : Math.min(Math.max(distToInk(q), distToPaper(q)), 99);
+            n++;
+            if (d > maxD) maxD = d;
+            if (d > 1.5) far++;
+          }
+      log(`vertices ${n}; off ink/border >1.5 px: ${far}; max ${maxD.toFixed(2)} px`);
+      const filled = t.traceMode === 'filled-contours' || t.traceMode === undefined;
+      if (filled) {
+        const vec = compareRegion(seed, vectorRegion(tracedWorldPaths(traced)), 0.03);
+        log(`VECTOR: ${JSON.stringify(vec)}`);
+      }
+      const b = burnOfTrace(st.project, traced.id);
+      log(`gcode ${b.gcode.startsWith('NOT OK') ? b.gcode.slice(0, 300) : `${b.gcode.length} bytes, lit segs ${b.segs.length}`}`);
+      if (filled && b.segs.length > 0) {
+        const br = compareRegion(seed, burnRegion(b.segs, 0.1, imageWorldBox(seed, 1), 0.02), 0.03, undefined, 3.5);
+        log(`BURN: ${JSON.stringify(br)}`);
+      }
+    });
+});

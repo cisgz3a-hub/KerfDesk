@@ -1,0 +1,49 @@
+// T23e: source grid larger than the decoded working grid (decode cap), and a Boundary crop, on a rotated image.
+import { describe, it, vi } from 'vitest';
+import type { RawImageData } from '../t22-main/src/core/trace';
+import { IDENTITY_TRANSFORM } from '../t22-main/src/core/scene';
+import { useStore } from '../t22-main/src/ui/state';
+import { logger } from './t23-common';
+import { imageWorldBox, runTrace, seedRaster, setupProject, tracedWorldPaths, W, H } from './t23-fixture';
+import { burnOfTrace, burnRegion, compareRegion, vectorRegion } from './t23-measure';
+
+vi.mock('../t22-main/src/ui/trace/off-thread-trace-decode', async () => {
+  const mask = await import('../t22-main/src/ui/trace/trace-source-mask');
+  const transp = await import('../t22-main/src/ui/trace/raw-image-transparency');
+  return {
+    decodeTraceSourceImage: async (file: File, maxEdge?: number) => {
+      (globalThis as { __T23_EDGES?: unknown[] }).__T23_EDGES?.push(maxEdge);
+      const image = mask.maskTraceSourcePixels(file, (globalThis as { __T23_PIXELS?: RawImageData }).__T23_PIXELS!);
+      return { image, hasTransparency: transp.rawImageHasTransparency(image) };
+    },
+  };
+});
+
+const log = logger('C:/Users/stolk/kd-t1/zz-t23/t23e.log');
+const SW = 1000, SH = 750; // stored source grid; the decode returns 400 x 300 (as a capped decode would)
+
+describe('T23e', () => {
+  for (const withBoundary of [false, true])
+    it(`grid ${SW}x${SH} -> ${W}x${H}${withBoundary ? ' + boundary crop' : ''}`, async () => {
+      (globalThis as { __T23_EDGES?: unknown[] }).__T23_EDGES = [];
+      const seed = seedRaster({ pixelWidth: SW, pixelHeight: SH, transform: { ...IDENTITY_TRANSFORM, x: 150, y: 120, rotationDeg: 30, mirrorX: true, scaleX: 1.3, scaleY: 0.8 } });
+      setupProject([seed]);
+      // boundary in the source grid: x 200..580, y 150..450  -> working grid x 80..232, y 60..180
+      const boundary = withBoundary ? { x: 200, y: 150, width: 380, height: 300 } : undefined;
+      const out = await runTrace(seed, 'Line Art', { header: [SW, SH], ...(boundary ? { boundary } : {}) });
+      const st = useStore.getState();
+      const traced = st.project.scene.objects.find((o) => o.kind === 'traced-image')!;
+      log(`\n=== boundary=${withBoundary} toasts ${JSON.stringify(out.toasts)} decode maxEdges ${JSON.stringify((globalThis as { __T23_EDGES?: unknown[] }).__T23_EDGES)}`);
+      log(`grid ${(traced as { tracePixelWidth?: number }).tracePixelWidth}x${(traced as { tracePixelHeight?: number }).tracePixelHeight} transform ${JSON.stringify(traced.transform)}`);
+      // Oracle in the stored grid: seed bounds span SW x SH, the image content is the same picture.
+      const oracleSeed = { ...seed, pixelWidth: W, pixelHeight: H };
+      const keep = boundary
+        ? (fx: number, fy: number) => fx >= 80 && fx < 232 && fy >= 60 && fy < 180
+        : undefined;
+      const vec = compareRegion(oracleSeed, vectorRegion(tracedWorldPaths(traced)), 0.03, keep);
+      log(`VECTOR: ${JSON.stringify(vec)}`);
+      const b = burnOfTrace(st.project, traced.id);
+      const br = compareRegion(oracleSeed, burnRegion(b.segs, 0.1, imageWorldBox(oracleSeed, 1), 0.02), 0.03, keep, 3.5);
+      log(`BURN: ${JSON.stringify(br)}`);
+    });
+});

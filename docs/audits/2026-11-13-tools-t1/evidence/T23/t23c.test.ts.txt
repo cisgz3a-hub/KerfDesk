@@ -1,0 +1,79 @@
+// T23c: save/reopen of a committed trace, cancellation mid-trace, and the commit with a moved source.
+import { describe, it, vi } from 'vitest';
+import type { RawImageData } from '../t22-main/src/core/trace';
+import { IDENTITY_TRANSFORM } from '../t22-main/src/core/scene';
+import { useStore } from '../t22-main/src/ui/state';
+import { serializeProject } from '../t22-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t22-main/src/io/project/deserialize-project';
+import { logger } from './t23-common';
+import { runTrace, seedRaster, setupProject } from './t23-fixture';
+import { burnOfTrace } from './t23-measure';
+
+vi.mock('../t22-main/src/ui/trace/off-thread-trace-decode', async () => {
+  const mask = await import('../t22-main/src/ui/trace/trace-source-mask');
+  const transp = await import('../t22-main/src/ui/trace/raw-image-transparency');
+  return {
+    decodeTraceSourceImage: async (file: File) => {
+      const image = mask.maskTraceSourcePixels(file, (globalThis as { __T23_PIXELS?: RawImageData }).__T23_PIXELS!);
+      return { image, hasTransparency: transp.rawImageHasTransparency(image) };
+    },
+  };
+});
+
+const log = logger('C:/Users/stolk/kd-t1/zz-t23/t23c.log');
+const T = (o: Partial<typeof IDENTITY_TRANSFORM>) => ({ ...IDENTITY_TRANSFORM, ...o });
+
+describe('T23c', () => {
+  it('save and reopen keeps geometry, settings and the burn', async () => {
+    const seed = seedRaster({ transform: T({ x: 150, y: 120, rotationDeg: 30, mirrorX: true }) });
+    setupProject([seed]);
+    await runTrace(seed, 'Line Art', { overrides: { smoothness: 0.5, ignoreLessThanPixels: 4 }, fillStyle: 'offset' });
+    const p = useStore.getState().project;
+    const traced = p.scene.objects.find((o) => o.kind === 'traced-image')!;
+    log(`ops: ${p.scene.layers.map((l) => `${l.id}/${(l as { mode?: string }).mode}/${(l as { fillStyle?: string }).fillStyle}`).join(", ")}`);
+    const text = serializeProject(p, { compact: true });
+    const back = deserializeProject(text);
+    const okb = (back as { kind?: string }).kind === 'ok'; log(`deserialize ok=${okb}`);
+    if (!okb) { log(JSON.stringify(back).slice(0, 400)); return; }
+    const p2 = (back as unknown as { project: typeof p }).project;
+    const t2 = p2.scene.objects.find((o) => o.id === traced.id)!;
+    const pick = (o: unknown) => {
+      const x = o as Record<string, unknown>;
+      return { transform: x.transform, traceSettings: x.traceSettings, operationOverride: x.operationOverride, traceSourceId: x.traceSourceId, traceMode: x.traceMode, tracePixelWidth: x.tracePixelWidth, tracePixelHeight: x.tracePixelHeight };
+    };
+    log(`before: ${JSON.stringify(pick(traced))}`);
+    log(`after:  ${JSON.stringify(pick(t2))}`);
+    const g1 = burnOfTrace(p, traced.id).gcode, g2 = burnOfTrace(p2, traced.id).gcode;
+    const strip = (g: string) => g.split('\n').filter((l) => !/^;/.test(l)).join('\n');
+    log(`gcode identical after reopen: ${strip(g1) === strip(g2)} (${g1.length} / ${g2.length} bytes)`);
+    if (strip(g1) !== strip(g2)) {
+      const a = strip(g1).split('\n'), b = strip(g2).split('\n');
+      const i = a.findIndex((l, k) => l !== b[k]);
+      log(`first diff line ${i}: ${a[i]} | ${b[i]}`);
+    }
+  });
+
+  it('cancel mid-trace leaves nothing behind', async () => {
+    const seed = seedRaster({ transform: T({ x: 60, y: 80 }) });
+    setupProject([seed]);
+    const before = useStore.getState().project;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), Number(process.env.T23_ABORT_MS ?? 5));
+    const out = await runTrace(seed, 'Line Art', { signal: ctl.signal }).catch((e) => ({ toasts: [`threw ${String(e)}`], closed: false, landed: false }));
+    clearTimeout(timer);
+    const st = useStore.getState();
+    log(`cancel: aborted=${ctl.signal.aborted} toasts=${JSON.stringify(out.toasts)} closed=${out.closed} objects=${st.project.scene.objects.length} same=${st.project === before} undo=${st.undoStack.length}`);
+  });
+
+  it('source moved/rotated while the dialog is open: the trace follows the live source', async () => {
+    const seed = seedRaster({ transform: T({ x: 60, y: 80 }) });
+    setupProject([seed]);
+    // Move the live source (transform-only change) before Trace is pressed.
+    const moved = { ...seed, transform: T({ x: 90, y: 100, rotationDeg: 15 }) };
+    useStore.setState({ project: { ...useStore.getState().project, scene: { ...useStore.getState().project.scene, objects: [moved] } } });
+    const out = await runTrace(seed, 'Line Art');
+    const st = useStore.getState();
+    const t = st.project.scene.objects.find((o) => o.kind === 'traced-image');
+    log(`moved source: toasts=${JSON.stringify(out.toasts)} traced=${t !== undefined} transform=${JSON.stringify(t?.transform)}`);
+  });
+});

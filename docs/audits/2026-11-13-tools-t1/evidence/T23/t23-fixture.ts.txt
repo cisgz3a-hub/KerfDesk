@@ -1,0 +1,242 @@
+// T23 shared fixture: synthetic binary art, the real Trace dialog commit, and pixel oracles.
+import {
+  createLayer,
+  createProject,
+  IDENTITY_TRANSFORM,
+  type Layer,
+  type Project,
+  type RasterImage,
+  type SceneObject,
+  type Transform,
+} from '../t22-main/src/core/scene';
+import type { RawImageData, TraceOptions } from '../t22-main/src/core/trace';
+import { TRACE_PRESETS } from '../t22-main/src/core/trace/trace-presets';
+import { compilationPolylines } from '../t22-main/src/core/job/compilation-polylines';
+import { useStore } from '../t22-main/src/ui/state';
+import { resetStore } from '../t22-main/src/ui/state/test-helpers';
+import { useUiStore } from '../t22-main/src/ui/state/ui-store';
+import { commit } from '../t22-main/src/ui/trace/ImportImageDialog';
+import {
+  captureTraceCommitOwner,
+  claimTraceCommitOwner,
+  closeOwnedTraceDialog,
+} from '../t22-main/src/ui/trace/trace-commit-ownership';
+import { bindTraceSourceMask } from '../t22-main/src/ui/trace/trace-source-mask';
+import { mergeLightBurnTraceSettings } from '../t22-main/src/ui/trace/trace-options';
+import { captureTraceSettings } from '../t22-main/src/ui/trace/trace-settings-snapshot';
+import { DEV, xf, type P } from './t23-common';
+
+export const W = 400;
+export const H = 300;
+export const PX_MM = 0.1; // default bounds 40 x 30 mm
+
+type Rect = { x0: number; y0: number; x1: number; y1: number }; // pixel, half-open
+export type Feature = { name: string; dark: (x: number, y: number) => boolean; kind: 'ink' | 'hole' };
+const inRect = (r: Rect) => (x: number, y: number) => x >= r.x0 && x < r.x1 && y >= r.y0 && y < r.y1;
+const inDisc = (cx: number, cy: number, r: number) => (x: number, y: number) =>
+  (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 <= r * r;
+function inTri(a: P, b: P, c: P) {
+  const s = (p: P, q: P, r: P) => (q.x - p.x) * (r.y - p.y) - (r.x - p.x) * (q.y - p.y);
+  return (x: number, y: number) => {
+    const p = { x: x + 0.5, y: y + 0.5 };
+    const d1 = s(a, b, p), d2 = s(b, c, p), d3 = s(c, a, p);
+    return (d1 >= 0 && d2 >= 0 && d3 >= 0) || (d1 <= 0 && d2 <= 0 && d3 <= 0);
+  };
+}
+const ringOuter = inDisc(100, 100, 60), ringHole = inDisc(100, 100, 35), island = inDisc(100, 100, 15);
+const plate = inRect({ x0: 240, y0: 30, x1: 350, y1: 130 }), plateHole = inRect({ x0: 270, y0: 60, x1: 320, y1: 100 });
+export const FEATURES: Feature[] = [
+  { name: 'ring', dark: (x, y) => ringOuter(x, y) && !ringHole(x, y), kind: 'ink' },
+  { name: 'ring hole', dark: (x, y) => ringHole(x, y) && !island(x, y), kind: 'hole' },
+  { name: 'island in hole', dark: island, kind: 'ink' },
+  { name: 'plate', dark: (x, y) => plate(x, y) && !plateHole(x, y), kind: 'ink' },
+  { name: 'plate hole', dark: plateHole, kind: 'hole' },
+  { name: 'line 1px', dark: inRect({ x0: 20, y0: 190, x1: 280, y1: 191 }), kind: 'ink' },
+  { name: 'line 2px', dark: inRect({ x0: 20, y0: 205, x1: 280, y1: 207 }), kind: 'ink' },
+  { name: 'line 3px', dark: inRect({ x0: 20, y0: 220, x1: 280, y1: 223 }), kind: 'ink' },
+  { name: 'vline 1px', dark: inRect({ x0: 385, y0: 150, x1: 386, y1: 290 }), kind: 'ink' },
+  { name: 'speck 1x1', dark: inRect({ x0: 200, y0: 270, x1: 201, y1: 271 }), kind: 'ink' },
+  { name: 'speck 2x2', dark: inRect({ x0: 220, y0: 270, x1: 222, y1: 272 }), kind: 'ink' },
+  { name: 'speck 3x3', dark: inRect({ x0: 240, y0: 270, x1: 243, y1: 273 }), kind: 'ink' },
+  { name: 'speck 4x4', dark: inRect({ x0: 260, y0: 270, x1: 264, y1: 274 }), kind: 'ink' },
+  { name: 'speck 6x6', dark: inRect({ x0: 280, y0: 270, x1: 286, y1: 276 }), kind: 'ink' },
+  { name: 'triangle', dark: inTri({ x: 300, y: 160 }, { x: 370, y: 160 }, { x: 335, y: 250 }), kind: 'ink' },
+];
+export function isDarkPx(x: number, y: number): boolean {
+  return FEATURES.some((f) => f.kind === 'ink' && f.dark(x, y));
+}
+export function makePixels(dark: (x: number, y: number) => boolean = isDarkPx): RawImageData {
+  const data = new Uint8ClampedArray(W * H * 4);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const v = dark(x, y) ? 0 : 255;
+      const o = (y * W + x) * 4;
+      data[o] = data[o + 1] = data[o + 2] = v;
+      data[o + 3] = 255;
+    }
+  return { width: W, height: H, data };
+}
+
+// The decode is the only replaced step (vi.mock in each test file): the real loader masks the pixels the same way.
+(globalThis as { __T23_PIXELS?: RawImageData }).__T23_PIXELS = makePixels();
+
+export function seedRaster(over: Partial<RasterImage> = {}): RasterImage {
+  return {
+    kind: 'raster-image',
+    id: 'src',
+    source: 'art.png',
+    dataUrl: 'data:image/png;base64,AAAA',
+    pixelWidth: W,
+    pixelHeight: H,
+    bounds: { minX: 0, minY: 0, maxX: W * PX_MM, maxY: H * PX_MM },
+    transform: IDENTITY_TRANSFORM,
+    color: '#808080',
+    dither: 'floyd-steinberg',
+    linesPerMm: 10,
+    ...over,
+  } as RasterImage;
+}
+
+export function setupProject(objects: SceneObject[], extraLayers: Layer[] = []): void {
+  resetStore();
+  const base = createProject(DEV);
+  const img = createLayer({ id: 'img-op', color: '#808080', name: 'Image', mode: 'image' }) as Layer;
+  useStore.setState({
+    project: { ...base, scene: { ...base.scene, objects, layers: [img, ...extraLayers], groups: [] } } as Project,
+    undoStack: [],
+    redoStack: [],
+  });
+}
+
+// A PNG signature + IHDR so the commit-grid planner can read the natural size (jsdom never loads <img>).
+function crc32(b: Uint8Array): number {
+  let c = ~0;
+  for (const x of b) {
+    c ^= x;
+    for (let k = 0; k < 8; k++) c = c & 1 ? (c >>> 1) ^ 0xedb88320 : c >>> 1;
+  }
+  return ~c >>> 0;
+}
+export function pngHeader(w: number, h: number): Uint8Array {
+  const out = new Uint8Array(8 + 25);
+  out.set([137, 80, 78, 71, 13, 10, 26, 10], 0);
+  const dv = new DataView(out.buffer);
+  dv.setUint32(8, 13);
+  out.set([73, 72, 68, 82], 12);
+  dv.setUint32(16, w);
+  dv.setUint32(20, h);
+  out.set([8, 6, 0, 0, 0], 24);
+  dv.setUint32(29, crc32(out.subarray(12, 29)));
+  return out;
+}
+
+export type CommitOutcome ={ toasts: string[]; closed: boolean; landed: boolean };
+export async function runTrace(
+  seed: RasterImage,
+  presetName: string,
+  opts: { boundary?: { x: number; y: number; width: number; height: number }; header?: [number, number]; overrides?: Record<string, unknown>; deleteSource?: boolean; fillStyle?: 'scanline' | 'offset' | 'island'; signal?: AbortSignal; output?: 'vector' | 'raster' } = {},
+): Promise<CommitOutcome> {
+  useUiStore.getState().openImageDialog(seed);
+  const token = useUiStore.getState().imageDialog!.requestToken;
+  const owner = captureTraceCommitOwner(seed, token);
+  if (owner === null) throw new Error('no owner');
+  const options: TraceOptions = mergeLightBurnTraceSettings(TRACE_PRESETS[presetName]!, (opts.overrides ?? {}) as never);
+  const file = bindTraceSourceMask(new File([pngHeader(...(opts.header ?? [W, H]))], 'art.png', { type: 'image/png' }), seed, owner.maskObject);
+  const toasts: string[] = [];
+  let closed = false;
+  const output = opts.output ?? 'vector';
+  const fillStyle = opts.fillStyle ?? 'scanline';
+  const traceSettings = captureTraceSettings({
+    presetName,
+    overrides: (opts.overrides ?? {}) as never,
+    output,
+    fillStyle,
+    boundary: opts.boundary ?? null,
+    boundaryMode: 'crop',
+  } as never);
+  const filled = options.traceMode !== 'centerline' && options.traceMode !== 'edge' && options.traceMode !== 'hybrid';
+  await commit(
+    {
+      file,
+      options,
+      seed,
+      traceOutput: output,
+      traceFillStyle: output === 'vector' && filled ? fillStyle : 'scanline',
+      deleteSourceAfterTrace: opts.deleteSource ?? false,
+      traceSettings,
+      boundary: opts.boundary ?? null,
+      boundaryMode: 'crop',
+    },
+    {
+      ...(opts.signal ? { signal: opts.signal } : {}),
+      traceExistingImage: useStore.getState().traceExistingImage,
+      commitRasterizedTrace: useStore.getState().commitRasterizedTrace,
+      pushToast: (m: string, k: string) => toasts.push(`${k}: ${m}`),
+      close: () => {
+        closed = true;
+        closeOwnedTraceDialog(token);
+      },
+      setBusy: () => {},
+      claimOwner: () => claimTraceCommitOwner(owner),
+    } as never,
+  );
+  return { toasts, closed, landed: closed };
+}
+
+// ---------- oracle: world point -> source pixel (independent inverse of the scene transform) ----------
+export function inv(p: P, t: Transform): P {
+  const r = (-t.rotationDeg * Math.PI) / 180;
+  const dx = p.x - t.x, dy = p.y - t.y;
+  let x = dx * Math.cos(r) - dy * Math.sin(r);
+  let y = dx * Math.sin(r) + dy * Math.cos(r);
+  if (t.mirrorX) x = -x;
+  if (t.mirrorY) y = -y;
+  return { x: x / t.scaleX, y: y / t.scaleY };
+}
+export function worldToPx(p: P, img: RasterImage): P {
+  const l = inv(p, img.transform);
+  return {
+    x: ((l.x - img.bounds.minX) / (img.bounds.maxX - img.bounds.minX)) * img.pixelWidth,
+    y: ((l.y - img.bounds.minY) / (img.bounds.maxY - img.bounds.minY)) * img.pixelHeight,
+  };
+}
+export function imageWorldBox(img: RasterImage, pad = 1) {
+  const b = img.bounds;
+  const pts = [
+    { x: b.minX, y: b.minY }, { x: b.maxX, y: b.minY }, { x: b.maxX, y: b.maxY }, { x: b.minX, y: b.maxY },
+  ].map((q) => xf(q, img.transform));
+  return {
+    x0: Math.min(...pts.map((q) => q.x)) - pad, y0: Math.min(...pts.map((q) => q.y)) - pad,
+    x1: Math.max(...pts.map((q) => q.x)) + pad, y1: Math.max(...pts.map((q) => q.y)) + pad,
+  };
+}
+
+// ---------- traced vector region: flattened exactly as compile does, world even-odd / nonzero ----------
+export type WorldPath = { rule: 'evenodd' | 'nonzero'; contours: P[][] };
+export function tracedWorldPaths(obj: SceneObject): WorldPath[] {
+  const o = obj as unknown as { paths: { fillRule?: 'evenodd' | 'nonzero'; polylines: unknown }[]; transform: Transform };
+  return o.paths.map((path) => ({
+    rule: path.fillRule ?? 'evenodd',
+    contours: compilationPolylines(path as never, o.transform)
+      .filter((pl) => pl.closed)
+      .map((pl) => pl.points.map((q) => xf(q, o.transform))),
+  }));
+}
+export function windingAt(p: P, contours: P[][]): number {
+  let w = 0;
+  for (const c of contours)
+    for (let i = 0; i < c.length; i++) {
+      const a = c[i]!, b = c[(i + 1) % c.length]!;
+      const cr = (b.x - a.x) * (p.y - a.y) - (p.x - a.x) * (b.y - a.y);
+      if (a.y <= p.y) {
+        if (b.y > p.y && cr > 0) w++;
+      } else if (b.y <= p.y && cr < 0) w--;
+    }
+  return w;
+}
+export function insideTraced(p: P, paths: WorldPath[], rule?: 'evenodd' | 'nonzero'): boolean {
+  return paths.some((path) => {
+    const w = windingAt(p, path.contours);
+    return (rule ?? path.rule) === 'nonzero' ? w !== 0 : w % 2 !== 0;
+  });
+}

@@ -1,0 +1,162 @@
+// T23 measurement: compare a world-space region (traced vectors or burned G-code) with the source pixels.
+import type { Project, RasterImage, SceneObject } from '../t22-main/src/core/scene';
+import { FEATURES, H, W, imageWorldBox, isDarkPx, worldToPx, type WorldPath } from './t23-fixture';
+import { burnedSegments, gcodeOf, type P, type Seg } from './t23-common';
+
+const DARK = (() => {
+  const m = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) m[y * W + x] = isDarkPx(x, y) ? 1 : 0;
+  return m;
+})();
+const FEAT_IDX = (() => {
+  const m = new Int8Array(W * H).fill(-1);
+  FEATURES.forEach((f, i) => {
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (f.dark(x, y)) m[y * W + x] = i;
+  });
+  return m;
+})();
+
+/** Row crossings of world contours: [x, dir] sorted. */
+function rowCrossings(y: number, contours: P[][]): { x: number; d: number }[] {
+  const out: { x: number; d: number }[] = [];
+  for (const c of contours)
+    for (let i = 0; i < c.length; i++) {
+      const a = c[i]!, b = c[(i + 1) % c.length]!;
+      if ((a.y <= y && b.y > y) || (b.y <= y && a.y > y)) {
+        const t = (y - a.y) / (b.y - a.y);
+        out.push({ x: a.x + t * (b.x - a.x), d: b.y > a.y ? 1 : -1 });
+      }
+    }
+  return out.sort((p, q) => p.x - q.x);
+}
+
+export type Region = { inside: (p: P) => boolean } | { rows: (y: number) => (x: number) => boolean };
+
+export function vectorRegion(paths: WorldPath[], rule?: 'evenodd' | 'nonzero') {
+  return (y: number) => {
+    const per = paths.map((p) => ({ rule: rule ?? p.rule, xs: rowCrossings(y, p.contours) }));
+    return (x: number) =>
+      per.some(({ rule: r, xs }) => {
+        let w = 0;
+        for (const c of xs) {
+          if (c.x > x) break;
+          w += c.d;
+        }
+        if (r === 'nonzero') return w !== 0;
+        let n = 0;
+        for (const c of xs) {
+          if (c.x > x) break;
+          n++;
+        }
+        return n % 2 === 1;
+      });
+  };
+}
+
+export function burnRegion(segs: Seg[], pitch: number, box: { x0: number; y0: number; x1: number; y1: number }, g: number) {
+  const nx = Math.ceil((box.x1 - box.x0) / g), ny = Math.ceil((box.y1 - box.y0) / g);
+  const burned = new Uint8Array(nx * ny);
+  const half = pitch / 2;
+  for (const s of segs) {
+    const dx = s.b.x - s.a.x, dy = s.b.y - s.a.y;
+    const L = Math.hypot(dx, dy);
+    if (L < 1e-9) continue;
+    const ux = dx / L, uy = dy / L;
+    const i0 = Math.max(0, Math.floor((Math.min(s.a.x, s.b.x) - half - box.x0) / g));
+    const i1 = Math.min(nx - 1, Math.ceil((Math.max(s.a.x, s.b.x) + half - box.x0) / g));
+    const j0 = Math.max(0, Math.floor((Math.min(s.a.y, s.b.y) - half - box.y0) / g));
+    const j1 = Math.min(ny - 1, Math.ceil((Math.max(s.a.y, s.b.y) + half - box.y0) / g));
+    for (let j = j0; j <= j1; j++)
+      for (let i = i0; i <= i1; i++) {
+        const px = box.x0 + (i + 0.5) * g - s.a.x, py = box.y0 + (j + 0.5) * g - s.a.y;
+        const along = px * ux + py * uy, perp = Math.abs(-px * uy + py * ux);
+        if (along >= -1e-9 && along <= L + 1e-9 && perp <= half + 1e-9) burned[j * nx + i] = 1;
+      }
+  }
+  return (y: number) => {
+    const j = Math.floor((y - box.y0) / g);
+    return (x: number) => {
+      const i = Math.floor((x - box.x0) / g);
+      return i >= 0 && j >= 0 && i < nx && j < ny && burned[j * nx + i] === 1;
+    };
+  };
+}
+
+/** Distance in source px from (fx,fy) to the nearest pixel of class `want` (capped at R+1). */
+function pxDist(fx: number, fy: number, want: number, extra: (x: number, y: number) => boolean, R = 4): number {
+  const cx = Math.floor(fx), cy = Math.floor(fy);
+  let best = R + 1;
+  for (let y = cy - R; y <= cy + R; y++)
+    for (let x = cx - R; x <= cx + R; x++) {
+      const v = x >= 0 && y >= 0 && x < W && y < H && DARK[y * W + x] === 1 && extra(x + 0.5, y + 0.5) ? 1 : 0;
+      if (v !== want) continue;
+      const dx = Math.max(x - fx, 0, fx - (x + 1)), dy = Math.max(y - fy, 0, fy - (y + 1));
+      best = Math.min(best, Math.hypot(dx, dy));
+    }
+  return best;
+}
+
+export type Compare = {
+  oracleMm2: number; regionMm2: number; mismatchMm2: number; farMm2: number; maxPxDist: number;
+  oracleCentroid: P; regionCentroid: P; farAt: P | null; features: Record<string, number>;
+};
+/**
+ * Sample the image's world box. Oracle: the sample maps into a dark source pixel (and the mask keeps it).
+ * `keep(pxX, pxY)` is the mask in source-pixel coordinates (default: everything).
+ */
+export function compareRegion(
+  img: RasterImage,
+  region: (y: number) => (x: number) => boolean,
+  g: number,
+  keep: (fx: number, fy: number) => boolean = () => true,
+  farPx = 1.5,
+): Compare {
+  const box = imageWorldBox(img, 1);
+  let o = 0, r = 0, mis = 0, far = 0, maxD = 0;
+  let ox = 0, oy = 0, rx = 0, ry = 0;
+  let farAt: P | null = null;
+  const fIn = new Array(FEATURES.length).fill(0), fTot = new Array(FEATURES.length).fill(0);
+  for (let y = box.y0 + g / 2; y < box.y1; y += g) {
+    const row = region(y);
+    for (let x = box.x0 + g / 2; x < box.x1; x += g) {
+      const p = { x, y };
+      const q = worldToPx(p, img);
+      const ix = Math.floor(q.x), iy = Math.floor(q.y);
+      const inImg = ix >= 0 && iy >= 0 && ix < W && iy < H;
+      const kept = inImg && keep(q.x, q.y);
+      const od = inImg && kept && DARK[iy * W + ix] === 1;
+      const rd = row(x);
+      if (od) { o++; ox += x; oy += y; }
+      if (rd) { r++; rx += x; ry += y; }
+      if (inImg && kept) {
+        const fi = FEAT_IDX[iy * W + ix]!;
+        if (fi >= 0) { fTot[fi]++; if (rd) fIn[fi]++; }
+        // holes: count pixels of the hole feature (not dark) via the feature mask
+      }
+      if (od !== rd) {
+        mis++;
+        const d = pxDist(q.x, q.y, rd ? 1 : 0, keep);
+        if (d > maxD) maxD = d;
+        if (d > farPx) { far++; if (!farAt || d >= maxD) farAt = p; }
+      }
+    }
+  }
+  const a = g * g;
+  const r3 = (v: number) => Math.round(v * 1000) / 1000;
+  const features: Record<string, number> = {};
+  FEATURES.forEach((f, i) => (features[f.name] = fTot[i] === 0 ? NaN : r3(fIn[i] / fTot[i])));
+  return {
+    oracleMm2: r3(o * a), regionMm2: r3(r * a), mismatchMm2: r3(mis * a), farMm2: r3(far * a), maxPxDist: r3(maxD),
+    oracleCentroid: { x: r3(ox / Math.max(o, 1)), y: r3(oy / Math.max(o, 1)) },
+    regionCentroid: { x: r3(rx / Math.max(r, 1)), y: r3(ry / Math.max(r, 1)) },
+    farAt: farAt && { x: r3(farAt.x), y: r3(farAt.y) }, features,
+  };
+}
+
+/** Burn only the traced object: drop the source image (its own Image op would also burn, ADR-673). */
+export function burnOfTrace(project: Project, tracedId: string): { gcode: string; segs: Seg[] } {
+  const objects = project.scene.objects.filter((o: SceneObject) => o.id === tracedId);
+  const p = { ...project, scene: { ...project.scene, objects } } as Project;
+  const gcode = gcodeOf(p);
+  return { gcode, segs: burnedSegments(gcode, project.device.bedHeight) };
+}

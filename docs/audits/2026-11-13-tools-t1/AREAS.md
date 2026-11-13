@@ -61,7 +61,7 @@ Run order puts tools that make or change burns first, then new tools, then the r
 | T20 | Image | Save Processed Bitmap | `tools.save-processed-bitmap` | ledgered: P3 3 (known 1) |
 | T21 | Image | Save Original Image | `tools.save-original-image` | ledgered: P2 2 (fix #1868), P3 4 (known 2) |
 | T22 | Bitmap | Convert to Bitmap | `tools.convert-to-bitmap` | ledgered: P3 6 (known 1) |
-| T23 | Trace | Trace Image | `tools.trace-image` | |
+| T23 | Trace | Trace Image | `tools.trace-image` | ledgered: P3 2 |
 | T24 | Trace | Re-trace Original | `tools.retrace-original` | |
 | T25 | Trace | Multi-File Trace | `tools.multi-file-trace` | |
 | T26 | Vector | Convert to Path | `tools.convert-to-path` | |

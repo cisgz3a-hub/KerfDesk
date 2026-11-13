@@ -1,0 +1,124 @@
+// T23a: Trace Image (Line Art default) through the real dialog commit -> store -> prepareOutput -> G-code,
+// for rotated / mirrored / non-uniformly scaled / offset-bounds / cropped / masked sources.
+// Oracle: an independent world->pixel inverse map and threshold of the synthetic source pixels.
+import { describe, it, vi } from 'vitest';
+import type { RawImageData } from '../t22-main/src/core/trace';
+import type { RasterImage, SceneObject } from '../t22-main/src/core/scene';
+import { IDENTITY_TRANSFORM } from '../t22-main/src/core/scene';
+import { useStore } from '../t22-main/src/ui/state';
+import { logger, circle, rect, xf, type P } from './t23-common';
+import { imageWorldBox, runTrace, seedRaster, setupProject, tracedWorldPaths, PX_MM, W, H } from './t23-fixture';
+import { burnOfTrace, burnRegion, compareRegion, vectorRegion } from './t23-measure';
+
+vi.mock('../t22-main/src/ui/trace/off-thread-trace-decode', async () => {
+  const mask = await import('../t22-main/src/ui/trace/trace-source-mask');
+  const transp = await import('../t22-main/src/ui/trace/raw-image-transparency');
+  return {
+    decodeTraceSourceImage: async (file: File) => {
+      const image = mask.maskTraceSourcePixels(file, (globalThis as { __T23_PIXELS?: RawImageData }).__T23_PIXELS!);
+      return { image, hasTransparency: transp.rawImageHasTransparency(image) };
+    },
+  };
+});
+
+const log = logger('C:/Users/stolk/kd-t1/zz-t23/t23a.log');
+const T = (o: Partial<typeof IDENTITY_TRANSFORM>) => ({ ...IDENTITY_TRANSFORM, ...o });
+
+function pointInEvenOdd(p: P, contours: P[][]): boolean {
+  let n = 0;
+  for (const c of contours)
+    for (let i = 0, j = c.length - 1; i < c.length; j = i++) {
+      const a = c[i]!, b = c[j]!;
+      if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) n++;
+    }
+  return n % 2 === 1;
+}
+
+type Case = { name: string; seed: RasterImage; extra?: SceneObject[]; keep?: (img: RasterImage) => (fx: number, fy: number) => boolean; deleteSource?: boolean };
+const clipLocal = rect(5, 3, 25, 22); // local mm
+const cases: Case[] = [
+  { name: 'A identity @60,80', seed: seedRaster({ transform: T({ x: 60, y: 80 }) }) },
+  { name: 'B rot 30', seed: seedRaster({ transform: T({ x: 150, y: 120, rotationDeg: 30 }) }) },
+  { name: 'C mirrorX', seed: seedRaster({ transform: T({ x: 60, y: 80, mirrorX: true }) }) },
+  { name: 'D scale 2 x 0.5 rot 45', seed: seedRaster({ transform: T({ x: 150, y: 150, scaleX: 2, scaleY: 0.5, rotationDeg: 45 }) }) },
+  {
+    name: 'E mirrorY rot 200 centred bounds',
+    seed: seedRaster({ bounds: { minX: -20, minY: -15, maxX: 20, maxY: 15 }, transform: T({ x: 200, y: 150, rotationDeg: 200, mirrorY: true }) }),
+  },
+  {
+    name: 'F imageClip (crop) rot 30 scale 1.5',
+    seed: seedRaster({
+      transform: T({ x: 120, y: 100, rotationDeg: 30, scaleX: 1.5, scaleY: 1.5 }),
+      imageClip: [{ color: '#000000', polylines: [{ points: clipLocal, closed: true }] }],
+    } as Partial<RasterImage>),
+    keep: () => (fx, fy) => pointInEvenOdd({ x: fx * PX_MM, y: fy * PX_MM }, [clipLocal]),
+  },
+  {
+    name: 'G external mask (world circle) on rot 30 mirrorX image',
+    seed: seedRaster({ transform: T({ x: 150, y: 120, rotationDeg: 30, mirrorX: true }), imageMaskId: 'mask' } as Partial<RasterImage>),
+    extra: [
+      {
+        kind: 'shape', id: 'mask', spec: { kind: 'polyline', points: circle(0, 0, 14, 14, 128), closed: true }, color: '#ff0000',
+        bounds: { minX: -14, minY: -14, maxX: 14, maxY: 14 }, transform: T({ x: 140, y: 125 }),
+        paths: [{ color: '#ff0000', polylines: [{ points: circle(0, 0, 14, 14, 128), closed: true }] }],
+      } as unknown as SceneObject,
+    ],
+    keep: (img) => {
+      const world = circle(140, 125, 14, 14, 128);
+      return (fx, fy) => {
+        const lx = img.bounds.minX + (fx / W) * (img.bounds.maxX - img.bounds.minX);
+        const ly = img.bounds.minY + (fy / H) * (img.bounds.maxY - img.bounds.minY);
+        return pointInEvenOdd(xf({ x: lx, y: ly }, img.transform), [world]);
+      };
+    },
+  },
+  { name: 'H delete source, rot 90 mirrorX', seed: seedRaster({ transform: T({ x: 100, y: 100, rotationDeg: 90, mirrorX: true }) }), deleteSource: true },
+];
+
+describe('T23a placement', () => {
+  for (const c of cases.filter((k) => !process.env.T23_ONLY || k.name.startsWith(process.env.T23_ONLY)))
+    it(c.name, async () => {
+      setupProject([c.seed, ...(c.extra ?? [])]);
+      const before = useStore.getState().project;
+      const t0 = Date.now(); log(`start ${c.name}`);
+      const out = await runTrace(c.seed, process.env.T23_PRESET ?? "Line Art", { deleteSource: c.deleteSource ?? false });
+      log(`trace ms ${Date.now() - t0}`);
+      const st = useStore.getState();
+      const traced = st.project.scene.objects.find((o) => o.kind === 'traced-image');
+      log(`\n=== ${c.name}`);
+      log(`toasts: ${JSON.stringify(out.toasts)} closed=${out.closed}`);
+      if (!traced) { log('NO TRACED OBJECT'); return; }
+      const t = traced as unknown as { transform: unknown; operationOverride?: unknown; operationIds?: string[]; paths: { color: string; operationIds?: string[]; fillRule?: string; polylines: unknown[] }[]; traceSourceId?: string; traceSettings?: unknown; tracePixelWidth?: number; tracePixelHeight?: number };
+      log(`objects: ${st.project.scene.objects.map((o) => `${o.kind}:${o.id}`).join(', ')} | undo depth ${st.undoStack.length}`);
+      log(`trace grid ${t.tracePixelWidth}x${t.tracePixelHeight}; transform ${JSON.stringify(t.transform)}; override ${JSON.stringify(t.operationOverride)}; traceSourceId ${t.traceSourceId}`);
+      log(`paths: ${t.paths.map((p) => `${p.color} rule=${p.fillRule ?? '-'} subpaths=${p.polylines.length} ops=${JSON.stringify(p.operationIds)}`).join(' ; ')}`);
+      const opIds = new Set([...(t.operationIds ?? []), ...t.paths.flatMap((p) => p.operationIds ?? [])]);
+      const ops = st.project.scene.layers.filter((l) => opIds.has(l.id) || t.paths.some((p) => p.color === l.color));
+      for (const l of ops) {
+        const L = l as unknown as Record<string, unknown>;
+        log(`op ${l.id} ${l.color} mode=${L.mode} fillStyle=${L.fillStyle} power=${L.power} speed=${L.speed} hatch=${L.hatchSpacingMm} angle=${L.hatchAngleDeg} output=${L.output}`);
+      }
+      log(`layers all: ${st.project.scene.layers.map((l) => `${l.id}/${l.color}/${(l as { mode?: string }).mode}`).join(', ')}`);
+      const keep = c.keep?.(c.seed);
+      const wp = tracedWorldPaths(traced);
+      const g = 0.03;
+      const vec = compareRegion(c.seed, vectorRegion(wp), g, keep);
+      log(`VECTOR(own rule): ${JSON.stringify(vec)}`);
+      const fill = ops.find((l) => (l as { mode?: string }).mode === 'fill') as unknown as { hatchSpacingMm: number } | undefined;
+      const pitch = fill?.hatchSpacingMm ?? 0.1;
+      const burn = burnOfTrace(st.project, traced.id);
+      log(`gcode bytes ${burn.gcode.length}, lit segs ${burn.segs.length}${burn.gcode.startsWith('NOT OK') ? ' ' + burn.gcode.slice(0, 400) : ''}`);
+      if (burn.segs.length > 0) {
+        const box = imageWorldBox(c.seed, 1);
+        const br = compareRegion(c.seed, burnRegion(burn.segs, pitch, box, 0.02), g, keep, 1.5 + pitch / (PX_MM * 0.5));
+        log(`BURN(pitch ${pitch}): ${JSON.stringify(br)}`);
+      }
+      // Undo / Redo
+      st.undo();
+      const u = useStore.getState().project;
+      log(`undo restores identical project: ${u === before || JSON.stringify(u) === JSON.stringify(before)}`);
+      useStore.getState().redo();
+      const r = useStore.getState().project;
+      log(`redo returns traced: ${JSON.stringify(r) === JSON.stringify(st.project)}`);
+    });
+});
