@@ -1,0 +1,325 @@
+// @vitest-environment jsdom
+// T29 refuter: own fixtures, own decoder (gdec.ts), real store / gates / output.
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { beforeEach, it, vi } from 'vitest';
+import {
+  createLayer,
+  createProject,
+  createRegistrationLayer,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  DEFAULT_PROJECT_VARIABLE_DATA,
+  IDENTITY_TRANSFORM,
+  type Layer,
+  type Project,
+  type RasterImage,
+  type SceneObject,
+  type TextObject,
+} from '../t29-main/src/core/scene';
+import { createRectangle } from '../t29-main/src/core/shapes/primitives/create-rectangle';
+import { createRegistrationBox } from '../t29-main/src/core/shapes';
+import { findRegistrationBoxes } from '../t29-main/src/core/scene/registration-layer';
+import { registrationJigArtworkInstances } from '../t29-main/src/core/scene/registration-jig-artwork';
+import { registrationJigCompilationRuns } from '../t29-main/src/core/job/registration-jig-compilation-runs';
+import { runPreflight } from '../t29-main/src/core/preflight';
+import { textToPolylines } from '../t29-main/src/core/text';
+import { parseVariableTemplateSource } from '../t29-main/src/core/variables/template-source';
+import { prepareOutput } from '../t29-main/src/io/gcode/prepare-output';
+import { prepareOutputSnapshot, type VariableTextRenderer } from '../t29-main/src/io/gcode/prepare-output-snapshot';
+import { emitPreparedGcode } from '../t29-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t29-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t29-main/src/io/project/deserialize-project';
+import { lumaToBase64 } from '../t29-main/src/ui/raster/luma-bitmap';
+import { resetStore } from '../t29-main/src/ui/state/test-helpers';
+import { useStore } from '../t29-main/src/ui/state/store';
+import { useToastStore } from '../t29-main/src/ui/state/toast-store';
+import { selectionCanWeld, unionSilhouetteOperations } from '../t29-main/src/ui/commands/selection-command-state';
+import { applyCenterArtworkInRegistrationJigSet } from '../t29-main/src/ui/state/registration-jig-artwork-actions';
+import { drawScene } from '../t29-main/src/ui/workspace/draw-scene';
+import { bb, byFS, decode, len, lenOutside, runs, type Pt, type Seg } from './gdec';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t29r/r.log';
+const out = (s: string) => appendFileSync(LOG, s + '\n');
+const st = () => useStore.getState();
+const f3 = (n: number) => n.toFixed(3);
+const toasts = () => JSON.stringify(useToastStore.getState().toasts.map((t) => `${t.variant ?? ''}:${t.message}`));
+const clearToasts = () => useToastStore.setState({ toasts: [] } as never);
+beforeEach(() => {
+  resetStore();
+  clearToasts();
+});
+it('init log', () => writeFileSync(LOG, ''));
+
+const font = (() => {
+  const b = readFileSync('C:/Users/stolk/kd-t1/t29-main/src/ui/text/fonts/Tinos-Regular.ttf');
+  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+})();
+const op = (id: string, mode: 'line' | 'fill', speed: number, power: number, extra: Partial<Layer> = {}) =>
+  ({ ...createLayer({ id, color: '#000000', name: id, mode }), speed, power, ...extra }) as Layer;
+function project(objects: SceneObject[], layers: Layer[], extra: Partial<Project> = {}): Project {
+  const base = createProject();
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers, groups: [] }, ...extra };
+}
+function load(p: Project, sel: string[]) {
+  useStore.setState({ project: p, selectedObjectId: sel[0] ?? null, additionalSelectedIds: new Set(sel.slice(1)), undoStack: [], redoStack: [], dirty: false });
+}
+const rect = (id: string, w: number, h: number, x: number, y: number, extra: Record<string, unknown> = {}) =>
+  ({ ...createRectangle({ id, color: '#000000', spec: { widthMm: w, heightMm: h, cornerRadiusMm: 0 }, transform: { ...IDENTITY_TRANSFORM, x, y } }), ...extra }) as SceneObject;
+const poly = (id: string, pts: Pt[], extra: Record<string, unknown> = {}) =>
+  ({
+    kind: 'imported-svg', id, source: `${id}.svg`,
+    bounds: { minX: Math.min(...pts.map((p) => p.x)), minY: Math.min(...pts.map((p) => p.y)), maxX: Math.max(...pts.map((p) => p.x)), maxY: Math.max(...pts.map((p) => p.y)) },
+    transform: IDENTITY_TRANSFORM,
+    paths: [{ color: '#000000', polylines: [{ points: pts, closed: true }] }],
+    ...extra,
+  }) as unknown as SceneObject;
+const sq = (x0: number, y0: number, x1: number, y1: number): Pt[] => [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
+function gcodeOf(p: Project): { ok: boolean; g: string; segs: Seg[]; adv: string[] } {
+  const prepared = prepareOutput(p);
+  if (!prepared.ok) return { ok: false, g: '', segs: [], adv: prepared.preflight.issues.map((i) => i.code) };
+  const g = emitPreparedGcode(prepared).gcode;
+  return { ok: true, g, segs: decode(g, p.device).segs, adv: (prepared.advisories ?? []).map((i) => i.code) };
+}
+
+// ---------------- R1 variable text ----------------
+const render: VariableTextRenderer = ({ text, content }) =>
+  textToPolylines({ content, sizeMm: text.sizeMm, alignment: text.alignment, lineHeight: text.lineHeight, letterSpacing: text.letterSpacing, color: text.color, fontBuffer: font });
+
+it('R1 variable text through Union silhouette', async () => {
+  const source = 'LOT-{{serial:3}}';
+  const parsed = parseVariableTemplateSource(source);
+  if (!parsed.ok) throw new Error(parsed.message);
+  const shell = {
+    kind: 'text', id: 'VT', content: source, variableTemplate: parsed.template, fontKey: 'tinos-regular', sizeMm: 8, alignment: 'left',
+    lineHeight: 1.2, letterSpacing: 0, color: '#000000', bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+    transform: { ...IDENTITY_TRANSFORM, x: 20, y: 30 }, paths: [], operationIds: ['L'],
+  } as unknown as TextObject;
+  const tmpl = await render({ text: shell, content: source, project: project([], []) });
+  const text = { ...shell, bounds: tmpl.bounds, paths: tmpl.paths } as TextObject;
+  // a backing tag that the text overlaps at its left edge, like a stencil tag
+  const tag = rect('TAG', 6, 10, 18, 30 + tmpl.bounds.minY - 1, { operationIds: ['L'] });
+  const p0 = project([text, tag], [op('L', 'line', 1500, 60)], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 7 } });
+  const snap = async (p: Project, serial: number) => {
+    const prepared = await prepareOutputSnapshot({ ...p, variables: { ...p.variables, serialValue: serial } }, { clock: () => new Date(0), renderVariableText: render });
+    if (!prepared.ok) return { L: NaN, box: [] as number[], g: '' };
+    const g = emitPreparedGcode(prepared).gcode;
+    const segs = decode(g, p.device).segs;
+    return { L: len(segs), box: bb(segs), g };
+  };
+  out(`R1 gates: union ops (text+tag) [${unionSilhouetteOperations(p0.scene, ['VT', 'TAG']).map((l) => l.id)}], (text alone) [${unionSilhouetteOperations(p0.scene, ['VT']).map((l) => l.id)}]; Weld gate (text alone) ${selectionCanWeld(p0, ['VT'])}`);
+  // Select All like a user would
+  load(p0, []);
+  st().selectAllObjects();
+  const sel = [st().selectedObjectId, ...st().additionalSelectedIds];
+  out(`R1 Select All -> ${JSON.stringify(sel)}; union ops [${unionSilhouetteOperations(p0.scene, sel as string[]).map((l) => l.id)}]`);
+  const b7 = await snap(p0, 7);
+  const b8 = await snap(p0, 8);
+  const ok = st().unionSilhouetteSelection('L');
+  const p1 = st().project;
+  const u = p1.scene.objects.find((o) => o.id.startsWith('union-'))!;
+  const a7 = await snap(p1, 7);
+  const a8 = await snap(p1, 8);
+  const v007 = await render({ text: shell, content: 'LOT-007', project: p0 });
+  out(`R1 applied ${ok}; objects ${p1.scene.objects.map((o) => `${o.kind}`).join(',')}; result variableTemplate ${JSON.stringify((u as { variableTemplate?: unknown }).variableTemplate)}; toasts ${toasts()}`);
+  out(`R1 before: serial 7 lit ${f3(b7.L)} box ${b7.box}; serial 8 lit ${f3(b8.L)} (G-code differs ${b7.g !== b8.g})`);
+  out(`R1 after : serial 7 lit ${f3(a7.L)} box ${a7.box}; serial 8 lit ${f3(a8.L)} (G-code differs ${a7.g !== a8.g})`);
+  out(`R1 oracle (own Tinos render): "LOT-007" right edge x ${f3(20 + v007.bounds.maxX)}; template "${source}" right edge x ${f3(20 + tmpl.bounds.maxX)}`);
+  // Weld control on the same Select All
+  load(p0, sel as string[]);
+  clearToasts();
+  st().weldSelection();
+  const pw = st().project;
+  out(`R1 Weld control: objects ${pw.scene.objects.map((o) => o.kind).join(',')}; text still variable ${pw.scene.objects.some((o) => o.kind === 'text' && (o as TextObject).variableTemplate !== undefined)}; toasts ${toasts()}`);
+});
+
+// ---------------- R2 image mask ----------------
+class ReadyImage {
+  complete = true; naturalWidth = 40; naturalHeight = 40; width = 40; height = 40; src = ''; onload: unknown = null; onerror: unknown = null; decoding = 'async';
+  addEventListener() {} removeEventListener() {} decode() { return Promise.resolve(); }
+}
+function recorder() {
+  const log: Array<{ op: string; depth: number }> = [];
+  const stack: number[] = [];
+  let depth = 0;
+  const target: Record<string, unknown> = {};
+  const ctx = new Proxy(target, {
+    get: (_t, k) => {
+      if (typeof k !== 'string' || k === 'then') return undefined;
+      if (k in target) return target[k];
+      if (k === 'canvas') return { width: 800, height: 600 };
+      if (k === 'measureText') return () => ({ width: 10 });
+      if (k === 'getTransform') return () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
+      if (k.startsWith('create')) return () => ({ addColorStop() {}, setTransform() {} });
+      if (k === 'getLineDash') return () => [];
+      return (..._a: unknown[]) => {
+        if (k === 'save') stack.push(depth);
+        if (k === 'restore') depth = stack.pop() ?? 0;
+        if (k === 'clip') depth += 1;
+        if (k === 'drawImage') log.push({ op: k, depth });
+      };
+    },
+    set: (_t, k, v) => { target[k as string] = v; return true; },
+  });
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, log };
+}
+const canvasClip = (p: Project) => {
+  const r = recorder();
+  drawScene(r.ctx, 800, 600, p, { selectedId: null, preview: false } as never);
+  return r.log.map((e) => e.depth).join(',');
+};
+
+it('R2 image mask source unioned (and Weld, Subtract)', () => {
+  vi.stubGlobal('Image', ReadyImage);
+  const N = 40;
+  const photo = {
+    kind: 'raster-image', id: 'photo', source: 'p.png', dataUrl: 'data:image/png;base64,AAAA', pixelWidth: N, pixelHeight: N,
+    bounds: { minX: 0, minY: 0, maxX: 40, maxY: 40 }, transform: { ...IDENTITY_TRANSFORM, x: 50, y: 50 }, color: '#808080',
+    operationIds: ['img'], dither: 'threshold', linesPerMm: 2, lumaBase64: lumaToBase64(new Uint8Array(N * N).fill(0)),
+  } as unknown as RasterImage;
+  const layers: Layer[] = [
+    { ...createLayer({ id: 'img', color: '#808080', name: 'Image', mode: 'image' }), linesPerMm: 2, speed: 3000, power: 50 } as Layer,
+    { ...createLayer({ id: 'guide', color: '#00aa00', name: 'Guide', mode: 'line' }), output: false } as Layer,
+  ];
+  // photo: where does it burn unmasked?
+  const pU = project([photo], layers);
+  const gU = gcodeOf(pU);
+  out(`R2 unmasked photo: lit ${f3(len(gU.segs))} mm box ${bb(gU.segs)}`);
+  const [x0, y0, x1, y1] = bb(gU.segs);
+  const cx = (x0! + x1!) / 2, cy = (y0! + y1!) / 2;
+  // mask: 16x16 square centred; extension: 6x4 ear on its right edge (world coordinates, identity transform)
+  const maskBox = sq(cx - 8, cy - 8, cx + 8, cy + 8);
+  const earBox = sq(cx + 6, cy - 2, cx + 12, cy + 2);
+  const mask = poly('mask', maskBox, { operationIds: ['guide'] });
+  const ear = poly('ear', earBox, { operationIds: ['guide'] });
+  const inMask = (p: Pt) => p.x >= cx - 8.001 && p.x <= cx + 8.001 && p.y >= cy - 8.001 && p.y <= cy + 8.001;
+  const inUnion = (p: Pt) => inMask(p) || (p.x >= cx + 5.999 && p.x <= cx + 12.001 && p.y >= cy - 2.001 && p.y <= cy + 2.001);
+  load(project([photo, mask, ear], layers), []);
+  st().applyImageMask('photo', 'mask');
+  const pm = st().project;
+  const gm = gcodeOf(pm);
+  out(`R2 masked: lit ${f3(len(gm.segs))} box ${bb(gm.segs)}; outside mask ${f3(lenOutside(gm.segs, inMask))} mm; canvas clip depth at drawImage [${canvasClip(pm)}]`);
+  for (const tool of ['union', 'weld', 'subtract'] as const) {
+    load(pm, ['mask', 'ear']);
+    clearToasts();
+    if (tool === 'union') {
+      out(`R2 union gate ops [${unionSilhouetteOperations(pm.scene, ['mask', 'ear']).map((l) => l.id)}]`);
+      st().unionSilhouetteSelection('guide');
+    } else if (tool === 'weld') st().weldSelection();
+    else st().booleanSelection('subtract');
+    const p1 = st().project;
+    const img = p1.scene.objects.find((o) => o.id === 'photo') as RasterImage;
+    const g1 = gcodeOf(p1);
+    const pre = runPreflight(p1, g1.g);
+    out(`R2 ${tool}: objects [${p1.scene.objects.map((o) => o.id.slice(0, 12))}]; imageMaskId=${img.imageMaskId} live=${p1.scene.objects.some((o) => o.id === img.imageMaskId)}; lit ${f3(len(g1.segs))} box ${bb(g1.segs)}; outside mask∪ear ${f3(lenOutside(g1.segs, inUnion))} mm; preflight [${pre.issues.map((i) => i.code)}] advisories [${g1.adv}]; canvas clip depth [${canvasClip(p1)}]; toasts ${toasts()}`);
+    if (tool === 'union') {
+      const re = deserializeProject(serializeProject(p1));
+      const rp = re.kind === 'ok' ? re.project : null;
+      const reImg = (rp as Project | null)?.scene.objects.find((o) => o.id === 'photo') as RasterImage | undefined;
+      out(`R2 union save/reopen: kind ${(re as { kind?: string }).kind}; imageMaskId=${reImg?.imageMaskId}`);
+      st().undo();
+      const pu = st().project;
+      out(`R2 union undo: imageMaskId=${(pu.scene.objects.find((o) => o.id === 'photo') as RasterImage).imageMaskId}, mask live ${pu.scene.objects.some((o) => o.id === 'mask')}; outside mask ${f3(lenOutside(gcodeOf(pu).segs, inMask))}`);
+    }
+  }
+  // Delete control
+  load(pm, ['mask']);
+  clearToasts();
+  st().removeSceneObject('mask');
+  const pd = st().project;
+  out(`R2 Delete control: imageMaskId=${(pd.scene.objects.find((o) => o.id === 'photo') as RasterImage).imageMaskId}; lit ${f3(len(gcodeOf(pd).segs))}; toasts ${toasts()}`);
+  vi.unstubAllGlobals();
+});
+
+// ---------------- R3 registration jig ----------------
+it('R3 registration jig', () => {
+  const art = op('art', 'line', 2000, 70);
+  const reg = createRegistrationLayer();
+  const boxA = createRegistrationBox({ widthMm: 50, heightMm: 50, x: 0, y: 0, id: 'boxA' });
+  const boxB = createRegistrationBox({ widthMm: 50, heightMm: 50, x: 60, y: 0, id: 'boxB' });
+  const s1 = rect('S1', 20, 10, 10, 20, { operationIds: ['art'] });
+  const s2 = rect('S2', 10, 20, 25, 15, { operationIds: ['art'] });
+  const p0 = project([boxA, boxB, s1, s2], [reg, art]);
+  load(p0, ['S1', 'S2']);
+  useStore.setState(applyCenterArtworkInRegistrationJigSet(st()) as never);
+  // ADR-606: jig editor Save locks the outlines
+  const pj0 = st().project;
+  const pj: Project = { ...pj0, scene: { ...pj0.scene, objects: pj0.scene.objects.map((o) => (o.id === 'boxA' || o.id === 'boxB' ? { ...o, locked: true } : o)) } };
+  const inst = registrationJigArtworkInstances(pj.scene).map((i) => `${i.boxId}:[${i.objects.map((o) => o.id.slice(0, 14))}]`);
+  const order = (p: Project) => {
+    const segs = gcodeOf(p).segs;
+    const seq: string[] = [];
+    for (const g of segs) {
+      const tag = g.a.x < 55 ? 'A' : 'B';
+      if (seq[seq.length - 1] !== tag) seq.push(tag);
+    }
+    return `${seq.join('>')} lit ${f3(len(segs))}`;
+  };
+  out(`R3 jig instances ${inst.join(' ')}; runs ${registrationJigCompilationRuns(pj.scene)?.length ?? 0}; burn order ${order(pj)}`);
+  // (d) ordinary: select the two sources in box A only
+  const srcIds = registrationJigArtworkInstances(pj.scene).find((i) => i.boxId === 'boxA')!.objects.map((o) => o.id);
+  load(pj, srcIds);
+  out(`R3d gate ops on sources in A [${unionSilhouetteOperations(pj.scene, srcIds).map((l) => l.id)}]; Weld gate ${selectionCanWeld(pj, srcIds)}`);
+  st().unionSilhouetteSelection('art');
+  const pd = st().project;
+  out(`R3d union of A's sources: boxes ${findRegistrationBoxes(pd.scene).length}; instances ${registrationJigArtworkInstances(pd.scene).map((i) => `${i.boxId}:${i.objects.length}`)}; runs ${registrationJigCompilationRuns(pd.scene)?.length ?? 0}; order ${order(pd)}; toasts ${toasts()}`);
+  // Weld control on A's sources
+  load(pj, srcIds);
+  clearToasts();
+  st().weldSelection();
+  out(`R3d Weld control: changed ${st().project !== pj}; toasts ${toasts()}`);
+  // (c) Select All with locked boxes
+  load(pj, []);
+  clearToasts();
+  st().selectAllObjects();
+  const all = [st().selectedObjectId, ...st().additionalSelectedIds] as string[];
+  out(`R3c Select All (boxes locked) -> ${all.length} objects; gate ops [${unionSilhouetteOperations(pj.scene, all).map((l) => l.id)}]`);
+  st().unionSilhouetteSelection('art');
+  const pc = st().project;
+  out(`R3c union: boxes ${findRegistrationBoxes(pc.scene).length}; runs ${registrationJigCompilationRuns(pc.scene)?.length ?? 0}; order ${order(pc)}; toasts ${toasts()}`);
+});
+
+// ---------------- R4 placed tabs ----------------
+it('R4 placed tabs', () => {
+  const L = op('L', 'line', 1000, 80, { tabsEnabled: true, tabSizeMm: 1.5, tabsPerShape: 3 } as Partial<Layer>);
+  const A = rect('A', 30, 30, 10, 10, { operationIds: ['L'], laserTabAnchors: [
+    { layerColor: '#000000', pathIndex: 0, polylineIndex: 0, pathT: 0.125 },
+    { layerColor: '#000000', pathIndex: 0, polylineIndex: 0, pathT: 0.625 },
+  ] });
+  const B = rect('B', 10, 10, 35, 20, { operationIds: ['L'] });
+  const p0 = project([A, B], [L]);
+  const g0 = gcodeOf(p0).segs;
+  out(`R4 before: lit ${f3(len(g0))}, lit runs ${runs(g0)} (A: 2 placed tabs -> 2 runs; B: 3 auto -> 3 runs)`);
+  for (const tool of ['union', 'weld'] as const) {
+    load(p0, ['A', 'B']);
+    clearToasts();
+    if (tool === 'union') st().unionSilhouetteSelection('L');
+    else st().weldSelection();
+    const p1 = st().project;
+    const g1 = gcodeOf(p1).segs;
+    out(`R4 ${tool}: objects ${p1.scene.objects.length}; anchors ${JSON.stringify((p1.scene.objects[0] as { laserTabAnchors?: unknown }).laserTabAnchors)}; lit ${f3(len(g1))} of perimeter 130.000; runs ${runs(g1)}; ${byFS(g1)}; toasts ${toasts()}`);
+  }
+});
+
+it('R3e jig: sources in box A unioned, per-box burn', () => {
+  const art = op('art', 'line', 2000, 70);
+  const reg = { ...createRegistrationLayer(), output: false } as Layer;
+  const boxA = createRegistrationBox({ widthMm: 50, heightMm: 50, x: 0, y: 0, id: 'boxA' });
+  const boxB = createRegistrationBox({ widthMm: 50, heightMm: 50, x: 60, y: 0, id: 'boxB' });
+  const s1 = rect('S1', 20, 10, 10, 20, { operationIds: ['art'] });
+  const s2 = rect('S2', 10, 20, 25, 15, { operationIds: ['art'] });
+  load(project([boxA, boxB, s1, s2], [reg, art]), ['S1', 'S2']);
+  useStore.setState(applyCenterArtworkInRegistrationJigSet(st()) as never);
+  const pj0 = st().project;
+  const pj: Project = { ...pj0, scene: { ...pj0.scene, objects: pj0.scene.objects.map((o) => (o.id.startsWith('box') ? { ...o, locked: true } : o)) } };
+  const perBox = (p: Project) => {
+    const segs = gcodeOf(p).segs;
+    const a = segs.filter((g) => g.a.x < 55), b = segs.filter((g) => g.a.x >= 55);
+    return `A lit ${f3(len(a))} runs ${runs(a)} | B lit ${f3(len(b))} runs ${runs(b)}`;
+  };
+  const srcIds = registrationJigArtworkInstances(pj.scene).find((i) => i.boxId === 'boxA')!.objects.map((o) => o.id);
+  const fitted = pj.scene.objects.filter((o) => srcIds.includes(o.id)).map((o) => o.transform);
+  out(`R3e before: ${perBox(pj)}; source transforms ${JSON.stringify(fitted.map((t) => [t.x, t.y, t.scaleX, t.scaleY].map((v) => +v.toFixed(3))))}`);
+  load(pj, srcIds);
+  st().unionSilhouetteSelection('art');
+  const p1 = st().project;
+  out(`R3e after union of A's sources: ${perBox(p1)}; jig instances ${registrationJigArtworkInstances(p1.scene).map((i) => `${i.boxId}:${i.objects.length}`)}; union jig identity ${JSON.stringify((p1.scene.objects.find((o) => o.id.startsWith('union-')) as { registrationJig?: unknown }).registrationJig)}`);
+});

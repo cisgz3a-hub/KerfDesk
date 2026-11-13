@@ -1,0 +1,112 @@
+// T28 oracle: chain decoded lit moves into loops, and compare filled regions on a
+// scanline grid (exact interval arithmetic per row), independent of Clipper.
+import type { LitMove, Vec } from './decode';
+
+export type Group = { contours: Vec[][]; rule: 'evenodd' | 'nonzero' };
+
+/** Chain consecutive lit moves that join end to start into contours. */
+export function loops(moves: ReadonlyArray<LitMove>, tol = 2e-3): Vec[][] {
+  const out: Vec[][] = [];
+  let cur: Vec[] = [];
+  for (const m of moves) {
+    const last = cur[cur.length - 1];
+    if (last === undefined || Math.hypot(last.x - m.from.x, last.y - m.from.y) > tol) {
+      if (cur.length > 2) out.push(cur);
+      cur = [m.from];
+    }
+    cur.push(m.to);
+  }
+  if (cur.length > 2) out.push(cur);
+  return out;
+}
+
+type Iv = [number, number];
+
+function rowIntervals(g: Group, y: number): Iv[] {
+  const xs: { x: number; w: number }[] = [];
+  for (const c of g.contours)
+    for (let i = 0; i < c.length; i++) {
+      const a = c[i]!;
+      const b = c[(i + 1) % c.length]!;
+      if ((a.y <= y && b.y > y) || (b.y <= y && a.y > y)) {
+        const t = (y - a.y) / (b.y - a.y);
+        xs.push({ x: a.x + t * (b.x - a.x), w: b.y > a.y ? 1 : -1 });
+      }
+    }
+  xs.sort((p, q) => p.x - q.x);
+  const res: Iv[] = [];
+  let wind = 0;
+  let parity = 0;
+  for (let i = 0; i < xs.length - 1; i++) {
+    wind += xs[i]!.w;
+    parity ^= 1;
+    const inside = g.rule === 'evenodd' ? parity === 1 : wind !== 0;
+    if (inside && xs[i + 1]!.x > xs[i]!.x) res.push([xs[i]!.x, xs[i + 1]!.x]);
+  }
+  return res;
+}
+
+function unionIv(list: Iv[]): Iv[] {
+  const s = [...list].sort((a, b) => a[0] - b[0]);
+  const out: Iv[] = [];
+  for (const iv of s) {
+    const last = out[out.length - 1];
+    if (last && iv[0] <= last[1]) last[1] = Math.max(last[1], iv[1]);
+    else out.push([iv[0], iv[1]]);
+  }
+  return out;
+}
+
+function len(list: Iv[]): number {
+  return list.reduce((n, [a, b]) => n + (b - a), 0);
+}
+
+function interLen(a: Iv[], b: Iv[]): number {
+  let i = 0;
+  let j = 0;
+  let n = 0;
+  while (i < a.length && j < b.length) {
+    const lo = Math.max(a[i]![0], b[j]![0]);
+    const hi = Math.min(a[i]![1], b[j]![1]);
+    if (hi > lo) n += hi - lo;
+    if (a[i]![1] < b[j]![1]) i++;
+    else j++;
+  }
+  return n;
+}
+
+/** Area of union(oracle groups) and union(actual groups) and their symmetric difference. */
+export function compareRegions(oracle: Group[], actual: Group[], step = 0.02) {
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const g of [...oracle, ...actual])
+    for (const c of g.contours)
+      for (const p of c) {
+        minY = Math.min(minY, p.y);
+        maxY = Math.max(maxY, p.y);
+      }
+  let ao = 0;
+  let aa = 0;
+  let xor = 0;
+  for (let y = minY + step / 2; y < maxY; y += step) {
+    const o = unionIv(oracle.flatMap((g) => rowIntervals(g, y)));
+    const a = unionIv(actual.flatMap((g) => rowIntervals(g, y)));
+    const lo = len(o);
+    const la = len(a);
+    ao += lo * step;
+    aa += la * step;
+    xor += (lo + la - 2 * interLen(o, a)) * step;
+  }
+  return { oracle: ao, actual: aa, xor };
+}
+
+export function perimeter(contours: Vec[][]): number {
+  let n = 0;
+  for (const c of contours)
+    for (let i = 0; i < c.length; i++) {
+      const a = c[i]!;
+      const b = c[(i + 1) % c.length]!;
+      n += Math.hypot(b.x - a.x, b.y - a.y);
+    }
+  return n;
+}

@@ -1,0 +1,125 @@
+// @vitest-environment jsdom
+// T29 Union silhouette: geometry against an independent scanline oracle and analytic numbers,
+// through the real store action and prepareOutput -> G-code.
+import { beforeEach, it } from 'vitest';
+import { IDENTITY_TRANSFORM, type ImportedSvg, type Project, type SceneObject } from '../t29-main/src/core/scene';
+import { materializeVectorObject } from '../t29-main/src/core/geometry/vector-path-tools';
+import { resetStore } from '../t29-main/src/ui/state/test-helpers';
+import { unionSilhouetteOperations } from '../t29-main/src/ui/commands/selection-command-state';
+import { compareRegions, loops, perimeter, type Group } from './oracle';
+import { totalLen } from './decode';
+import { box, burn, circ, clearToasts, f3, layer, logger, proj, rect, ring, setProject, st, svg, textObj, toasts, type P } from './common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t29/t29-geom-G4.log');
+beforeEach(() => {
+  resetStore();
+  clearToasts();
+});
+
+/** Oracle groups: each source path in world space with its own fill rule (text non-zero). */
+function oracleGroups(objects: SceneObject[]): Group[] {
+  return objects.flatMap((o) => {
+    const m = materializeVectorObject(o as never);
+    return m.paths.map((p) => ({
+      contours: p.polylines.map((l) => l.points.map((q) => ({ x: q.x, y: q.y }))),
+      rule: o.kind === 'text' || p.fillRule === 'nonzero' ? ('nonzero' as const) : ('evenodd' as const),
+    }));
+  });
+}
+
+function runCase(name: string, objects: SceneObject[], expect: { area?: number; perim?: number } = {}) {
+  const L = layer('L', 'line', 1000, 50);
+  const objs = objects.map((o) => ({ ...o, operationIds: ['L'] }) as SceneObject);
+  const p0 = proj(objs, [L]);
+  const ids = objs.map((o) => o.id);
+  setProject(p0, ids);
+  const ops = unionSilhouetteOperations(p0.scene, ids).map((l) => l.id);
+  const t0 = performance.now();
+  const applied = st().unionSilhouetteSelection('L');
+  const ms = performance.now() - t0;
+  const p1 = st().project;
+  const res = p1.scene.objects.find((o) => o.id.startsWith('union-')) as ImportedSvg | undefined;
+  if (!applied || res === undefined) {
+    out(`${name}: menu ops [${ops}] applied=${applied} objects=${p1.scene.objects.length} toasts ${JSON.stringify(toasts())}`);
+    return;
+  }
+  const oracle = oracleGroups(objs);
+  const resContours = res.paths.flatMap((p) => p.polylines.map((l) => l.points.map((q) => ({ x: q.x, y: q.y }))));
+  const geo = compareRegions(oracle, [{ contours: resContours, rule: 'evenodd' }], 0.01);
+  const b = burn(p1);
+  const burnLoops = loops(b.moves);
+  const bg = compareRegions(oracle, [{ contours: burnLoops, rule: 'evenodd' }], 0.01);
+  const lit = totalLen(b.moves);
+  out(
+    `${name}: ops [${ops}] ${f3(ms)} ms; result contours ${resContours.length}; area oracle ${f3(geo.oracle)} result ${f3(geo.actual)} xor ${f3(geo.xor)}; ` +
+      `burn loops ${burnLoops.length} burn area ${f3(bg.actual)} xor ${f3(bg.xor)}; lit ${f3(lit)} perimeter(result) ${f3(perimeter(resContours))}` +
+      (expect.area !== undefined ? `; ANALYTIC area ${f3(expect.area)}` : '') +
+      (expect.perim !== undefined ? ` perim ${f3(expect.perim)}` : '') +
+      `; objects after ${p1.scene.objects.length}; toast ${JSON.stringify(toasts())}`,
+  );
+}
+
+it('G1 overlapping rectangles (ADR fixture)', () => {
+  runCase('G1 overlap 60x40@(40,40)+(70,60)', [rect('A', 60, 40, { x: 40, y: 40 }), rect('B', 60, 40, { x: 70, y: 60 })], { area: 4200, perim: 300 });
+});
+it('G2 touching and disjoint', () => {
+  runCase('G2a touching edge', [svg('A', [box(0, 0, 10, 10)]), svg('B', [box(10, 0, 10, 10)])], { area: 200, perim: 60 });
+  runCase('G2b corner touch', [svg('A', [box(0, 0, 10, 10)]), svg('B', [box(10, 10, 10, 10)])], { area: 200, perim: 80 });
+  runCase('G2c disjoint', [svg('A', [box(0, 0, 10, 10)]), svg('B', [box(30, 0, 5, 5)])], { area: 125, perim: 60 });
+});
+it('G3 nested, holes, islands', () => {
+  // separate objects nested: inner swallowed
+  runCase('G3a nested separate squares', [svg('A', [box(0, 0, 40, 40)]), svg('B', [box(10, 10, 20, 20)])], { area: 1600, perim: 160 });
+  // ring as one object (even-odd hole), plus an island inside the hole
+  runCase('G3b ring+island', [svg('R', [box(0, 0, 40, 40), box(10, 10, 20, 20)]), svg('I', [box(15, 15, 10, 10)])], { area: 1200 + 100, perim: 160 + 80 + 40 });
+  // ring + shape filling half the hole
+  runCase('G3c ring+half hole', [svg('R', [box(0, 0, 40, 40), box(10, 10, 20, 20)]), svg('H', [box(5, 5, 15, 30)])], { area: 1200 + 200, perim: 160 + 40 + 20 * 2 });
+  // island inside a hole inside a ring, as ONE object with three nested contours (even-odd)
+  runCase('G3d one-object triple nest', [svg('T', [box(0, 0, 40, 40), box(10, 10, 20, 20), box(15, 15, 10, 10)]), svg('X', [box(50, 0, 5, 5)])], { area: 1300 + 25, perim: 160 + 80 + 40 + 20 });
+});
+it.only('G4 text with counters', async () => {
+  runCase('G4a text "OB8a"', [await textObj('T', 'OB8a', { x: 20, y: 20 }, ['L'])]);
+  runCase('G4b text "OB8a" + bar under it', [await textObj('T', 'OB8a', { x: 20, y: 20 }, ['L']), svg('BAR', [box(18, 30, 60, 3)])]);
+});
+it('G5 self-crossing and curves', () => {
+  const star: P[] = Array.from({ length: 5 }, (_, i) => {
+    const a = -Math.PI / 2 + (i * 4 * Math.PI) / 5;
+    return { x: 50 + 20 * Math.cos(a), y: 50 + 20 * Math.sin(a) };
+  });
+  runCase('G5a pentagram even-odd', [svg('S', [star])]);
+  runCase('G5b pentagram nonzero', [svg('S', [star], {}, true, 'nonzero')]);
+  runCase('G5c two circles d20 overlapping', [circ('C1', 20, { x: 40, y: 40 }), circ('C2', 20, { x: 50, y: 40 })], {
+    // analytic lens: two r=10 circles, centres 10 apart
+    area: 2 * Math.PI * 100 - (2 * 100 * Math.acos(10 / 20) - 5 * Math.sqrt(400 - 100)),
+    perim: 2 * (2 * Math.PI * 10) - 2 * (2 * 10 * Math.acos(10 / 20)),
+  });
+});
+it('G6 transforms', () => {
+  runCase('G6a rotated 30 + mirrored + scaled rect over ellipse', [
+    rect('A', 30, 10, { x: 40, y: 40, rotationDeg: 30, mirrorX: true, scaleX: 1.5, scaleY: 0.7 }),
+    circ('B', 20, { x: 50, y: 45, scaleX: 2, scaleY: 0.5, rotationDeg: -20, mirrorY: true }),
+  ]);
+  runCase('G6b negative scale rect', [rect('A', 30, 10, { x: 40, y: 40, scaleX: -1 }), rect('B', 10, 30, { x: 40, y: 40, scaleY: -2 })]);
+});
+it('G7 open, degenerate, single, many', () => {
+  runCase('G7a open path in selection', [svg('O', [[{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }]], {}, false), svg('A', [box(0, 0, 5, 5)])]);
+  runCase('G7b zero-area closed polygon only', [svg('Z', [[{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 20, y: 0 }]])]);
+  runCase('G7c zero-area + real', [svg('Z', [[{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 20, y: 0 }]]), svg('A', [box(0, 0, 5, 5)])], { area: 25, perim: 20 });
+  runCase('G7d single object', [svg('A', [box(0, 0, 5, 5), box(1, 1, 1, 1)])], { area: 24, perim: 24 });
+  runCase('G7e tiny 0.0004 mm square + 5mm', [svg('T', [box(100, 100, 0.0004, 0.0004)]), svg('A', [box(0, 0, 5, 5)])], { area: 25 });
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const many = Array.from({ length: 800 }, (_, i) => svg(`M${i}`, [box(10 + rnd() * 200, 10 + rnd() * 150, 1 + rnd() * 15, 1 + rnd() * 15)]));
+  runCase('G7f 800 random rectangles', many);
+  runCase('G7g huge 2000 mm squares', [svg('A', [box(0, 0, 2000, 2000)]), svg('B', [box(1000, 1000, 2000, 2000)])], { area: 7_000_000, perim: 12000 });
+});
+it('G8 menu rule', () => {
+  const objs = [svg('A', [box(0, 0, 10, 10)], { operationIds: ['L'] }), svg('B', [box(5, 5, 10, 10)], { operationIds: ['L'], locked: true })];
+  const p: Project = proj(objs, [layer('L', 'line', 1000, 50)]);
+  out(`G8a one locked in selection: ops ${unionSilhouetteOperations(p.scene, ['A', 'B']).length}`);
+  out(`G8b empty selection: ops ${unionSilhouetteOperations(p.scene, []).length}`);
+  const unassigned = proj([svg('A', [box(0, 0, 10, 10)]), svg('B', [box(5, 5, 10, 10)])], [layer('L', 'line', 1000, 50)]);
+  out(`G8c unassigned art (no operationIds, colour #000000 = layer colour): ops ${unionSilhouetteOperations(unassigned.scene, ['A', 'B']).map((l) => l.id)}`);
+  void IDENTITY_TRANSFORM;
+  void ring;
+});

@@ -1,0 +1,320 @@
+// @vitest-environment jsdom
+// T29 Union silhouette: what the result inherits and what burns.
+import { beforeEach, it } from 'vitest';
+import {
+  createRegistrationLayer,
+  DEFAULT_PROJECT_VARIABLE_DATA,
+  IDENTITY_TRANSFORM,
+  createLayer,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type RasterImage,
+  type SceneObject,
+  type TextObject,
+} from '../t29-main/src/core/scene';
+import { createRegistrationBox } from '../t29-main/src/core/shapes';
+import { registrationJigCopyId } from '../t29-main/src/core/scene/registration-jig-artwork';
+import { registrationJigCompilationRuns } from '../t29-main/src/core/job/registration-jig-compilation-runs';
+import { findRegistrationBoxes } from '../t29-main/src/core/scene/registration-layer';
+import { compileJob } from '../t29-main/src/core/job';
+import { runPreflight } from '../t29-main/src/core/preflight';
+import { textToPolylines } from '../t29-main/src/core/text';
+import { prepareOutputSnapshot, type VariableTextRenderer } from '../t29-main/src/io/gcode/prepare-output-snapshot';
+import { emitPreparedGcode } from '../t29-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t29-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t29-main/src/io/project/deserialize-project';
+import { lumaToBase64 } from '../t29-main/src/ui/raster/luma-bitmap';
+import { resetStore } from '../t29-main/src/ui/state/test-helpers';
+import { unionSilhouetteOperations } from '../t29-main/src/ui/commands/selection-command-state';
+import { litMoves, totalLen, bbox, type LitMove } from './decode';
+import { compareRegions, loops } from './oracle';
+import { box, burn, byFS, circ, clearToasts, f3, layer, logger, proj, rect, roboto, setProject, st, svg, toasts } from './common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t29/t29-burn.log');
+beforeEach(() => {
+  resetStore();
+  clearToasts();
+});
+const renderer: VariableTextRenderer = ({ text, content }) =>
+  textToPolylines({ content, sizeMm: text.sizeMm, alignment: text.alignment, lineHeight: text.lineHeight, letterSpacing: text.letterSpacing, color: text.color, fontBuffer: roboto });
+const ids = (p: Project) => p.scene.objects.map((o) => o.id).join(',');
+
+it('B1 mixed operations, power scale, overrides, undo/redo, save/reopen', () => {
+  const L1 = layer('L1', 'line', 1000, 80);
+  const L2 = layer('L2', 'fill', 3000, 30, { hatchSpacingMm: 0.1, color: '#0000ff' } as Partial<Layer>);
+  const A = rect('A', 20, 10, { x: 10, y: 10 }, { operationIds: ['L1'], powerScale: 50, name: 'Alpha', operationOverride: { byOperation: { L1: { power: 12, speed: 777 } } } });
+  const B = rect('B', 20, 10, { x: 20, y: 15 }, { operationIds: ['L2'], name: 'Beta' });
+  const C = rect('C', 6, 6, { x: 60, y: 60 }, { operationIds: ['L1'] }); // not selected, keeps L1 alive
+  const p0 = proj([A, B, C], [L1, L2]);
+  for (const choice of ['L1', 'L2']) {
+    setProject(p0, ['A', 'B']);
+    clearToasts();
+    const before = burn(p0);
+    const ops = unionSilhouetteOperations(p0.scene, ['A', 'B']).map((l) => `${l.id}/${l.mode}`);
+    st().unionSilhouetteSelection(choice);
+    const p1 = st().project;
+    const u = p1.scene.objects.find((o) => o.id.startsWith('union-')) as ImportedSvg;
+    const after = burn(p1);
+    out(`B1 choose ${choice}: menu ops [${ops}]; before ${byFS(before.moves)}; after ${byFS(after.moves)}`);
+    out(`   result: name=${u.name} powerScale=${u.powerScale} override=${JSON.stringify(u.operationOverride)} opIds=${u.operationIds} colour=${u.paths[0]?.color} source=${u.source}; objects ${ids(p1)}; layers ${p1.scene.layers.map((l) => l.id)}; selected ${st().selectedObjectId}; dirty ${st().dirty}; undo ${st().undoStack.length}; toasts ${JSON.stringify(toasts())}`);
+    st().undo();
+    const pu = st().project;
+    out(`   undo restores exactly: ${JSON.stringify(pu) === JSON.stringify(p0)}; selected ${st().selectedObjectId},${[...st().additionalSelectedIds]}`);
+    st().redo();
+    const pr = st().project;
+    out(`   redo equals result: ${JSON.stringify(pr) === JSON.stringify(p1)}`);
+    const re = deserializeProject(serializeProject(p1));
+    if (re.kind === 'ok') {
+      const rp = (re as { project: Project }).project;
+      const rb = burn(rp);
+      out(`   save/reopen burn same: ${byFS(rb.moves) === byFS(after.moves)} (${re.kind})`);
+    } else out(`   reopen failed ${JSON.stringify(re)}`);
+  }
+});
+
+it('B2 same operation, different path colours (T28-P2-2 twin)', () => {
+  const L = layer('L', 'line', 1000, 50);
+  const A = rect('A', 20, 10, { x: 10, y: 10 }, { operationIds: ['L'] });
+  const B = { ...rect('B', 20, 10, { x: 20, y: 15 }, { operationIds: ['L'] }) } as SceneObject;
+  const Bc = { ...B, color: '#ff0000', paths: (B as ImportedSvg).paths.map((p) => ({ ...p, color: '#ff0000' })) } as SceneObject;
+  const p0 = proj([A, Bc], [L]);
+  setProject(p0, ['A', 'B']);
+  const ops = unionSilhouetteOperations(p0.scene, ['A', 'B']).map((l) => l.id);
+  st().unionSilhouetteSelection('L');
+  const b = burn(st().project);
+  out(`B2 menu ops [${ops}]; lit after ${f3(totalLen(b.moves))} (oracle union perimeter 80.000); objects ${ids(st().project)}; toasts ${JSON.stringify(toasts())}`);
+});
+
+it('B3 variable text + plate', async () => {
+  const template = 'SN {{serial:4}}';
+  const base = {
+    kind: 'text', id: 'VT', content: template,
+    variableTemplate: { tokens: [{ kind: 'literal', value: 'SN ' }, { kind: 'serial', prefix: '', width: 4 }] },
+    fontKey: 'roboto-regular', sizeMm: 10, alignment: 'left', lineHeight: 1.4, letterSpacing: 0, color: '#000000',
+    bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 }, transform: { ...IDENTITY_TRANSFORM, x: 50, y: 50 }, paths: [], operationIds: ['L'],
+  } as unknown as TextObject;
+  const src = await renderer({ text: base, content: template, project: proj([], []) });
+  const text = { ...base, bounds: src.bounds, paths: src.paths } as TextObject;
+  const plate = rect('PLATE', 4, 2, { x: 49, y: 50 + src.bounds.maxY - 1 }, { operationIds: ['L'] });
+  const p0 = proj([text, plate], [layer('L', 'line', 1234, 37)], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 42 } });
+  const snap = async (p: Project) => {
+    const prepared = await prepareOutputSnapshot(p, { clock: () => new Date(0), renderVariableText: renderer });
+    if (!prepared.ok) return { len: NaN, b: null as unknown };
+    const moves = litMoves(emitPreparedGcode(prepared).gcode, p.device);
+    return { len: totalLen(moves), b: bbox(moves) };
+  };
+  out(`B3 menu ops with only the variable text selected: [${unionSilhouetteOperations(p0.scene, ['VT']).map((l) => l.id)}]; with plate: [${unionSilhouetteOperations(p0.scene, ['VT', 'PLATE']).map((l) => l.id)}]`);
+  setProject(p0, ['VT', 'PLATE']);
+  const before = await snap(p0);
+  st().unionSilhouetteSelection('L');
+  const p1 = st().project;
+  const after = await snap(p1);
+  const value = await renderer({ text: base, content: 'SN 0042', project: p0 });
+  out(`B3 objects after ${p1.scene.objects.map((o) => `${o.id.slice(0, 12)}:${o.kind}`).join(',')}`);
+  out(`B3 before lit ${f3(before.len)} bbox ${JSON.stringify(before.b)}`);
+  out(`B3 after  lit ${f3(after.len)} bbox ${JSON.stringify(after.b)}`);
+  out(`B3 oracle: value "SN 0042" width ${f3(value.bounds.maxX - value.bounds.minX)} mm; template width ${f3(src.bounds.maxX - src.bounds.minX)} mm`);
+  const after43 = await snap({ ...p1, variables: { ...p1.variables, serialValue: 43 } });
+  const before43 = await snap({ ...p0, variables: { ...p0.variables, serialValue: 43 } });
+  out(`B3 serial 43: before-union lit ${f3(before43.len)} (changes: ${Math.abs(before43.len - before.len) > 1e-6}); after-union lit ${f3(after43.len)} (changes: ${Math.abs(after43.len - after.len) > 1e-6})`);
+  out(`B3 toasts ${JSON.stringify(toasts())}`);
+  // variable text alone, single object
+  setProject(p0, ['VT']);
+  clearToasts();
+  const applied = st().unionSilhouetteSelection('L');
+  const s1 = await snap(st().project);
+  out(`B3b variable text alone: applied ${applied}; lit ${f3(s1.len)} bbox ${JSON.stringify(s1.b)}; toasts ${JSON.stringify(toasts())}`);
+});
+
+it('B4 registration jig', () => {
+  const BOX_A = '379754e4-b1f1-45b1-853d-75a769147a71';
+  const BOX_B = '389754e4-b1f1-45b1-853d-75a769147a72';
+  const SRC = 'd9c94761-4f55-4e18-b166-3dbb322a789a';
+  const SRC2 = 'e9c94761-4f55-4e18-b166-3dbb322a789b';
+  const boxes = [BOX_A, BOX_B].map((id, i) => createRegistrationBox({ id, widthMm: 60, heightMm: 60, x: 10 + i * 80, y: 10 }));
+  const s1 = circ(SRC, 20, { x: 25, y: 25 }, { operationIds: ['art'] });
+  const s2 = circ(SRC2, 20, { x: 35, y: 30 }, { operationIds: ['art'] });
+  const c1 = { ...s1, id: registrationJigCopyId(SRC, BOX_B), transform: { ...s1.transform, x: 105 } };
+  const c2 = { ...s2, id: registrationJigCopyId(SRC2, BOX_B), transform: { ...s2.transform, x: 115 } };
+  const eng = rect('ENG', 6, 6, { x: 30, y: 50 }, { operationIds: ['eng'] });
+  const engC = { ...eng, id: registrationJigCopyId('ENG', BOX_B), transform: { ...eng.transform, x: 110 } };
+  const layers = [{ ...createRegistrationLayer(), output: false }, layer('eng', 'line', 1111, 10), layer('art', 'line', 2222, 90)];
+  const order = (p: Project) =>
+    burn(p).moves.reduce<string[]>((acc, m) => {
+      const tag = `F${m.f}@${m.from.x < 85 ? 'A' : 'B'}`;
+      if (acc.at(-1) !== tag) acc.push(tag);
+      return acc;
+    }, []);
+  // (a) art + its jig copies
+  const p2 = proj([...boxes, s1, s2, c1, c2], layers);
+  const sel = [SRC, SRC2, c1.id, c2.id];
+  out(`B4a menu ops on art+copies: [${unionSilhouetteOperations(p2.scene, sel).map((l) => l.id)}]`);
+  setProject(p2, sel);
+  st().unionSilhouetteSelection('art');
+  const p3 = st().project;
+  out(`B4a boxes ${findRegistrationBoxes(p3.scene).length}; jig runs before ${registrationJigCompilationRuns(p2.scene)?.length ?? 0} after ${registrationJigCompilationRuns(p3.scene)?.length ?? 0}; objects ${p3.scene.objects.map((o) => o.id.slice(0, 8)).join(' ')}; toasts ${JSON.stringify(toasts())}`);
+  // (b) Select All (boxes unlocked)
+  const p0 = proj([...boxes, s1, s2, c1, c2, eng, engC], layers);
+  setProject(p0, []);
+  st().selectAllObjects();
+  const all = [st().selectedObjectId, ...st().additionalSelectedIds] as string[];
+  const ops = unionSilhouetteOperations(p0.scene, all).map((l) => `${l.id}(out=${l.output})`);
+  out(`B4b Select All picked ${all.length}/${p0.scene.objects.length}; menu ops [${ops}]`);
+  const o0 = order(p0);
+  const runs0 = registrationJigCompilationRuns(p0.scene)?.length ?? 0;
+  clearToasts();
+  st().unionSilhouetteSelection('art');
+  const p1 = st().project;
+  out(`B4b boxes before ${findRegistrationBoxes(p0.scene).length} after ${findRegistrationBoxes(p1.scene).length}; jig runs ${runs0} -> ${registrationJigCompilationRuns(p1.scene)?.length ?? 0}; layers ${p1.scene.layers.map((l) => l.id)}`);
+  out(`B4b order before: ${o0.join(' > ')}`);
+  out(`B4b order after:  ${order(p1).join(' > ')}; lit before ${byFS(burn(p0).moves)}; after ${byFS(burn(p1).moves)}; toasts ${JSON.stringify(toasts())}`);
+  // (c) locked boxes (jig editor Save locks them, ADR-606)
+  const lockedBoxes = boxes.map((b) => ({ ...b, locked: true }) as SceneObject);
+  const p4 = proj([...lockedBoxes, s1, s2, c1, c2, eng, engC], layers);
+  setProject(p4, []);
+  st().selectAllObjects();
+  const all4 = [st().selectedObjectId, ...st().additionalSelectedIds] as string[];
+  out(`B4c locked boxes: Select All picked ${all4.length}; menu ops [${unionSilhouetteOperations(p4.scene, all4).map((l) => l.id)}]`);
+  st().unionSilhouetteSelection('art');
+  const p5 = st().project;
+  out(`B4c jig runs ${registrationJigCompilationRuns(p4.scene)?.length ?? 0} -> ${registrationJigCompilationRuns(p5.scene)?.length ?? 0}; order before ${order(p4).join(' > ')}; after ${order(p5).join(' > ')}`);
+});
+
+it('B5 image mask shape unioned', () => {
+  const N = 40;
+  const photo: RasterImage = {
+    kind: 'raster-image', id: 'photo', source: 'portrait.png', dataUrl: 'data:image/png;base64,portrait', pixelWidth: N, pixelHeight: N,
+    bounds: { minX: 0, minY: 0, maxX: 40, maxY: 40 }, transform: { ...IDENTITY_TRANSFORM, x: 100, y: 100 }, color: '#808080',
+    operationIds: ['photo-op'], dither: 'threshold', linesPerMm: 1, lumaBase64: lumaToBase64(new Uint8Array(N * N).fill(40)),
+  } as RasterImage;
+  // 20 mm circle centred on the photo (photo spans 100..140 if transform x/y is its min corner, or 80..120 if centre)
+  const pb = photo;
+  const p00 = proj([pb], []);
+  void p00;
+  const layers: Layer[] = [
+    { ...createLayer({ id: 'photo-op', color: '#808080', mode: 'image' }), linesPerMm: 1 } as Layer,
+    { ...createLayer({ id: 'mask-op', color: '#000000', mode: 'line' }), output: false } as Layer,
+    layer('cut', 'line', 500, 90),
+  ];
+  const tmp = proj([photo], layers);
+  const cells = (p: Project) => {
+    const g = compileJob(p.scene, p.device).groups.find((c) => c.kind === 'raster' && c.sourceObjectId === 'photo');
+    return g?.kind === 'raster' ? g.sValues.filter((s) => s > 0).length : -1;
+  };
+  out(`B5 unmasked photo burns ${cells(tmp)} cells`);
+  // where is the photo? use preflight-free bbox of the raster burn
+  const rb = bbox(burn(tmp).moves);
+  const cx = (rb.minX + rb.maxX) / 2;
+  const cy = (rb.minY + rb.maxY) / 2;
+  out(`B5 photo burn bbox ${JSON.stringify(rb)}; centre ${f3(cx)},${f3(cy)}`);
+  const mask = circ('mask', 20, { x: cx, y: cy }, { operationIds: ['mask-op'] });
+  const tab = rect('tab', 30, 6, { x: cx + 12, y: cy }, { operationIds: ['mask-op'] });
+  const p0 = proj([photo, mask, tab], layers);
+  setProject(p0, []);
+  st().applyImageMask('photo', 'mask');
+  const pm = st().project;
+  const before = { cells: cells(pm), b: bbox(burn(pm).moves.filter((m) => m.f !== 500)) };
+  out(`B5 masked photo: imageMaskId=${(pm.scene.objects.find((o) => o.id === 'photo') as RasterImage).imageMaskId}; cells ${before.cells} (oracle circle d20 at 1 line/mm ~ pi*100=314); bbox ${JSON.stringify(before.b)}`);
+  // user extends the mask with a tab: Union silhouette of mask + tab, result on mask-op
+  setProject(pm, ['mask', 'tab']);
+  clearToasts();
+  const ops = unionSilhouetteOperations(pm.scene, ['mask', 'tab']).map((l) => l.id);
+  st().unionSilhouetteSelection('mask-op');
+  const p1 = st().project;
+  const img = p1.scene.objects.find((o) => o.id === 'photo') as RasterImage;
+  const after = { cells: cells(p1), b: bbox(burn(p1).moves) };
+  const pre = runPreflight(p1, burn(p1).gcode);
+  out(`B5 after union (menu ops [${ops}]): objects ${ids(p1)}; photo.imageMaskId=${img.imageMaskId} (exists: ${p1.scene.objects.some((o) => o.id === img.imageMaskId)}); cells ${after.cells}; bbox ${JSON.stringify(after.b)}`);
+  out(`B5 preflight codes after: ${JSON.stringify((pre as { issues?: { code: string }[] }).issues?.map((i) => i.code) ?? pre).slice(0, 400)}`);
+  out(`B5 toasts ${JSON.stringify(toasts())}`);
+  // control: Delete of the mask (ordinary delete repairs and reports)
+  setProject(pm, ['mask']);
+  clearToasts();
+  st().removeSceneObject('mask');
+  const pd = st().project;
+  const imgD = pd.scene.objects.find((o) => o.id === 'photo') as RasterImage | undefined;
+  out(`B5 control Delete mask: imageMaskId=${imgD?.imageMaskId}; toasts ${JSON.stringify(toasts())}`);
+  // Weld on the same pair, for the record
+  setProject(pm, ['mask', 'tab']);
+  clearToasts();
+  st().weldSelection();
+  const pw = st().project;
+  const imgW = pw.scene.objects.find((o) => o.id === 'photo') as RasterImage;
+  out(`B5 Weld same pair: objects ${ids(pw)}; imageMaskId=${imgW.imageMaskId} exists ${pw.scene.objects.some((o) => o.id === imgW.imageMaskId)}; cells ${cells(pw)}`);
+});
+
+it('B6 text-on-path guide, groups, compound, metadata, default choice', async () => {
+  // groups
+  const L = layer('L', 'line', 1000, 50);
+  const A = svg('A', [box(0, 0, 10, 10)], { operationIds: ['L'] });
+  const B = svg('B', [box(5, 5, 10, 10)], { operationIds: ['L'] });
+  const C = svg('C', [box(40, 0, 10, 10)], { operationIds: ['L'] });
+  const pg = { ...proj([A, B, C], [L]) };
+  const pg2 = { ...pg, scene: { ...pg.scene, groups: [{ id: 'G', objectIds: ['A', 'B', 'C'] }] } } as Project;
+  setProject(pg2, ['A', 'B']);
+  st().unionSilhouetteSelection('L');
+  const p1 = st().project;
+  out(`B6a group {A,B,C}, union A+B: groups ${JSON.stringify(p1.scene.groups)}; objects ${ids(p1)}`);
+  setProject(pg2, ['A', 'B', 'C']);
+  st().unionSilhouetteSelection('L');
+  out(`B6b union whole group: groups ${JSON.stringify(st().project.scene.groups)}; objects ${ids(st().project)}`);
+  // compound in selection
+  const K = svg('K', [box(5, 5, 10, 10)], { operationIds: ['L'], booleanCompound: { op: 'subtract', sourceIds: [] } });
+  const pk = proj([A, K], [L]);
+  setProject(pk, ['A', 'K']);
+  clearToasts();
+  const opsK = unionSilhouetteOperations(pk.scene, ['A', 'K']).map((l) => l.id);
+  const appliedK = st().unionSilhouetteSelection('L');
+  out(`B6c compound in selection: menu ops [${opsK}] (enabled ${opsK.length > 0}); applied ${appliedK}; toasts ${JSON.stringify(toasts())}`);
+  // metadata
+  const M1 = svg('M1', [box(0, 0, 10, 10)], {
+    operationIds: ['L'], name: 'Logo', libraryProvenance: { schemaVersion: 1, assetId: 'x', title: 'Leaf', sourceName: 'OpenClipart', licenseId: 'CC-BY-4.0', creator: 'Ann' },
+    laserTabAnchors: [{ layerColor: '#000000', pathIndex: 0, polylineIndex: 0, pathT: 0.5 }],
+  });
+  const M2 = svg('M2', [box(5, 5, 10, 10)], { operationIds: ['L'] });
+  const pmeta = proj([M1, M2], [L]);
+  setProject(pmeta, ['M1', 'M2']);
+  st().unionSilhouetteSelection('L');
+  const u = st().project.scene.objects[0] as ImportedSvg & Record<string, unknown>;
+  out(`B6d metadata: name=${u.name} provenance=${JSON.stringify(u.libraryProvenance)} laserTabAnchors=${JSON.stringify(u.laserTabAnchors)} source=${u.source}`);
+  // default choice: first scene layer among the selection's operations
+  const Off = layer('Guide', 'line', 1000, 50, { output: false } as Partial<Layer>);
+  const G1 = svg('G1', [box(0, 0, 10, 10)], { operationIds: ['Guide'] });
+  const G2 = svg('G2', [box(5, 5, 10, 10)], { operationIds: ['L'] });
+  const pdef = proj([G1, G2], [Off, L]);
+  out(`B6e dialog default (operations[0]) for [Guide(output off), L]: ${unionSilhouetteOperations(pdef.scene, ['G1', 'G2'])[0]?.id}`);
+  // text on path guide unioned
+  const guide = svg('GUIDE', [box(0, 0, 60, 20)], { operationIds: ['L'] });
+  const other = svg('OTHER', [box(50, 5, 20, 10)], { operationIds: ['L'] });
+  const tr = await textToPolylines({ content: 'ABC', sizeMm: 8, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000', fontBuffer: roboto });
+  const pt = {
+    kind: 'text', id: 'PT', content: 'ABC', fontKey: 'roboto-regular', sizeMm: 8, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000',
+    bounds: tr.bounds, transform: { ...IDENTITY_TRANSFORM, x: 5, y: 25 }, paths: tr.paths, operationIds: ['L'],
+    pathText: { guideObjectId: 'GUIDE', offsetMm: 0, reverse: false },
+  } as unknown as SceneObject;
+  const ppt = proj([guide, other, pt], [L]);
+  const lit0 = burn(ppt);
+  setProject(ppt, ['GUIDE', 'OTHER']);
+  st().unionSilhouetteSelection('L');
+  const ppt1 = st().project;
+  const t1 = ppt1.scene.objects.find((o) => o.id === 'PT') as TextObject & { pathText?: { guideObjectId: string } };
+  const lit1 = burn(ppt1);
+  out(`B6f text-on-path after guide unioned: pathText=${JSON.stringify(t1.pathText)} guide exists ${ppt1.scene.objects.some((o) => o.id === t1.pathText?.guideObjectId)}; prepareOutput ok ${lit1.ok} ${lit1.why}; lit ${f3(totalLen(lit0.moves))} -> ${f3(totalLen(lit1.moves))}`);
+  void compareRegions;
+  void loops;
+  void (null as unknown as LitMove);
+});
+
+it('B7 group of four, union two members', () => {
+  const L = layer('L', 'line', 1000, 50);
+  const objs = ['A', 'B', 'C', 'D'].map((id, i) => svg(id, [box(i * 8, 0, 10, 10)], { operationIds: ['L'] }));
+  const p = proj(objs, [L]);
+  const pg = { ...p, scene: { ...p.scene, groups: [{ id: 'G', objectIds: ['A', 'B', 'C', 'D'] }] } } as Project;
+  setProject(pg, ['A', 'B']);
+  st().unionSilhouetteSelection('L');
+  out(`B7 group {A,B,C,D}, union A+B: groups ${JSON.stringify(st().project.scene.groups)}; objects ${ids(st().project)}`);
+  setProject(pg, ['A', 'B']);
+  st().weldSelection();
+  out(`B7 Weld same: groups ${JSON.stringify(st().project.scene.groups)}; objects ${ids(st().project)}`);
+});
