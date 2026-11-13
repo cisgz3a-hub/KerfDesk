@@ -75,4 +75,9 @@ export type CommandSelection = {
   readonly selected: Project['scene']['objects'][number] | null;
   readonly selectedIds: ReadonlyArray<string>;
   readonly imageMaskPair: SelectedImageMaskPair | null;
+  /** The one masked image Crop and Remove Image Mask act on (T18-P2-1). */
+  readonly maskedImage: Extract<
+    Project['scene']['objects'][number],
+    { kind: 'raster-image' }
+  > | null;
 };

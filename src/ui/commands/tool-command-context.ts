@@ -124,8 +124,8 @@ export function toolCommandContext(
     },
     canLeaveWhiteUnburned: countBurningImportedWhites(app.project.scene) > 0,
     applyImageMask: applyImageMaskAction(app, selection.imageMaskPair),
-    cropImage: cropImageAction(app, selection.selected, pushToast),
-    removeImageMask: removeImageMaskAction(app, selection.selected),
+    cropImage: cropImageAction(app, selection.maskedImage, pushToast),
+    removeImageMask: removeImageMaskAction(app, selection.maskedImage),
   };
 }
 

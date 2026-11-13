@@ -25,7 +25,7 @@ import { toolCommandContext } from './tool-command-context';
 import { editingToolsCommandContext } from './editing-tools-command-context';
 import { moveLaserToSelection } from '../laser/move-laser-to-selection';
 import type { AppCommandContext } from './command-types';
-import { selectedImageMaskPair } from './image-mask-command-state';
+import { selectedImageMaskPair, selectedMaskedImage } from './image-mask-command-state';
 import { traceSourceForTracedImage } from './image-command-actions';
 import { hasPreviewableContent } from './previewable-content';
 import { deleteSelection } from './selection-delete-action';
@@ -121,9 +121,9 @@ function appCommandContext(
   const selectedIds = selectedObjectIds(app.selectedObjectId, app.additionalSelectedIds);
   const arrangeUnits = focusedLayoutUnitCount(app, selectedIds);
   const imageMaskPair = selectedImageMaskPair(app.project, selectedIds);
-  const selection = { selected, selectedIds, imageMaskPair };
-  const hasMaskedRasterSelection =
-    selected?.kind === 'raster-image' && selected.imageMaskId !== undefined;
+  const maskedImage = selectedMaskedImage(app.project, selected, selectedIds);
+  const selection = { selected, selectedIds, imageMaskPair, maskedImage };
+  const hasMaskedRasterSelection = maskedImage !== null;
   const activeStreamer = isActiveStreamerStatus(laser.streamer?.status);
   const openFill = selectedOpenFillContourCounts(
     app.project,
