@@ -296,9 +296,15 @@ describe('detectCncMachineLimitWarnings with stage recipes', () => {
 
   it('names a recipe whose feed, plunge or RPM exceeds $110/$112/$30', () => {
     // At the 12,000 RPM ceiling, so nothing is scaled and the program sends these.
-    const atCeiling = { ...hot, spindleRpm: 12_000 };
+    // The layer itself runs at 9000, so the recipe is the top RPM.
+    const project = withWallRecipe(libraryToolId, { ...hot, spindleRpm: 12_000 });
+    const layer = project.scene.layers[0]!;
+    const slowLayer: Project = {
+      ...project,
+      scene: { ...project.scene, layers: [{ ...layer, cnc: { ...layer.cnc!, spindleRpm: 9000 } }] },
+    };
     const limits: ControllerSettingsSnapshot = { maxFeed: 2000, zMaxFeed: 500, maxPowerS: 10_000 };
-    const warnings = detectCncMachineLimitWarnings(withWallRecipe(libraryToolId, atCeiling), limits);
+    const warnings = detectCncMachineLimitWarnings(slowLayer, limits);
     expect(warnings.some((w) => w.includes(`${WALL_RECIPE} requests feed 4000`))).toBe(true);
     expect(warnings.some((w) => w.includes(`${WALL_RECIPE} requests plunge 1500`))).toBe(true);
     expect(warnings.some((w) => w.includes(`${WALL_RECIPE} requests spindle 12000`))).toBe(true);

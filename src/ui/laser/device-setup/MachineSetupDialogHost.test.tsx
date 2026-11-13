@@ -220,6 +220,8 @@ describe('MachineSetupDialogHost', () => {
       (entry) => !cncMachine().tools.some((tool) => tool.catalogId === entry.id),
     );
     if (existing === undefined || catalog === undefined) throw new Error('bit fixture missing');
+    // The starter carries its two flutes (ADR-233 Amd 1); staging must keep them until Save.
+    expect(existing.fluteCount).toBe(2);
     const view = await renderHost();
     try {
       await act(async () => openMachineSetup({ kind: 'cnc', field: 'tool-plan' }));
@@ -231,16 +233,16 @@ describe('MachineSetupDialogHost', () => {
       );
       await changeInput(view.host, `Flute count for ${catalog.tool.name}`, '18');
 
-      expect(
-        cncMachine().tools.find((tool) => tool.id === existing.id)?.fluteCount,
-      ).toBeUndefined();
+      expect(cncMachine().tools.find((tool) => tool.id === existing.id)?.fluteCount).toBe(
+        existing.fluteCount,
+      );
       expect(
         useStore.getState().cncLibrary.customTools.some((tool) => tool.catalogId === catalog.id),
       ).toBe(false);
       await act(async () => button(view.host, 'Cancel without saving').click());
-      expect(
-        cncMachine().tools.find((tool) => tool.id === existing.id)?.fluteCount,
-      ).toBeUndefined();
+      expect(cncMachine().tools.find((tool) => tool.id === existing.id)?.fluteCount).toBe(
+        existing.fluteCount,
+      );
 
       await act(async () => openMachineSetup({ kind: 'cnc', field: 'tool-plan' }));
       await changeInput(view.host, `Flute count for ${existing.name}`, '17');

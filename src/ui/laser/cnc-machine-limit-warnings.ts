@@ -148,7 +148,7 @@ function spindleVsMax(
       `${maxS} RPM. On GRBL, S commands above $30 use maximum PWM output. If ${maxS} RPM is the ` +
       `spindle's real top speed, the feeds stay as planned at ${top.value} RPM, so each tooth takes ` +
       `${ratio.toFixed(1)}× the planned chip load: set Spindle maximum to ${maxS} RPM in Machine ` +
-      'Setup and KerfDesk lowers the feeds to match. Actual spindle RPM is not measured.',
+      'Setup and KerfDesk lowers the feeds to match; actual spindle RPM is not measured.',
   ];
 }
 
