@@ -115,6 +115,7 @@ async function render(onApply: (patch: PhotoEngravingApply) => void = vi.fn()): 
         onApply={onApply}
         onEditSource={vi.fn()}
         onCalibrateTones={vi.fn()}
+        onBurnTestCard={vi.fn()}
       />,
     );
   });

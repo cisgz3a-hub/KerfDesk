@@ -195,6 +195,10 @@ jobs:
             echo 'No candidate-tree build, report script, or provider command was executed.'
           } >> "${GITHUB_STEP_SUMMARY}"
 
+      - name: Restore Electron downloads
+        if: steps.deployment_identity.outputs.eligible == 'true' && hashFiles('.github/actions/electron-downloads/action.yml') != ''
+        uses: ./.github/actions/electron-downloads
+
       - name: Install dependencies
         if: ${{ steps.deployment_identity.outputs.eligible == 'true' }}
         run: pnpm install --frozen-lockfile

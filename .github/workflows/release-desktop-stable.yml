@@ -95,6 +95,11 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Restore Electron downloads
+        uses: ./.github/actions/electron-downloads
+        with:
+          packaging: 'true'
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 

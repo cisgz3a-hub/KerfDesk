@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from 'react';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
 import { useImageEditorStore } from '../image-editor/image-editor-store';
+import { openPhotoTestCard } from '../calibration/photo-test-card-store';
 import { openToneCalibration } from '../calibration/tone-calibration-store';
 import { useToastStore } from '../state/toast-store';
 import {
@@ -32,7 +33,8 @@ function OwnedPhotoEngravingDialog({
   const close = (): void => usePhotoEngravingStore.getState().close(session);
   const current = useStore((state) => photoEngravingSessionIsCurrent(state, session));
   const [error, setError] = useState<string | null>(null);
-  const apply = (patch: PhotoEngravingApply): void => {
+  // `after` runs once the settings are on the photo and the window has closed.
+  const apply = (patch: PhotoEngravingApply, after?: () => void): void => {
     if (!photoEngravingPatchIsValid(patch)) {
       setError('Enter valid photo tones and a positive engraving resolution.');
       return;
@@ -61,6 +63,7 @@ function OwnedPhotoEngravingDialog({
         useToastStore
           .getState()
           .pushToast('Photo engraving settings applied to the selected photo.', 'success');
+        after?.();
       },
     );
     if (!applied)
@@ -83,6 +86,12 @@ function OwnedPhotoEngravingDialog({
           close();
           openToneCalibration({ seed });
         }}
+        // ADR-711: the card replaces the project, so the window's settings go
+        // onto the photo first. Undo after the card then returns to the photo
+        // as this window left it, recipe and tones included.
+        onBurnTestCard={(seed, patch) =>
+          apply(patch, () => openPhotoTestCard({ step: 'generate', seed }))
+        }
       />
     </Suspense>
   );

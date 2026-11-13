@@ -94,6 +94,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'tools.box-fit-test': { callback: 'boxFitTest' },
   'tools.material-test': { callback: 'materialTest', guard: 'create a material test' },
   'tools.interval-test': { callback: 'intervalTest', guard: 'create an interval test' },
+  'tools.photo-test-card': { callback: 'photoTestCard' },
   'tools.tone-calibration': { callback: 'toneCalibration' },
   'tools.scan-offset-test': { callback: 'scanOffsetTest', guard: 'create a scan offset test' },
   'tools.focus-test': { callback: 'focusTest', guard: 'create a focus test' },

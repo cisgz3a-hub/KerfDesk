@@ -32,6 +32,15 @@ export type PhotoEngravingDraft = {
   readonly negativeImage: boolean;
   /** ADR-670: the material tone calibration; undefined burns the tones uncorrected. */
   readonly photoToneCurve: PhotoToneCurve | undefined;
+  /** ADR-711: power and speed picked from a burned Photo Test Card; undefined
+   * keeps the operation's own. */
+  readonly testedBurn: TestedBurn | undefined;
+};
+
+/** Burn power in percent and feed in mm/min, as a test card's square ran them. */
+export type TestedBurn = {
+  readonly power: number;
+  readonly speed: number;
 };
 
 export function initialPhotoEngravingDraft(
@@ -49,6 +58,7 @@ export function initialPhotoEngravingDraft(
     linesPerMm: effective.linesPerMm,
     negativeImage: effective.negativeImage,
     photoToneCurve: activePhotoToneCurve(effective.photoToneCurve),
+    testedBurn: undefined,
   };
 }
 
@@ -85,6 +95,9 @@ export function photoEngravingPatch(draft: PhotoEngravingDraft): PhotoEngravingA
       negativeImage: draft.negativeImage,
       passThrough: false,
       photoToneCurve: draft.photoToneCurve,
+      ...(draft.testedBurn === undefined
+        ? {}
+        : { power: draft.testedBurn.power, speed: draft.testedBurn.speed }),
     },
   };
 }

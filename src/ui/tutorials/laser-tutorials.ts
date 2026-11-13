@@ -122,12 +122,12 @@ export const LASER_TUTORIALS: readonly Tutorial[] = [
       },
       {
         // The window a beginner needs first (UX audit U6-P3-5): its recipes
-        // set the dither, density and tones for the material.
+        // set the marking, dither and tones for the material (ADR-685).
         title: 'Let Photo engraving set it up',
         instruction:
-          'With the photo selected, choose Photo engraving in the toolbar (or Tools → Photo engraving...). Under Material recipe, pick your material, such as wood, slate or leather. The recipe sets the dither, row density and tones, and Auto tones read the photo to set its contrast. Apply, then fine-tune below only if you need to.',
+          'With the photo selected, choose Photo engraving in the toolbar (or Tools → Photo engraving...). Under Material recipe, pick your material, such as wood, slate or leather. The recipe sets the marking, the dither, the tones and a light sharpen; it leaves power, speed and DPI alone. Apply, then fine-tune below only if you need to.',
         focus: 'Photo engraving · Material recipe',
-        result: 'The image operation starts from settings made for that material.',
+        result: 'The photo starts from processing made for that material.',
         visual: 'image-tone',
       },
       {
@@ -147,10 +147,10 @@ export const LASER_TUTORIALS: readonly Tutorial[] = [
           'You can compare wider scan rows with denser rows without changing the physical image size.',
       },
       {
-        title: 'Preview, then compare a material test',
+        title: 'Find power and speed with a test card',
         instruction:
-          'Inspect the raster preview and use a tested Power and Speed recipe. If a real bidirectional sample has shifted alternate rows, compare one-way scanning and check scan-offset calibration.',
-        focus: 'Raster preview',
+          'In Photo engraving, choose Burn a test card… under Power and speed. It burns one piece of your photo at a range of powers and speeds on a scrap of the same material. Reopen Tools → Photo Test Card, pick the square that looks best, then choose it under Tested power and speed. If a real bidirectional sample has shifted alternate rows, compare one-way scanning and check scan-offset calibration.',
+        focus: 'Photo engraving · Power and speed',
         result:
           'You have an image recipe to evaluate on your own material; the on-screen picture is not a burn result.',
         visual: 'preview',
@@ -160,6 +160,8 @@ export const LASER_TUTORIALS: readonly Tutorial[] = [
     keywords: [
       'photo engraving',
       'material recipe',
+      'photo test card',
+      'power and speed',
       'auto tones',
       'image',
       'raster',

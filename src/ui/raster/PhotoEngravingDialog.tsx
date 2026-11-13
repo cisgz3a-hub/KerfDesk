@@ -3,7 +3,8 @@ import {
   effectiveObjectPowerPercent,
   effectiveOperationForObject,
 } from '../../core/effective-output';
-import type { Layer } from '../../core/scene';
+import type { Layer, LayerOperationSettings } from '../../core/scene';
+import type { PhotoTestSeed } from '../calibration/photo-test-card-draft';
 import { photoBurnSettings, type ToneCalibrationSeed } from '../calibration/tone-calibration-draft';
 import { Button, Dialog, DialogActions } from '../kit';
 import type { PhotoEngravingApply } from './photo-engraving-apply';
@@ -31,6 +32,9 @@ export default function PhotoEngravingDialog(props: {
   readonly onApply: (patch: PhotoEngravingApply) => void;
   readonly onEditSource: () => void;
   readonly onCalibrateTones: (seed: ToneCalibrationSeed) => void;
+  /** ADR-711: apply the window's draft to the photo, then make a Photo Test
+   * Card from it. */
+  readonly onBurnTestCard: (seed: PhotoTestSeed, patch: PhotoEngravingApply) => void;
 }): JSX.Element {
   const { session } = props;
   const workbench = usePhotoWorkbench(session, props.current);
@@ -84,6 +88,12 @@ export default function PhotoEngravingDialog(props: {
           onCalibrateTones={() =>
             props.onCalibrateTones(toneCalibrationSeed(session, effective, draft))
           }
+          onBurnTestCard={() =>
+            props.onBurnTestCard(
+              photoTestSeed(session, effective, draft),
+              photoEngravingPatch(draft),
+            )
+          }
         />
       </div>
       <PhotoEngravingGuide current={props.current} onEditSource={props.onEditSource} />
@@ -100,8 +110,8 @@ function PhotoEngravingFooter(props: {
   return (
     <>
       <p className="lf-photo-engraving__hint">
-        Applies an Image operation to this photo. Power and speed use its current operation
-        settings. Review the job, then Frame and Start when ready.
+        Applies an Image operation to this photo. Power and speed use its current operation settings
+        unless you choose tested ones above. Review the job, then Frame and Start when ready.
       </p>
       {!props.current || props.error !== null ? (
         <p role="alert">
@@ -211,8 +221,9 @@ function PhotoEngravingGuide(props: {
           canvas first.
         </li>
         <li>
-          Focus the laser, then use Tools → Material Test to choose power and speed for the
-          material. Use Tools → Interval Test to find spacing where marks just meet.
+          Focus the laser, then choose Burn a test card… under Power and speed. It burns a piece of
+          this photo at a range of powers and speeds; pick the square that looks best. Use Tools →
+          Interval Test to find spacing where marks just meet.
         </li>
         <li>
           Burn a Tools → Tone Calibration wedge with these settings and record it, then choose that
@@ -255,13 +266,53 @@ function toneCalibrationSeed(
 ): ToneCalibrationSeed {
   return {
     sourceName: session.image.source,
-    settings: {
-      ...photoBurnSettings(effective, session.image),
-      mode: 'image',
-      ditherAlgorithm: draft.ditherAlgorithm,
-      linesPerMm: draft.linesPerMm,
-      negativeImage: draft.negativeImage,
-      passThrough: false,
+    settings: draftBurnSettings(session, effective, draft),
+  };
+}
+
+// The photo's operation as this window's draft would burn it: at the tested
+// power and speed when one is chosen (ADR-711), else at the photo's own.
+function draftBurnSettings(
+  session: PhotoEngravingSession,
+  effective: Layer,
+  draft: PhotoEngravingDraft,
+): LayerOperationSettings {
+  return {
+    ...photoBurnSettings(effective, session.image),
+    mode: 'image',
+    ditherAlgorithm: draft.ditherAlgorithm,
+    linesPerMm: draft.linesPerMm,
+    negativeImage: draft.negativeImage,
+    passThrough: false,
+    ...(draft.testedBurn === undefined
+      ? {}
+      : { power: draft.testedBurn.power, speed: draft.testedBurn.speed }),
+  };
+}
+
+/**
+ * ADR-711: the card's squares burn a piece of this photo exactly as the window
+ * has it: its tones, sharpening, processing and tone calibration.
+ */
+function photoTestSeed(
+  session: PhotoEngravingSession,
+  effective: Layer,
+  draft: PhotoEngravingDraft,
+): PhotoTestSeed {
+  const { photoToneCurve: _stored, ...settings } = draftBurnSettings(session, effective, draft);
+  return {
+    sourceName: session.image.source,
+    image: session.image,
+    settings:
+      draft.photoToneCurve === undefined
+        ? settings
+        : { ...settings, photoToneCurve: draft.photoToneCurve },
+    tones: {
+      brightness: draft.brightness,
+      contrast: draft.contrast,
+      gamma: draft.gamma,
+      sharpenAmount: draft.sharpenAmount,
+      sharpenRadius: draft.sharpenRadius,
     },
   };
 }

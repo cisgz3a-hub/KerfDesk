@@ -1,0 +1,49 @@
+name: Restore Electron downloads
+description: >-
+  Keep the Electron zip and electron-builder's tools in the Actions cache so a
+  GitHub release CDN outage does not fail pnpm install or electron-builder
+  (ADR-712). Use it after setup-node and before pnpm install.
+inputs:
+  packaging:
+    description: >-
+      'true' in a job that runs electron-builder: save this job's downloads to
+      the cache, and fetch a missing Electron zip with retries and backoff.
+      Otherwise the job only restores what packaging jobs saved.
+    default: 'false'
+  cache:
+    description: >-
+      'false' in a job that restores no caches (the commercial release lane and
+      its qualification): skip the Actions cache; a packaging job still fetches
+      with retries.
+    default: 'true'
+runs:
+  using: composite
+  steps:
+    - name: Plan the Electron download cache
+      id: plan
+      shell: bash
+      env:
+        ELECTRON_DOWNLOADS_PACKAGING: ${{ inputs.packaging }}
+        ELECTRON_DOWNLOADS_JOB: ${{ github.job }}
+      run: node "${GITHUB_ACTION_PATH}/electron-downloads.mjs" plan
+
+    - name: Restore and save this packaging job's Electron downloads
+      if: inputs.cache == 'true' && inputs.packaging == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.plan.outputs.path }}
+        key: ${{ steps.plan.outputs.key }}
+        restore-keys: ${{ steps.plan.outputs.restore-keys }}
+
+    - name: Restore the Electron downloads packaging jobs saved
+      if: inputs.cache == 'true' && inputs.packaging != 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.plan.outputs.path }}
+        key: ${{ steps.plan.outputs.key }}
+        restore-keys: ${{ steps.plan.outputs.restore-keys }}
+
+    - name: Fetch a missing Electron zip with retries
+      if: inputs.packaging == 'true'
+      shell: bash
+      run: node "${GITHUB_ACTION_PATH}/electron-downloads.mjs" prefetch

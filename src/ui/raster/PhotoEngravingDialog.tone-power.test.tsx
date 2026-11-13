@@ -98,6 +98,7 @@ async function render(onCalibrateTones = vi.fn()): Promise<void> {
         onApply={vi.fn()}
         onEditSource={vi.fn()}
         onCalibrateTones={onCalibrateTones}
+        onBurnTestCard={vi.fn()}
       />,
     );
   });

@@ -30,33 +30,64 @@ export type SaveOriginalImageCtx = {
   readonly format: OriginalImageFormat;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
   readonly readSource?: (image: RasterImage) => Promise<File>;
-  readonly encode?: (source: File, format: OriginalImageFormat) => Promise<Blob>;
+  readonly encode?: (source: File, format: OriginalImageFormat, widthMm: number) => Promise<Blob>;
 };
+
+/**
+ * Whether the stored pixels are no longer the imported file: Crop and Flatten
+ * replace them with the baked crop (and leave an owned clip), and an Image
+ * Studio Apply replaces them with the edit (and keeps its layer document).
+ * Nothing else keeps the imported bytes (tools audit T1, T21-P2-2).
+ */
+export function imageEditedInProject(image: RasterImage): boolean {
+  return image.imageClip !== undefined || image.editorDocument !== undefined;
+}
+
+/** The density a re-encoded file must carry to re-import at the image's
+ * placed size: pixels across its width in millimetres (T21-P2-1). */
+export function imageDpi(pixelWidth: number, widthMm: number): number | null {
+  const dpi = pixelWidth / (widthMm / 25.4);
+  return Number.isFinite(dpi) && dpi > 0 ? dpi : null;
+}
 
 export async function saveOriginalImage(ctx: SaveOriginalImageCtx): Promise<void> {
   const { mime, extension } = FORMATS[ctx.format];
+  const edited = imageEditedInProject(ctx.image);
   try {
     // The picker empties an existing file as it returns (ADR-656): the image
     // is read and encoded first.
     const source = await (ctx.readSource ?? ((image) => readRasterSourceFile(image, image.source)))(
       ctx.image,
     );
+    const widthMm = ctx.image.bounds.maxX - ctx.image.bounds.minX;
     const blob =
-      source.type === mime ? source : await (ctx.encode ?? encodeInBrowser)(source, ctx.format);
+      source.type === mime
+        ? source
+        : await (ctx.encode ?? encodeInBrowser)(source, ctx.format, widthMm);
+    // An edited image is not the imported file: never suggest its own name,
+    // which would invite replacing the user's original (T21-P2-2).
+    const stem = `${fileStem(ctx.image.source)}${edited ? '-edited' : ''}`;
     const target = await pickPreparedSaveTarget(
       ctx.platform,
-      { suggestedName: `${fileStem(ctx.image.source)}${extension}`, extensions: [extension] },
+      { suggestedName: `${stem}${extension}`, extensions: [extension] },
       { title: 'Save original image', message: 'The image is ready.' },
     );
     if (target === null) return;
     await target.write(blob);
-    ctx.pushToast(`Saved the original image to ${target.displayName}`, 'success');
+    ctx.pushToast(
+      `Saved the ${edited ? 'edited' : 'original'} image to ${target.displayName}`,
+      'success',
+    );
   } catch (error) {
     ctx.pushToast(`Could not save the image: ${errorMessage(error)}`, 'error');
   }
 }
 
-async function encodeInBrowser(source: File, format: OriginalImageFormat): Promise<Blob> {
+async function encodeInBrowser(
+  source: File,
+  format: OriginalImageFormat,
+  widthMm: number,
+): Promise<Blob> {
   const canvas = document.createElement('canvas');
   const bitmap = await createImageBitmap(source);
   let context: CanvasRenderingContext2D;
@@ -79,7 +110,12 @@ async function encodeInBrowser(source: File, format: OriginalImageFormat): Promi
   }
   if (format === 'bmp') {
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
-    return new Blob([encodeBmp24(pixels.data, pixels.width, pixels.height)], { type: 'image/bmp' });
+    // The image's own density, not the encoder's 96 DPI default: KerfDesk
+    // reads BMP density on import, so 96 re-imported 2.6-3.1x too large.
+    const dpi = imageDpi(pixels.width, widthMm) ?? undefined;
+    return new Blob([encodeBmp24(pixels.data, pixels.width, pixels.height, dpi)], {
+      type: 'image/bmp',
+    });
   }
   return new Promise((resolve, reject) =>
     canvas.toBlob(

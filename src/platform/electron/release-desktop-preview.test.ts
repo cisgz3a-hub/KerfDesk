@@ -29,8 +29,12 @@ describe('Preview desktop release action references', () => {
       true,
     );
     expect([...new Set(external)].sort()).toEqual([...EXPECTED_ACTION_REFERENCES].sort());
-    // The local composite is pinned by this checkout and its external actions are
-    // covered by the recursive action-pinning policy gate.
-    expect([...new Set(local)]).toEqual(['./.github/actions/setup-remote-control']);
+    // The local composites are pinned by this checkout and their external actions
+    // are covered by the recursive action-pinning policy gate (electron-downloads:
+    // actions/cache, ADR-712).
+    expect([...new Set(local)]).toEqual([
+      './.github/actions/electron-downloads',
+      './.github/actions/setup-remote-control',
+    ]);
   });
 });
