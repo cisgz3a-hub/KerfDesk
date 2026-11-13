@@ -1,0 +1,62 @@
+// T20a: saved processed bitmap vs the burned cells decoded from G-code.
+import { it } from 'vitest';
+import { IDENTITY_TRANSFORM, type Layer, type RasterImage, type Transform } from '../t13-main/src/core/scene';
+import { DEV, burnedSegments, cellsFromSegments, diff, exportOf, flipCols, flipRows, gcodeOf, greys, imageLayer, logger, mkImage, project, xf } from './t20-common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t20/t20a.log');
+const T = (t: Partial<Transform>): Transform => ({ ...IDENTITY_TRANSFORM, ...t });
+const W = 40, H = 20, BOX = { x: 10, y: 10, w: 8, h: 4 };
+
+type Case = { name: string; layer?: Partial<Layer>; image?: Partial<RasterImage>; transform?: Transform; device?: Partial<typeof DEV>; gridW?: number; gridH?: number };
+
+async function run(c: Case): Promise<void> {
+  const device = { ...DEV, ...(c.device ?? {}) } as typeof DEV;
+  const tr = c.transform ?? IDENTITY_TRANSFORM;
+  const img = mkImage('R', W, H, BOX, tr, c.image ?? {});
+  const layer = imageLayer(c.layer ?? {});
+  const p = project([img], [layer], device);
+  const e = await exportOf(p);
+  const g = gcodeOf(p);
+  if (g.startsWith('NOT OK')) { out(`${c.name}: ${g}`); return; }
+  let segs = burnedSegments(g, device.bedHeight);
+  if (device.origin === 'rear-left') segs = segs.map((s) => ({ ...s, a: { x: s.a.x, y: device.bedHeight - s.a.y }, b: { x: s.b.x, y: device.bedHeight - s.b.y } }));
+  const corners = [{ x: BOX.x, y: BOX.y }, { x: BOX.x + BOX.w, y: BOX.y }, { x: BOX.x + BOX.w, y: BOX.y + BOX.h }, { x: BOX.x, y: BOX.y + BOX.h }].map((q) => xf(q, tr));
+  const box = { minX: Math.min(...corners.map((q) => q.x)), minY: Math.min(...corners.map((q) => q.y)), maxX: Math.max(...corners.map((q) => q.x)), maxY: Math.max(...corners.map((q) => q.y)) };
+  const gw = c.gridW ?? e.width, gh = c.gridH ?? e.height;
+  const { s, stray } = cellsFromSegments(segs, box, gw, gh);
+  const power = (c.layer?.power ?? 80);
+  const sMaxG = (power / 100) * device.maxPowerS;
+  const eg = greys(e.rgba);
+  const sArr = Array.from(s);
+  const sValues = [...new Set(sArr)].sort((a, b) => a - b);
+  const gValues = [...new Set(eg)].sort((a, b) => a - b);
+  const line = [`${c.name}: export ${e.width}x${e.height} burnGrid ${gw}x${gh} segs ${segs.length} stray ${stray} toasts ${JSON.stringify(e.toasts)}`];
+  if (gw === e.width && gh === e.height) {
+    line.push(`   direct  ${JSON.stringify(diff(eg, sArr, sMaxG))}`);
+    line.push(`   flipY   ${JSON.stringify(diff(eg, flipRows(sArr, gw, gh), sMaxG))}`);
+    line.push(`   flipX   ${JSON.stringify(diff(eg, flipCols(sArr, gw, gh), sMaxG))}`);
+  }
+  line.push(`   distinct export greys ${gValues.length} [${gValues.slice(0, 6).join(',')}${gValues.length > 6 ? ',...' : ''}] distinct G-code S ${sValues.length} [${sValues.slice(0, 6).join(',')}${sValues.length > 6 ? ',...' : ''}] sMaxG ${sMaxG}`);
+  out(line.join('\n'));
+}
+
+it('parity matrix', async () => {
+  await run({ name: '01 floyd identity front-left' });
+  await run({ name: '02 threshold identity', layer: { ditherAlgorithm: 'threshold' } });
+  await run({ name: '03 ordered identity', layer: { ditherAlgorithm: 'ordered' } });
+  await run({ name: '04 grayscale min20', layer: { ditherAlgorithm: 'grayscale', minPower: 20 } });
+  await run({ name: '05 jarvis negative', layer: { ditherAlgorithm: 'jarvis', negativeImage: true } });
+  await run({ name: '06 floyd rear-left device', device: { origin: 'rear-left' } as never });
+  await run({ name: '07 threshold mirrorX', layer: { ditherAlgorithm: 'threshold' }, transform: T({ mirrorX: true, x: 36 }) });
+  await run({ name: '08 floyd mirrorX', transform: T({ mirrorX: true, x: 36 }) });
+  await run({ name: '09 threshold mirrorY', layer: { ditherAlgorithm: 'threshold' }, transform: T({ mirrorY: true, y: 24 }) });
+  await run({ name: '10 threshold rot90', layer: { ditherAlgorithm: 'threshold' }, transform: T({ rotationDeg: 90, x: 30, y: 0 }), gridW: 20, gridH: 40 });
+  await run({ name: '11 pass-through', layer: { passThrough: true, minPower: 20 } as never });
+  await run({ name: '12 3d-sliced passes4', layer: { ditherAlgorithm: '3d-sliced', passes: 4 } as never });
+  await run({ name: '13 floyd sharpen', image: { sharpenAmount: 100, sharpenRadius: 0.4 } as never });
+  await run({ name: '14 threshold 2.5 lines/mm (resample)', layer: { ditherAlgorithm: 'threshold', linesPerMm: 2.5 } });
+  await run({ name: '15 floyd scaleX 1.5', transform: T({ scaleX: 1.5 }) });
+  await run({ name: '16 blue-noise', layer: { ditherAlgorithm: 'blue-noise' } as never });
+  await run({ name: '17 atkinson', layer: { ditherAlgorithm: 'atkinson' } as never });
+  await run({ name: '18 threshold scan angle 90', layer: { ditherAlgorithm: 'threshold', scanAngleDeg: 90 } as never });
+});

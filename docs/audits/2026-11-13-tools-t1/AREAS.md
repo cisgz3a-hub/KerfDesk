@@ -58,7 +58,7 @@ Run order puts tools that make or change burns first, then new tools, then the r
 | T17 | Image | Crop Image | `tools.crop-image` | ledgered: P2 2 (fix #1867), P3 2 (known 3) |
 | T18 | Image | Flatten Image Mask | `tools.flatten-image-mask` | ledgered: P2 1 (fix #1865), P3 4 (known 9) |
 | T19 | Image | Remove Image Mask | `tools.remove-image-mask` | ledgered: P3 3 (known 2) |
-| T20 | Image | Save Processed Bitmap | `tools.save-processed-bitmap` | |
+| T20 | Image | Save Processed Bitmap | `tools.save-processed-bitmap` | ledgered: P3 3 (known 1) |
 | T21 | Image | Save Original Image | `tools.save-original-image` | |
 | T22 | Bitmap | Convert to Bitmap | `tools.convert-to-bitmap` | |
 | T23 | Trace | Trace Image | `tools.trace-image` | |
