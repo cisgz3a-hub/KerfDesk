@@ -1,0 +1,240 @@
+// @vitest-environment jsdom
+// T26 Convert to Path: decoded G-code before vs after conversion for every convertible kind,
+// identity and rotated+mirrored+non-uniform transforms, Line and Fill. Own decoder + own geometry.
+import { beforeEach, it } from 'vitest';
+import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type TextObject,
+  type Transform,
+} from '../t26-main/src/core/scene';
+import { createRectangle } from '../t26-main/src/core/shapes/primitives/create-rectangle';
+import { createEllipse } from '../t26-main/src/core/shapes/primitives/create-ellipse';
+import { createPolygon } from '../t26-main/src/core/shapes/primitives/create-polygon';
+import { createStar } from '../t26-main/src/core/shapes/primitives/create-star';
+import { textToPolylines } from '../t26-main/src/core/text';
+import { prepareOutput } from '../t26-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t26-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t26-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t26-main/src/io/project/deserialize-project';
+import { useStore } from '../t26-main/src/ui/state/store';
+import { resetStore } from '../t26-main/src/ui/state/test-helpers';
+import { litMoves, totalLen, type LitMove, type Vec } from './decode';
+
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t26/t26-burn.log', log.join('\n'));
+};
+beforeEach(() => resetStore());
+const st = () => useStore.getState();
+const f3 = (n: number) => n.toFixed(3);
+
+function layerFor(mode: 'line' | 'fill'): Layer {
+  return {
+    ...createLayer({ id: 'L', color: '#000000', name: 'L', mode }),
+    speed: mode === 'line' ? 1234 : 4321,
+    power: 37,
+    passes: 1,
+    ...(mode === 'fill' ? { hatchSpacingMm: 0.2, hatchAngleDeg: 0 } : {}),
+  } as Layer;
+}
+
+function load(objects: SceneObject[], layer: Layer): void {
+  const base = createProject();
+  const project: Project = {
+    ...base,
+    optimization: { ...DEFAULT_PROJECT_OPTIMIZATION },
+    scene: { ...base.scene, objects, layers: [layer], groups: [] },
+  };
+  useStore.setState({
+    project,
+    selectedObjectId: objects[0]!.id,
+    additionalSelectedIds: new Set(objects.slice(1).map((o) => o.id)),
+    undoStack: [],
+    redoStack: [],
+    dirty: false,
+  });
+}
+
+function burn(project: Project) {
+  const prepared = prepareOutput(project);
+  if (!prepared.ok) return { ok: false, moves: [] as LitMove[], gcode: '', issues: JSON.stringify(prepared.preflight).slice(0, 300) };
+  const emitted = emitPreparedGcode(prepared);
+  return { ok: true, moves: litMoves(emitted.gcode, project.device), gcode: emitted.gcode, issues: '' };
+}
+
+function densify(moves: ReadonlyArray<LitMove>, step = 0.05): Vec[] {
+  const res: Vec[] = [];
+  for (const m of moves) {
+    const n = Math.max(1, Math.ceil(m.len / step));
+    for (let k = 0; k <= n; k++) res.push({ x: m.from.x + ((m.to.x - m.from.x) * k) / n, y: m.from.y + ((m.to.y - m.from.y) * k) / n });
+  }
+  return res;
+}
+function segDist(p: Vec, a: Vec, b: Vec): number {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const l2 = dx * dx + dy * dy;
+  const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+function directed(a: ReadonlyArray<LitMove>, b: ReadonlyArray<LitMove>): number {
+  let worst = 0;
+  const pts = densify(a, 0.1);
+  for (let i = 0; i < pts.length; i += 1) {
+    const p = pts[i]!;
+    let best = Infinity;
+    for (const m of b) {
+      const d = segDist(p, m.from, m.to);
+      if (d < best) best = d;
+      if (best < 1e-6) break;
+    }
+    if (best > worst) worst = best;
+  }
+  return worst;
+}
+type Chain = { start: Vec; area: number; len: number };
+function chains(moves: ReadonlyArray<LitMove>): Chain[] {
+  const res: Chain[] = [];
+  let cur: LitMove[] = [];
+  const flush = () => {
+    if (cur.length === 0) return;
+    let area = 0;
+    for (const m of cur) area += m.from.x * m.to.y - m.to.x * m.from.y;
+    res.push({ start: cur[0]!.from, area: area / 2, len: totalLen(cur) });
+    cur = [];
+  };
+  for (const m of moves) {
+    const last = cur.at(-1);
+    if (last !== undefined && Math.hypot(last.to.x - m.from.x, last.to.y - m.from.y) > 1e-3) flush();
+    cur.push(m);
+  }
+  flush();
+  return res;
+}
+const fs = (moves: ReadonlyArray<LitMove>) => [...new Set(moves.map((m) => `F${m.f}/S${m.s}`))].join(',');
+
+async function font(name: string): Promise<ArrayBuffer> {
+  const bytes = readFileSync(`C:/Users/stolk/kd-t1/t26-main/src/ui/text/fonts/${name}`);
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+async function textObject(id: string, content: string, transform: Transform): Promise<TextObject> {
+  const rendered = await textToPolylines({
+    fontBuffer: await font('Roboto-Regular.ttf'),
+    content,
+    sizeMm: 20,
+    alignment: 'left',
+    lineHeight: 1.4,
+    color: '#000000',
+  });
+  return {
+    kind: 'text',
+    id,
+    content,
+    fontKey: 'Roboto',
+    sizeMm: 20,
+    alignment: 'left',
+    lineHeight: 1.4,
+    letterSpacing: 0,
+    color: '#000000',
+    bounds: rendered.bounds,
+    transform,
+    paths: rendered.paths,
+  } as TextObject;
+}
+
+function cubicSvg(id: string, transform: Transform): ImportedSvg {
+  // A closed blob of two cubics (canonical curves) and its compatibility polyline.
+  const curves = [
+    {
+      start: { x: 0, y: 0 },
+      closed: true,
+      segments: [
+        { kind: 'cubic' as const, control1: { x: 0, y: 20 }, control2: { x: 30, y: 20 }, to: { x: 30, y: 0 } },
+        { kind: 'cubic' as const, control1: { x: 30, y: -10 }, control2: { x: 0, y: -10 }, to: { x: 0, y: 0 } },
+      ],
+    },
+  ];
+  const pts: Vec[] = [];
+  const cub = (p0: Vec, p1: Vec, p2: Vec, p3: Vec, t: number) => {
+    const u = 1 - t;
+    return {
+      x: u * u * u * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * p3.x,
+      y: u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y,
+    };
+  };
+  for (let i = 0; i < 64; i++) pts.push(cub({ x: 0, y: 0 }, { x: 0, y: 20 }, { x: 30, y: 20 }, { x: 30, y: 0 }, i / 64));
+  for (let i = 0; i < 64; i++) pts.push(cub({ x: 30, y: 0 }, { x: 30, y: -10 }, { x: 0, y: -10 }, { x: 0, y: 0 }, i / 64));
+  return {
+    kind: 'imported-svg',
+    id,
+    source: 'blob.svg',
+    bounds: { minX: 0, minY: -7.5, maxX: 30, maxY: 15 },
+    transform,
+    paths: [{ color: '#000000', polylines: [{ closed: true, points: pts }], curves }],
+  };
+}
+
+const TRANSFORMS: Record<string, Transform> = {
+  identity: { ...IDENTITY_TRANSFORM, x: 100, y: 100 },
+  rotMirAniso: { ...IDENTITY_TRANSFORM, x: 150, y: 120, rotationDeg: 35, mirrorX: true, scaleX: 2.5, scaleY: 0.8 },
+};
+
+async function makeKinds(t: Transform): Promise<Record<string, SceneObject>> {
+  return {
+    rectR5: createRectangle({ id: 'o', color: '#000000', spec: { widthMm: 40, heightMm: 25, cornerRadiusMm: 5 }, transform: t }),
+    ellipse: createEllipse({ id: 'o', color: '#000000', spec: { widthMm: 30, heightMm: 20 }, transform: t }),
+    polygonBulge: createPolygon({ id: 'o', color: '#000000', spec: { sides: 6, radiusMm: 15, bulge: 0.4 }, transform: t }),
+    starBulge: createStar({ id: 'o', color: '#000000', spec: { points: 5, outerRadiusMm: 15, innerRadiusRatio: 0.45, bulge: 0.3 }, transform: t }),
+    cubicSvg: cubicSvg('o', t),
+    text: await textObject('o', 'Ag8%@', t),
+  };
+}
+
+it('burn before vs after Convert to Path, every kind, Line and Fill', async () => {
+  out('kind | transform | mode | before len/after len | chains b/a | hausdorff b->a, a->b | F/S b | F/S a | first start b | first start a | undo | redo');
+  for (const [tName, t] of Object.entries(TRANSFORMS)) {
+    const kinds = await makeKinds(t);
+    for (const [kName, obj] of Object.entries(kinds)) {
+      for (const mode of ['line', 'fill'] as const) {
+        resetStore();
+        load([obj], layerFor(mode));
+        const p0 = st().project;
+        const b = burn(p0);
+        st().convertSelectionToPath();
+        const p1 = st().project;
+        const conv = p1.scene.objects[0]!;
+        const a = burn(p1);
+        const cb = chains(b.moves);
+        const ca = chains(a.moves);
+        const hBA = b.moves.length && a.moves.length ? directed(b.moves, a.moves) : NaN;
+        const hAB = b.moves.length && a.moves.length ? directed(a.moves, b.moves) : NaN;
+        st().undo();
+        const undoOk = st().project === p0;
+        st().redo();
+        const redoOk = JSON.stringify(st().project.scene.objects) === JSON.stringify(p1.scene.objects);
+        // save/reopen
+        const reopened = deserializeProject(serializeProject(p1));
+        const r = reopened.kind === "ok" ? burn(reopened.project) : { ok: false, moves: [] as LitMove[], gcode: '', issues: 'reopen failed' };
+        const reopenSame = r.moves.length === a.moves.length && Math.abs(totalLen(r.moves) - totalLen(a.moves)) < 1e-6;
+        const areasB = cb.map((c) => Math.sign(c.area)).join('');
+        const areasA = ca.map((c) => Math.sign(c.area)).join('');
+        out(
+          `${kName} | ${tName} | ${mode} | ok ${b.ok}/${a.ok} ${f3(totalLen(b.moves))}/${f3(totalLen(a.moves))} | ${cb.length}/${ca.length} | ${f3(hBA)}, ${f3(hAB)} | ${fs(b.moves)} | ${fs(a.moves)} | ` +
+            `${cb[0] ? `${f3(cb[0].start.x)},${f3(cb[0].start.y)}` : '-'} | ${ca[0] ? `${f3(ca[0].start.x)},${f3(ca[0].start.y)}` : '-'} | undo ${undoOk} redo ${redoOk} reopen ${reopenSame}` +
+            (mode === 'line' ? ` | winding b ${areasB.slice(0, 20)} a ${areasA.slice(0, 20)}` : '') +
+            ` | conv kind ${conv.kind} fillRule ${'paths' in conv ? conv.paths.map((p) => p.fillRule ?? '-').join('/') : ''} curves ${'paths' in conv ? conv.paths.map((p) => (p.curves ? 'y' : 'n')).join('') : ''} pts ${'paths' in conv ? conv.paths.reduce((n, p) => n + p.polylines.reduce((m, l) => m + l.points.length, 0), 0) : 0}` +
+            (b.issues || a.issues ? ` | issues ${b.issues} || ${a.issues}` : ''),
+        );
+      }
+    }
+  }
+});

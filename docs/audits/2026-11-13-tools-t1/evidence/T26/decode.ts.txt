@@ -1,0 +1,107 @@
+// T06 decode helpers: lit G1 moves in scene coordinates, plus an even-odd / nonzero
+// grid oracle that is independent of the app's fill engine.
+import { toSceneCoords, type DeviceProfile } from '../t26-main/src/core/devices';
+
+export type Vec = { x: number; y: number };
+export type LitMove = { from: Vec; to: Vec; f: number; s: number; len: number; line: number };
+
+export function litMoves(gcode: string, device: DeviceProfile): LitMove[] {
+  let x = 0;
+  let y = 0;
+  let s = 0;
+  let f = 0;
+  let g = 0;
+  let laserOn = false;
+  const moves: LitMove[] = [];
+  gcode.split('\n').forEach((raw, lineNo) => {
+    const line = raw.replace(/;.*$/, '').replace(/\(.*?\)/g, '').toUpperCase();
+    const words = [...line.matchAll(/([A-Z])\s*(-?\d*\.?\d+)/g)];
+    const map = new Map<string, string>();
+    const ms: number[] = [];
+    for (const [, letter, value] of words) {
+      if (letter === 'M') ms.push(Number(value));
+      else map.set(letter!, value!);
+    }
+    for (const m of ms) {
+      if (m === 3 || m === 4) laserOn = true;
+      if (m === 5) laserOn = false;
+    }
+    const gv = map.get('G');
+    if (gv !== undefined) {
+      const gn = Number(gv);
+      if (gn === 0 || gn === 1 || gn === 2 || gn === 3) g = gn;
+    }
+    if (map.has('F')) f = Number(map.get('F'));
+    if (map.has('S')) s = Number(map.get('S'));
+    const nx = map.has('X') ? Number(map.get('X')) : x;
+    const ny = map.has('Y') ? Number(map.get('Y')) : y;
+    if ((map.has('X') || map.has('Y')) && g === 1 && laserOn && s > 0) {
+      const from = toSceneCoords({ x, y }, device);
+      const to = toSceneCoords({ x: nx, y: ny }, device);
+      moves.push({ from, to, f, s, len: Math.hypot(to.x - from.x, to.y - from.y), line: lineNo });
+    }
+    x = nx;
+    y = ny;
+  });
+  return moves;
+}
+
+export function totalLen(moves: ReadonlyArray<LitMove>): number {
+  return moves.reduce((a, m) => a + m.len, 0);
+}
+
+export function bbox(moves: ReadonlyArray<LitMove>) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const m of moves)
+    for (const p of [m.from, m.to]) {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    }
+  return { minX, minY, maxX, maxY };
+}
+
+/** Grid oracle: fraction of area covered under even-odd or nonzero, sampled at step mm. */
+export function gridArea(
+  contours: ReadonlyArray<ReadonlyArray<Vec>>,
+  rule: 'evenodd' | 'nonzero',
+  step = 0.05,
+): number {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const c of contours) for (const p of c) {
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+  }
+  let count = 0;
+  for (let y = minY + step / 2; y < maxY; y += step) {
+    // crossings with winding direction
+    const xs: { x: number; w: number }[] = [];
+    for (const c of contours)
+      for (let i = 0; i < c.length; i++) {
+        const a = c[i]!;
+        const b = c[(i + 1) % c.length]!;
+        if ((a.y <= y && b.y > y) || (b.y <= y && a.y > y)) {
+          const t = (y - a.y) / (b.y - a.y);
+          xs.push({ x: a.x + t * (b.x - a.x), w: b.y > a.y ? 1 : -1 });
+        }
+      }
+    xs.sort((p, q) => p.x - q.x);
+    let wind = 0;
+    let parity = 0;
+    for (let i = 0; i < xs.length - 1; i++) {
+      wind += xs[i]!.w;
+      parity ^= 1;
+      const inside = rule === 'evenodd' ? parity === 1 : wind !== 0;
+      if (inside) count += (xs[i + 1]!.x - xs[i]!.x) * step;
+    }
+  }
+  return count;
+}
+
+/** Hatched area estimate: lit length on fill rows times row spacing. */
+export function hatchArea(moves: ReadonlyArray<LitMove>, spacing: number): number {
+  return totalLen(moves) * spacing;
+}
+
+export function rowsOf(moves: ReadonlyArray<LitMove>): number {
+  return new Set(moves.map((m) => ((m.from.y + m.to.y) / 2).toFixed(3))).size;
+}

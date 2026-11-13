@@ -1,0 +1,263 @@
+// @vitest-environment jsdom
+// T26 refuter: own checks for Convert to Path (variable text, curves under scale, registration jig).
+import { beforeEach, it } from 'vitest';
+import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  createRegistrationLayer,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  DEFAULT_PROJECT_VARIABLE_DATA,
+  IDENTITY_TRANSFORM,
+  findRegistrationBoxes,
+  isRegistrationBox,
+  registrationRunState,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type TextObject,
+} from '../t26-main/src/core/scene';
+import { createEllipse } from '../t26-main/src/core/shapes/primitives/create-ellipse';
+import { createRectangle } from '../t26-main/src/core/shapes/primitives/create-rectangle';
+import { createRegistrationBox } from '../t26-main/src/core/shapes';
+import { textToPolylines } from '../t26-main/src/core/text';
+import { parseVariableTemplateSource } from '../t26-main/src/core/variables';
+import { localPathArtwork } from '../t26-main/src/core/geometry/local-path-artwork';
+import { prepareOutput } from '../t26-main/src/io/gcode/prepare-output';
+import { prepareOutputSnapshot, type VariableTextRenderer } from '../t26-main/src/io/gcode/prepare-output-snapshot';
+import { emitPreparedGcode } from '../t26-main/src/io/gcode/emit-gcode';
+import { deriveVariableBarcodeDisplay } from '../t26-main/src/ui/workspace/variable-barcode-display';
+import { applyRegistrationOutputToScene } from '../t26-main/src/ui/state/registration-output-actions';
+import { useStore } from '../t26-main/src/ui/state/store';
+import { resetStore } from '../t26-main/src/ui/state/test-helpers';
+import { selectionHasUnlockedVectorObject } from '../t26-main/src/ui/commands/selection-command-state';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t26r/r26.log';
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync(LOG, log.join('\n'));
+};
+beforeEach(() => resetStore());
+const st = () => useStore.getState();
+const f3 = (n: number) => n.toFixed(3);
+
+// Independent font from the auditor (monospace: width is proportional to character count).
+const mono = (() => {
+  const b = readFileSync('C:/Users/stolk/kd-t1/t26-main/src/ui/text/fonts/Inconsolata-Regular.ttf');
+  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+})();
+const renderer: VariableTextRenderer = ({ text, content }) =>
+  textToPolylines({
+    content,
+    sizeMm: text.sizeMm,
+    alignment: text.alignment,
+    lineHeight: text.lineHeight,
+    letterSpacing: text.letterSpacing,
+    color: text.color,
+    fontBuffer: mono,
+  });
+
+function layer(id: string, color: string, extra: Partial<Layer> = {}): Layer {
+  return { ...createLayer({ id, color, name: id, mode: 'line' }), ...extra } as Layer;
+}
+function proj(objects: SceneObject[], layers: Layer[], extra: Partial<Project> = {}): Project {
+  const base = createProject();
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers, groups: [] }, ...extra };
+}
+function setProject(project: Project, selected: string[]): void {
+  useStore.setState({ project, selectedObjectId: selected[0] ?? null, additionalSelectedIds: new Set(selected.slice(1)), undoStack: [], redoStack: [], dirty: false });
+}
+
+// Own G-code reader: lit runs (contours), lit X extent, G1/G2/G3 counts, lit segments.
+type Seg = { x0: number; y0: number; x1: number; y1: number; f: number };
+function readGcode(g: string) {
+  let x = 0, y = 0, s = 0, f = 0, mode = 0, on = false, runs = 0, inRun = false;
+  let minX = Infinity, maxX = -Infinity;
+  const segs: Seg[] = [];
+  let g1 = 0, arcs = 0;
+  for (const raw of g.split('\n')) {
+    const line = raw.replace(/;.*$/, '').replace(/\(.*?\)/g, '').trim().toUpperCase();
+    if (line === '') continue;
+    if (/\bM[34]\b/.test(line)) on = true;
+    if (/\bM5\b/.test(line)) on = false;
+    const gm = line.match(/\bG0*([0-3])(?![0-9.])/);
+    if (gm) mode = Number(gm[1]);
+    const sx = line.match(/S(-?[\d.]+)/); if (sx) s = Number(sx[1]);
+    const fx = line.match(/F(-?[\d.]+)/); if (fx) f = Number(fx[1]);
+    const xm = line.match(/X(-?[\d.]+)/), ym = line.match(/Y(-?[\d.]+)/);
+    if (!xm && !ym) continue;
+    const nx = xm ? Number(xm[1]) : x, ny = ym ? Number(ym[1]) : y;
+    const lit = on && s > 0 && mode >= 1;
+    if (mode === 1) g1++;
+    if (mode === 2 || mode === 3) arcs++;
+    if (lit) {
+      if (!inRun) { runs++; inRun = true; }
+      segs.push({ x0: x, y0: y, x1: nx, y1: ny, f });
+      minX = Math.min(minX, x, nx); maxX = Math.max(maxX, x, nx);
+    } else inRun = false;
+    x = nx; y = ny;
+  }
+  return { runs, minX, maxX, segs, g1, arcs };
+}
+
+it('R1 variable text: canvas, preview/output before and after Convert to Path', async () => {
+  const source = 'SN {{serial:4}}';
+  const parsed = parseVariableTemplateSource(source);
+  if (!parsed.ok) throw new Error(parsed.message);
+  const base = {
+    kind: 'text', id: 'VT', content: source, variableTemplate: parsed.template,
+    fontKey: 'inconsolata-regular', sizeMm: 8, alignment: 'left', lineHeight: 1.2, letterSpacing: 0,
+    color: '#000000', bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+    transform: { ...IDENTITY_TRANSFORM, x: 30, y: 40 }, paths: [],
+  } as unknown as TextObject;
+  const stored = await renderer({ text: base, content: source, project: createProject() });
+  const text = { ...base, bounds: stored.bounds, paths: stored.paths } as TextObject;
+  const p0 = proj([text], [layer('L', '#000000', { speed: 1000, power: 30 })], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 42 } });
+  out(`R1 parsed tokens: ${JSON.stringify(parsed.template.tokens)}`);
+  // Canvas: the only canvas substitution is for barcodes; text keeps its stored (template) paths.
+  const canvas = deriveVariableBarcodeDisplay(p0).project.scene.objects[0] as TextObject;
+  out(`R1 canvas draws stored paths unchanged: ${canvas.paths === text.paths}; stored bbox width ${f3(stored.bounds.maxX - stored.bounds.minX)} mm (template glyphs)`);
+  // Value oracle: render evaluated text in the same font.
+  const valueR = await renderer({ text: base, content: 'SN 0042', project: p0 });
+  out(`R1 oracle widths: "SN 0042" ${f3(valueR.bounds.maxX - valueR.bounds.minX)} mm, template ${f3(stored.bounds.maxX - stored.bounds.minX)} mm; closed contours value ${valueR.paths.flatMap((p) => p.polylines).length}, template ${stored.paths.flatMap((p) => p.polylines).length}`);
+  const snap = async (p: Project, label: string) => {
+    const prepared = await prepareOutputSnapshot(p, { clock: () => new Date(0), renderVariableText: renderer });
+    if (!prepared.ok) { out(`${label}: not ok ${JSON.stringify(prepared.preflight).slice(0, 300)}`); return; }
+    const r = readGcode(emitPreparedGcode(prepared).gcode);
+    out(`${label}: lit runs ${r.runs}, lit X ${f3(r.minX)}..${f3(r.maxX)} (width ${f3(r.maxX - r.minX)}), advisories ${JSON.stringify((prepared.advisories ?? []).map((a) => a.code ?? a.message))}`);
+  };
+  await snap(p0, 'R1 Start/Preview before (snapshot)');
+  out(`R1 Convert to Path enabled on variable text: ${selectionHasUnlockedVectorObject(p0, ['VT'])}`);
+  setProject(p0, ['VT']);
+  st().convertSelectionToPath();
+  const p1 = st().project;
+  const c = p1.scene.objects[0] as ImportedSvg;
+  out(`R1 after: kind ${c.kind}, variableTemplate kept ${'variableTemplate' in c}, source "${c.source}"`);
+  // Preview path after conversion: no variable data -> plain prepareOutput (buildPreviewToolpath).
+  const plain = prepareOutput(p1);
+  if (plain.ok) {
+    const r = readGcode(emitPreparedGcode(plain).gcode);
+    out(`R1 Preview/Start after (plain prepare): lit runs ${r.runs}, lit X ${f3(r.minX)}..${f3(r.maxX)} (width ${f3(r.maxX - r.minX)}), advisories ${JSON.stringify((plain.advisories ?? []).map((a) => a.code ?? a.message))}`);
+  }
+  await snap(p1, 'R1 Start after (snapshot)');
+  // Twin: Bake Variable Text then Convert = documented path to freeze the value
+  const toasts = (await import('../t26-main/src/ui/state/toast-store')).useToastStore.getState().toasts;
+  out(`R1 toasts after convert: ${JSON.stringify(toasts.map((t) => t.message))}`);
+});
+
+function radialDev(segs: Seg[], _cx: number, _cy: number, r: number): number {
+  // centre from the lit extent (output may be Y-flipped / offset by the job origin)
+  const xs = segs.flatMap((s) => [s.x0, s.x1]), ys = segs.flatMap((s) => [s.y0, s.y1]);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  out(`     lit extent ${f3(Math.max(...xs) - Math.min(...xs))} x ${f3(Math.max(...ys) - Math.min(...ys))}; first seg ${JSON.stringify(segs[0])}`);
+  let worst = 0;
+  for (const sg of segs) for (let k = 0; k <= 10; k++) {
+    const x = sg.x0 + ((sg.x1 - sg.x0) * k) / 10, y = sg.y0 + ((sg.y1 - sg.y0) * k) / 10;
+    worst = Math.max(worst, Math.abs(Math.hypot(x - cx, y - cy) - r));
+  }
+  return worst;
+}
+
+it('R2 curves: nodes after convert, store resize, arcs, Trim-twin path re-converted', () => {
+  const dev0 = createProject().device;
+  const device = { ...dev0, controllerKind: 'grbl-v1.1', laserArcMoves: 'on' } as Project['device'];
+  for (const d of [10, 40]) {
+    const e = createEllipse({ id: 'E', color: '#000000', spec: { widthMm: d, heightMm: d }, transform: { ...IDENTITY_TRANSFORM, x: 100, y: 100 } });
+    const p0 = proj([e], [layer('L', '#000000', { speed: 1000, power: 30 })], { device });
+    setProject(p0, ['E']);
+    st().convertSelectionToPath();
+    const c = st().project.scene.objects[0] as ImportedSvg;
+    const nodes = c.paths[0]!.polylines[0]!.points.length;
+    out(`R2 circle d${d}: original curves ${e.paths[0]!.curves !== undefined} (${JSON.stringify(e.paths[0]!.curves?.map((s) => s.segments?.length ?? '?'))}); converted nodes ${nodes}, curves kept ${c.paths[0]!.curves !== undefined}`);
+    for (const k of [2, 5, 10]) {
+      // Resize through the store, as the canvas/Size fields do; centre = 100 + d/2 kept by shifting x.
+      const t = c.transform;
+      const cx0 = 100 + d / 2;
+      st().setObjectTransform('E', { ...t, scaleX: k, scaleY: k, x: cx0 - cx0 * k, y: cx0 - cx0 * k });
+      const pr = prepareOutput(st().project);
+      if (!pr.ok) { out('not ok'); continue; }
+      const r = readGcode(emitPreparedGcode(pr).gcode);
+      // unconverted twin resized the same way (scale about the shape's own origin)
+      const e2 = { ...e, transform: { ...e.transform, scaleX: k, scaleY: k, x: cx0 - (d / 2) * k, y: cx0 - (d / 2) * k } };
+      const pu = prepareOutput(proj([e2], p0.scene.layers as Layer[], { device }));
+      const ru = pu.ok ? readGcode(emitPreparedGcode(pu).gcode) : null;
+      const devC = radialDev(r.segs.filter((sg) => true), cx0, cx0, (d * k) / 2);
+      out(`R2   x${k} (dia ${d * k}): converted G1 ${r.g1} G2/3 ${r.arcs} max radial dev ${f3(devC)} mm (chord sag of ${nodes - 1}-gon oracle ${f3(((d * k) / 2) * (1 - Math.cos(Math.PI / (nodes - 1))))}); unconverted G1 ${ru?.g1} G2/3 ${ru?.arcs}`);
+      st().setObjectTransform('E', t);
+    }
+  }
+  // Twin: Trim/Optimize keep curves via localPathArtwork. Convert that path again -> curves?
+  const e = createEllipse({ id: 'T', color: '#000000', spec: { widthMm: 30, heightMm: 30 }, transform: { ...IDENTITY_TRANSFORM, x: 10, y: 10 } });
+  const asPath = localPathArtwork(e);
+  setProject(proj([asPath], [layer('L', '#000000')]), ['T']);
+  out(`R2 imported-svg path with curves: curves ${asPath.paths[0]!.curves !== undefined}, enabled ${selectionHasUnlockedVectorObject(st().project, ['T'])}`);
+  st().convertSelectionToPath();
+  const again = st().project.scene.objects[0] as ImportedSvg;
+  out(`R2   Convert to Path on an existing curved path: curves kept ${again.paths[0]!.curves !== undefined}, nodes ${again.paths[0]!.polylines[0]!.points.length}`);
+  // Rounded rect: corner nodes
+  const rr = createRectangle({ id: 'R', color: '#000000', spec: { widthMm: 40, heightMm: 20, cornerRadiusMm: 5 }, transform: { ...IDENTITY_TRANSFORM } });
+  setProject(proj([rr], [layer('L', '#000000')]), ['R']);
+  st().convertSelectionToPath();
+  const rc = st().project.scene.objects[0] as ImportedSvg;
+  out(`R2 rounded rect r5: nodes after convert ${rc.paths[0]!.polylines[0]!.points.length}`);
+});
+
+it('R3 registration jig: Select All -> Convert to Path', () => {
+  const regLayer = createRegistrationLayer();
+  const boxA = createRegistrationBox({ id: 'boxA', widthMm: 60, heightMm: 60, x: 10, y: 10 });
+  const boxB = createRegistrationBox({ id: 'boxB', widthMm: 60, heightMm: 60, x: 80, y: 10 });
+  const art = createEllipse({ id: 'art', color: '#000000', spec: { widthMm: 30, heightMm: 30 }, transform: { ...IDENTITY_TRANSFORM, x: 25, y: 25 } });
+  const p0 = proj([boxA, boxB, art], [regLayer, layer('L', '#000000')]);
+  for (const scope of ['box', 'artwork'] as const) {
+    const scene = applyRegistrationOutputToScene(p0.scene, scope);
+    setProject({ ...p0, scene }, []);
+    out(`R3 [${scope}] before: boxes ${findRegistrationBoxes(st().project.scene).length}, run state ${registrationRunState(st().project.scene)}, locked flags ${JSON.stringify([boxA.locked, boxB.locked])}`);
+    st().selectAllObjects();
+    const sel = [st().selectedObjectId, ...st().additionalSelectedIds];
+    out(`R3 [${scope}] Select All picks ${JSON.stringify(sel)}`);
+    st().convertSelectionToPath();
+    const s1 = st().project.scene;
+    const regObjs = s1.objects.filter((o) => o.id.startsWith('box'));
+    out(`R3 [${scope}] after: boxes ${findRegistrationBoxes(s1).length}, isRegistrationBox ${JSON.stringify(regObjs.map((o) => isRegistrationBox(o)))}, kinds ${JSON.stringify(regObjs.map((o) => o.kind))}, jig bar shown ${findRegistrationBoxes(s1).length > 0}, run state ${registrationRunState(s1)}, reg layer output ${s1.layers.find((l) => l.id === 'registration')?.output}, art layer output ${s1.layers.find((l) => l.id === 'L')?.output}`);
+    const pr = prepareOutput(st().project);
+    const r = pr.ok ? readGcode(emitPreparedGcode(pr).gcode) : null;
+    out(`R3 [${scope}] burn after: ok ${pr.ok} lit runs ${r?.runs} lit X ${r ? f3(r.minX) + '..' + f3(r.maxX) : ''}`);
+    st().undo();
+    out(`R3 [${scope}] Undo restores boxes: ${findRegistrationBoxes(st().project.scene).length}`);
+  }
+});
+
+it('R4 barcodes (QR / Code 128, plain and inverted) under Fill and Line: burn before vs after', async () => {
+  const { createBarcodeObject } = await import('../t26-main/src/core/barcode');
+  const { defaultBarcodeSpec } = await import('../t26-main/src/core/barcode/barcode-spec');
+  const caption = async () => ({ polylines: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } });
+  const len = (segs: Seg[]) => segs.reduce((n, s) => n + Math.hypot(s.x1 - s.x0, s.y1 - s.y0), 0);
+  for (const sym of ['qr', 'code128'] as const) for (const invert of [false, true]) for (const mode of ['fill', 'line'] as const) {
+    const spec = { ...defaultBarcodeSpec(sym), invert, showText: false };
+    const made = await createBarcodeObject({ id: 'B', color: '#000000', spec, value: spec.data, renderCaption: caption as never, transform: { ...IDENTITY_TRANSFORM, x: 40, y: 40, rotationDeg: 30 } });
+    if (!made.ok) { out(`R4 ${sym} make failed ${made.message}`); continue; }
+    const p0 = proj([made.object], [layer('L', '#000000', { mode, speed: 3000, power: 40 } as Partial<Layer>)]);
+    const b = (p: Project) => { const pr = prepareOutput(p); if (!pr.ok) return null; const r = readGcode(emitPreparedGcode(pr).gcode); return { runs: r.runs, len: len(r.segs) }; };
+    const before = b(p0);
+    setProject(p0, ['B']);
+    st().convertSelectionToPath();
+    const after = b(st().project);
+    const fr = (st().project.scene.objects[0] as ImportedSvg).paths.map((p) => p.fillRule);
+    out(`R4 ${sym} invert ${invert} ${mode}: before runs ${before?.runs} lit ${before ? f3(before.len) : '-'}; after runs ${after?.runs} lit ${after ? f3(after.len) : '-'}; src fillRule ${JSON.stringify(made.object.paths.map((p) => p.fillRule))} -> ${JSON.stringify(fr)}`);
+  }
+});
+
+it('R5 live boolean compound: menu state and Convert to Path result', async () => {
+  const { loadCompound } = await import('../t26-main/src/ui/state/boolean-compound-workflow.test-fixture');
+  const c = loadCompound('subtract');
+  useStore.setState({ selectedObjectId: c.id, additionalSelectedIds: new Set() });
+  const p0 = st().project;
+  const enabled = selectionHasUnlockedVectorObject(p0, [c.id]);
+  const undoBefore = st().undoStack.length;
+  const { useToastStore } = await import('../t26-main/src/ui/state/toast-store');
+  const toastsBefore = useToastStore.getState().toasts.length;
+  st().convertSelectionToPath();
+  out(`R5 compound: menu enabled ${enabled}; project changed ${st().project !== p0}; undo steps added ${st().undoStack.length - undoBefore}; new toasts ${JSON.stringify(useToastStore.getState().toasts.slice(toastsBefore).map((t) => t.message))}; still compound ${'booleanCompound' in (st().project.scene.objects[0] as object)}`);
+});
