@@ -115,7 +115,8 @@ describe('detectCncMachineLimitWarnings (ADR-111)', () => {
         '12000 RPM — the program sends S12000 and lowers its feed from 1000 to 500 mm/min and ' +
         'plunge from 300 to 150 mm/min by the same ratio, so each tooth keeps the chip load ' +
         'planned at 24000 RPM and the cut runs slower. To plan at the speed the machine runs, ' +
-        'set the spindle to 12000 RPM or reapply the material.',
+        'set the spindle to 12000 RPM or reapply the material. KerfDesk sends the S value only; ' +
+        'actual spindle RPM is not measured.',
     );
     expect(warning).not.toContain('Verify the controller-to-spindle scale');
   });

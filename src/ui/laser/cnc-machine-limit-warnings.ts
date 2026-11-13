@@ -126,7 +126,7 @@ function spindleVsConfiguredCeiling(
       `${feedText(cap.requestedPlungeMmPerMin)} to ${feedText(top.row.plungeMmPerMin)} mm/min ` +
       `by the same ratio, so each tooth keeps the chip load planned at ${cap.requestedRpm} RPM and ` +
       `the cut runs slower. To plan at the speed the machine runs, set the spindle to ${ceiling} RPM ` +
-      'or reapply the material.',
+      'or reapply the material. KerfDesk sends the S value only; actual spindle RPM is not measured.',
   ];
 }
 
