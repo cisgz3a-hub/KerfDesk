@@ -1,0 +1,188 @@
+// T19 Remove Image Mask: through the real store, the real command action,
+// the real bake (Crop) and the real output path (prepareOutput -> G-code).
+import { it, vi } from 'vitest';
+vi.mock('../t13-main/src/ui/raster/luma-bitmap', () => ({ lumaToBitmap: (r: { luma: Uint8Array }) => ({ dataUrl: 'data:image/png;base64,baked', lumaBase64: Buffer.from(r.luma).toString('base64') }) }));
+import type { Layer, Project, RasterImage, SceneObject } from '../t13-main/src/core/scene';
+import { createLayer } from '../t13-main/src/core/scene';
+import { serializeProject } from '../t13-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t13-main/src/io/project/deserialize-project';
+import { exportSceneSvg } from '../t13-main/src/io/svg/export-scene-svg';
+import { imageMaskOffImageIssues } from '../t13-main/src/core/preflight/image-mask-off-image-issues';
+import { rasterPreviewBitmap } from '../t13-main/src/ui/workspace/raster-preview-bitmap';
+import { useStore } from '../t13-main/src/ui/state/store';
+import { resetStore } from '../t13-main/src/ui/state/test-helpers';
+import { cropMaskedRasterImage } from '../t13-main/src/ui/raster/crop-image';
+import { removeImageMaskAction } from '../t13-main/src/ui/commands/image-command-actions';
+import { burnedSegments, circle, encode, gcodeOf, imageLayer, logger, mkImage, mkMask, project, rect, sMap, diffMaps, DEV, T } from './t19-common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t19/t19a.log');
+const st = () => useStore.getState();
+
+// Non-aligned grid on purpose: 40 px over 20 mm (0.5 mm px) burned at 5 l/mm.
+const LPM = 5;
+const imgLayer = (extra: Partial<Layer> = {}) => imageLayer({ linesPerMm: LPM, ...extra });
+const opLayer = (mode: 'line' | 'fill', output = true): Layer =>
+  ({ ...createLayer({ id: 'mask', color: '#000000', name: `Mask ${mode}`, mode }), output, power: 50, speed: 1000 }) as Layer;
+const img = (id: string, x = 10, extra: Partial<RasterImage> = {}) =>
+  ({ ...mkImage(id, 40, 40, { x, y: 10, w: 20, h: 20 }, undefined, { linesPerMm: LPM }), ...extra }) as RasterImage;
+const c0 = circle(20.05, 19.95, 7.3);
+
+const ids = (p: Project) => p.scene.objects.map((o) => o.id).join(',');
+const obj = (id: string) => st().project.scene.objects.find((o) => o.id === id)!;
+const raster = (id: string) => obj(id) as RasterImage;
+const actionApp = () => ({ get project() { return st().project; }, get projectDocumentEpoch() { return st().projectDocumentEpoch; }, applyImageMask: st().applyImageMask, cropImage: st().cropImage, removeImageMask: st().removeImageMask });
+/** Verbatim gate from use-app-commands.ts:125-126 */
+const removeEnabled = () => { const s = st(); const sel = s.project.scene.objects.find((o) => o.id === s.selectedObjectId) ?? null; return sel?.kind === 'raster-image' && sel.imageMaskId !== undefined; };
+/** Run the real menu handler on the current primary selection. */
+const runRemove = () => { const s = st(); const sel = s.project.scene.objects.find((o) => o.id === s.selectedObjectId) ?? null; removeImageMaskAction(actionApp(), sel)(); };
+
+type Case = { name: string; image: Partial<RasterImage>; layer: Partial<Layer>; maskOp: 'line' | 'fill'; maskOut: boolean };
+const cases: Case[] = [
+  { name: 'grayscale, mask on output Line op', image: {}, layer: {}, maskOp: 'line', maskOut: true },
+  { name: 'negative grayscale', image: { negative: true }, layer: {}, maskOp: 'line', maskOut: true },
+  { name: 'floyd, bidirectional + overscan', image: { dither: 'floyd-steinberg' } as Partial<RasterImage>, layer: { ditherAlgorithm: 'floyd-steinberg', imageBidirectional: true, imageOverscanMm: 3 } as Partial<Layer>, maskOp: 'line', maskOut: true },
+  { name: 'image rotated 30 deg, mirrorX, 1.3x0.8', image: { transform: T({ rotationDeg: 30, mirrorX: true, scaleX: 1.3, scaleY: 0.8 }) }, layer: {}, maskOp: 'line', maskOut: true },
+  { name: 'threshold, mask on output Fill op', image: { dither: 'threshold' } as Partial<RasterImage>, layer: { ditherAlgorithm: 'threshold' } as Partial<Layer>, maskOp: 'fill', maskOut: true },
+  { name: 'brightness/contrast/sharpen adjusted', image: { brightness: 20, contrast: 30, sharpenAmount: 1.5, sharpenRadius: 1 } as Partial<RasterImage>, layer: {}, maskOp: 'line', maskOut: false },
+];
+
+it('A1: Remove restores the never-masked burn exactly; mask untouched; Undo/Redo; reopen', async () => {
+  for (const c of cases) {
+    resetStore();
+    const base = img('R', 10, c.image);
+    st().setProject(project([base, mkMask('M', [c0])], [imgLayer(c.layer), opLayer(c.maskOp, c.maskOut)]));
+    const g0 = gcodeOf(st().project); // never masked
+    const maskJson0 = JSON.stringify(obj('M'));
+    const prev0 = rasterPreviewBitmap({ image: raster('R'), layer: st().project.scene.layers[0]!, device: DEV, sceneObjects: st().project.scene.objects });
+    st().selectObject('R'); st().toggleSelectObject('M');
+    st().applyImageMask('R', 'M');
+    const g1 = gcodeOf(st().project);
+    const masked = JSON.stringify(st().project);
+    const undo1 = st().undoStack.length;
+    // user selects the masked image alone and runs Tools -> Remove Image Mask
+    st().selectObject('R');
+    const enabled = removeEnabled();
+    runRemove();
+    const g2 = gcodeOf(st().project);
+    const removed = JSON.stringify(st().project);
+    const prev2 = rasterPreviewBitmap({ image: raster('R'), layer: st().project.scene.layers[0]!, device: DEV, sceneObjects: st().project.scene.objects });
+    const prevEq = prev0 !== null && prev2 !== null && prev0.width === prev2.width && prev0.height === prev2.height && Buffer.from(prev0.rgba).equals(Buffer.from(prev2.rgba));
+    const segs0 = burnedSegments(g0), segs1 = burnedSegments(g1), segs2 = burnedSegments(g2);
+    const region = { x0: 0, y0: 0, x1: 45, y1: 45 };
+    const d = diffMaps(sMap(segs0, 1 / LPM, region), sMap(segs2, 1 / LPM, region), [c0], 1, 800);
+    out(`A1 [${c.name}]: Remove enabled ${enabled}; G-code never-masked vs after Remove identical ${g0 === g2} (${segs0.length} vs ${segs2.length} burn segs; masked had ${segs1.length}; masked differs ${g0 !== g1}); S-map diff ${d.diffMm2} mm2, sumS ${d.sumSBefore}/${d.sumSAfter}; mask object JSON unchanged ${JSON.stringify(obj('M')) === maskJson0}; imageMaskId ${raster('R').imageMaskId}; image JSON = original ${JSON.stringify(raster('R')) === JSON.stringify(base)}; preview bitmap equal ${prevEq}; objects ${ids(st().project)}; undo depth ${undo1} -> ${st().undoStack.length}; selection ${st().selectedObjectId}+${[...st().additionalSelectedIds]}; dirty ${st().dirty}`);
+    st().undo();
+    out(`A1 [${c.name}] undo: JSON = masked ${JSON.stringify(st().project) === masked}; gcode = masked ${gcodeOf(st().project) === g1}`);
+    st().redo();
+    out(`A1 [${c.name}] redo: JSON = removed ${JSON.stringify(st().project) === removed}; gcode = removed ${gcodeOf(st().project) === g2}`);
+    // second Remove is a no-op
+    const depth = st().undoStack.length; runRemove();
+    out(`A1 [${c.name}] second Remove: undo depth ${depth} -> ${st().undoStack.length}; enabled now ${removeEnabled()}`);
+    const back = deserializeProject(serializeProject(st().project));
+    if (back.kind !== 'ok') { out(`A1 reopen failed ${JSON.stringify(back).slice(0, 300)}`); continue; }
+    const rb = back.project.scene.objects.find((o) => o.id === 'R') as RasterImage;
+    out(`A1 [${c.name}] reopen: gcode = never-masked ${gcodeOf(back.project) === g0}; imageMaskId ${rb.imageMaskId}`);
+  }
+});
+
+it('A2: shared mask: Remove from one image keeps the other masked', () => {
+  resetStore();
+  const m = mkMask('M', [circle(30, 20, 12)]);
+  st().setProject(project([img('R1', 10), img('R2', 35), m], [imgLayer(), opLayer('line', false)]));
+  const gR1only = gcodeOf({ ...st().project, scene: { ...st().project.scene, objects: [img('R1', 10)] } });
+  st().applyImageMask('R1', 'M'); st().applyImageMask('R2', 'M');
+  const r2Of = (p: Project) => burnedSegments(gcodeOf(p)).filter((s) => Math.min(s.a.x, s.b.x) >= 34.9);
+  const r1Of = (p: Project) => burnedSegments(gcodeOf(p)).filter((s) => Math.max(s.a.x, s.b.x) <= 30.1);
+  const r2Before = r2Of(st().project);
+  st().selectObject('R1'); runRemove();
+  const r2After = r2Of(st().project);
+  const r1After = r1Of(st().project);
+  const r1Never = burnedSegments(gR1only);
+  out(`A2: R1 imageMaskId ${raster('R1').imageMaskId}, R2 imageMaskId ${raster('R2').imageMaskId}; R2 burn unchanged ${JSON.stringify(r2Before) === JSON.stringify(r2After)} (${r2Before.length} segs); R1 burn = never-masked R1 ${JSON.stringify(r1After) === JSON.stringify(r1Never)} (${r1After.length} vs ${r1Never.length})`);
+  // both images selected, R1 primary
+  resetStore();
+  st().setProject(project([img('R1', 10, { imageMaskId: 'M' }), img('R2', 35, { imageMaskId: 'M' }), m], [imgLayer(), opLayer('line', false)]));
+  st().selectObject('R1'); st().toggleSelectObject('R2');
+  runRemove();
+  out(`A2 both images selected (primary ${st().selectedObjectId}): R1 ${raster('R1').imageMaskId ?? 'removed'}, R2 ${raster('R2').imageMaskId ?? 'removed'}; undo depth ${st().undoStack.length}`);
+});
+
+it('A3: dangling imageMaskId (mask object missing)', () => {
+  resetStore();
+  const never = project([img('R', 10)], [imgLayer()]);
+  const g0 = gcodeOf(never);
+  const dangling = project([img('R', 10, { imageMaskId: 'GONE' })], [imgLayer()]);
+  // through a saved file
+  const back = deserializeProject(serializeProject(dangling));
+  const loaded = back.kind === 'ok' ? back.project : dangling;
+  out(`A3 file load keeps dangling id: ${(loaded.scene.objects[0] as RasterImage).imageMaskId}`);
+  st().setProject(loaded);
+  out(`A3 store after open: imageMaskId ${raster('R').imageMaskId}; burns whole (gcode = never-masked) ${gcodeOf(st().project) === g0}; preflight issues ${JSON.stringify(imageMaskOffImageIssues(st().project).map((i) => i.code))}`);
+  let svg = ''; try { const r = exportSceneSvg(st().project); svg = r.ok ? 'ok' : `err ${r.error}`; } catch (e) { svg = `threw: ${(e as Error).message}`; }
+  out(`A3 SVG export with dangling id: ${svg}`);
+  st().selectObject('R');
+  const enabled = removeEnabled(); runRemove();
+  let svg2 = ''; try { const r = exportSceneSvg(st().project); svg2 = r.ok ? 'ok' : `err ${r.error}`; } catch (e) { svg2 = `threw: ${(e as Error).message}`; }
+  out(`A3 Remove enabled ${enabled}; after Remove imageMaskId ${raster('R').imageMaskId}; undo depth ${st().undoStack.length}; gcode = never-masked ${gcodeOf(st().project) === g0}; SVG export ${svg2}`);
+  // mask deleted in-app
+  resetStore();
+  st().setProject(project([img('R', 10, { imageMaskId: 'M' }), mkMask('M', [c0])], [imgLayer(), opLayer('line', false)]));
+  st().removeSceneObject('M');
+  out(`A3 delete mask in app: objects ${ids(st().project)}; R imageMaskId ${raster('R').imageMaskId}; gcode = never-masked ${gcodeOf(st().project) === g0}`);
+});
+
+it('A4: Remove after Crop (owned clip) and with owned clip + live mask', async () => {
+  resetStore();
+  const base = img('R', 10, { imageMaskId: 'M1' });
+  const m1 = mkMask('M1', [c0]);
+  const m2 = mkMask('M2', [rect(12, 14, 26, 24)]);
+  st().setProject(project([base, m1, m2], [imgLayer(), opLayer('line', false)]));
+  const gLive = gcodeOf(st().project);
+  st().cropImage('R', await cropMaskedRasterImage(base, m1, encode));
+  const gCropped = gcodeOf(st().project);
+  const r = raster('R');
+  st().selectObject('R');
+  const enabled = removeEnabled();
+  const before = JSON.stringify(st().project); const depth = st().undoStack.length;
+  runRemove();
+  out(`A4 after Crop: ${r.pixelWidth}x${r.pixelHeight} px (was 40x40); imageClip ${r.imageClip !== undefined}; imageMaskId ${r.imageMaskId}; Remove enabled ${enabled}; Remove changes project ${JSON.stringify(st().project) !== before}; undo depth ${depth} -> ${st().undoStack.length}; live-vs-cropped burn segs ${burnedSegments(gLive).length}/${burnedSegments(gCropped).length}`);
+  // white-out check: any source pixel outside the mask whitened? count luma 255 in the cropped image vs original
+  const lc = Buffer.from(r.lumaBase64!, 'base64'); let white = 0; for (const v of lc) if (v === 255) white++;
+  out(`A4 cropped luma: ${lc.length} px, ${white} pure-white (pixels outside the mask are destroyed; only Undo returns the full photo)`);
+  // owned clip + live mask M2, then Remove -> must burn as the cropped image did
+  st().applyImageMask('R', 'M2');
+  const gBoth = gcodeOf(st().project);
+  st().selectObject('R'); runRemove();
+  const gAfter = gcodeOf(st().project);
+  out(`A4 clip+live M2: masked differs from cropped ${gBoth !== gCropped}; after Remove = cropped burn ${gAfter === gCropped}; clip kept ${raster('R').imageClip !== undefined}`);
+});
+
+it('A5: order gate (KNOWN T18-P2-1) and locked mask', () => {
+  for (const order of ['image-first', 'mask-first'] as const) {
+    resetStore();
+    const objs = order === 'image-first' ? [img('R'), mkMask('M', [c0])] : [mkMask('M', [c0]), img('R')];
+    st().setProject(project(objs, [imgLayer(), opLayer('line', false)]));
+    st().selectObject('R'); st().toggleSelectObject('M'); st().applyImageMask('R', 'M');
+    out(`A5 ${order}: pair still selected, Remove enabled ${removeEnabled()}`);
+  }
+  resetStore();
+  st().setProject(project([img('R', 10, { imageMaskId: 'M' }), { ...mkMask('M', [c0]), locked: true } as SceneObject], [imgLayer(), opLayer('line', true)]));
+  const mj = JSON.stringify(obj('M'));
+  st().selectObject('R'); runRemove();
+  out(`A5 locked mask: R imageMaskId ${raster('R').imageMaskId}; mask unchanged ${JSON.stringify(obj('M')) === mj}`);
+  resetStore();
+  st().setProject(project([img('R', 10, { imageMaskId: 'M', locked: true }), mkMask('M', [c0])], [imgLayer(), opLayer('line', false)]));
+  st().selectObject('R');
+  out(`A5 locked image: selectable ${st().selectedObjectId === 'R'}; Remove enabled ${removeEnabled()}`);
+});
+
+it('A6: large scene latency of the store action', () => {
+  resetStore();
+  const objs: SceneObject[] = [];
+  for (let i = 0; i < 3000; i++) objs.push(mkMask(`S${i}`, [rect(i % 50, Math.floor(i / 50), (i % 50) + 0.5, Math.floor(i / 50) + 0.5)]));
+  objs.push(img('R', 10, { imageMaskId: 'S0' }));
+  st().setProject(project(objs, [imgLayer(), opLayer('line', false)]));
+  st().selectObject('R');
+  const t0 = performance.now(); runRemove(); const t1 = performance.now();
+  out(`A6 3001-object scene: Remove store action ${(t1 - t0).toFixed(1)} ms; imageMaskId ${raster('R').imageMaskId}`);
+});
