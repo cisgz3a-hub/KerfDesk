@@ -19,6 +19,7 @@ import { detectCncContourPrecisionWarnings } from './cnc-contour-precision-warni
 import { detectCncDefaultFeedWarnings } from './cnc-default-feed-warnings';
 import { detectCncFinishAllowanceWarnings } from './cnc-finish-allowance-warnings';
 import { detectCncFullTabCoverageWarnings } from './cnc-full-tab-coverage-warnings';
+import { detectCncCutGuideWarnings } from './cnc-cut-guide-warnings';
 import { detectCncMachineLimitWarnings } from './cnc-machine-limit-warnings';
 import { detectCncMissingPrimaryToolWarnings } from './cnc-missing-primary-tool-warnings';
 import { detectCncOffsetLadderWarnings } from './cnc-offset-ladder-warnings';
@@ -64,6 +65,7 @@ export function detectMachineJobWarnings(
           ...detectCncAngledToolFeedWarnings(project),
           ...detectCncUnmodeledBitLayoutWarnings(project),
           ...detectCncMachineLimitWarnings(project, controllerSettings, job),
+          ...(job === undefined ? [] : detectCncCutGuideWarnings(project, job)),
           ...detectCncZTravelWarnings(project, controllerSettings, job),
           ...detectCncMissingPrimaryToolWarnings(project),
           ...(prepared === undefined

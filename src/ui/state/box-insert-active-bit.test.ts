@@ -152,9 +152,11 @@ describe('box operations cut with the bit their reliefs were sized for', () => {
     });
     const settings = result.project.scene.layers[0]?.cnc;
     expect(settings?.toolId).toBeUndefined();
+    // ADR-233 Amd 2: the 1/16" bit takes the interpolated aluminium chip load
+    // (0.0105 mm/tooth: F250 at 12,000 RPM), not the 1/8" band capped to F300.
     expect(settings).toMatchObject({
-      feedMmPerMin: 300,
-      plungeMmPerMin: 50,
+      feedMmPerMin: 250,
+      plungeMmPerMin: 40,
       depthPerPassMm: 0.2,
       feedSource: { kind: 'material-recipe', materialKey: 'aluminum', fluteCount: 2 },
     });
