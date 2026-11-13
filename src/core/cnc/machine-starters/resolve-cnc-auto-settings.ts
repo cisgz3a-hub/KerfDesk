@@ -7,7 +7,12 @@ import {
   type CncTool,
 } from '../../scene';
 import { cncHeadDevice } from '../cnc-head-feeds';
-import { calculateFeeds, isChiploadMaterialKey } from '../feeds-calculator';
+import {
+  calculateFeeds,
+  chiploadFor,
+  isChiploadMaterialKey,
+  type ChiploadMaterial,
+} from '../feeds-calculator';
 import {
   resolveCncMachineStarter,
   type CncMachineStarterLiveCaps,
@@ -37,6 +42,11 @@ export type CncMaterialFeedInput = {
   // two-flute end mill). A caller seeding a different kind of cut, such as
   // spoilboard surfacing with a facing cutter, leaves its ceilings out.
   readonly ignoreMachineStarter?: boolean;
+  // The operation's RPM came from a recipe or machine starter, not a hand edit
+  // (any hand edit drops the feed source). A starter that lowers RPM to meet its
+  // feed cap then plans from the spindle's full speed, so a speed it lowered for
+  // one material never holds down the next (ADR-256 Amendment 1).
+  readonly automaticSpindleRpm?: boolean;
 };
 
 export type CncStarterFeedInput = {
@@ -59,6 +69,7 @@ export function resolveCncAutoLayerSettings(input: CncAutoSettingsInput): CncLay
       spindleRpm: base.spindleRpm,
       machineSpindleMaxRpm: input.machine.params.spindleMaxRpm,
       fluteCount: tool.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT,
+      automaticSpindleRpm: true,
       ...(input.liveCaps === undefined ? {} : { liveCaps: input.liveCaps }),
     });
     return materialPatch === null ? null : { ...base, ...materialPatch };
@@ -99,9 +110,18 @@ export function resolveCncMaterialFeedPatch(
 ): Partial<CncLayerSettings> | null {
   if (!isChiploadMaterialKey(input.materialKey)) return null;
   const starter = input.ignoreMachineStarter === true ? null : materialMachineStarter(input);
-  const spindleRpm = materialSpindleRpm(input, starter?.spindleRpm);
-  if (spindleRpm === undefined) return null;
+  const spindleMinRpm = starter?.spindleMinRpm;
+  const rpmCeiling = materialSpindleRpm(input, spindleMinRpm !== undefined);
+  if (rpmCeiling === undefined) return null;
   const maxFeedMmPerMin = materialFeedCeiling(input, starter?.feedMmPerMin);
+  const spindleRpm = rpmForFeedCeiling({
+    material: input.materialKey,
+    bitDiameterMm: input.tool.diameterMm,
+    fluteCount: input.fluteCount,
+    rpmCeiling,
+    maxFeedMmPerMin,
+    spindleMinRpm,
+  });
   const feeds = calculateFeeds({
     material: input.materialKey,
     bitDiameterMm: input.tool.diameterMm,
@@ -136,17 +156,46 @@ function materialMachineStarter(input: CncMaterialFeedInput) {
   );
 }
 
+// The fastest RPM the recipe may plan at: the spindle's ceilings, and the
+// operation's own RPM unless that RPM is automatic and the starter lowers RPM
+// to its feed cap. The starter's seed RPM is not a ceiling (ADR-256 Amd 1).
 function materialSpindleRpm(
   input: CncMaterialFeedInput,
-  starterSpindleRpm: number | undefined,
+  starterLowersRpm: boolean,
 ): number | undefined {
-  return lesserPositive([
-    input.spindleRpm,
+  const spindleCeiling = lesserPositive([
     input.machineSpindleMaxRpm,
     input.profile.cncSubProfile?.spindleMaxRpm,
     input.liveCaps?.spindleMaxRpm,
-    starterSpindleRpm,
   ]);
+  if (starterLowersRpm && input.automaticSpindleRpm === true && spindleCeiling !== undefined) {
+    return spindleCeiling;
+  }
+  return lesserPositive([input.spindleRpm, spindleCeiling]);
+}
+
+const RPM_STEP = 50;
+
+// ADR-256 Amendment 1 (CNC audit FS-2; maintainer's choice "Keep 300, lower
+// RPM"): when the feed ceiling stops the recipe reaching the chart chip load,
+// lower the RPM until it does, rounded up to 50 RPM so the chip load never
+// exceeds the chart, and never below the spindle's minimum. Only a starter that
+// names its spindle's minimum lowers RPM; elsewhere the feed is simply capped.
+function rpmForFeedCeiling(input: {
+  readonly material: ChiploadMaterial;
+  readonly bitDiameterMm: number;
+  readonly fluteCount: number;
+  readonly rpmCeiling: number;
+  readonly maxFeedMmPerMin: number | undefined;
+  readonly spindleMinRpm: number | undefined;
+}): number {
+  const { maxFeedMmPerMin: maxFeed, spindleMinRpm: minRpm, rpmCeiling } = input;
+  if (maxFeed === undefined || minRpm === undefined) return rpmCeiling;
+  const chiploadMm = chiploadFor(input.material, input.bitDiameterMm);
+  const flutes = Math.max(1, Math.round(input.fluteCount));
+  if (!(chiploadMm > 0) || !Number.isFinite(flutes)) return rpmCeiling;
+  const rpmAtChart = Math.ceil(maxFeed / (flutes * chiploadMm) / RPM_STEP) * RPM_STEP;
+  return Math.min(rpmCeiling, Math.max(minRpm, rpmAtChart));
 }
 
 function materialFeedCeiling(

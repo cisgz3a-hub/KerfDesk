@@ -27,6 +27,8 @@ export type CncMachineStarterCapDetail = {
 };
 
 export type ResolvedCncMachineStarter = CncMachineStarterValues & {
+  // ADR-256 Amd 1: the floor a feed-capped material recipe lowers RPM to.
+  readonly spindleMinRpm?: number;
   readonly tool: {
     readonly toolId: string;
     readonly diameterMm: number;
@@ -117,6 +119,9 @@ export function resolveCncMachineStarter(
 
   return {
     ...resolution.values,
+    ...(match.starter.spindleMinRpm === undefined
+      ? {}
+      : { spindleMinRpm: match.starter.spindleMinRpm }),
     tool: match.starter.tool,
     material: match.starter.material,
     provenance: {

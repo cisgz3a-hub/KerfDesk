@@ -39,6 +39,7 @@ export function layerWithCncMaterial(input: {
     materialKey: input.materialKey,
     tool: layerCncTool(input.machine, cnc),
     spindleRpm: cnc.spindleRpm,
+    automaticSpindleRpm: input.layer.cnc === undefined || cnc.feedSource !== undefined,
     profile: input.profile,
     machineParams: input.machine.params,
     ...(input.liveCaps === undefined ? {} : { liveCaps: input.liveCaps }),
@@ -61,6 +62,8 @@ export function materialFeedsPatch(input: {
   readonly liveCaps?: CncMachineStarterLiveCaps | null;
   readonly fluteCount?: number;
   readonly ignoreMachineStarter?: boolean;
+  // True when the operation's RPM came from a recipe or starter (ADR-256 Amd 1).
+  readonly automaticSpindleRpm?: boolean;
 }): Partial<CncLayerSettings> | null {
   return resolveCncMaterialFeedPatch({
     profile: cncHeadDevice(input.profile, input.machineParams),
@@ -73,6 +76,7 @@ export function materialFeedsPatch(input: {
       ? {}
       : { liveCaps: input.liveCaps }),
     ...(input.ignoreMachineStarter === true ? { ignoreMachineStarter: true } : {}),
+    ...(input.automaticSpindleRpm === true ? { automaticSpindleRpm: true } : {}),
   });
 }
 

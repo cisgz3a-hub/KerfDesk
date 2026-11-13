@@ -69,7 +69,7 @@ describe('CNC automatic-setting transition policy', () => {
             operation('manual', manual),
             operation('known', starterSettings(333)),
             operation('unknown', starterSettings(444, 'unknown-starter')),
-            operation('newer', starterSettings(555, STARTER_ID, 3)),
+            operation('newer', starterSettings(555, STARTER_ID, 4)),
           ],
         },
       },
@@ -79,7 +79,7 @@ describe('CNC automatic-setting transition policy', () => {
 
     expect(cncSettings('absent')).toMatchObject({
       feedMmPerMin: 300,
-      feedSource: { kind: 'machine-starter', starterId: STARTER_ID, revision: 2 },
+      feedSource: { kind: 'machine-starter', starterId: STARTER_ID, revision: 3 },
     });
     expect(cncSettings('manual')).toEqual(manual);
     expect(cncSettings('known')).toMatchObject({ feedMmPerMin: 300 });
@@ -147,7 +147,7 @@ describe('CNC automatic-setting transition policy', () => {
 
     expect(cncSettings('automatic')).toMatchObject({
       feedMmPerMin: 250,
-      feedSource: { kind: 'machine-starter', starterId: STARTER_ID, revision: 2 },
+      feedSource: { kind: 'machine-starter', starterId: STARTER_ID, revision: 3 },
     });
     expect(cncSettings('manual')).toEqual(manual);
   });
@@ -180,7 +180,7 @@ describe('CNC automatic-setting transition policy', () => {
     if (current?.kind !== 'cnc') throw new Error('CNC machine missing');
     const saved = {
       ...current,
-      params: { ...current.params, spindleMaxRpm: 9_000 },
+      params: { ...current.params, spindleMaxRpm: 2_500 },
     };
     const manual = { ...DEFAULT_CNC_LAYER_SETTINGS, spindleRpm: 11_000 };
     useStore.setState((state) => ({
@@ -202,8 +202,8 @@ describe('CNC automatic-setting transition policy', () => {
 
     useStore.getState().applyCncMachineProfile('slow');
 
-    expect(useStore.getState().project.device.cncSubProfile?.spindleMaxRpm).toBe(9_000);
-    expect(cncSettings('automatic')?.spindleRpm).toBe(9_000);
+    expect(useStore.getState().project.device.cncSubProfile?.spindleMaxRpm).toBe(2_500);
+    expect(cncSettings('automatic')?.spindleRpm).toBe(2_500);
     expect(cncSettings('manual')).toEqual(manual);
   });
 

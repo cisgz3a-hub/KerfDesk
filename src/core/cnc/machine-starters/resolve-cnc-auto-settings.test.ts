@@ -17,12 +17,13 @@ describe('resolveCncAutoLayerSettings', () => {
       toolId: 'em-3175',
       feedMmPerMin: 300,
       plungeMmPerMin: 250,
-      spindleRpm: 12000,
+      // ADR-256 Amd 1: the 500 W spindle's minimum, so 300 mm/min is 0.05 mm/tooth.
+      spindleRpm: 3000,
       depthPerPassMm: 0.75,
       feedSource: {
         kind: 'machine-starter',
         starterId: 'neotronics-4040-shallow-wood-mdf',
-        revision: 2,
+        revision: 3,
       },
     });
   });
@@ -46,7 +47,8 @@ describe('resolveCncAutoLayerSettings', () => {
       feedMmPerMin: 300,
       // 40% of the 300 mm/min ceiling — below the starter's own 250 plunge cap.
       plungeMmPerMin: 120,
-      spindleRpm: 12000,
+      // ADR-256 Amd 1: 300 / (2 x 0.06) is 2,500 RPM, floored at the spindle's 3,000.
+      spindleRpm: 3000,
       depthPerPassMm: 0.75,
       feedSource: {
         kind: 'material-recipe',
@@ -103,7 +105,7 @@ describe('resolveCncAutoLayerSettings', () => {
     ).toMatchObject({
       feedMmPerMin: 260,
       plungeMmPerMin: 90,
-      spindleRpm: 12000,
+      spindleRpm: 3000,
       depthPerPassMm: 0.75,
     });
   });
@@ -111,7 +113,7 @@ describe('resolveCncAutoLayerSettings', () => {
   it('never suggests spindle RPM above the compile-authoritative CNC machine ceiling', () => {
     const machine = {
       ...DEFAULT_CNC_MACHINE_CONFIG,
-      params: { ...DEFAULT_CNC_MACHINE_CONFIG.params, spindleMaxRpm: 8_000 },
+      params: { ...DEFAULT_CNC_MACHINE_CONFIG.params, spindleMaxRpm: 2_500 },
     };
 
     expect(
@@ -119,7 +121,7 @@ describe('resolveCncAutoLayerSettings', () => {
         profile: NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
         machine,
       }),
-    ).toMatchObject({ spindleRpm: 8_000 });
+    ).toMatchObject({ spindleRpm: 2_500 });
   });
 
   it('does not stamp a starter tool id that is absent from the machine tool library', () => {
@@ -173,7 +175,8 @@ describe('resolveCncMaterialFeedPatch', () => {
     ).toMatchObject({
       feedMmPerMin: 300,
       plungeMmPerMin: 120,
-      spindleRpm: 12_000,
+      // 300 / (2 x 0.0569) is 2,650 RPM after rounding up, floored at 3,000.
+      spindleRpm: 3_000,
       depthPerPassMm: 0.75,
       feedSource: {
         kind: 'material-recipe',
@@ -201,7 +204,7 @@ describe('resolveCncMaterialFeedPatch', () => {
     ).toMatchObject({
       feedMmPerMin: 300,
       plungeMmPerMin: 90,
-      spindleRpm: 12000,
+      spindleRpm: 3000,
       depthPerPassMm: 0.75,
     });
   });

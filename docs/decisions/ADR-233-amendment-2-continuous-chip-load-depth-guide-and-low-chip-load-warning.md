@@ -50,9 +50,8 @@ the warning half of FS-2. Adds no Start guard: every check here is a Job Review 
 - Recipes for bits between the chart diameters change: smaller bits get lower feeds, and a bit
   just over 1/8" or 1/4" no longer jumps to the next band. Bits at the chart diameters are
   unchanged.
-- Jobs on the Neotronics 4040 profile with a material recipe for a bit larger than the starter's
-  1/8" show the low-chip-load warning until the cap itself changes. Raising the cap, or lowering
-  RPM with it, is the rest of FS-2 and waits for the maintainer's choice, since ADR-256 records
-  the 300 mm/min and 12,000 RPM as the maintainer's own values.
+- The rest of FS-2 is ADR-256 Amendment 1: the maintainer kept the 4040's 300 mm/min cap and
+  chose to lower RPM to it, floored at the spindle's 3,000 RPM. Where that floor still leaves a
+  bit under half the chart, such as a 1/4" bit in MDF, this warning still shows.
 - None of this is hardware qualification: the chart is provisional, the chip load shown is the
   programmed nominal value, and the depth guide is a rule of thumb, not the bit's real length.

@@ -11,7 +11,8 @@ describe('resolveCncMachineStarter', () => {
     expect(result).toMatchObject({
       feedMmPerMin: 300,
       plungeMmPerMin: 250,
-      spindleRpm: 12000,
+      spindleRpm: 3000,
+      spindleMinRpm: 3000,
       depthPerPassMm: 0.75,
       provenance: {
         source: 'machine-starter-catalog',
@@ -33,8 +34,8 @@ describe('resolveCncMachineStarter', () => {
         field: 'spindleRpm',
         source: 'profile.cncSubProfile.spindleMaxRpm',
         limit: 12000,
-        valueBefore: 12000,
-        valueAfter: 12000,
+        valueBefore: 3000,
+        valueAfter: 3000,
         didLimit: false,
       },
     ]);
@@ -48,7 +49,7 @@ describe('resolveCncMachineStarter', () => {
         cncSubProfile: {
           ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.cncSubProfile,
           safeZMm: 3.81,
-          spindleMaxRpm: 11000,
+          spindleMaxRpm: 2800,
           spindleSpinupSec: 3,
         },
       },
@@ -56,14 +57,14 @@ describe('resolveCncMachineStarter', () => {
         xMaxFeedMmPerMin: 280,
         yMaxFeedMmPerMin: 260,
         zMaxFeedMmPerMin: 100,
-        spindleMaxRpm: 9000,
+        spindleMaxRpm: 2500,
       },
     });
 
     expect(result).toMatchObject({
       feedMmPerMin: 260,
       plungeMmPerMin: 100,
-      spindleRpm: 9000,
+      spindleRpm: 2500,
       depthPerPassMm: 0.75,
     });
     expect(result?.provenance.capDetails.filter((detail) => detail.didLimit)).toEqual([
@@ -72,9 +73,9 @@ describe('resolveCncMachineStarter', () => {
       expect.objectContaining({ source: 'controller.$112', valueAfter: 100 }),
       expect.objectContaining({
         source: 'profile.cncSubProfile.spindleMaxRpm',
-        valueAfter: 11000,
+        valueAfter: 2800,
       }),
-      expect.objectContaining({ source: 'controller.$30', valueAfter: 9000 }),
+      expect.objectContaining({ source: 'controller.$30', valueAfter: 2500 }),
     ]);
   });
 
@@ -92,7 +93,7 @@ describe('resolveCncMachineStarter', () => {
     expect(result).toMatchObject({
       feedMmPerMin: 280,
       plungeMmPerMin: 250,
-      spindleRpm: 12000,
+      spindleRpm: 3000,
     });
     expect(result?.provenance.capDetails.map((detail) => detail.source)).toEqual([
       'profile.maxFeed',
@@ -104,16 +105,16 @@ describe('resolveCncMachineStarter', () => {
   it('records the CNC machine spindle ceiling separately from profile and controller caps', () => {
     const result = resolveCncMachineStarter({
       profile: NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
-      machineSpindleMaxRpm: 8_000,
+      machineSpindleMaxRpm: 2_500,
     });
 
-    expect(result?.spindleRpm).toBe(8_000);
+    expect(result?.spindleRpm).toBe(2_500);
     expect(result?.provenance.capDetails).toContainEqual({
       field: 'spindleRpm',
       source: 'machine.params.spindleMaxRpm',
-      limit: 8_000,
-      valueBefore: 12_000,
-      valueAfter: 8_000,
+      limit: 2_500,
+      valueBefore: 3_000,
+      valueAfter: 2_500,
       didLimit: true,
     });
   });

@@ -262,7 +262,7 @@ describe('cncOperationDetail', () => {
       'Machine starter values: Neotronics 4040 shallow wood / MDF starter (revision 1)',
     );
     expect(cncOperationDetail(settings)).toContain(
-      'Unverified cutting starter: retained legacy values for a 3.175 mm 2-flute cutter and assumed 500 W spindle.',
+      'Unverified cutting starter for a 3.175 mm 2-flute cutter and assumed 500 W spindle:',
     );
     expect(cncOperationDetail(settings)).toContain('no attributable physical cutting record');
     expect(cncOperationDetail(settings)).not.toContain('Maintainer-verified');
