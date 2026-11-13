@@ -16,7 +16,7 @@
 // fallback) freed the part with the spindle running (AUDIT A5).
 
 import { applyAutomaticTabsToPolylines, applyManualTabsToPolyline } from '../geometry/tabs-bridges';
-import { DEFAULT_CNC_STOCK, type CncLayerSettings, type Polyline } from '../scene';
+import type { CncLayerSettings, Polyline } from '../scene';
 
 export type CncTabSettings = {
   readonly tabWidthMm: number;
@@ -49,10 +49,18 @@ export function passNeedsTabs(zMm: number, depthMm: number, tabHeightMm: number)
 // stock would reach the stock top, so no pass could cut over it and
 // passNeedsTabs dropped it, freeing a part cut through thin sheet under the
 // default 2 mm tab. Such a tab is cut half the stock thick instead: still a
-// real bridge, and still the same whatever the cut depth (amendment 3). The
-// shipped stock thickness reads as never set, so the request stands there.
-export function stockLimitedTabHeightMm(tabHeightMm: number, stockThicknessMm: number): number {
-  if (stockThicknessMm === DEFAULT_CNC_STOCK.thicknessMm) return tabHeightMm;
+// real bridge, and still the same whatever the cut depth (amendment 3).
+//
+// Amendment 6 (CNC audit J1-P3-3): every rule here takes the SET stock
+// thickness (setStockThicknessMm), undefined while the operator has not set
+// one. Comparing against the shipped 6.35 mm instead read a real 6.35 mm sheet
+// as never set, so the "Set Stock thickness" advice could not be followed.
+// Unset, the request stands.
+export function stockLimitedTabHeightMm(
+  tabHeightMm: number,
+  stockThicknessMm: number | undefined,
+): number {
+  if (stockThicknessMm === undefined) return tabHeightMm;
   return tabHeightMm < stockThicknessMm - TAB_EPS ? tabHeightMm : stockThicknessMm / 2;
 }
 
@@ -61,15 +69,14 @@ export function stockLimitedTabHeightMm(tabHeightMm: number, stockThicknessMm: n
 // tabs there only leave bumps along the groove; Easel likewise adds tabs only
 // when the cut depth reaches the material thickness. A floor thinner than a tab
 // keeps them, so a stock thickness set slightly off still gets tabs. The tab
-// compared is the one the compiler cuts (amendment 4). The shipped stock
-// thickness is indistinguishable from never having set it, so on that value
-// any cut may go through and the depth-only rule above stays in force.
+// compared is the one the compiler cuts (amendment 4). With no stock thickness
+// set any cut may go through, and the depth-only rule above stays in force.
 export function cutCanFreePart(
   depthMm: number,
   tabHeightMm: number,
-  stockThicknessMm: number,
+  stockThicknessMm: number | undefined,
 ): boolean {
-  if (stockThicknessMm === DEFAULT_CNC_STOCK.thicknessMm) return true;
+  if (stockThicknessMm === undefined) return true;
   const keptTabMm = stockLimitedTabHeightMm(tabHeightMm, stockThicknessMm);
   return stockThicknessMm - depthMm < keptTabMm - TAB_EPS;
 }
@@ -78,14 +85,14 @@ export function cutCanFreePart(
 // tab height of material above the stock bottom, as Easel measures it, so a cut
 // that runs on into the spoilboard no longer thins or removes the tabs. The pass
 // builders measure the tab top up from the cut floor (tabTopZMm), so this is the
-// floor-measured height that puts the top there. The shipped stock thickness
-// reads as never set and keeps the cut-floor rule, as cutCanFreePart does.
+// floor-measured height that puts the top there. With no stock thickness set
+// the cut-floor rule stands, as in cutCanFreePart.
 export function tabHeightAboveCutFloorMm(
   depthMm: number,
   tabHeightMm: number,
-  stockThicknessMm: number,
+  stockThicknessMm: number | undefined,
 ): number {
-  if (stockThicknessMm === DEFAULT_CNC_STOCK.thicknessMm) return tabHeightMm;
+  if (stockThicknessMm === undefined) return tabHeightMm;
   const keptTabMm = stockLimitedTabHeightMm(tabHeightMm, stockThicknessMm);
   return keptTabMm + Math.max(0, depthMm) - stockThicknessMm;
 }
@@ -94,7 +101,7 @@ export function tabHeightAboveCutFloorMm(
  * part, and a kept tab measured from the stock bottom when the stock is set. */
 export function settingsWithStockTabGate(
   settings: CncLayerSettings,
-  stockThicknessMm: number,
+  stockThicknessMm: number | undefined,
 ): CncLayerSettings {
   if (!settings.tabsEnabled) return settings;
   if (!cutCanFreePart(settings.depthMm, settings.tabHeightMm, stockThicknessMm)) {

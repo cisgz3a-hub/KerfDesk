@@ -38,12 +38,14 @@ import { tabbedProfileLayerIds } from '../../core/cnc/compiled-tab-rises';
 import type { Job } from '../../core/job';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
-  DEFAULT_CNC_STOCK,
   sceneObjectUsesOperation,
   type CncLayerSettings,
+  type CncStock,
   type Layer,
   type Project,
 } from '../../core/scene';
+// Deep import: core/scene's barrel is a ratcheted over-cap legacy barrel.
+import { setStockThicknessMm } from '../../core/scene/machine';
 import { cncNoteContours } from '../layers/cnc-note-contours';
 import { projectionStockWarning } from './cnc-projection-stock-warnings';
 import { throughPocketIslandWarning } from './cnc-through-pocket-island-warnings';
@@ -59,7 +61,7 @@ export function detectCncThroughCutTabWarnings(
 ): ReadonlyArray<string> {
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc') return [];
-  const stockThicknessMm = machine.stock.thicknessMm;
+  const stock = machine.stock;
   // The operations whose passes really rise into tabs. Compiled here only when
   // a tabbed overcut asks and the caller has no job, as the full tab coverage
   // advisory does.
@@ -85,12 +87,7 @@ export function detectCncThroughCutTabWarnings(
     if (!layer.output) continue;
     const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
     if (settings.reliefProjection !== undefined) {
-      const warning = projectionStockWarning(
-        layer,
-        settings,
-        projectionFacts(layer),
-        stockThicknessMm,
-      );
+      const warning = projectionStockWarning(layer, settings, projectionFacts(layer), stock);
       if (warning !== null) warnings.push(warning);
       continue;
     }
@@ -98,7 +95,7 @@ export function detectCncThroughCutTabWarnings(
     // physical evidence when every object on the operation is a relief; the
     // prepared-job warning below uses the exact rough/finish pass depth.
     if (layerCarriesOnlyReliefs(project, layer)) continue;
-    const warning = layerStockWarning(project, layer, stockThicknessMm, cutsTabs);
+    const warning = layerStockWarning(project, layer, stock, cutsTabs);
     if (warning !== null) warnings.push(warning);
   }
   return warnings;
@@ -107,11 +104,12 @@ export function detectCncThroughCutTabWarnings(
 function layerStockWarning(
   project: Project,
   layer: Layer,
-  stockThicknessMm: number,
+  stock: CncStock,
   cutsTabs: (layer: Layer) => boolean,
 ): string | null {
   const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
-  const throughCut = throughCutWarning(project, layer, settings, stockThicknessMm);
+  const stockThicknessMm = stock.thicknessMm;
+  const throughCut = throughCutWarning(project, layer, settings, stock);
   if (throughCut !== null) return throughCut;
   // ADR-106 Amendment 3: a through pocket frees its islands, and says so in
   // place of the plainer spoilboard line below.
@@ -124,11 +122,11 @@ function layerStockWarning(
     return (
       `Layer ${layer.id} cuts ${settings.depthMm} mm into ${stockThicknessMm} mm stock — ` +
       `${pastMm.toFixed(2)} mm past the bottom, into the spoilboard. ` +
-      overcutTabNote(settings, stockThicknessMm, () => cutsTabs(layer)) +
+      overcutTabNote(settings, stock, () => cutsTabs(layer)) +
       'Reduce the cut depth if that is not intended.'
     );
   }
-  if (stockSkipsTabs(settings, stockThicknessMm)) {
+  if (stockSkipsTabs(settings, stock)) {
     return (
       `${layer.name} skips its holding tabs: Stock thickness is ${formatMm(stockThicknessMm)} mm, ` +
       `so the ${formatMm(settings.depthMm)} mm cut leaves a ` +
@@ -149,15 +147,16 @@ function throughCutWarning(
   project: Project,
   layer: Layer,
   settings: CncLayerSettings,
-  stockThicknessMm: number,
+  stock: CncStock,
 ): string | null {
+  const stockThicknessMm = stock.thicknessMm;
   if (!isProfileCutType(settings.cutType) || settings.depthMm < stockThicknessMm) return null;
   const cut = `Layer ${layer.id} cuts through the stock (${settings.depthMm} mm ≥ ${stockThicknessMm} mm)`;
   const freed = 'the part and any hole slugs come free on the final pass.';
   if (!settings.tabsEnabled) {
     return `${cut} with no holding tabs — ${freed} Enable Tabs or reduce the cut depth.`;
   }
-  const tabs = settingsWithStockTabGate(settings, stockThicknessMm);
+  const tabs = settingsWithStockTabGate(settings, setStockThicknessMm(stock));
   if (passNeedsTabs(-tabs.depthMm, tabs.depthMm, tabs.tabHeightMm)) return null;
   if (!layerCarriesClosedShape(project, layer)) return null;
   return (
@@ -168,27 +167,28 @@ function throughCutWarning(
 
 // ADR-258 amendment 3 (CNC audit TP-1): how much of each tab an overcut profile
 // leaves in the stock. A set stock thickness keeps the full tab above the stock
-// bottom, which relies on that thickness being right; the shipped default still
-// measures from the cut floor, so the overcut eats into the tab. Amendment 4:
+// bottom, which relies on that thickness being right; an unset one (ADR-258
+// Amendment 6) still measures from the cut floor, so the overcut eats into the tab. Amendment 4:
 // silent unless the compiled passes rise into tabs, and a tab no thinner than
 // the set stock says it was cut half the stock thick.
 function overcutTabNote(
   settings: CncLayerSettings,
-  stockThicknessMm: number,
+  stock: CncStock,
   cutsTabs: () => boolean,
 ): string {
   if (!isProfileCutType(settings.cutType) || !settings.tabsEnabled) return '';
-  const tabs = settingsWithStockTabGate(settings, stockThicknessMm);
+  const setMm = setStockThicknessMm(stock);
+  const tabs = settingsWithStockTabGate(settings, setMm);
   if (!tabs.tabsEnabled || !passNeedsTabs(-tabs.depthMm, tabs.depthMm, tabs.tabHeightMm)) {
     return '';
   }
   if (!cutsTabs()) return '';
-  if (stockThicknessMm !== DEFAULT_CNC_STOCK.thicknessMm) {
-    const keptMm = stockLimitedTabHeightMm(settings.tabHeightMm, stockThicknessMm);
+  if (setMm !== undefined) {
+    const keptMm = stockLimitedTabHeightMm(settings.tabHeightMm, setMm);
     const thickness =
       keptMm < settings.tabHeightMm
         ? `are ${formatMm(keptMm)} mm thick above the stock bottom, thinned from the ` +
-          `${formatMm(settings.tabHeightMm)} mm set to half the ${formatMm(stockThicknessMm)} mm stock`
+          `${formatMm(settings.tabHeightMm)} mm set to half the ${formatMm(setMm)} mm stock`
         : `reach ${formatMm(settings.tabHeightMm)} mm above the stock bottom`;
     // Rolling audit v12 X6-P1-1: a tab keeps only the stock that is there, so a
     // relief or pocket cut deeper under it first leaves it thinner.
@@ -197,22 +197,27 @@ function overcutTabNote(
       'pocket cut deeper under them first leaves them thinner. '
     );
   }
-  const inStockMm = stockThicknessMm + tabTopZMm(tabs.depthMm, tabs.tabHeightMm);
+  const inStockMm = stock.thicknessMm + tabTopZMm(tabs.depthMm, tabs.tabHeightMm);
   return inStockMm > 0
-    ? `Stock thickness is still the default, so its tabs are measured from the cut floor and only ` +
-        `${formatMm(inStockMm)} mm of each is in the stock. Set Stock thickness to keep them full height. `
-    : 'Stock thickness is still the default, so its tabs are measured from the cut floor and sit ' +
-        'below the stock, and the part comes free. Set Stock thickness to keep them. ';
+    ? `Stock thickness has not been set, so its tabs are measured from the cut floor and only ` +
+        `${formatMm(inStockMm)} mm of each is in the stock. ${SET_STOCK_ADVICE} to keep them full height. `
+    : 'Stock thickness has not been set, so its tabs are measured from the cut floor and sit ' +
+        `below the stock, and the part comes free. ${SET_STOCK_ADVICE} to keep them. `;
 }
 
+// ADR-258 Amendment 6: a real 6.35 mm sheet is confirmed with the Use 6.35 mm
+// button beside the field, which shows the default until a value is committed.
+const SET_STOCK_ADVICE =
+  'Set Stock thickness in Machine Setup (press Use 6.35 mm there if that is the real sheet)';
+
 /** True when the compiler drops tabs this profile asks for (cnc-tabs.ts). */
-function stockSkipsTabs(settings: CncLayerSettings, stockThicknessMm: number): boolean {
+function stockSkipsTabs(settings: CncLayerSettings, stock: CncStock): boolean {
   return (
     isProfileCutType(settings.cutType) &&
     settings.tabsEnabled &&
     // No deeper than the tab, a pass never gets tabs anyway (passNeedsTabs).
     settings.depthMm > settings.tabHeightMm &&
-    !cutCanFreePart(settings.depthMm, settings.tabHeightMm, stockThicknessMm)
+    !cutCanFreePart(settings.depthMm, settings.tabHeightMm, setStockThicknessMm(stock))
   );
 }
 

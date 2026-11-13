@@ -6,7 +6,7 @@ import { isProfileCutType, passNeedsTabs, zPassDepths } from '../../../core/cnc'
 // Deep import: core/cnc's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json) and may only shrink.
 import { depthsWithTabTopPass, settingsWithStockTabGate } from '../../../core/cnc/cnc-tabs';
-import { DEFAULT_CNC_STOCK, type CncLayerSettings } from '../../../core/scene';
+import type { CncLayerSettings } from '../../../core/scene';
 import { formatMm } from './job-review-format';
 
 export function cncDepthParts(
@@ -36,10 +36,7 @@ export function closedShapesGetTabs(
   stockThicknessMm?: number,
 ): boolean {
   if (!settings.tabsEnabled) return false;
-  const tabs = settingsWithStockTabGate(
-    settings,
-    stockThicknessMm ?? DEFAULT_CNC_STOCK.thicknessMm,
-  );
+  const tabs = settingsWithStockTabGate(settings, stockThicknessMm);
   return tabs.tabsEnabled && passNeedsTabs(-tabs.depthMm, tabs.depthMm, tabs.tabHeightMm);
 }
 
@@ -60,9 +57,6 @@ function cncDepthLevelCount(
   ) {
     return depths.length;
   }
-  const tabs = settingsWithStockTabGate(
-    settings,
-    stockThicknessMm ?? DEFAULT_CNC_STOCK.thicknessMm,
-  );
+  const tabs = settingsWithStockTabGate(settings, stockThicknessMm);
   return depthsWithTabTopPass(depths, tabs).length;
 }

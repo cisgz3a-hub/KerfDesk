@@ -190,8 +190,10 @@ describe('tabs no thinner than the stock (ADR-258 amendment 4)', () => {
     expect(stockLimitedTabHeightMm(2, 2)).toBe(1);
     expect(stockLimitedTabHeightMm(3, 2)).toBe(1);
     expect(stockLimitedTabHeightMm(1.9, 2)).toBe(1.9);
-    const shipped = DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm;
-    expect(stockLimitedTabHeightMm(8, shipped)).toBe(8);
+    // Amendment 6: an unset stock thickness is undefined and keeps the request;
+    // a set 6.35 mm, the shipped value, is thinned like any other.
+    expect(stockLimitedTabHeightMm(8, undefined)).toBe(8);
+    expect(stockLimitedTabHeightMm(8, DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm)).toBe(3.175);
   });
 });
 

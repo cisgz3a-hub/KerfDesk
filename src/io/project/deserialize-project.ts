@@ -8,7 +8,6 @@ import type { ReliefAuthoringResolutions } from './project-relief-authoring-vali
 
 import { normalizeCameraModelRecord } from '../../core/camera/model/camera-model-record';
 import { normalizeOtherCameraModels } from '../../core/camera/model/saved-cameras';
-import { isChiploadMaterialKey } from '../../core/cnc';
 import {
   DEFAULT_DEVICE_PROFILE,
   isKnownControllerKind,
@@ -36,6 +35,7 @@ import {
 import { normalizeProjectStartPoints } from '../../core/scene/start-points';
 import { workspaceAids } from './normalize-workspace-aids';
 import { isObject } from './project-shape-primitives';
+import { normalizeCncStock } from './normalize-cnc-stock';
 import { DEFAULT_PROJECT_OPTIMIZATION, PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
 import {
   normalizedCutDirection,
@@ -207,14 +207,7 @@ export function normalizeCncMachineConfig(raw: unknown): CncMachineConfig | null
       : (tools[0]?.id ?? d.toolId);
   return {
     kind: 'cnc',
-    stock: {
-      thicknessMm: positiveNumberOrDefault(stock['thicknessMm'], d.stock.thicknessMm),
-      widthMm: positiveNumberOrDefault(stock['widthMm'], d.stock.widthMm),
-      heightMm: positiveNumberOrDefault(stock['heightMm'], d.stock.heightMm),
-      originOffset: normalizeStockOriginOffset(stock['originOffset'], d.stock.originOffset),
-      // ADR-112 project material: keep only a known chipload key; drop stale ones.
-      ...(isChiploadMaterialKey(stock['materialKey']) ? { materialKey: stock['materialKey'] } : {}),
-    },
+    stock: normalizeCncStock(stock),
     tools,
     toolId,
     params: {
@@ -271,18 +264,6 @@ function normalizeCncTiling(raw: unknown): { tiling: CncTiling } | Record<string
 // Stock placement may legitimately be anywhere on (or partially off) the bed
 // origin side, so any finite pair is accepted; anything else reverts to the
 // default corner.
-function normalizeStockOriginOffset(
-  raw: unknown,
-  fallback: { readonly x: number; readonly y: number },
-): { x: number; y: number } {
-  if (!isObject(raw)) return { ...fallback };
-  const x = raw['x'];
-  const y = raw['y'];
-  if (typeof x !== 'number' || !Number.isFinite(x)) return { ...fallback };
-  if (typeof y !== 'number' || !Number.isFinite(y)) return { ...fallback };
-  return { x, y };
-}
-
 /**
  * Preserve an explicit worker-transport opt-out as well as opt-in. Absent stays
  * absent so old projects use the compatible driver's default. The unreliable

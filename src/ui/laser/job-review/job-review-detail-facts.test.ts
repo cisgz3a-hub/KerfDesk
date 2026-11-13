@@ -3,7 +3,6 @@ import { effectiveFillOverscanMm } from '../../../core/job/fill-overscan';
 import {
   createLayer,
   DEFAULT_CNC_LAYER_SETTINGS,
-  DEFAULT_CNC_MACHINE_CONFIG,
   type CncLayerSettings,
   type Layer,
 } from '../../../core/scene';
@@ -154,9 +153,10 @@ describe('cncOperationDetail', () => {
     expect(cncOperationDetail(settings, 19)).toContain(
       'tabs 4 per shape (6 × 2 mm) above the stock bottom',
     );
-    expect(
-      cncOperationDetail(settings, DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm),
-    ).not.toContain('above the stock bottom');
+    // ADR-258 Amd 6: undefined is unset; a set 6.35 mm stands on the stock bottom.
+    expect(cncOperationDetail(settings, undefined)).not.toContain('above the stock bottom');
+    const throughSet635 = cncOperationDetail({ ...settings, depthMm: 6.5 }, 6.35);
+    expect(throughSet635).toContain('tabs 4 per shape (6 × 2 mm) above the stock bottom');
   });
 
   it('includes direction, entry, finish allowance, strategy, and material feeds', () => {

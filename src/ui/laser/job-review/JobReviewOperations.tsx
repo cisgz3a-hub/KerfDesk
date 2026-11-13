@@ -17,6 +17,8 @@ import {
   type MachineKind,
   type SceneObject,
 } from '../../../core/scene';
+// Deep import: core/scene's barrel is a ratcheted over-cap legacy barrel.
+import { setStockThicknessMm } from '../../../core/scene/machine';
 import { placedLaserTabCount } from '../../../core/job/laser-tab-anchors';
 import { layerSubLayerOperationId } from '../../../core/scene/layer';
 import type { MaterialLibraryDocument } from '../../../io/material-library';
@@ -174,7 +176,8 @@ function CncOperations(props: {
             settings={settings}
             detail={cncOperationDetail(
               settings,
-              machine.stock.thicknessMm,
+              // ADR-258 Amendment 6: undefined while Stock thickness is unset.
+              setStockThicknessMm(machine.stock),
               effective?.plungingReliefStages,
               effective?.relief,
               effective?.unrampedShapes,
