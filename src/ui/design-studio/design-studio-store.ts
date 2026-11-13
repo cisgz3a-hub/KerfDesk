@@ -84,6 +84,7 @@ import { previewTrimSession, trimSessionAt } from './design-trim';
 import { deleteSessionDimension } from './design-dimension-session';
 import { dimensionActions, viewToggleActions } from './design-store-slices';
 import type { DesignTracking } from './design-tracking';
+import { linkDesignStudioShell } from './design-studio-shell-link';
 
 export type DesignStudioState = {
   readonly documentEpoch: number;
@@ -404,6 +405,9 @@ function openStudio(): void | Promise<void> {
     return publish(projectSessionKeepingDraft(project));
   });
 }
+
+// The boot workspace sees this store only through the shell (ADR-272 Amendment 9).
+linkDesignStudioShell(useDesignStudioStore);
 
 useStore.subscribe((next, previous) => {
   if (next.projectDocumentEpoch === previous.projectDocumentEpoch) return;

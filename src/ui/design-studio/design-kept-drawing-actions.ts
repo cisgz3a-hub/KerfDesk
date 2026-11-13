@@ -1,10 +1,10 @@
-// design-kept-drawing-actions — bringing back a kept Studio drawing, and the
-// unapplied drawing the unsaved-changes prompt counts (ADR-590 Amendments 1
-// and 2).
+// design-kept-drawing-actions — bringing back a kept Studio drawing (ADR-590
+// Amendments 1 and 2). The unapplied drawing the unsaved-changes prompt counts
+// is studioHoldsUnappliedDrawing in design-studio-shell-link.ts.
 
 import { useStore } from '../state';
 import { designRecoveryOwner } from './design-recovery-owner';
-import { restoreDesignSession, sessionSketch, type DesignSession } from './design-session';
+import { restoreDesignSession } from './design-session';
 import { useDesignStudioStore } from './design-studio-store';
 import {
   keepDesignDrawing,
@@ -55,13 +55,4 @@ export async function restoreKeptDesignDrawing(id: string): Promise<boolean> {
     session: projectHoldsDrawing(project, kept) ? restored : { ...restored, dirtySinceApply: true },
   });
   return true;
-}
-
-/** True while the Studio, open or closed, holds shapes drawn since the last
- *  Apply for the current project. */
-export function designStudioHoldsUnappliedDrawing(): boolean {
-  const studio = useDesignStudioStore.getState();
-  if (studio.documentEpoch !== useStore.getState().projectDocumentEpoch) return false;
-  const session: DesignSession | null = studio.session ?? studio.stash;
-  return session !== null && session.dirtySinceApply && sessionSketch(session).entities.length > 0;
 }

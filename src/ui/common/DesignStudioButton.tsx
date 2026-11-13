@@ -1,5 +1,5 @@
 import { Icon } from '../kit';
-import { useDesignStudioStore } from '../design-studio';
+import { openDesignStudio } from '../design-studio';
 import { requestProFeature, useEdition } from '../licensing/edition';
 
 /** A workspace destination that stays visible when file commands overflow. */
@@ -12,9 +12,7 @@ export function DesignStudioButton(): JSX.Element {
       className="lf-btn lf-toolbar-command lf-toolbar-design-studio"
       aria-label="Open Design Studio"
       title={`Design Studio${locked ? ' (Pro)' : ''}: draw parts to size with precision tools, snapping and dimensions.`}
-      onClick={() =>
-        requestProFeature('design-studio', () => useDesignStudioStore.getState().openStudio())
-      }
+      onClick={() => requestProFeature('design-studio', openDesignStudio)}
     >
       <Icon name="shapes" size={18} />
       <span>Design Studio</span>

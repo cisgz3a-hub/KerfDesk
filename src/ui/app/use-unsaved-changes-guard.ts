@@ -22,7 +22,7 @@ import { useEffect } from 'react';
 import { useStore } from '../state';
 import { anyMachineJobActive } from '../state/link-machine-work';
 import { desktopCloseController } from './desktop-close-runtime';
-import { designStudioHoldsUnappliedDrawing } from '../design-studio/design-kept-drawing-actions';
+import { designStudioHoldsUnappliedDrawing } from '../design-studio/design-studio-shell';
 
 export function shouldWarnBeforeUnload(args: {
   readonly dirty: boolean;

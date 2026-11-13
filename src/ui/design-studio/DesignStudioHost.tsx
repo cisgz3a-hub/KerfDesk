@@ -1,16 +1,16 @@
 // Mount point for the Design Studio (ADR-272). App renders this always; the
-// heavy overlay chunk loads lazily only once a session opens, so a user who
-// never opens the Studio pays nothing at cold start (the ADR-102 lazy-import
-// precedent, and the same shape as ImageEditorHost). If that chunk can no
-// longer be fetched (a window left on the previous build), the boundary shows a
-// notice instead of crashing the app; Close stashes the drawing through the
-// store's own closeStudio.
+// Studio's session code (design-studio-runtime.ts) and its heavy overlay chunk
+// load lazily only once a session opens, so a user who never opens the Studio
+// pays nothing at cold start (the ADR-102 lazy-import precedent, the same shape
+// as ImageEditorHost, and ADR-272 Amendment 9). This host reads only the boot
+// shell. If either chunk can no longer be fetched (a window left on the
+// previous build), the boundary shows a notice instead of crashing the app;
+// Close stashes the drawing through the store's own closeStudio.
 
 import { lazy, Suspense } from 'react';
-import { rejectAsLoadFailure } from '../common/lazy-load-failure';
+import { rejectAsLoadFailure, type LazyLoadError } from '../common/lazy-load-failure';
 import { LazyOverlayBoundary } from '../common/LazyOverlayBoundary';
-import { useDesignStudioStore } from './design-studio-store';
-import { useDesignSessionPersistence } from './use-design-session-persistence';
+import { closeDesignStudio, useDesignStudioShell } from './design-studio-shell';
 
 const LazyOverlay = lazy(() =>
   import('./DesignStudioOverlay')
@@ -19,19 +19,24 @@ const LazyOverlay = lazy(() =>
 );
 
 export function DesignStudioHost(): JSX.Element | null {
-  const hasSession = useDesignStudioStore((state) => state.session !== null);
-  const closeStudio = useDesignStudioStore((state) => state.closeStudio);
-  // Mounted on the host rather than the overlay: the drawing must keep being
-  // saved while the Studio is closed and living in the stash.
-  useDesignSessionPersistence();
-  if (!hasSession) return null;
+  const hasSession = useDesignStudioShell((state) => state.sessionOpen);
+  const loading = useDesignStudioShell((state) => state.loading);
+  const loadFailure = useDesignStudioShell((state) => state.loadFailure);
+  if (!hasSession && !loading && loadFailure === null) return null;
   return (
-    <LazyOverlayBoundary toolName="Design Studio" onClose={closeStudio}>
+    <LazyOverlayBoundary toolName="Design Studio" onClose={closeDesignStudio}>
       <Suspense fallback={<LoadingCard />}>
-        <LazyOverlay />
+        {hasSession ? <LazyOverlay /> : <RuntimePending failure={loadFailure} />}
       </Suspense>
     </LazyOverlayBoundary>
   );
+}
+
+// While the first Open fetches the session code: the same card the overlay's
+// own chunk shows next. A failed fetch is thrown to the boundary's notice.
+function RuntimePending(props: { readonly failure: LazyLoadError | null }): JSX.Element {
+  if (props.failure !== null) throw props.failure;
+  return <LoadingCard />;
 }
 
 function LoadingCard(): JSX.Element {

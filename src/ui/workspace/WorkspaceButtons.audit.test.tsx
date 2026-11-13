@@ -9,7 +9,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { REGISTRATION_LAYER_ID, isRegistrationBox } from '../../core/scene';
 import { NumericEditsBar } from '../commands/NumericEditsBar';
-import { useDesignStudioStore } from '../design-studio';
+import { useDesignStudioStore } from '../design-studio/design-studio-store';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { useUiStore, type ToolMode } from '../state/ui-store';
