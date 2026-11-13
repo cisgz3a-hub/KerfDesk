@@ -327,9 +327,12 @@ describe('active-job transport write containment', () => {
     expect(useLaserStore.getState().log.join('\n')).toContain(
       'Serial write failed: job transport rejected',
     );
+    // The reset byte itself was refused, so the notice says the Abort was not
+    // written; the failed disconnect after it no longer replaces that with a
+    // vaguer one (CNC audit v3 N5-P3-3, ADR-398 Amendment 10).
     expect(useLaserStore.getState()).toMatchObject({
       connection: { kind: 'disconnected' },
-      safetyNotice: { kind: 'write-failed', action: 'disconnect' },
+      safetyNotice: { kind: 'write-failed', action: 'stop' },
       streamer: { status: 'cancelled' },
     });
     rejectWrites = false;

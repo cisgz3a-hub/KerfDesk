@@ -320,7 +320,11 @@ async function quarantineStreamFault(
     if (refs.connection === connection) {
       set((state) => ({
         ...disconnectFailureIncident(refs, state, error),
-        safetyNotice: writeFailedNotice('disconnect'),
+        // The job's own fault notice says what stopped the job, and a failed
+        // off line after the reset has added itself to it. Replacing it with
+        // "the disconnect command was not written" hid both (CNC audit v3
+        // N5-P3-3, ADR-398 Amendment 10).
+        safetyNotice: state.safetyNotice ?? writeFailedNotice('disconnect'),
       }));
     }
   } finally {

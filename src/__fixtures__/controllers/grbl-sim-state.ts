@@ -54,6 +54,9 @@ export type GrblSimState = {
   readonly overrides: GrblSimOverrides;
   /** A door input held open: the door state reports Door:1 and refuses cycle start. */
   readonly doorAjar?: boolean;
+  /** The spindle speed a safety door stopped, which cycle start restores
+   *  (protocol.c mc_spindle restore after the door, CNC audit v3 N5-P3-4). */
+  readonly spindleBeforeDoor?: number;
   /** The probe input closed (plate touching the bit): reports carry Pn:P and a
    *  G38.2 fails with ALARM:4, as GRBL checks the input before it moves. */
   readonly probeClosed?: boolean;

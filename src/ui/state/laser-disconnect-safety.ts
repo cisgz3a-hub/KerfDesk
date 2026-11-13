@@ -25,6 +25,7 @@ const PHYSICAL_STOP_UNCERTAIN_WRITE_ACTIONS: ReadonlySet<WriteFailedAction> = ne
   'fire',
   'console',
   'stream',
+  'stop-cleanup',
 ]);
 
 /** The lines Disconnect or Forget writes before closing the port of a

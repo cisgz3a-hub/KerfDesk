@@ -296,10 +296,16 @@ function reportsStatus(state: GrblSimState, opts: GrblSimOptions): boolean {
   return grblHal || !state.critical;
 }
 
+// The door stops the spindle and cycle start turns it back on at its earlier
+// speed (protocol.c protocol_exec_rt_suspend: the restore runs
+// spindle_set_state with the saved state before motion resumes). The
+// SAFETY_DOOR_SPINDLE_DELAY wait before motion is not modelled.
 function reduceSafetyDoor(state: GrblSimState): GrblSimReaction {
   const stops = ['Idle', 'Run', 'Jog', 'Hold'].includes(state.machine);
   return {
-    state: stops ? { ...state, machine: 'Door', spindle: 0 } : state,
+    state: stops
+      ? { ...state, machine: 'Door', spindle: 0, spindleBeforeDoor: state.spindle }
+      : state,
     effects: [],
   };
 }
@@ -320,8 +326,15 @@ function reduceCycleStart(state: GrblSimState, opts: GrblSimOptions): GrblSimRea
     // suspend and gc_execute_line returns, which is when M0's `ok` goes out.
     return { state: { ...state, machine: 'Idle', pendingLine: null }, effects: [emit('ok', opts)] };
   }
+  const { spindleBeforeDoor, ...rest } = state;
   return {
-    state: { ...state, machine: state.pendingMotions > 0 ? 'Run' : 'Idle' },
+    state: {
+      ...rest,
+      machine: state.pendingMotions > 0 ? 'Run' : 'Idle',
+      ...(state.machine === 'Door' && spindleBeforeDoor !== undefined
+        ? { spindle: spindleBeforeDoor }
+        : {}),
+    },
     effects: [],
   };
 }
@@ -334,8 +347,10 @@ function reduceSoftReset(state: GrblSimState, opts: GrblSimOptions): GrblSimReac
     state.machine === 'Jog' ||
     state.machine === 'Home' ||
     (state.pendingMotions > 0 && !heldSettled);
+  // A reset ends the door suspend: nothing is left to restore.
+  const { spindleBeforeDoor: _dropped, ...kept } = state;
   const base: GrblSimState = {
-    ...state,
+    ...kept,
     pendingMotions: 0,
     spindle: 0,
     // Stock GRBL's soft reset clears G92 (gcode.c gc_init memsets the parser
