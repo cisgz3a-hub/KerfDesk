@@ -1,0 +1,77 @@
+import { it } from 'vitest';
+import { IDENTITY_TRANSFORM, type RasterImage, type SceneObject, type Transform } from '../t13-main/src/core/scene';
+import { selectedImageMaskPair } from '../t13-main/src/ui/commands/image-mask-command-state';
+import { burnedSegments, circle, compare, gcodeOf, imageLayer, logger, maskLayer, mkImage, mkMask, project, rect, xf, type P } from './t16-common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t16/t16a.log');
+const T = (t: Partial<Transform>): Transform => ({ ...IDENTITY_TRANSFORM, ...t });
+const BOX = { x: 10, y: 10, w: 20, h: 20 };
+const REGION = { x0: 0, y0: 0, x1: 50, y1: 50 };
+
+type Case = { name: string; mask: SceneObject; local: P[][]; rule: 'evenodd' | 'nonzero'; image?: RasterImage; layerExtra?: Record<string, unknown> };
+
+function run(c: Case): void {
+  const img = c.image ?? mkImage('R', 40, 40, BOX);
+  const image = { ...img, imageMaskId: c.mask.id } as RasterImage;
+  const p = project([image, c.mask], [imageLayer(c.layerExtra as never), maskLayer(false)]);
+  const g = gcodeOf(p);
+  if (g.startsWith('NOT OK')) { out(`${c.name}: ${g}`); return; }
+  const segs = burnedSegments(g);
+  const maskScene = c.local.map((cn) => cn.map((pt) => xf(pt, c.mask.transform)));
+  const quad = [
+    { x: image.bounds.minX, y: image.bounds.minY }, { x: image.bounds.maxX, y: image.bounds.minY },
+    { x: image.bounds.maxX, y: image.bounds.maxY }, { x: image.bounds.minX, y: image.bounds.maxY },
+  ].map((pt) => xf(pt, image.transform));
+  const pitch = 1 / 5;
+  const eo = compare(segs, pitch, quad, maskScene, 'evenodd', REGION);
+  const nz = compare(segs, pitch, quad, maskScene, 'nonzero', REGION);
+  const pair = selectedImageMaskPair(p, [image.id, c.mask.id]);
+  out(`${c.name}: segs ${segs.length} pairEnabled=${pair !== null}\n   vs even-odd ${JSON.stringify(eo)}\n   vs non-zero ${JSON.stringify(nz)}`);
+}
+
+it('A: burned area vs independent point-in-polygon oracle', () => {
+  const rot = (deg: number, pts: P[]) => ({ local: pts, t: T({ x: 20, y: 20, rotationDeg: deg }) });
+  const cases: Case[] = [];
+  // 0 baseline: no mask (mask object far away but NOT linked) -> handled via rule none below
+  cases.push({ name: '01 rectangle', mask: mkMask('M', [rect(14.1, 12.3, 25.3, 27.7)]), local: [rect(14.1, 12.3, 25.3, 27.7)], rule: 'evenodd' });
+  const circ = circle(20.05, 19.95, 7.3);
+  cases.push({ name: '02 circle r7.3', mask: mkMask('M', [circ]), local: [circ], rule: 'evenodd' });
+  const rr = rot(30, rect(-6.1, -4.2, 6.1, 4.2));
+  cases.push({ name: '03 rect rotated 30 (mask transform)', mask: mkMask('M', [rr.local], rr.t), local: [rr.local], rule: 'evenodd' });
+  const tri: P[] = [{ x: -7, y: -6 }, { x: 8, y: -2 }, { x: -3, y: 7 }];
+  cases.push({ name: '04 triangle mirrorX (mask transform)', mask: mkMask('M', [tri], T({ x: 20, y: 20, mirrorX: true })), local: [tri], rule: 'evenodd' });
+  const uc = circle(0, 0, 5);
+  cases.push({ name: '05 circle scaleX1.6 scaleY0.7 (mask transform)', mask: mkMask('M', [uc], T({ x: 20, y: 20, scaleX: 1.6, scaleY: 0.7 })), local: [uc], rule: 'evenodd' });
+  const hole = [rect(12.2, 12.2, 27.8, 27.8), circle(20, 20, 4.4)];
+  cases.push({ name: '06 rect with circular hole (one path)', mask: mkMask('M', hole), local: hole, rule: 'evenodd' });
+  const star: P[] = Array.from({ length: 5 }, (_, i) => { const a = -Math.PI / 2 + (i * 4 * Math.PI) / 5; return { x: 20 + 9 * Math.cos(a), y: 20.1 + 9 * Math.sin(a) }; });
+  cases.push({ name: '07 self-crossing pentagram shape (no fillRule)', mask: mkMask('M', [star]), local: [star], rule: 'evenodd' });
+  cases.push({ name: '08 pentagram imported SVG fill-rule nonzero', mask: mkMask('M', [star], IDENTITY_TRANSFORM, 'imported-svg', 'nonzero'), local: [star], rule: 'nonzero' });
+  const glyphs = [rect(12.1, 13.1, 21.3, 26.9), rect(18.7, 13.1, 27.9, 26.9)]; // two overlapping "glyphs", same winding
+  cases.push({ name: '09 text, two overlapping glyph contours (text fill = nonzero)', mask: mkMask('M', glyphs, IDENTITY_TRANSFORM, 'text'), local: glyphs, rule: 'nonzero' });
+  const two = [circle(15, 15, 3.6), circle(25.1, 24.9, 3.6)];
+  cases.push({ name: '10 two disjoint circles (multi-subpath)', mask: mkMask('M', two), local: two, rule: 'evenodd' });
+  cases.push({ name: '11 rect partly outside image', mask: mkMask('M', [rect(24.1, 15.1, 40.3, 25.3)]), local: [rect(24.1, 15.1, 40.3, 25.3)], rule: 'evenodd' });
+  cases.push({ name: '12 rect entirely outside image', mask: mkMask('M', [rect(35.1, 35.1, 45.3, 45.3)]), local: [rect(35.1, 35.1, 45.3, 45.3)], rule: 'evenodd' });
+  // image transforms with a circle mask
+  const c0 = circle(20.05, 19.95, 7.3);
+  cases.push({ name: '13 image rotated 30 (40px)', mask: mkMask('M', [c0]), local: [c0], rule: 'evenodd', image: mkImage('R', 40, 40, { x: -10, y: -10, w: 20, h: 20 }, T({ x: 20, y: 20, rotationDeg: 30 })) });
+  cases.push({ name: '14 image mirrorX', mask: mkMask('M', [c0]), local: [c0], rule: 'evenodd', image: mkImage('R', 40, 40, { x: -10, y: -10, w: 20, h: 20 }, T({ x: 20, y: 20, mirrorX: true })) });
+  cases.push({ name: '15 image scaleX 1.5 scaleY 0.8', mask: mkMask('M', [c0]), local: [c0], rule: 'evenodd', image: mkImage('R', 40, 40, { x: -10, y: -10, w: 20, h: 20 }, T({ x: 20, y: 20, scaleX: 1.5, scaleY: 0.8 })) });
+  // low-resolution source (2 mm pixels): upright vs rotated vs angled scan
+  cases.push({ name: '16 low-res 10px image upright', mask: mkMask('M', [c0]), local: [c0], rule: 'evenodd', image: mkImage('R', 10, 10, { x: -10, y: -10, w: 20, h: 20 }, T({ x: 20, y: 20 })) });
+  cases.push({ name: '17 low-res 10px image rotated 30', mask: mkMask('M', [c0]), local: [c0], rule: 'evenodd', image: mkImage('R', 10, 10, { x: -10, y: -10, w: 20, h: 20 }, T({ x: 20, y: 20, rotationDeg: 30 })) });
+  cases.push({ name: '18 low-res 10px image rotated 90', mask: mkMask('M', [c0]), local: [c0], rule: 'evenodd', image: mkImage('R', 10, 10, { x: -10, y: -10, w: 20, h: 20 }, T({ x: 20, y: 20, rotationDeg: 90 })) });
+  cases.push({ name: '19 low-res 10px upright, scan angle 45', mask: mkMask('M', [c0]), local: [c0], rule: 'evenodd', image: mkImage('R', 10, 10, { x: -10, y: -10, w: 20, h: 20 }, T({ x: 20, y: 20 })), layerExtra: { imageScanAngleDeg: 45 } });
+  cases.push({ name: '20 40px upright, scan angle 45', mask: mkMask('M', [c0]), local: [c0], rule: 'evenodd', layerExtra: { imageScanAngleDeg: 45 } });
+  cases.push({ name: '21 40px upright, bidirectional + overscan 5', mask: mkMask('M', [c0]), local: [c0], rule: 'evenodd', layerExtra: { imageBidirectional: true, imageOverscanMm: 5 } });
+  for (const c of cases) run(c);
+  // open path: not eligible
+  const open = mkMask('O', [rect(14, 14, 26, 26)], IDENTITY_TRANSFORM, 'shape', undefined, false);
+  const img = mkImage('R', 40, 40, BOX);
+  out(`22 open rect path: pair=${JSON.stringify(selectedImageMaskPair(project([img, open], [imageLayer()]), ['R', 'O']))}`);
+  // baseline unmasked
+  const g = gcodeOf(project([img], [imageLayer()]));
+  const quad = [{ x: 10, y: 10 }, { x: 30, y: 10 }, { x: 30, y: 30 }, { x: 10, y: 30 }];
+  out(`00 unmasked baseline: ${JSON.stringify(compare(burnedSegments(g), 0.2, quad, [], 'none', REGION))}`);
+});

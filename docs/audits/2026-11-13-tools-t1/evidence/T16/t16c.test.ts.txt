@@ -1,0 +1,76 @@
+import { it, vi } from 'vitest';
+import { IDENTITY_TRANSFORM, type RasterImage } from '../t13-main/src/core/scene';
+import { serializeProject } from '../t13-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t13-main/src/io/project/deserialize-project';
+import { useStore } from '../t13-main/src/ui/state/store';
+import { resetStore } from '../t13-main/src/ui/state/test-helpers';
+import { drawRasterImage } from '../t13-main/src/ui/workspace/draw-raster';
+import { selectedImageMaskPair } from '../t13-main/src/ui/commands/image-mask-command-state';
+import { burnedSegments, circle, gcodeOf, imageLayer, logger, maskLayer, mkImage, mkMask, project, rect } from './t16-common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t16/t16c.log');
+const st = () => useStore.getState();
+const img = () => mkImage('R', 40, 40, { x: 10, y: 10, w: 20, h: 20 });
+const c0 = circle(20.05, 19.95, 7.3);
+
+it('C1: Apply, Undo, Redo exactness and Save/reopen', () => {
+  resetStore();
+  const p0 = project([img(), mkMask('M', [c0])], [imageLayer(), maskLayer(false)]);
+  st().setProject(p0);
+  const before = JSON.stringify(st().project);
+  const g0 = gcodeOf(st().project);
+  st().selectObjects?.(['R', 'M']);
+  out(`C1 selection after selectObjects: ${st().selectedObjectId} + ${[...st().additionalSelectedIds].join(',')}`);
+  st().applyImageMask('R', 'M');
+  const applied = JSON.stringify(st().project);
+  const gA = gcodeOf(st().project);
+  const r = st().project.scene.objects.find((o) => o.id === 'R') as RasterImage;
+  out(`C1 applied: imageMaskId=${r.imageMaskId}; undo depth ${st().undoStack.length}; dirty ${st().dirty}; objects ${st().project.scene.objects.length}; burned segs ${burnedSegments(g0).length} -> ${burnedSegments(gA).length}`);
+  // second apply of same pair is a no-op
+  const depth = st().undoStack.length; st().applyImageMask('R', 'M');
+  out(`C1 re-apply same pair: undo depth ${depth} -> ${st().undoStack.length}`);
+  st().undo();
+  out(`C1 undo exact: ${JSON.stringify(st().project) === before}; gcode equal to unmasked: ${gcodeOf(st().project) === g0}`);
+  st().redo();
+  out(`C1 redo exact: ${JSON.stringify(st().project) === applied}; gcode equal to masked: ${gcodeOf(st().project) === gA}`);
+  const text = serializeProject(st().project);
+  const back = deserializeProject(text);
+  if (back.kind !== 'ok') { out(`C1 reopen failed ${JSON.stringify(back).slice(0, 400)}`); return; }
+  const rb = back.project.scene.objects.find((o) => o.id === 'R') as RasterImage;
+  out(`C1 reopen: imageMaskId=${rb.imageMaskId}; gcode identical after reopen: ${gcodeOf(back.project) === gA}`);
+  // move the mask afterwards: live?
+  st().setProject({ ...st().project, scene: { ...st().project.scene, objects: st().project.scene.objects.map((o) => (o.id === 'M' ? { ...o, transform: { ...o.transform, x: 3 } } : o)) } });
+  const gMoved = gcodeOf(st().project);
+  const segs = burnedSegments(gMoved);
+  const minX = Math.min(...segs.map((s) => Math.min(s.a.x, s.b.x)));
+  out(`C1 mask moved +3 mm in X: leftmost burn ${minX.toFixed(2)} (mask circle left edge was 12.75, now 15.75)`);
+});
+
+it('C2: replace an existing mask, and a grouped mask', () => {
+  resetStore();
+  const m1 = mkMask('M1', [c0]); const m2 = mkMask('M2', [rect(12.1, 12.1, 18.3, 18.3)]);
+  st().setProject(project([{ ...img(), imageMaskId: 'M1' } as RasterImage, m1, m2], [imageLayer(), maskLayer(false)]));
+  st().applyImageMask('R', 'M2');
+  const r = st().project.scene.objects.find((o) => o.id === 'R') as RasterImage;
+  out(`C2 apply second mask to masked image: imageMaskId=${r.imageMaskId} (first mask silently replaced; one undo restores ${(() => { st().undo(); return (st().project.scene.objects.find((o) => o.id === 'R') as RasterImage).imageMaskId; })()})`);
+  // group selection: LightBurn accepts a group of vectors on one layer as the mask
+  const p = project([img(), mkMask('A', [circle(15, 15, 3)]), mkMask('B', [circle(25, 25, 3)])], [imageLayer(), maskLayer(false)]);
+  out(`C2 image + two-shape group (3 ids): pair=${JSON.stringify(selectedImageMaskPair(p, ['R', 'A', 'B']))}`);
+});
+
+it('C3: design canvas draws an image with an external mask without clipping', () => {
+  class ReadyImage { complete = true; naturalWidth = 40; naturalHeight = 40; src = ''; onload: unknown = null; onerror: unknown = null; }
+  vi.stubGlobal('Image', ReadyImage);
+  const calls: string[] = [];
+  const ctx = new Proxy({}, { get: (_t, k) => (typeof k === 'string' && k !== 'then' ? (...a: unknown[]) => { calls.push(k); void a; } : undefined), set: () => true }) as unknown as CanvasRenderingContext2D;
+  const view = { scale: 1, offsetX: 0, offsetY: 0 };
+  const masked = { ...img(), imageMaskId: 'M', dataUrl: 'data:image/png;base64,AAAA' } as RasterImage;
+  try { drawRasterImage(ctx, masked, view); } catch (e) { out(`C3 draw threw ${String(e)}`); }
+  out(`C3 external mask: clip() calls ${calls.filter((c) => c === 'clip').length}; drawImage ${calls.filter((c) => c === 'drawImage').length}`);
+  calls.length = 0;
+  const owned = { ...img(), dataUrl: 'data:image/png;base64,AAAA', imageClip: [{ color: '#000000', fillRule: 'evenodd', polylines: [{ points: c0, closed: true }] }] } as unknown as RasterImage;
+  try { drawRasterImage(ctx, owned, view); } catch (e) { out(`C3 draw threw ${String(e)}`); }
+  out(`C3 owned clip (after Crop/Flatten): clip() calls ${calls.filter((c) => c === 'clip').length}; drawImage ${calls.filter((c) => c === 'drawImage').length}`);
+  vi.unstubAllGlobals();
+  void IDENTITY_TRANSFORM;
+});

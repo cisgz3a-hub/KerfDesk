@@ -54,7 +54,7 @@ Run order puts tools that make or change burns first, then new tools, then the r
 | T13 | Image | Image Studio | `tools.edit-image` | ledgered: P2 2 (fixed by #1855), P3 2 (known 3) |
 | T14 | Image | Adjust Image | `tools.adjust-image` | ledgered: P2 2 (fix #1856), P3 2 (known 3) |
 | T15 | Image | Photo Engraving | `tools.photo-engraving` | ledgered: P2 2 (fix #1860), P3 3 |
-| T16 | Image | Apply Mask to Image | `tools.apply-image-mask` | |
+| T16 | Image | Apply Mask to Image | `tools.apply-image-mask` | ledgered: P2 3 (fix session proposed), P3 3 |
 | T17 | Image | Crop Image | `tools.crop-image` | |
 | T18 | Image | Flatten Image Mask | `tools.flatten-image-mask` | |
 | T19 | Image | Remove Image Mask | `tools.remove-image-mask` | |
