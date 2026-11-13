@@ -1,0 +1,259 @@
+// @vitest-environment jsdom
+// T27 Generate Path From Cut: generated geometry vs decoded G-code of the real output path.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type Transform,
+} from '../t26-main/src/core/scene';
+import { createRectangle } from '../t26-main/src/core/shapes/primitives/create-rectangle';
+import { createEllipse } from '../t26-main/src/core/shapes/primitives/create-ellipse';
+import { prepareOutput } from '../t26-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t26-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t26-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t26-main/src/io/project/deserialize-project';
+import { useStore } from '../t26-main/src/ui/state/store';
+import { useToastStore } from '../t26-main/src/ui/state/toast-store';
+import { resetStore } from '../t26-main/src/ui/state/test-helpers';
+import { litMoves, totalLen, type LitMove, type Vec } from './decode';
+
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t27/t27-burn.log', log.join('\n'));
+};
+beforeEach(() => resetStore());
+const st = () => useStore.getState();
+const f3 = (n: number) => n.toFixed(3);
+
+function layer(mode: 'line' | 'fill', extra: Partial<Layer> = {}): Layer {
+  return {
+    ...createLayer({ id: 'L', color: '#000000', name: 'L', mode }),
+    speed: mode === 'line' ? 1200 : 3000,
+    power: 40,
+    passes: 1,
+    ...(mode === 'fill' ? { hatchSpacingMm: 0.5, hatchAngleDeg: 0 } : {}),
+    ...extra,
+  } as Layer;
+}
+
+function project(objects: SceneObject[], layers: Layer[], device: Partial<Project['device']> = {}): Project {
+  const base = createProject();
+  return {
+    ...base,
+    device: { ...base.device, ...device },
+    optimization: { ...DEFAULT_PROJECT_OPTIMIZATION },
+    scene: { ...base.scene, objects, layers, groups: [] },
+  };
+}
+
+const toasts = () => useToastStore.getState().toasts.map((t) => `[${t.variant}] ${t.message}`);
+
+async function generate(p: Project, sel: string[]): Promise<{ obj: ImportedSvg | null; moves: LitMove[]; polylines: number; toast: string }> {
+  useToastStore.setState({ toasts: [] } as never);
+  useStore.setState({
+    project: p,
+    selectedObjectId: sel[0] ?? null,
+    additionalSelectedIds: new Set(sel.slice(1)),
+    undoStack: [],
+    redoStack: [],
+    dirty: false,
+  });
+  await st().generatePathFromCut();
+  const objs = st().project.scene.objects;
+  const toast = toasts().join(' | ');
+  if (objs.length === p.scene.objects.length) return { obj: null, moves: [], polylines: 0, toast };
+  const obj = objs[objs.length - 1] as ImportedSvg;
+  const moves: LitMove[] = [];
+  let polylines = 0;
+  for (const path of obj.paths)
+    for (const pl of path.polylines) {
+      polylines += 1;
+      for (let i = 1; i < pl.points.length; i++) {
+        const a = pl.points[i - 1]!, b = pl.points[i]!;
+        moves.push({ from: a, to: b, f: 0, s: 0, len: Math.hypot(b.x - a.x, b.y - a.y), line: 0 });
+      }
+    }
+  return { obj, moves, polylines, toast };
+}
+
+function burn(p: Project, sel: string[]): LitMove[] {
+  const prepared = prepareOutput(
+    p,
+    sel.length === 0
+      ? {}
+      : { outputScope: { cutSelectedGraphics: true, useSelectionOrigin: false, selectedObjectIds: sel } },
+  );
+  if (!prepared.ok) throw new Error(JSON.stringify(prepared.preflight).slice(0, 300));
+  return litMoves(emitPreparedGcode(prepared).gcode, p.device);
+}
+
+function densify(moves: ReadonlyArray<LitMove>, step = 0.1): Vec[] {
+  const res: Vec[] = [];
+  for (const m of moves) {
+    const n = Math.max(1, Math.ceil(m.len / step));
+    for (let k = 0; k <= n; k++) res.push({ x: m.from.x + ((m.to.x - m.from.x) * k) / n, y: m.from.y + ((m.to.y - m.from.y) * k) / n });
+  }
+  return res;
+}
+function segDist(p: Vec, a: Vec, b: Vec): number {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const l2 = dx * dx + dy * dy;
+  const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+function directed(a: ReadonlyArray<LitMove>, b: ReadonlyArray<LitMove>): number {
+  let worst = 0;
+  for (const p of densify(a)) {
+    let best = Infinity;
+    for (const m of b) {
+      const d = segDist(p, m.from, m.to);
+      if (d < best) best = d;
+      if (best < 1e-6) break;
+    }
+    if (best > worst) worst = best;
+  }
+  return worst;
+}
+function bb(moves: ReadonlyArray<LitMove>) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const m of moves)
+    for (const q of [m.from, m.to]) {
+      minX = Math.min(minX, q.x); maxX = Math.max(maxX, q.x);
+      minY = Math.min(minY, q.y); maxY = Math.max(maxY, q.y);
+    }
+  return `[${f3(minX)},${f3(minY)}]-[${f3(maxX)},${f3(maxY)}] w=${f3(maxX - minX)} h=${f3(maxY - minY)}`;
+}
+
+async function compare(name: string, p: Project, sel: string[], burnSel: string[] = sel): Promise<void> {
+  const g = await generate(p, sel);
+  let gc: LitMove[] = [];
+  try {
+    gc = burn(p, burnSel);
+  } catch (e) {
+    out(`${name}: burn failed ${String(e)}`);
+  }
+  out(
+    `${name}: gen polylines=${g.polylines} len=${f3(totalLen(g.moves))} bbox=${bb(g.moves)}\n` +
+      `   gcode lit moves=${gc.length} len=${f3(totalLen(gc))} bbox=${bb(gc)}\n` +
+      `   hausdorff gen->gcode=${g.moves.length && gc.length ? f3(directed(g.moves, gc)) : 'n/a'} gcode->gen=${g.moves.length && gc.length ? f3(directed(gc, g.moves)) : 'n/a'}\n` +
+      `   toast: ${g.toast}`,
+  );
+}
+
+const rect = (id: string, w: number, h: number, t: Transform) =>
+  createRectangle({ id, color: '#000000', spec: { widthMm: w, heightMm: h, cornerRadiusMm: 0 }, transform: t });
+const at = (x: number, y: number, extra: Partial<Transform> = {}): Transform => ({ ...IDENTITY_TRANSFORM, x, y, ...extra });
+
+it('A plain square, line, kerf', async () => {
+  const sq = rect('sq', 10, 10, at(50, 50));
+  await compare('A0 square no kerf', project([sq], [layer('line')]), ['sq']);
+  await compare('A1 square kerf +0.25', project([sq], [layer('line', { kerfOffsetMm: 0.25 })]), ['sq']);
+  await compare('A2 square kerf -0.25', project([sq], [layer('line', { kerfOffsetMm: -0.25 })]), ['sq']);
+  await compare('A3 nothing selected kerf +0.25', project([sq], [layer('line', { kerfOffsetMm: 0.25 })]), []);
+});
+
+it('B passes', async () => {
+  const sq = rect('sq', 10, 10, at(50, 50));
+  await compare('B1 square passes=3', project([sq], [layer('line', { passes: 3 })]), ['sq']);
+  await compare('B2 fill passes=2', project([rect('f', 10, 5, at(50, 50))], [layer('fill', { passes: 2 })]), ['f']);
+});
+
+it('C hole selected alone (kerf side judged among whole scene)', async () => {
+  const outer = rect('outer', 30, 30, at(100, 100));
+  const inner = rect('inner', 10, 10, at(100, 100));
+  const p = project([outer, inner], [layer('line', { kerfOffsetMm: 0.5 })]);
+  await compare('C0 both selected', p, ['outer', 'inner']);
+  await compare('C1 inner only selected (gen) vs real Cut Selected inner', p, ['inner']);
+  await compare('C2 outer only selected', p, ['outer']);
+  // leads too
+  const pl = project([outer, inner], [layer('line', { leadInEnabled: true, leadLengthMm: 2, leadStyle: 'line' as never })]);
+  await compare('C3 leads, inner only selected', pl, ['inner']);
+  await compare('C4 leads, both selected', pl, ['outer', 'inner']);
+});
+
+it('D fill with scanning offsets', async () => {
+  const f = rect('f', 20, 10, at(60, 60));
+  const offs = [
+    { speedMmPerMin: 1000, offsetMm: 0.3 },
+    { speedMmPerMin: 6000, offsetMm: 0.3 },
+  ];
+  await compare('D0 fill bidi, no scan offset', project([f], [layer('fill', { fillBidirectional: true })]), ['f']);
+  const pd = project([f], [layer('fill', { fillBidirectional: true })], { scanningOffsets: offs } as never);
+  await compare('D1 fill bidi, scan offset 0.3', pd, ['f']);
+  const g = await generate(pd, ['f']);
+  const rows = new Map<string, { minX: number; maxX: number }>();
+  for (const m of g.moves) {
+    const k = f3(m.from.y);
+    const r = rows.get(k) ?? { minX: Infinity, maxX: -Infinity };
+    r.minX = Math.min(r.minX, m.from.x, m.to.x);
+    r.maxX = Math.max(r.maxX, m.from.x, m.to.x);
+    rows.set(k, r);
+  }
+  out('   D1 first 4 generated rows: ' + [...rows].slice(0, 4).map(([y, r]) => `y=${y} x ${f3(r.minX)}..${f3(r.maxX)}`).join('; '));
+  const gc = burn(pd, ['f']);
+  out('   D1 first 4 gcode lit moves: ' + gc.slice(0, 4).map((m) => `y=${f3(m.from.y)} x ${f3(m.from.x)}->${f3(m.to.x)}`).join('; '));
+});
+
+it('E transforms and origins', async () => {
+  const e = createEllipse({ id: 'e', color: '#000000', spec: { widthMm: 30, heightMm: 20 }, transform: at(150, 120, { rotationDeg: 35, mirrorX: true, scaleX: 2, scaleY: 0.8 }) });
+  for (const origin of ['front-left', 'rear-right', 'center'] as const) {
+    await compare(`E ellipse rot/mirror/aniso kerf 0.3 origin ${origin}`, project([e], [layer('line', { kerfOffsetMm: 0.3 })], { origin } as never), ['e']);
+  }
+});
+
+it('F tabs, overcut, perforation, leads', async () => {
+  const sq = rect('sq', 20, 20, at(80, 80));
+  await compare('F1 tabs 4x1mm', project([sq], [layer('line', { tabsEnabled: true, tabsPerShape: 4, tabSizeMm: 1, tabSkipInnerShapes: false })]), ['sq']);
+  await compare('F2 overcut 2mm', project([sq], [layer('line', { overcutMm: 2 })]), ['sq']);
+  await compare('F3 perforation 2/1', project([sq], [layer('line', { perforationEnabled: true, perforationCutMm: 2, perforationSkipMm: 1 })]), ['sq']);
+  await compare('F4 lead-in 3mm', project([sq], [layer('line', { leadInEnabled: true, leadLengthMm: 3 })]), ['sq']);
+});
+
+it('G rotary', async () => {
+  const sq = rect('sq', 10, 10, at(50, 50));
+  const rotary = { enabled: true, type: 'roller', mmPerRotation: 100, objectDiameterMm: 80 };
+  await compare('G1 rotary roller (G-code machine-space; gen expected surface-true 45..55)', project([sq], [layer('line')], { rotary } as never), ['sq']);
+});
+
+it('H undo, redo, save/reopen, output of generated object', async () => {
+  const sq = rect('sq', 10, 10, at(50, 50));
+  const p = project([sq], [layer('line', { kerfOffsetMm: 0.25 })]);
+  const g = await generate(p, ['sq']);
+  const after = st().project;
+  out(`H generated: kind=${g.obj?.kind} source=${g.obj?.source} opIds=${JSON.stringify(g.obj?.operationIds)} colors=${g.obj?.paths.map((x) => x.color)} dirty=${st().dirty} selected=${st().selectedObjectId === g.obj?.id} undo=${st().undoStack.length}`);
+  st().undo();
+  out(`H after undo: objects=${st().project.scene.objects.length} project===original ${st().project === p}`);
+  st().redo();
+  out(`H after redo: objects=${st().project.scene.objects.length} same as generated ${st().project === after}`);
+  const reopened = deserializeProject(serializeProject(after));
+  const ro = reopened.ok ? reopened.project.scene.objects.at(-1) as ImportedSvg : null;
+  out(`H reopen ok=${reopened.ok} opIds=${JSON.stringify(ro?.operationIds)} pathOpIds=${JSON.stringify(ro?.paths.map((x) => (x as { operationIds?: unknown }).operationIds))}`);
+  if (reopened.ok) {
+    const all = burn(reopened.project, []);
+    const only = (() => { try { return burn(reopened.project, [ro!.id]).length; } catch (e) { return String(e).slice(0, 200); } })();
+    out(`H reopened full output lit len=${f3(totalLen(all))} (source alone burns ${f3(totalLen(burn(p, [])))}); generated-only output: ${only}`);
+  }
+  // Generate again with nothing selected: second generation must not include the first
+  useStore.setState({ selectedObjectId: null, additionalSelectedIds: new Set() });
+  await st().generatePathFromCut();
+  out(`H second generate (nothing selected): objects=${st().project.scene.objects.length}; toast ${toasts().at(-1)}`);
+});
+
+it('I edge cases: empty, output off, CNC, hidden', async () => {
+  const sq = rect('sq', 10, 10, at(50, 50));
+  await compare('I1 empty project', project([], [layer('line')]), []);
+  await compare('I2 layer output off, selected', project([sq], [layer('line', { output: false } as never)]), ['sq']);
+  await compare('I3 power 0', project([sq], [layer('line', { power: 0 })]), ['sq']);
+  const hidden = { ...sq, hidden: true } as SceneObject;
+  await compare('I4 hidden object selected', project([hidden], [layer('line')]), ['sq']);
+  const locked = { ...sq, locked: true } as SceneObject;
+  await compare('I5 locked object selected', project([locked], [layer('line')]), ['sq']);
+});

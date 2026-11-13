@@ -1,0 +1,209 @@
+// @vitest-environment jsdom
+// T27 refuter: Generate Path From Cut vs the real Start / Cut Selected Graphics G-code.
+// Own decoder, rear-left origin so machine X/Y equal scene X/Y (no app coordinate mapping
+// in the oracle), and analytic expectations next to the decoded ones.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type ImportedSvg, type Layer, type Project, type SceneObject } from '../t26-main/src/core/scene';
+import { prepareOutput } from '../t26-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t26-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t26-main/src/ui/state/store';
+import { useToastStore } from '../t26-main/src/ui/state/toast-store';
+import { resetStore } from '../t26-main/src/ui/state/test-helpers';
+import { DEFAULT_CNC_MACHINE_CONFIG } from '../t26-main/src/core/scene/machine';
+
+type P = { x: number; y: number };
+type Seg = [P, P];
+const lines: string[] = [];
+const say = (s: string) => {
+  lines.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t27r/r27.log', lines.join('\n'));
+};
+beforeEach(() => resetStore());
+
+// Closed polygon as an imported SVG in scene mm, identity transform.
+function poly(id: string, op: string, rings: P[][]): ImportedSvg {
+  const xs = rings.flat().map((p) => p.x), ys = rings.flat().map((p) => p.y);
+  return {
+    kind: 'imported-svg', id, source: `${id}.svg`,
+    bounds: { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) },
+    transform: IDENTITY_TRANSFORM, operationIds: [op],
+    paths: [{ color: '#000000', polylines: rings.map((r) => ({ closed: true, points: [...r, r[0]!] })) }],
+  };
+}
+const sq = (x: number, y: number, s: number): P[] => [{ x, y }, { x: x + s, y }, { x: x + s, y: y + s }, { x, y: y + s }];
+// Ring drawn the other way round, to make sure winding does not decide the side.
+const sqRev = (x: number, y: number, s: number): P[] => sq(x, y, s).reverse();
+
+function op(id: string, mode: 'line' | 'fill', extra: Partial<Layer> = {}): Layer {
+  return { ...createLayer({ id, color: '#000000', name: id, mode }), power: 50, speed: 1000, passes: 1, ...extra } as Layer;
+}
+function proj(objects: SceneObject[], layers: Layer[]): Project {
+  const base = createProject();
+  return { ...base, device: { ...base.device, origin: 'rear-left' }, scene: { ...base.scene, objects, layers, groups: [] } };
+}
+
+// Own G-code decoder: segments burned while M3/M4 is on with S>0 under G1 (G2/G3 flagged).
+function decode(gcode: string): { segs: Seg[]; arcs: number } {
+  let x = 0, y = 0, s = 0, mode = 0, on = false, arcs = 0;
+  const segs: Seg[] = [];
+  for (const raw of gcode.split(/\r?\n/)) {
+    const l = raw.split(';')[0]!.toUpperCase();
+    const w = new Map<string, number>();
+    for (const m of l.matchAll(/([GMXYSF])(-?[0-9.]+)/g)) {
+      const k = m[1]!, v = Number(m[2]);
+      if (k === 'G') { if ([0, 1, 2, 3].includes(v)) mode = v; }
+      else if (k === 'M') { if (v === 3 || v === 4) on = true; if (v === 5) on = false; }
+      else w.set(k, v);
+    }
+    if (w.has('S')) s = w.get('S')!;
+    const nx = w.get('X') ?? x, ny = w.get('Y') ?? y;
+    if ((w.has('X') || w.has('Y')) && on && s > 0 && mode !== 0) {
+      if (mode !== 1) arcs++;
+      segs.push([{ x, y }, { x: nx, y: ny }]);
+    }
+    x = nx; y = ny;
+  }
+  return { segs, arcs };
+}
+
+async function generated(p: Project, sel: string[]): Promise<{ segs: Seg[]; toast: string }> {
+  useToastStore.setState({ toasts: [] } as never);
+  useStore.setState({ project: p, selectedObjectId: sel[0] ?? null, additionalSelectedIds: new Set(sel.slice(1)), undoStack: [], redoStack: [], dirty: false });
+  await useStore.getState().generatePathFromCut();
+  const toast = useToastStore.getState().toasts.map((t) => t.message).join(' | ');
+  const objs = useStore.getState().project.scene.objects;
+  if (objs.length === p.scene.objects.length) return { segs: [], toast };
+  const g = objs[objs.length - 1] as ImportedSvg;
+  const segs: Seg[] = [];
+  for (const path of g.paths) for (const pl of path.polylines) for (let i = 1; i < pl.points.length; i++) segs.push([pl.points[i - 1]!, pl.points[i]!]);
+  return { segs, toast };
+}
+
+function burned(p: Project, sel: string[]): Seg[] {
+  const prepared = prepareOutput(p, sel.length ? { outputScope: { cutSelectedGraphics: true, useSelectionOrigin: false, selectedObjectIds: sel } } : {});
+  if (!prepared.ok) throw new Error(prepared.preflight.issues.map((i) => i.message).join(' '));
+  return decode(emitPreparedGcode(prepared).gcode).segs;
+}
+
+const len = (ss: Seg[]) => ss.reduce((a, [p, q]) => a + Math.hypot(q.x - p.x, q.y - p.y), 0);
+function box(ss: Seg[]) {
+  const pts = ss.flat();
+  if (!pts.length) return 'empty';
+  const f = (n: number) => n.toFixed(3);
+  return `x ${f(Math.min(...pts.map((p) => p.x)))}..${f(Math.max(...pts.map((p) => p.x)))} y ${f(Math.min(...pts.map((p) => p.y)))}..${f(Math.max(...pts.map((p) => p.y)))}`;
+}
+// Segments within a window (to isolate the hole's burn from the plate's).
+const within = (ss: Seg[], x0: number, y0: number, x1: number, y1: number) =>
+  ss.filter(([p, q]) => [p, q].every((r) => r.x > x0 && r.x < x1 && r.y > y0 && r.y < y1));
+// Max distance from any vertex of a to the nearest segment of b, both ways.
+function haus(a: Seg[], b: Seg[]): number {
+  const d = (p: P, [u, v]: Seg) => {
+    const dx = v.x - u.x, dy = v.y - u.y, l2 = dx * dx + dy * dy;
+    const t = l2 ? Math.max(0, Math.min(1, ((p.x - u.x) * dx + (p.y - u.y) * dy) / l2)) : 0;
+    return Math.hypot(p.x - u.x - t * dx, p.y - u.y - t * dy);
+  };
+  const one = (x: Seg[], y: Seg[]) => Math.max(0, ...x.flat().map((p) => Math.min(...y.map((s) => d(p, s)))));
+  if (!a.length || !b.length) return NaN;
+  return Math.max(one(a, b), one(b, a));
+}
+
+async function row(name: string, p: Project, sel: string[], expect: string, win?: [number, number, number, number]) {
+  const g = await generated(p, sel);
+  let b: Seg[] = [];
+  let err = '';
+  try { b = burned(p, sel); } catch (e) { err = String(e); }
+  const gw = win ? within(g.segs, ...win) : g.segs;
+  const bw = win ? within(b, ...win) : b;
+  say(`${name}\n  sel=[${sel.join(',')}] expect: ${expect}\n  GEN  len ${len(gw).toFixed(3)} ${box(gw)}\n  BURN len ${len(bw).toFixed(3)} ${box(bw)} ${err}\n  hausdorff ${haus(gw, bw).toFixed(3)}  toast: ${g.toast}`);
+}
+
+const K = { kerfOffsetMm: 0.5 };
+const LEADS = { leadInEnabled: true, leadOutEnabled: false, leadStyle: 'line', leadLengthMm: 2, leadAngleDeg: 90, leadSide: 'auto' } as Partial<Layer>;
+
+it('R1 kerf: plate + hole on one Line operation (hole drawn reversed)', async () => {
+  const p = proj([poly('plate', 'A', [sq(40, 40, 40)]), poly('hole', 'A', [sqRev(55, 55, 10)])], [op('A', 'line', K)]);
+  await row('R1a hole only', p, ['hole'], 'hole cut 9x9 at 55.5..64.5, len 36');
+  await row('R1b plate only', p, ['plate'], 'plate 41x41 at 39.5..80.5, len 164');
+  await row('R1c both (hole window)', p, ['plate', 'hole'], 'hole 9x9', [50, 50, 70, 70]);
+  await row('R1d nothing selected (hole window)', p, [], 'hole 9x9', [50, 50, 70, 70]);
+});
+
+it('R2 kerf: hole on its own Line op, plate op has kerf', async () => {
+  const p = proj([poly('plate', 'A', [sq(40, 40, 40)]), poly('hole', 'B', [sq(55, 55, 10)])], [op('A', 'line', K), op('B', 'line', K)]);
+  await row('R2a hole only', p, ['hole'], 'hole 9x9');
+});
+
+it('R3 boundary: plate op has no kerf/leads/tabs (Amd 3 decision 3)', async () => {
+  const p = proj([poly('plate', 'A', [sq(40, 40, 40)]), poly('hole', 'B', [sq(55, 55, 10)])], [op('A', 'line'), op('B', 'line', K)]);
+  await row('R3a hole only, plate op plain', p, ['hole'], 'hole taken as outline by design: 11x11 in both');
+});
+
+it('R4 compound object: letter-like ring (outer + counter in one object) inside a plate', async () => {
+  // Stencil "O": the letter is a hole in the plate, its counter an island.
+  const p = proj([poly('plate', 'A', [sq(40, 40, 40)]), poly('letterO', 'A', [sq(50, 50, 20), sqRev(56, 56, 8)])], [op('A', 'line', K)]);
+  await row('R4a letter only', p, ['letterO'], 'letter outer = hole 19x19 at 50.5..69.5; counter = island 9x9 at 55.5..64.5');
+  await row('R4b both (letter window)', p, ['plate', 'letterO'], 'same as R4a', [45, 45, 75, 75]);
+});
+
+it('R5 compound object: plate with its hole in one object', async () => {
+  const p = proj([poly('platehole', 'A', [sq(40, 40, 40), sqRev(55, 55, 10)])], [op('A', 'line', K)]);
+  await row('R5 compound selected', p, ['platehole'], 'hole 9x9 (no trigger: one object)', [50, 50, 70, 70]);
+});
+
+it('R6 nested island: plate > hole > island, three objects', async () => {
+  const p = proj(
+    [poly('plate', 'A', [sq(20, 20, 80)]), poly('hole', 'A', [sq(40, 40, 40)]), poly('island', 'A', [sq(55, 55, 10)])],
+    [op('A', 'line', K)],
+  );
+  await row('R6a island only', p, ['island'], 'island is depth 2 = part: 11x11 (outline either way)');
+  await row('R6b hole only', p, ['hole'], 'hole 39x39 at 40.5..79.5');
+  await row('R6c hole+island (hole window)', p, ['hole', 'island'], 'hole 39x39, island 11x11', [30, 30, 90, 90]);
+  await row('R6d hole+island (island window)', p, ['hole', 'island'], 'island 11x11', [50, 50, 70, 70]);
+});
+
+it('R7 leads alone, no kerf', async () => {
+  const p = proj([poly('plate', 'A', [sq(40, 40, 40)]), poly('hole', 'A', [sq(55, 55, 10)])], [op('A', 'line', LEADS)]);
+  await row('R7a hole only', p, ['hole'], 'lead inside the hole: everything within 55..65', [50, 50, 70, 70]);
+  await row('R7b both', p, ['plate', 'hole'], 'lead inside the hole', [50, 50, 70, 70]);
+});
+
+it('R8 Fill: plate + hole on one Fill operation', async () => {
+  const F = { hatchSpacingMm: 1, hatchAngleDeg: 0 } as Partial<Layer>;
+  const p = proj([poly('plate', 'A', [sq(40, 40, 40)]), poly('hole', 'A', [sq(55, 55, 10)])], [op('A', 'fill', F)]);
+  await row('R8a hole only', p, ['hole'], 'fill inside the hole only (scoped both ways)');
+  await row('R8b plate only', p, ['plate'], 'fill the whole plate (hole is not part of scope)');
+  await row('R8c both', p, ['plate', 'hole'], 'plate minus hole');
+});
+
+it('R9 Fill+kerf? Fill operation with kerf offset set, hole only', async () => {
+  const F = { hatchSpacingMm: 1, hatchAngleDeg: 0, kerfOffsetMm: 0.5 } as Partial<Layer>;
+  const p = proj([poly('plate', 'A', [sq(40, 40, 40)]), poly('hole', 'A', [sq(55, 55, 10)])], [op('A', 'fill', F)]);
+  await row('R9a hole only', p, ['hole'], 'whatever Start does');
+});
+
+it('R10 multi-pass and CNC re-check', async () => {
+  const p = proj([poly('a', 'A', [sq(40, 40, 10)])], [op('A', 'line', { passes: 3 })]);
+  await row('R10a passes 3', p, ['a'], 'G-code len 120; generated?');
+  const g = await generated(p, ['a']);
+  const obj = useStore.getState().project.scene.objects.at(-1) as ImportedSvg;
+  say(`  R10a polylines=${obj.paths.reduce((n, q) => n + q.polylines.length, 0)} toast=${g.toast}`);
+  const base = proj([poly('a', 'A', [sq(40, 40, 10)])], [op('A', 'line')]);
+  const cnc = { ...base, machine: DEFAULT_CNC_MACHINE_CONFIG } as Project;
+  const c = await generated(cnc, ['a']);
+  say(`R10b CNC naive machine flag: toast=${c.toast} segs=${c.segs.length}`);
+});
+
+it('R11 leads, no hole: outer part with unselected neighbours 1 mm away (ADR-626 Amd 10)', async () => {
+  const L = { ...LEADS, leadSide: 'auto', leadLengthMm: 2 } as Partial<Layer>;
+  const objs = [
+    poly('a', 'A', [sq(50, 50, 10)]),
+    poly('n1', 'A', [[{ x: 30, y: 30 }, { x: 80, y: 30 }, { x: 80, y: 49 }, { x: 30, y: 49 }]]),
+    poly('n2', 'A', [[{ x: 30, y: 61 }, { x: 80, y: 61 }, { x: 80, y: 80 }, { x: 30, y: 80 }]]),
+    poly('n3', 'A', [[{ x: 30, y: 50 }, { x: 49, y: 50 }, { x: 49, y: 60 }, { x: 30, y: 60 }]]),
+    poly('n4', 'A', [[{ x: 61, y: 50 }, { x: 80, y: 50 }, { x: 80, y: 60 }, { x: 61, y: 60 }]]),
+  ];
+  const p = proj(objs, [op('A', 'line', L)]);
+  await row('R11a a only (window 48..62)', p, ['a'], 'lead must not reach a neighbour (stay within 49..61)', [45, 45, 65, 65]);
+  await row('R11b all (window 48..62)', p, [], 'same', [48.5, 48.5, 61.5, 61.5]);
+});

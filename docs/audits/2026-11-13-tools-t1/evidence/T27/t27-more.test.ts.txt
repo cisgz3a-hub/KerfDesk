@@ -1,0 +1,152 @@
+// @vitest-environment jsdom
+// T27 more: reopen, registration jig, CNC message, fill on selected hole, variable text with the real renderer.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type TextObject,
+  type Transform,
+} from '../t26-main/src/core/scene';
+import { DEFAULT_CNC_MACHINE_CONFIG } from '../t26-main/src/core/scene/machine';
+import { DEFAULT_PROJECT_VARIABLE_DATA } from '../t26-main/src/core/scene/variable-template';
+import { createRectangle } from '../t26-main/src/core/shapes/primitives/create-rectangle';
+import { prepareOutput } from '../t26-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t26-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t26-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t26-main/src/io/project/deserialize-project';
+import { useStore } from '../t26-main/src/ui/state/store';
+import { useToastStore } from '../t26-main/src/ui/state/toast-store';
+import { resetStore } from '../t26-main/src/ui/state/test-helpers';
+import { litMoves, totalLen, type LitMove } from './decode';
+
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t27/t27-more.log', log.join('\n'));
+};
+beforeEach(() => resetStore());
+const st = () => useStore.getState();
+const f3 = (n: number) => n.toFixed(3);
+const toasts = () => useToastStore.getState().toasts.map((t) => `[${t.variant}] ${t.message}`).join(' | ');
+
+function layer(mode: 'line' | 'fill', extra: Partial<Layer> = {}, id = 'L', color = '#000000'): Layer {
+  return {
+    ...createLayer({ id, color, name: id, mode }),
+    speed: mode === 'line' ? 1200 : 3000,
+    power: 40,
+    passes: 1,
+    ...(mode === 'fill' ? { hatchSpacingMm: 0.5, hatchAngleDeg: 0 } : {}),
+    ...extra,
+  } as Layer;
+}
+function project(objects: SceneObject[], layers: Layer[]): Project {
+  const base = createProject();
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers, groups: [] } };
+}
+const at = (x: number, y: number): Transform => ({ ...IDENTITY_TRANSFORM, x, y });
+const rect = (id: string, w: number, h: number, t: Transform, color = '#000000') =>
+  createRectangle({ id, color, spec: { widthMm: w, heightMm: h, cornerRadiusMm: 0 }, transform: t });
+
+function genLen(o: ImportedSvg | undefined): number {
+  let s = 0;
+  for (const p of o?.paths ?? []) for (const pl of p.polylines) for (let i = 1; i < pl.points.length; i++) s += Math.hypot(pl.points[i]!.x - pl.points[i - 1]!.x, pl.points[i]!.y - pl.points[i - 1]!.y);
+  return s;
+}
+function burn(p: Project, sel: string[]): LitMove[] {
+  const prepared = prepareOutput(p, sel.length === 0 ? {} : { outputScope: { cutSelectedGraphics: true, useSelectionOrigin: false, selectedObjectIds: sel } });
+  if (!prepared.ok) throw new Error(JSON.stringify(prepared.preflight).slice(0, 300));
+  return litMoves(emitPreparedGcode(prepared).gcode, p.device);
+}
+async function gen(p: Project, sel: string[]): Promise<ImportedSvg | undefined> {
+  useToastStore.setState({ toasts: [] } as never);
+  useStore.setState({ project: p, selectedObjectId: sel[0] ?? null, additionalSelectedIds: new Set(sel.slice(1)), undoStack: [], redoStack: [] });
+  await st().generatePathFromCut();
+  const objs = st().project.scene.objects;
+  return objs.length > p.scene.objects.length ? (objs.at(-1) as ImportedSvg) : undefined;
+}
+
+it('reopen keeps the generated object unbound', async () => {
+  const p = project([rect('sq', 10, 10, at(50, 50))], [layer('line', { kerfOffsetMm: 0.25 })]);
+  const g = await gen(p, ['sq']);
+  const r = deserializeProject(serializeProject(st().project));
+  if (r.kind !== 'ok') { out(`reopen failed ${JSON.stringify(r)}`); return; }
+  const ro = r.project.scene.objects.find((o) => o.id === g!.id) as ImportedSvg;
+  out(`reopen: opIds=${JSON.stringify(ro.operationIds)} paths=${ro.paths.length} len=${f3(genLen(ro))} (before ${f3(genLen(g))})`);
+  out(`reopen: full output lit len=${f3(totalLen(burn(r.project, [])))} vs source-only ${f3(totalLen(burn(p, [])))}`);
+  try { out(`reopen: output generated only: lit=${burn(r.project, [g!.id]).length}`); } catch (e) { out(`reopen: output generated only refused: ${String(e).slice(0, 200)}`); }
+  // Move the generated object onto a layer by the same colour? Change layer colour -> does it bind?
+});
+
+it('registration jig', async () => {
+  const p = project([rect('art', 20, 10, at(150, 150))], [layer('line', { kerfOffsetMm: 0.2 })]);
+  useStore.setState({ project: p, selectedObjectId: null, additionalSelectedIds: new Set() });
+  st().addRegistrationBox(60, 40);
+  const withJig = st().project;
+  out(`jig: objects=${withJig.scene.objects.map((o) => `${o.id}:${o.kind}`).join(',')} layers=${withJig.scene.layers.map((l) => `${l.id}/${l.output}`).join(',')}`);
+  const g = await gen(withJig, []);
+  const gc = burn(withJig, []);
+  out(`jig nothing selected: gen len=${f3(genLen(g))} gcode lit len=${f3(totalLen(gc))}; toast ${toasts()}`);
+  const g2 = await gen(withJig, ['art']);
+  const gc2 = burn(withJig, ['art']);
+  out(`jig art selected: gen len=${f3(genLen(g2))} gcode lit len=${f3(totalLen(gc2))}; jig objects after=${st().project.scene.objects.length} (before ${withJig.scene.objects.length + 1} expected)`);
+  const jigIds = withJig.scene.objects.filter((o) => o.id !== 'art').map((o) => o.id);
+  const g3 = await gen(withJig, jigIds);
+  let gc3 = 'n/a';
+  try { gc3 = f3(totalLen(burn(withJig, jigIds))); } catch (e) { gc3 = String(e).slice(0, 120); }
+  out(`jig box selected: gen len=${f3(genLen(g3))} gcode ${gc3}; toast ${toasts()}`);
+});
+
+it('CNC project message', async () => {
+  const base = project([rect('sq', 10, 10, at(50, 50))], [layer('line')]);
+  const p = { ...base, machine: DEFAULT_CNC_MACHINE_CONFIG } as Project;
+  const g = await gen(p, ['sq']);
+  out(`cnc: generated=${g !== undefined}; toast ${toasts()}`);
+});
+
+it('fill: selected hole alone vs Cut Selected', async () => {
+  const outer = rect('outer', 30, 30, at(100, 100));
+  const inner = rect('inner', 10, 10, at(110, 110));
+  const p = project([outer, inner], [layer('fill')]);
+  const g = await gen(p, ['outer']);
+  out(`fill outer only: gen len=${f3(genLen(g))} gcode=${f3(totalLen(burn(p, ['outer'])))}`);
+  const g2 = await gen(p, ['inner']);
+  out(`fill inner only: gen len=${f3(genLen(g2))} gcode=${f3(totalLen(burn(p, ['inner'])))}`);
+});
+
+it('kerf hole, two operations: hole on one op, outer on another', async () => {
+  const outer = rect('outer', 30, 30, at(100, 100), '#ff0000');
+  const inner = rect('inner', 10, 10, at(110, 110));
+  const p = project([outer, inner], [layer('line', { kerfOffsetMm: 0.5 }), layer('line', { kerfOffsetMm: 0.5 }, 'R', '#ff0000')]);
+  const g = await gen(p, ['inner']);
+  const gc = burn(p, ['inner']);
+  const gcAll = burn(p, []);
+  out(`two-op hole: gen len=${f3(genLen(g))} cut-selected gcode=${f3(totalLen(gc))} full gcode=${f3(totalLen(gcAll))}`);
+});
+
+it('variable text with the real renderer', async () => {
+  const base = rect('t', 10, 10, at(50, 50));
+  const text: TextObject = {
+    ...(base as unknown as ImportedSvg),
+    kind: 'text',
+    content: '{{serial:4}}',
+    color: '#000000',
+    fontKey: 'roboto-regular',
+    sizeMm: 10,
+    alignment: 'left',
+    lineHeight: 1,
+    letterSpacing: 0,
+    variableTemplate: { tokens: [{ kind: 'serial', prefix: '', width: 4 }] },
+  } as unknown as TextObject;
+  const p0 = project([text], [layer('line')]);
+  const p = { ...p0, variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 17 } } as Project;
+  const g = await gen(p, ['t']);
+  const src = st().project.scene.objects.find((o) => o.id === 't') as TextObject;
+  out(`vartext: generated=${g !== undefined} paths=${g?.paths.reduce((a, x) => a + x.polylines.length, 0)} len=${f3(genLen(g))}; source content still "${src.content}" template=${src.variableTemplate !== undefined}; toast ${toasts()}`);
+});
