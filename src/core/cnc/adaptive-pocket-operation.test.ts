@@ -5,7 +5,9 @@ import { findPlungedTravelIssues } from '../invariants';
 import type { CncGroup } from '../job';
 import { cncGrblStrategy } from '../output';
 import { DEFAULT_CNC_LAYER_SETTINGS, type CncTool, type Polyline, type Vec2 } from '../scene';
+import { planAdaptivePocket } from './adaptive-pocket';
 import { adaptivePocketPasses, resolveAdaptivePocketOperation } from './adaptive-pocket-operation';
+import { ADAPTIVE_SLOT_REFUSAL } from './cnc-strategy-fallback-notice';
 
 const TOOL: CncTool = { id: 'em4', name: '4 mm end mill', kind: 'end-mill', diameterMm: 4 };
 
@@ -42,9 +44,25 @@ describe('adaptivePocketPasses', () => {
       pocketStrategy: 'adaptive' as const,
       adaptiveOptimalLoadMm: 2,
     };
-    const operation = resolveAdaptivePocketOperation([pocket], settings, TOOL);
-    expect(operation.kind).toBe('ok');
-    if (operation.kind !== 'ok') return;
+    // ADR-154 Amendment 7: at 50 % the shared outer rings run round the second
+    // arm before it is opened, a full-width slot, so the operation is refused.
+    // The emission of a two-branch plan is still checked on the plan itself.
+    expect(resolveAdaptivePocketOperation([pocket], settings, TOOL)).toEqual({
+      kind: 'error',
+      reason: ADAPTIVE_SLOT_REFUSAL,
+    });
+    const plan = planAdaptivePocket([pocket], TOOL.diameterMm, 2);
+    if (!plan.ok) throw new Error(plan.reason);
+    const operation = {
+      kind: 'ok' as const,
+      plan,
+      verification: {
+        ok: true as const,
+        coverageRatio: 1,
+        gridMm: 0.25,
+        maxSimulatedEngagementMm: 0,
+      },
+    };
     expect(operation.plan.sequences).toHaveLength(2);
 
     const passes = adaptivePocketPasses(operation, [-1]);

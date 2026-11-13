@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { ciBudgetMs } from '../../__fixtures__/ci-budget';
 import type { Polyline } from '../scene';
 import { planAdaptivePocket, type AdaptivePocketPlan } from './adaptive-pocket';
+import { adaptivePocketContainmentIssue } from './adaptive-pocket-containment';
 import { verifyAdaptivePocket } from './adaptive-pocket-verifier';
+import { ADAPTIVE_SLOT_REFUSAL } from './cnc-strategy-fallback-notice';
 
 function square(x: number, y: number, size: number): Polyline {
   return rectangle(x, y, size, size);
@@ -215,13 +217,19 @@ describe('verifyAdaptivePocket', () => {
     });
   });
 
-  it('verifies the split U-pocket plan without cutting across its kept-material notch', () => {
+  it('splits the U-pocket plan without cutting across its kept-material notch', () => {
     const contours = [uPocket()];
     const plan = planAdaptivePocket(contours, 4, 2);
     expect(plan).toMatchObject({ ok: true, sequences: expect.any(Array) });
     if (!plan.ok) return;
     expect(plan.sequences).toHaveLength(2);
-    expect(verifyAdaptivePocket(contours, 4, plan)).toMatchObject({ ok: true });
+    expect(adaptivePocketContainmentIssue(contours, 2, plan)).toBeNull();
+    // ADR-154 Amendment 7: the shared outer rings run round the second arm
+    // before it is opened, a full-width slot, which 50 % no longer admits.
+    expect(verifyAdaptivePocket(contours, 4, plan)).toMatchObject({
+      ok: false,
+      reason: ADAPTIVE_SLOT_REFUSAL,
+    });
   });
 
   it('rejects the historical U-pocket connector through kept material', () => {
@@ -321,8 +329,10 @@ describe('verifyAdaptivePocket', () => {
   );
 
   it('uses the canonical union boundary for edge-touching contours', () => {
-    const splitContours = [rectangle(0, 0, 20, 20), rectangle(20, 0, 20, 20)];
-    const wholeContour = [rectangle(0, 0, 40, 20)];
+    // 40 x 40 rather than 40 x 20: one entry opens a 40 x 20 pocket only by a
+    // full-width slot, which 50 % no longer admits (ADR-154 Amendment 7).
+    const splitContours = [rectangle(0, 0, 20, 40), rectangle(20, 0, 20, 40)];
+    const wholeContour = [rectangle(0, 0, 40, 40)];
     const splitPlan = planAdaptivePocket(splitContours, 4, 2);
     const wholePlan = planAdaptivePocket(wholeContour, 4, 2);
     expect(splitPlan).toMatchObject({ ok: true, sequences: expect.any(Array) });

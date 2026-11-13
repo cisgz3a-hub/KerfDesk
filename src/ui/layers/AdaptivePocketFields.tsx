@@ -26,7 +26,7 @@ export function AdaptivePocketFields(props: {
         min={0.05}
         max={diameterMm / 2}
         step={0.05}
-        title="Compile-time geometric radial-engagement limit for adaptive roughing. KerfDesk does not measure live cutting force or spindle/axis load and does not change feed automatically."
+        title="Compile-time geometric radial-engagement limit for adaptive roughing. KerfDesk does not measure live cutting force or spindle/axis load and does not change feed automatically. Whatever its value, the clearing rings never cut a full-width slot at the cutting feed: a plan that would cuts offset rings instead."
         onCommit={(adaptiveOptimalLoadMm) => props.onCommit({ adaptiveOptimalLoadMm })}
       />
       <p role="note" style={feedbackBoundaryStyle}>
