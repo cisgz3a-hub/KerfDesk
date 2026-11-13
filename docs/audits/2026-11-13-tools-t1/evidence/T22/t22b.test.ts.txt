@@ -1,0 +1,47 @@
+// T22b: investigate the 635 DPI interior miss (case 17) — luma vs compiled G-code.
+import { describe, it, vi } from 'vitest';
+import { type RasterImage, type SceneObject } from '../t22-main/src/core/scene';
+import { useStore } from '../t22-main/src/ui/state';
+import { resetStore } from '../t22-main/src/ui/state/test-helpers';
+import { convertSelectedVectorsToBitmap } from '../t22-main/src/ui/commands/bitmap-conversion';
+import type { ConvertibleVector } from '../t22-main/src/ui/raster/vector-to-bitmap';
+import { burnedSegments, circle, fillLayer, gcodeOf, logger, mkObj, project, rect } from './t22-common';
+
+vi.mock('../t22-main/src/ui/raster/convert-bitmap-worker-client', async () => {
+  const asm = await import('../t22-main/src/ui/raster/bitmap-assembly');
+  const lb = await import('../t22-main/src/ui/raster/luma-bitmap');
+  return {
+    convertBitmapInWorker: (objects: never, options: never, id: string) =>
+      Promise.resolve(asm.assembleBitmap(objects, (r) => ({ dataUrl: 'data:image/png;base64,iVBORw0KGgo=', lumaBase64: lb.lumaToBase64(r.luma) }), id, options)),
+  };
+});
+const log = logger('C:/Users/stolk/kd-t1/zz-t22/t22b.log');
+
+async function conv(objects: SceneObject[], dpi: number, brightness: number) {
+  const layers = [fillLayer('F', '#000000')];
+  resetStore();
+  useStore.setState({ project: project(objects, layers), selectedObjectId: objects[0]!.id });
+  await convertSelectedVectorsToBitmap(objects as unknown as ConvertibleVector[], layers, { renderType: 'fill-all', dpi, brightnessPercent: brightness }, useStore.getState().convertToBitmap, () => {});
+  return useStore.getState().project;
+}
+
+describe('T22b', () => {
+  it('635 dpi row detail', async () => {
+    const sq = rect(10.03, 10.07, 17.34, 17.38);
+    const obj = mkObj('a', 'shape', [{ contours: [sq, circle(13.6, 13.7, 2)] }], undefined, ['F']);
+    const p = await conv([obj], 635, 0);
+    const img = p.scene.objects[0] as RasterImage;
+    const luma = Buffer.from(img.lumaBase64!, 'base64');
+    // pixel row covering y=14.025
+    const row = Math.floor((14.025 - img.bounds.minY) / ((img.bounds.maxY - img.bounds.minY) / img.pixelHeight));
+    const line = Array.from(luma.subarray(row * img.pixelWidth, (row + 1) * img.pixelWidth)).map((v) => (v < 128 ? '#' : '.')).join('');
+    log(`row ${row} luma: ${line}`);
+    const g = gcodeOf(p);
+    const segs = burnedSegments(g).filter((s) => Math.abs(s.a.y - 14.025) < 0.06 || Math.abs(s.b.y - 14.025) < 0.06);
+    log(`segs near y=14.025: ${JSON.stringify(segs.map((s) => [s.a.x, s.a.y, s.b.x, s.b.y, s.s]))}`);
+    const lines = g.split('\n');
+    const idx = lines.findIndex((l) => /Y\d/.test(l) && Math.abs(300 - Number((l.match(/Y(-?[\d.]+)/) ?? [])[1]) - 14.0) < 0.1);
+    log(`gcode around: \n${lines.slice(Math.max(0, idx - 5), idx + 25).join('\n')}`);
+    log(`header:\n${lines.slice(0, 25).join('\n')}`);
+  });
+});

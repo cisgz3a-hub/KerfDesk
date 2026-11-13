@@ -56,11 +56,11 @@ Run order puts tools that make or change burns first, then new tools, then the r
 | T15 | Image | Photo Engraving | `tools.photo-engraving` | ledgered: P2 2 (fixed by #1860), P3 3 |
 | T16 | Image | Apply Mask to Image | `tools.apply-image-mask` | ledgered: P2 3 (fixed by #1867), P3 3 |
 | T17 | Image | Crop Image | `tools.crop-image` | ledgered: P2 2 (fixed by #1867), P3 2 (known 3) |
-| T18 | Image | Flatten Image Mask | `tools.flatten-image-mask` | ledgered: P2 1 (fix #1865), P3 4 (known 9) |
+| T18 | Image | Flatten Image Mask | `tools.flatten-image-mask` | ledgered: P2 1 (fixed by #1865), P3 4 (known 9) |
 | T19 | Image | Remove Image Mask | `tools.remove-image-mask` | ledgered: P3 3 (known 2) |
 | T20 | Image | Save Processed Bitmap | `tools.save-processed-bitmap` | ledgered: P3 3 (known 1) |
 | T21 | Image | Save Original Image | `tools.save-original-image` | ledgered: P2 2 (fix #1868), P3 4 (known 2) |
-| T22 | Bitmap | Convert to Bitmap | `tools.convert-to-bitmap` | |
+| T22 | Bitmap | Convert to Bitmap | `tools.convert-to-bitmap` | ledgered: P3 6 (known 1) |
 | T23 | Trace | Trace Image | `tools.trace-image` | |
 | T24 | Trace | Re-trace Original | `tools.retrace-original` | |
 | T25 | Trace | Multi-File Trace | `tools.multi-file-trace` | |

@@ -1,0 +1,167 @@
+// T22a: Convert to Bitmap burn region vs independent oracle and vs the same objects' Fill.
+// Real path: convertSelectedVectorsToBitmap -> store.convertToBitmap -> prepareOutput -> G-code.
+// Only the Web Worker transport is replaced by the same assembleBitmap call the worker runs.
+import { describe, it, vi } from 'vitest';
+import {
+  IDENTITY_TRANSFORM,
+  type Layer,
+  type RasterImage,
+  type SceneObject,
+  type Transform,
+} from '../t22-main/src/core/scene';
+import { useStore } from '../t22-main/src/ui/state';
+import { resetStore } from '../t22-main/src/ui/state/test-helpers';
+import { convertSelectedVectorsToBitmap } from '../t22-main/src/ui/commands/bitmap-conversion';
+import type { ConvertibleVector } from '../t22-main/src/ui/raster/vector-to-bitmap';
+import {
+  burnedSegments, circle, compare, gcodeOf, insideAll, logger, mkObj, project, rect, rectCW, segBounds, star, xf,
+  fillLayer, lineLayer, type OracleObj, type P, type PathSpec,
+} from './t22-common';
+
+vi.mock('../t22-main/src/ui/raster/convert-bitmap-worker-client', async () => {
+  const asm = await import('../t22-main/src/ui/raster/bitmap-assembly');
+  const lb = await import('../t22-main/src/ui/raster/luma-bitmap');
+  return {
+    convertBitmapInWorker: (objects: never, options: never, id: string) =>
+      Promise.resolve(
+        asm.assembleBitmap(objects, (r) => ({ dataUrl: 'data:image/png;base64,iVBORw0KGgo=', lumaBase64: lb.lumaToBase64(r.luma) }), id, options),
+      ),
+  };
+});
+
+const log = logger('C:/Users/stolk/kd-t1/zz-t22/t22a.log');
+const T = (t: Partial<Transform>): Transform => ({ ...IDENTITY_TRANSFORM, ...t });
+
+type Case = {
+  name: string;
+  objs: { id: string; kind: 'shape' | 'imported-svg' | 'text'; paths: PathSpec[]; t?: Transform; ops?: string[] }[];
+  layers?: Layer[];
+  renderType?: 'fill-all' | 'outlines' | 'use-cut-settings';
+  dpi?: number;
+  combine?: 'evenodd' | 'union';
+  fillCombine?: 'evenodd' | 'union';
+};
+
+function oracleObjs(c: Case): { objs: OracleObj[]; edges: P[][] } {
+  const edges: P[][] = [];
+  const objs = c.objs.map((o) => ({
+    paths: o.paths
+      .filter((p) => p.closed !== false)
+      .map((p) => {
+        const contours = p.contours.map((cc) => cc.map((q) => xf(q, o.t ?? IDENTITY_TRANSFORM)));
+        edges.push(...contours);
+        return { contours, rule: p.fillRule ?? (o.kind === 'text' ? 'nonzero' : 'evenodd') } as const;
+      }),
+  }));
+  return { objs, edges };
+}
+
+async function runCase(c: Case) {
+  const layers = c.layers ?? [fillLayer('F', '#000000')];
+  const objects: SceneObject[] = c.objs.map((o) => mkObj(o.id, o.kind, o.paths, o.t, o.ops ?? [layers[0]!.id]));
+  // Fill burn of the originals.
+  const fillG = gcodeOf(project(objects, layers));
+  const fillSegs = burnedSegments(fillG);
+  // Convert.
+  resetStore();
+  useStore.setState({ project: project(objects, layers), selectedObjectId: objects[0]!.id });
+  const toasts: string[] = [];
+  const outcome = await convertSelectedVectorsToBitmap(
+    objects as unknown as ConvertibleVector[],
+    layers,
+    { renderType: c.renderType ?? 'fill-all', dpi: c.dpi ?? 254, brightnessPercent: 0 },
+    useStore.getState().convertToBitmap,
+    (m) => toasts.push(m),
+  );
+  const st = useStore.getState();
+  const img = st.project.scene.objects.find((o) => o.kind === 'raster-image') as RasterImage | undefined;
+  const imgLayer = st.project.scene.layers.find((l) => l.mode === 'image');
+  log(`\n## ${c.name}\n  outcome ${JSON.stringify(outcome)} toasts ${JSON.stringify(toasts)}`);
+  if (!img || !imgLayer) { log('  NO IMAGE'); return; }
+  log(`  image ${img.pixelWidth}x${img.pixelHeight}px bounds ${JSON.stringify(img.bounds)} linesPerMm ${img.linesPerMm}; layer ${imgLayer.name} power ${imgLayer.power} speed ${imgLayer.speed} lpm ${imgLayer.linesPerMm} dither ${imgLayer.ditherAlgorithm} objects ${st.project.scene.objects.length} layers ${st.project.scene.layers.map((l) => `${l.name}:${l.mode}`).join(',')}`);
+  const g = gcodeOf(st.project);
+  if (g.startsWith('NOT OK')) { log('  ' + g); return; }
+  const segs = burnedSegments(g);
+  const { objs, edges } = oracleObjs(c);
+  const all = edges.flat();
+  const region = {
+    x0: Math.floor(Math.min(...all.map((p) => p.x))) - 2, y0: Math.floor(Math.min(...all.map((p) => p.y))) - 2,
+    x1: Math.ceil(Math.max(...all.map((p) => p.x))) + 2, y1: Math.ceil(Math.max(...all.map((p) => p.y))) + 2,
+  };
+  const pitch = 1 / (imgLayer.linesPerMm ?? 10);
+  const bmp = compare(segs, pitch, (p) => insideAll(p, objs, c.combine ?? 'evenodd'), edges, region);
+  log(`  bitmap segs ${segs.length} burnBounds ${JSON.stringify(segBounds(segs))}`);
+  log(`  bitmap vs oracle(${c.combine ?? 'evenodd'} across objects) ${JSON.stringify(bmp)}`);
+  if (!fillG.startsWith('NOT OK')) {
+    const fill = compare(fillSegs, 0.1, (p) => insideAll(p, objs, c.fillCombine ?? c.combine ?? 'evenodd'), edges, region);
+    log(`  Fill    vs oracle(${c.fillCombine ?? c.combine ?? 'evenodd'}) ${JSON.stringify(fill)}`);
+  } else log('  Fill: ' + fillG.slice(0, 300));
+  // Undo / redo
+  st.undo();
+  const u = useStore.getState().project.scene;
+  log(`  undo: objects ${u.objects.map((o) => o.id).join(',')} same refs ${objects.every((o) => u.objects.includes(o))} layers ${u.layers.map((l) => l.id).join(',')}`);
+  useStore.getState().redo();
+  const r = useStore.getState().project.scene;
+  log(`  redo: objects ${r.objects.map((o) => o.kind).join(',')} layers ${r.layers.map((l) => l.mode).join(',')}`);
+}
+
+const sq = (x: number, y: number, s: number) => rect(x, y, x + s, y + s);
+
+const cases: Case[] = [
+  { name: '01 rect 20x10', objs: [{ id: 'a', kind: 'shape', paths: [{ contours: [rect(10, 10, 30, 20)] }] }] },
+  { name: '02 square with circular hole (one path)', objs: [{ id: 'a', kind: 'shape', paths: [{ contours: [sq(10, 10, 20), circle(20, 20, 5)] }] }] },
+  {
+    name: '03 two overlapping paths in one SVG object (evenodd each) -> union',
+    objs: [{ id: 'a', kind: 'imported-svg', paths: [{ contours: [sq(10, 10, 20)], fillRule: 'evenodd' }, { contours: [sq(20, 10, 20)], fillRule: 'evenodd' }] }],
+  },
+  { name: '04 pentagram SVG fill-rule nonzero', objs: [{ id: 'a', kind: 'imported-svg', paths: [{ contours: [star(20, 20, 10)], fillRule: 'nonzero' }] }] },
+  { name: '05 pentagram shape (no rule -> evenodd)', objs: [{ id: 'a', kind: 'shape', paths: [{ contours: [star(20, 20, 10)] }] }] },
+  {
+    name: '06 text, two overlapping glyph contours in one path (nonzero)',
+    objs: [{ id: 'a', kind: 'text', paths: [{ contours: [rect(10, 10, 22, 20), rect(18, 10, 30, 20)] }] }],
+  },
+  {
+    name: '07 text, unwelded: two glyph paths overlapping, inner counter in 2nd (nonzero per path, union)',
+    objs: [{ id: 'a', kind: 'text', paths: [{ contours: [rect(10, 10, 22, 20)] }, { contours: [rect(18, 10, 30, 20), rectCW(24, 13, 27, 17)] }] }],
+  },
+  {
+    name: '08 nested: small square object inside big square object, same Fill layer (evenodd across objects)',
+    objs: [
+      { id: 'a', kind: 'shape', paths: [{ contours: [sq(10, 10, 20)] }] },
+      { id: 'b', kind: 'shape', paths: [{ contours: [sq(15, 15, 10)] }] },
+    ],
+  },
+  {
+    name: '09 nested objects on DIFFERENT Fill layers: Fill burns union, Fill All bitmap?',
+    layers: [fillLayer('F', '#000000'), fillLayer('G', '#ff0000')],
+    objs: [
+      { id: 'a', kind: 'shape', paths: [{ contours: [sq(10, 10, 20)] }], ops: ['F'] },
+      { id: 'b', kind: 'shape', paths: [{ contours: [sq(15, 15, 10)], color: '#ff0000' }], ops: ['G'] },
+    ],
+    combine: 'evenodd',
+    fillCombine: 'union',
+  },
+  {
+    name: '09b same, Use Cut Settings (independent operations should both paint)',
+    layers: [fillLayer('F', '#000000'), fillLayer('G', '#ff0000')],
+    objs: [
+      { id: 'a', kind: 'shape', paths: [{ contours: [sq(10, 10, 20)] }], ops: ['F'] },
+      { id: 'b', kind: 'shape', paths: [{ contours: [sq(15, 15, 10)], color: '#ff0000' }], ops: ['G'] },
+    ],
+    renderType: 'use-cut-settings',
+    combine: 'union',
+  },
+  { name: '10 circle rotated 30', objs: [{ id: 'a', kind: 'shape', paths: [{ contours: [rect(-8, -4, 8, 4)] }], t: T({ x: 20, y: 20, rotationDeg: 30 }) }] },
+  { name: '11 triangle mirrorX', objs: [{ id: 'a', kind: 'shape', paths: [{ contours: [[{ x: 0, y: 0 }, { x: 12, y: 0 }, { x: 2, y: 9 }]] }], t: T({ x: 20, y: 15, mirrorX: true }) }] },
+  { name: '12 ellipse scale 1.6 x 0.7 + rotate 15', objs: [{ id: 'a', kind: 'shape', paths: [{ contours: [circle(0, 0, 6)] }], t: T({ x: 20, y: 20, scaleX: 1.6, scaleY: 0.7, rotationDeg: 15 }) }] },
+  { name: '13 square with hole, mirrored Y and rotated 90', objs: [{ id: 'a', kind: 'shape', paths: [{ contours: [sq(0, 0, 14), sq(4, 4, 4)] }], t: T({ x: 20, y: 20, mirrorY: true, rotationDeg: 90 }) }] },
+  { name: '14 tiny: 0.4 mm circle and 0.15 mm wide bar', objs: [{ id: 'a', kind: 'shape', paths: [{ contours: [circle(12, 12, 0.2, 0.2, 32), rect(14, 10, 14.15, 15)] }] }] },
+  { name: '15 open path only (Fill All)', objs: [{ id: 'a', kind: 'shape', paths: [{ contours: [[{ x: 10, y: 10 }, { x: 30, y: 10 }, { x: 30, y: 20 }]], closed: false }] }] },
+  { name: '16 at 127 DPI', dpi: 127, objs: [{ id: 'a', kind: 'shape', paths: [{ contours: [sq(10.03, 10.07, 7.31), circle(13.6, 13.7, 2)] }] }] },
+  { name: '17 at 635 DPI', dpi: 635, objs: [{ id: 'a', kind: 'shape', paths: [{ contours: [sq(10.03, 10.07, 7.31), circle(13.6, 13.7, 2)] }] }] },
+  { name: '18 off-grid 7.33 x 3.17 rect at 254 DPI', objs: [{ id: 'a', kind: 'shape', paths: [{ contours: [rect(10.013, 10.041, 17.343, 13.211)] }] }] },
+];
+
+describe('T22a burn region', () => {
+  for (const c of cases) it(c.name, async () => { await runCase(c); });
+});
