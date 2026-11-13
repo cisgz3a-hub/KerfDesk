@@ -1,4 +1,3 @@
-import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 import {
   replaceSelectedAtEarliest,
   replaceIdsAtEarliest,
@@ -10,11 +9,7 @@ import { pruneDesignTreeOrder } from '../../core/scene/design-hierarchy-order';
 export { uniqueObjectId } from './vector-path-selection';
 import { retainBooleanCompoundResult } from '../../core/geometry/boolean-compound';
 import { booleanCompoundActions, type BooleanCompoundActions } from './boolean-compound-actions';
-import {
-  isVectorPathObject,
-  type VectorBooleanOp,
-  type VectorSceneObject,
-} from '../../core/geometry';
+import { type VectorBooleanOp, type VectorSceneObject } from '../../core/geometry';
 import { dogboneOperationRegions } from '../../core/geometry/dogbone-operations';
 import { canonicalArtworkOrder } from '../../core/artwork-order';
 import { effectiveOperationForObject } from '../../core/effective-output';
@@ -38,6 +33,7 @@ import type { PathNodeRef } from './path-node-edit-actions';
 import { combineSelectionNotingTabs, removedTabsNotice } from './removed-tabs-notice';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
 import { useToastStore } from './toast-store';
+import { convertSelectionToPathMutation } from './convert-to-path-mutation';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
 import {
   combineForSelection,
@@ -47,7 +43,6 @@ import {
   type PreparedVectorCombine,
 } from './vector-op-prepared';
 import { vectorRepairActions, type VectorRepairActions } from './vector-repair-actions';
-import { convertVectorObjectToPath } from './vector-path-conversion';
 
 export type VectorCombineOptions = {
   readonly keepOperands?: boolean;
@@ -171,35 +166,6 @@ function dogboneSelectionMutation(
   }
   if (!changed) return state;
   onRelieved(relieved);
-  return {
-    project: { ...state.project, scene },
-    selectedObjectId: state.selectedObjectId,
-    selectedPathNode: null,
-    selectedPathNodes: [],
-    additionalSelectedIds: new Set(state.additionalSelectedIds),
-    undoStack: pushUndo(state.project, state.undoStack),
-    redoStack: [],
-    dirty: true,
-  };
-}
-
-function convertSelectionToPathMutation(
-  state: VectorPathState,
-): VectorPathMutation | VectorPathState {
-  const selectedIds = new Set(selectedObjectIds(state));
-  if (selectedIds.size === 0) return state;
-  let scene = state.project.scene;
-  let changed = false;
-  for (const object of state.project.scene.objects) {
-    if (!selectedIds.has(object.id) || object.locked === true || !isVectorPathObject(object)) {
-      continue;
-    }
-    if (isBooleanCompoundObject(object)) continue;
-    const materialized = convertVectorObjectToPath(object);
-    scene = replaceObject(scene, object.id, materialized);
-    changed = true;
-  }
-  if (!changed) return state;
   return {
     project: { ...state.project, scene },
     selectedObjectId: state.selectedObjectId,
