@@ -1,0 +1,504 @@
+// @vitest-environment jsdom
+// T11 Radius / Fillet: independent oracle checks of round / reverse / remove,
+// fitting, transforms, holes, open paths, curves, G-code, history and files.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  type ColoredPath,
+  type CurveSubpath,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type Transform,
+  type Vec2,
+} from '../t06-main/src/core/scene';
+import { flattenCurveSubpath } from '../t06-main/src/core/scene/curve-path';
+import { compilationPolylines } from '../t06-main/src/core/job/compilation-polylines';
+import { filletCurveCorners, removeCurveFillets } from '../t06-main/src/core/geometry/curve-fillet';
+import { prepareOutput } from '../t06-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t06-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t06-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t06-main/src/io/project/deserialize-project';
+import { createCncTabAnchorPositionResolver } from '../t06-main/src/core/cnc/cnc-tab-anchors';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t06-main/src/ui/state/toast-store';
+import { litMoves } from '../zz-t07/decode';
+
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t11/t11.log', log.join('\n'));
+};
+beforeEach(() => resetStore());
+const f = (n: number, d = 4) => (Number.isFinite(n) ? n.toFixed(d) : String(n));
+const st = () => useStore.getState();
+const deg = (a: number) => (a * Math.PI) / 180;
+
+// ---------- independent helpers ----------
+function flat(curve: CurveSubpath, tol = 0.0005): Vec2[] {
+  const r = flattenCurveSubpath(curve, { toleranceMm: tol, segmentBudget: 2_000_000 });
+  if (r.kind !== 'ok') throw new Error('flatten ' + r.kind);
+  return [...r.polyline.points];
+}
+function shoelace(pts: ReadonlyArray<Vec2>): number {
+  let a = 0;
+  for (let i = 0; i < pts.length; i += 1) {
+    const p = pts[i]!;
+    const q = pts[(i + 1) % pts.length]!;
+    a += p.x * q.y - q.x * p.y;
+  }
+  return a / 2;
+}
+function polyLen(pts: ReadonlyArray<Vec2>, closed = false): number {
+  let s = 0;
+  for (let i = 1; i < pts.length; i += 1) s += Math.hypot(pts[i]!.x - pts[i - 1]!.x, pts[i]!.y - pts[i - 1]!.y);
+  if (closed && pts.length > 1) s += Math.hypot(pts[0]!.x - pts.at(-1)!.x, pts[0]!.y - pts.at(-1)!.y);
+  return s;
+}
+function segDist(p: Vec2, a: Vec2, b: Vec2): number {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const l2 = dx * dx + dy * dy;
+  const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+const kinds = (c: CurveSubpath) => c.segments.map((s) => (s.kind === 'elliptical-arc' ? 'A' : s.kind[0])).join('');
+function poly(points: Vec2[], closed: boolean): CurveSubpath {
+  return { start: points[0]!, segments: points.slice(1).map((to) => ({ kind: 'line' as const, to })), closed };
+}
+function regular(n: number, R: number, cx = 0, cy = 0, phase = 0): Vec2[] {
+  return Array.from({ length: n }, (_, k) => ({ x: cx + R * Math.cos(phase + (2 * Math.PI * k) / n), y: cy + R * Math.sin(phase + (2 * Math.PI * k) / n) }));
+}
+// interior angle at each vertex of a simple polygon (convex check by sign)
+function cornerAngles(pts: Vec2[]): number[] {
+  return pts.map((p, i) => {
+    const a = pts[(i - 1 + pts.length) % pts.length]!;
+    const b = pts[(i + 1) % pts.length]!;
+    const u = { x: a.x - p.x, y: a.y - p.y };
+    const v = { x: b.x - p.x, y: b.y - p.y };
+    return Math.acos((u.x * v.x + u.y * v.y) / (Math.hypot(u.x, u.y) * Math.hypot(v.x, v.y)));
+  });
+}
+const filletLoss = (r: number, th: number) => r * r * (1 / Math.tan(th / 2) - (Math.PI - th) / 2);
+
+// ---------- A: corner oracle ----------
+it('A corner oracle (round + reverse), both turn directions', () => {
+  out('== A: open path far1 -> corner -> far2, legs 100 mm; r in mm; flattened at 0.0005');
+  const r = 2;
+  for (const thDeg of [5, 10, 30, 60, 90, 120, 150, 170, 179, 179.9, 179.99999]) {
+    for (const turn of [1, -1]) {
+      const th = deg(thDeg);
+      const corner = { x: 10, y: 20 };
+      const uDir = { x: Math.cos(deg(17)), y: Math.sin(deg(17)) };
+      const vAng = deg(17) + turn * th;
+      const vDir = { x: Math.cos(vAng), y: Math.sin(vAng) };
+      const far1 = { x: corner.x + 100 * uDir.x, y: corner.y + 100 * uDir.y };
+      const far2 = { x: corner.x + 100 * vDir.x, y: corner.y + 100 * vDir.y };
+      const c = poly([far1, corner, far2], false);
+      for (const mode of ['round', 'reverse'] as const) {
+        const res = filletCurveCorners(c, r, mode);
+        if (res === null) {
+          out(`th=${thDeg} turn=${turn} ${mode}: null (no change)`);
+          continue;
+        }
+        const segs = res.curve.segments;
+        const t1 = segs[0]!.to;
+        const t2 = segs[1]!.to;
+        const expD = mode === 'round' ? r / Math.tan(th / 2) : r;
+        const bis = { x: uDir.x + vDir.x, y: uDir.y + vDir.y };
+        const bl = Math.hypot(bis.x, bis.y);
+        const cen = mode === 'round' ? { x: corner.x + (bis.x / bl) * (r / Math.sin(th / 2)), y: corner.y + (bis.y / bl) * (r / Math.sin(th / 2)) } : corner;
+        const pts = flat(res.curve);
+        let maxRadErr = 0;
+        let arcPts = 0;
+        let wrongSide = 0;
+        for (const p of pts) {
+          const dl = Math.min(segDist(p, far1, t1), segDist(p, t2, far2));
+          if (dl < 1e-7) continue;
+          arcPts += 1;
+          maxRadErr = Math.max(maxRadErr, Math.abs(Math.hypot(p.x - cen.x, p.y - cen.y) - r));
+          // inside the corner wedge (towards bisector from corner)
+          if ((p.x - corner.x) * bis.x + (p.y - corner.y) * bis.y < -1e-9) wrongSide += 1;
+        }
+        const expLen = mode === 'round' ? 200 - 2 * expD + r * (Math.PI - th) : 200 - 2 * r + r * th;
+        out(
+          `th=${thDeg} turn=${turn} ${mode}: |t1-corner| ${f(Math.hypot(t1.x - corner.x, t1.y - corner.y), 6)} exp ${f(expD, 6)}; |t2-corner| ${f(Math.hypot(t2.x - corner.x, t2.y - corner.y), 6)}; ` +
+            `arc pts ${arcPts} max|d-r| ${f(maxRadErr, 6)} wrongSide ${wrongSide}; len ${f(polyLen(pts), 5)} exp ${f(expLen, 5)}; segs ${kinds(res.curve)} rx=${(segs[1] as any).radiusX}`,
+        );
+      }
+    }
+  }
+});
+
+// ---------- B: area oracle on closed polygons ----------
+it('B areas vs analytic', () => {
+  out('== B: area after round (convex: A0 - sum r^2(cot(th/2)-(pi-th)/2)); reverse convex: A0 - sum r^2 th/2');
+  const shapes: Array<[string, Vec2[], number]> = [
+    ['square 20 CCW', [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }], 2],
+    ['square 20 CW', [{ x: 0, y: 0 }, { x: 0, y: 20 }, { x: 20, y: 20 }, { x: 20, y: 0 }], 2],
+    ['triangle 3-4-5 x10', [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 0, y: 30 }], 3],
+    ['hexagon R20', regular(6, 20), 4],
+    ['pentagon R20', regular(5, 20, 0, 0, 0.3), 5],
+    ['thin 60x2 rect r 0.9', [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 60, y: 2 }, { x: 0, y: 2 }], 0.9],
+  ];
+  for (const [name, pts, r] of shapes) {
+    const a0 = Math.abs(shoelace(pts));
+    const th = cornerAngles(pts);
+    const roundExp = a0 - th.reduce((s, t) => s + filletLoss(r, t), 0);
+    const revExp = a0 - th.reduce((s, t) => s + (r * r * t) / 2, 0);
+    for (const mode of ['round', 'reverse'] as const) {
+      const res = filletCurveCorners(poly(pts, true), r, mode);
+      const area = res === null ? NaN : Math.abs(shoelace(flat(res.curve)));
+      const exp = mode === 'round' ? roundExp : revExp;
+      out(`${name} r=${r} ${mode}: count ${res?.count} area ${f(area)} exp ${f(exp)} diff ${f(area - exp, 5)}`);
+    }
+  }
+  // concave L-shape: reflex corner fillet adds material
+  const L = [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 10 }, { x: 10, y: 10 }, { x: 10, y: 30 }, { x: 0, y: 30 }];
+  const a0 = Math.abs(shoelace(L));
+  const r = 3;
+  const res = filletCurveCorners(poly(L, true), r, 'round');
+  const area = Math.abs(shoelace(flat(res!.curve)));
+  // 5 convex 90 deg corners lose r^2(1-pi/4); reflex (inner) corner gains r^2(1-pi/4)
+  const exp = a0 - 5 * filletLoss(r, Math.PI / 2) + filletLoss(r, Math.PI / 2);
+  out(`L-shape r=3 round: count ${res?.count} area ${f(area)} exp ${f(exp)} diff ${f(area - exp, 5)}`);
+  const rev = filletCurveCorners(poly(L, true), r, 'reverse');
+  const areaR = Math.abs(shoelace(flat(rev!.curve)));
+  // convex corners lose quarter disc pi r^2/4; reflex corner: arc centred on corner through the outside 90 wedge -> gains a quarter disc
+  const expR = a0 - 5 * (Math.PI * r * r) / 4 + (Math.PI * r * r) / 4;
+  out(`L-shape r=3 reverse: count ${rev?.count} area ${f(areaR)} exp(if reflex gains quarter disc) ${f(expR)} diff ${f(areaR - expR, 5)}`);
+});
+
+// ---------- C: fit limits ----------
+it('C fit limits: exact-fit radius, too large, short edges, neighbours', () => {
+  out('== C: radius where arcs meet exactly, slightly under/over; short edges');
+  const cases: Array<[string, Vec2[], number[]]> = [
+    ['square 10', [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }], [4.9, 4.999999, 5, 5.000001, 6]],
+    ['rect 10x30 (slot)', [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 10 }, { x: 0, y: 10 }], [4.99, 5, 5.01]],
+    ['rect 12.7x25.4', [{ x: 0, y: 0 }, { x: 25.4, y: 0 }, { x: 25.4, y: 12.7 }, { x: 0, y: 12.7 }], [6.35]],
+    ['rect 0.3x0.1 offset at 123.4', [{ x: 123.4, y: 56.7 }, { x: 123.7, y: 56.7 }, { x: 123.7, y: 56.8 }, { x: 123.4, y: 56.8 }], [0.05]],
+    ['eq triangle side 20', regular(3, 20 / Math.sqrt(3)), [20 / (2 * Math.sqrt(3)) - 1e-3, 20 / (2 * Math.sqrt(3))]],
+    ['hexagon side 10', regular(6, 10), [5 * Math.tan(deg(60)) - 1e-3, 5 * Math.tan(deg(60))]],
+  ];
+  for (const [name, pts, radii] of cases) {
+    for (const r of radii) {
+      const res = filletCurveCorners(poly(pts, true), r, 'round');
+      const pr = res ? flat(res.curve) : [];
+      out(`${name} r=${r}: count ${res?.count ?? 0} of ${pts.length}; segs ${res ? kinds(res.curve) : '-'}; area ${res ? f(Math.abs(shoelace(pr))) : '-'}`);
+    }
+  }
+  // neighbour that cannot fit (its other side is tiny) blocks a corner that would fit alone
+  const notch = [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 20 }, { x: 20.5, y: 20 }, { x: 20.5, y: 21 }, { x: 0, y: 21 }];
+  const res = filletCurveCorners(poly(notch, true), 2, 'round');
+  out(`step outline (1 mm step at x=20.5), r=2: count ${res?.count} of 6 (corners at (40,20) and (0,21) each fit alone? side lengths 19.5/20.5 vs r=2)`);
+  for (const node of [0, 1, 2, 3, 4, 5]) {
+    const one = filletCurveCorners(poly(notch, true), 2, 'round', [node]);
+    out(`   picked node ${node} alone: count ${one?.count ?? 0}`);
+  }
+  // reverse at exact fit
+  const sq = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];
+  for (const r of [4.9, 5, 5.1]) {
+    const rv = filletCurveCorners(poly(sq, true), r, 'reverse');
+    out(`square 10 reverse r=${r}: count ${rv?.count ?? 0}`);
+  }
+});
+
+// ---------- D: curved edges, arcs, remove ----------
+it('D curves and remove', () => {
+  out('== D: corners next to cubic / elliptical-arc; remove on fillets and on non-fillet arcs');
+  // D shape: line, line, then a semicircle arc back to start; plus a corner between line and arc
+  const dShape: CurveSubpath = {
+    start: { x: 0, y: 0 },
+    segments: [
+      { kind: 'line', to: { x: 20, y: 0 } },
+      { kind: 'line', to: { x: 20, y: 20 } },
+      { kind: 'line', to: { x: 0, y: 20 } },
+      { kind: 'elliptical-arc', radiusX: 10, radiusY: 10, rotationDeg: 0, largeArc: false, sweep: true, to: { x: 0, y: 0 } },
+    ],
+    closed: true,
+  };
+  const before = flat(dShape);
+  const r = filletCurveCorners(dShape, 3, 'round');
+  const after = r ? flat(r.curve) : [];
+  out(`D shape (2 line-line corners, 2 line-arc corners) r=3: count ${r?.count}; segs ${r ? kinds(r.curve) : '-'}; area ${f(Math.abs(shoelace(before)))} -> ${f(Math.abs(shoelace(after)))} exp ${f(Math.abs(shoelace(before)) - 2 * filletLoss(3, Math.PI / 2))}`);
+  // check the arc segment kept verbatim
+  const arcKept = r?.curve.segments.find((s) => s.kind === 'elliptical-arc' && s.radiusX === 10);
+  out(`   original r10 arc kept verbatim: ${JSON.stringify(arcKept)}`);
+
+  // remove: fillet then remove on a square, arcs exact
+  const sq = poly([{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }], true);
+  const rounded = filletCurveCorners(sq, 4, 'round')!.curve;
+  const removed = removeCurveFillets(rounded);
+  out(`square 20 r4 round -> remove: count ${removed?.count}; area ${f(Math.abs(shoelace(flat(removed!.curve))))} exp 400; segs ${kinds(removed!.curve)}`);
+  // remove after rounding with picked corners and odd angles
+  const hex = poly(regular(6, 20, 3, 4, 0.2), true);
+  const hr = filletCurveCorners(hex, 3, 'round')!.curve;
+  const hrem = removeCurveFillets(hr);
+  out(`hexagon r3 round -> remove: count ${hrem?.count}; area ${f(Math.abs(shoelace(flat(hrem!.curve))))} exp ${f(Math.abs(shoelace(regular(6, 20))))}`);
+  // remove on non-fillet tangent arcs: tapered slot (lines converge 2 deg) ends are ~178 deg arcs
+  const halfAng = deg(1);
+  // build tapered slot: big end radius 5 at x=0, small end radius 4 at x=L
+  const R1 = 5, R2 = 4.5;
+  const L = (R1 - R2) / Math.sin(halfAng); // distance between centres for tangent lines at slope halfAng
+  const c1 = { x: 0, y: 0 }, c2 = { x: L, y: 0 };
+  const nTop = { x: -Math.sin(halfAng), y: Math.cos(halfAng) };
+  const p1 = { x: c1.x + R1 * nTop.x, y: c1.y + R1 * nTop.y };
+  const p2 = { x: c2.x + R2 * nTop.x, y: c2.y + R2 * nTop.y };
+  const q2 = { x: c2.x + R2 * nTop.x, y: -(c2.y + R2 * nTop.y) };
+  const q1 = { x: c1.x + R1 * nTop.x, y: -(c1.y + R1 * nTop.y) };
+  const slot: CurveSubpath = {
+    start: p1,
+    segments: [
+      { kind: 'line', to: p2 },
+      // around the small end (clockwise in y-up when going top->bottom on the right): minor arc? sweep >180 so this is largeArc
+      { kind: 'elliptical-arc', radiusX: R2, radiusY: R2, rotationDeg: 0, largeArc: false, sweep: false, to: q2 },
+      { kind: 'line', to: q1 },
+      { kind: 'elliptical-arc', radiusX: R1, radiusY: R1, rotationDeg: 0, largeArc: true, sweep: false, to: p1 },
+    ],
+    closed: true,
+  };
+  const sb = flat(slot);
+  const xs = sb.map((p) => p.x);
+  out(`tapered slot L=${f(L, 2)} (R ${R1}/${R2}, 2 deg taper): bbox x ${f(Math.min(...xs), 2)}..${f(Math.max(...xs), 2)}`);
+  const srem = removeCurveFillets(slot);
+  if (srem) {
+    const sa = flat(srem.curve);
+    const xa = sa.map((p) => p.x), ya = sa.map((p) => p.y);
+    out(`   remove fillets: count ${srem.count}; bbox x ${f(Math.min(...xa), 2)}..${f(Math.max(...xa), 2)} y ${f(Math.min(...ya), 2)}..${f(Math.max(...ya), 2)}; segs ${kinds(srem.curve)}`);
+  } else out('   remove fillets: null (no change)');
+  // a teardrop: two lines meeting at a point, joined by a big tangent arc (~ 300 deg) -> largeArc, not removable; and a tangent cubic join
+  const cubicJoin: CurveSubpath = {
+    start: { x: 0, y: 0 },
+    segments: [
+      { kind: 'line', to: { x: 40, y: 0 } },
+      { kind: 'cubic', control1: { x: 60, y: 0 }, control2: { x: 41, y: 1 }, to: { x: 40 + 0.5, y: 20 } },
+      { kind: 'line', to: { x: 41, y: 40 } },
+      { kind: 'line', to: { x: 0, y: 40 } },
+    ],
+    closed: true,
+  };
+  const cj = removeCurveFillets(cubicJoin);
+  if (cj) {
+    const pa = flat(cj.curve);
+    const xa = pa.map((p) => p.x), ya = pa.map((p) => p.y);
+    out(`swoop cubic tangent to 0deg line and ~88.6deg line (not a fillet shape): remove count ${cj.count}; bbox x ..${f(Math.max(...xa), 2)} y ${f(Math.min(...ya), 2)}..; before max x ${f(Math.max(...flat(cubicJoin).map((p) => p.x)), 2)}`);
+  } else out('swoop cubic: remove null');
+});
+
+// ---------- store-level helpers ----------
+const LINE_SPEED = 1234;
+function layerOf(mode: 'line' | 'fill', extra: Partial<Layer> = {}): Layer {
+  return { ...createLayer({ id: 'L', color: '#ff0000', name: 'L', mode }), speed: LINE_SPEED, power: 30, ...extra };
+}
+function pathOf(curves: CurveSubpath[]): ColoredPath {
+  return { color: '#ff0000', polylines: curves.map((c) => ({ points: flat(c, 0.01), closed: c.closed })), curves };
+}
+function svgObj(id: string, paths: ColoredPath[], transform: Transform = IDENTITY_TRANSFORM, extra: Partial<ImportedSvg> = {}): ImportedSvg {
+  const all = paths.flatMap((p) => p.polylines.flatMap((pl) => pl.points));
+  return {
+    kind: 'imported-svg', id, source: `${id}.svg`,
+    bounds: { minX: Math.min(...all.map((p) => p.x)), minY: Math.min(...all.map((p) => p.y)), maxX: Math.max(...all.map((p) => p.x)), maxY: Math.max(...all.map((p) => p.y)) },
+    transform, operationIds: ['L'], paths, ...extra,
+  } as ImportedSvg;
+}
+function load(objects: SceneObject[], selected: string[], layer: Layer = layerOf('line')): void {
+  const base = createProject();
+  const project: Project = { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers: [layer], groups: [] } };
+  useStore.setState({ project, selectedObjectId: selected[0] ?? null, additionalSelectedIds: new Set(selected.slice(1)), undoStack: [], redoStack: [], dirty: false, selectedPathNodes: [], selectedPathNode: null } as any);
+}
+let lastToast = '';
+function apply(r: number, action: 'round' | 'reverse' | 'remove') {
+  const p0 = st().project;
+  const u0 = st().undoStack.length;
+  useToastStore.setState({ toasts: [] } as any);
+  st().filletSelection(r, action);
+  const toasts = (useToastStore.getState() as any).toasts ?? [];
+  lastToast = toasts.length > 0 ? toasts.map((t: any) => t.message).join(' | ') : '(no toast)';
+  return { changed: st().project !== p0, undoAdded: st().undoStack.length - u0 };
+}
+function worldContours(obj: SceneObject): Vec2[][] {
+  return (obj as ImportedSvg).paths.flatMap((p) => compilationPolylines(p, obj.transform, 0.0005).map((pl) => [...pl.points]));
+}
+function evenOddArea(contours: Vec2[][]): number {
+  // contours nested one level (outer + holes): sum of signed areas with orientation normalised
+  const areas = contours.map((c) => Math.abs(shoelace(c)));
+  const max = Math.max(...areas);
+  return areas.reduce((s, a) => s + (a === max ? a : -a), 0);
+}
+function burn(project: Project) {
+  const prepared = prepareOutput(project);
+  const emitted = prepared.ok ? emitPreparedGcode(prepared) : { gcode: '' };
+  const moves = litMoves(emitted.gcode, project.device).filter((m) => m.f === LINE_SPEED);
+  return { gcode: emitted.gcode, moves, ok: prepared.ok, len: moves.reduce((s, m) => s + m.len, 0) };
+}
+
+it('E transforms: world radius, mirror, rotation, non-uniform', () => {
+  out('== E: square 20 local, world r=2; world area exp = (20 s)^2 - 4 r^2 (1 - pi/4)');
+  const sq = poly([{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }], true);
+  const T = (o: Partial<Transform>): Transform => ({ ...IDENTITY_TRANSFORM, x: 50, y: 50, ...o });
+  const ts: Array<[string, Transform, number]> = [
+    ['identity', T({}), 1],
+    ['scale 2 uniform', T({ scaleX: 2, scaleY: 2 }), 2],
+    ['scale 0.5, rot 30', T({ scaleX: 0.5, scaleY: 0.5, rotationDeg: 30 }), 0.5],
+    ['mirrorX + rot 45, scale 1.5', T({ scaleX: 1.5, scaleY: 1.5, mirrorX: true, rotationDeg: 45 }), 1.5],
+    ['negative scaleX -1.5/1.5', T({ scaleX: -1.5, scaleY: 1.5 }), 1.5],
+    ['nonuniform 2x1', T({ scaleX: 2, scaleY: 1 }), NaN],
+    ['nearly uniform 1/3 vs 0.33333333', T({ scaleX: 1 / 3, scaleY: 0.33333333 }), 1 / 3],
+  ];
+  for (const [name, t, s] of ts) {
+    load([svgObj('a', [pathOf([sq])], t)], ['a']);
+    const res = apply(2, 'round');
+    const obj = st().project.scene.objects[0]!;
+    const w = worldContours(obj);
+    const area = Math.abs(shoelace(w[0]!));
+    const exp = (20 * s) ** 2 - 4 * filletLoss(2, Math.PI / 2);
+    out(`${name}: changed ${res.changed} undo+${res.undoAdded} toast "${lastToast}"; world area ${f(area)} exp ${f(exp)} diff ${f(area - exp, 5)}`);
+  }
+});
+
+it('F holes, multi-subpath, open paths, picked nodes', () => {
+  out('== F');
+  const outer = poly([{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 40 }, { x: 0, y: 40 }], true);
+  const hole = poly([{ x: 10, y: 10 }, { x: 10, y: 30 }, { x: 30, y: 30 }, { x: 30, y: 10 }], true); // CW
+  load([svgObj('a', [pathOf([outer, hole])])], ['a'], layerOf('fill'));
+  const g0 = burn(st().project);
+  const res = apply(3, 'round');
+  const obj = st().project.scene.objects[0]!;
+  const w = worldContours(obj);
+  const area = evenOddArea(w);
+  // outer loses 4 L, hole corner rounding: hole area shrinks by 4 L -> material gains 4 L
+  const exp = 1600 - 400;
+  const L = filletLoss(3, Math.PI / 2);
+  const g1 = burn(st().project);
+  out(`square with square hole r=3: toast "${lastToast}" undo+${res.undoAdded}; material area ${f(area)} exp ${f(exp - 4 * L + 4 * L)} (outer ${f(Math.abs(shoelace(w[0]!)))} exp ${f(1600 - 4 * L)}, hole ${f(Math.abs(shoelace(w[1]!)))} exp ${f(400 - 4 * L)})`);
+  out(`   Fill burn: lit length ${f(g0.len, 2)} -> ${f(g1.len, 2)}; x interval 0.1 => area ~ ${f(g0.len * 0.1, 1)} -> ${f(g1.len * 0.1, 1)} (exp ${f(1200, 1)} -> ${f(1200, 1)})`);
+
+  // open zigzag: end nodes untouched
+  const zig = poly([{ x: 0, y: 0 }, { x: 10, y: 10 }, { x: 20, y: 0 }, { x: 30, y: 10 }], false);
+  load([svgObj('z', [pathOf([zig])])], ['z']);
+  apply(2, 'round');
+  const zc = (st().project.scene.objects[0] as ImportedSvg).paths[0]!.curves![0]!;
+  out(`open zigzag 4 nodes r=2: toast "${lastToast}"; start ${JSON.stringify(zc.start)} end ${JSON.stringify(zc.segments.at(-1)!.to)} segs ${kinds(zc)}`);
+
+  // open path whose ends coincide (no Z): corner at the joined ends
+  const openSq = poly([{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }, { x: 0, y: 0 }], false);
+  load([svgObj('o', [pathOf([openSq])])], ['o']);
+  apply(2, 'round');
+  out(`open square with coincident ends r=2: toast "${lastToast}"`);
+
+  // picked nodes: only those corners; node index semantics
+  const sq = poly([{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }], true);
+  load([svgObj('p', [pathOf([sq])])], ['p']);
+  useStore.setState({ selectedPathNodes: [{ objectId: 'p', pathIndex: 0, polylineIndex: 0, pointIndex: 2 }] } as any);
+  apply(2, 'round');
+  const pc = (st().project.scene.objects[0] as ImportedSvg).paths[0]!.curves![0]!;
+  const arc = pc.segments.findIndex((s) => s.kind === 'elliptical-arc');
+  out(`picked node 2 of square: toast "${lastToast}"; arc ends at ${JSON.stringify(pc.segments[arc]!.to)} (node 2 is (20,20) => arc from (20,18) to (18,20))`);
+
+  // polyline stored WITHOUT curves, closed with duplicate closing point
+  const dup = { color: '#ff0000', polylines: [{ closed: true, points: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }, { x: 0, y: 0 }] }] } as ColoredPath;
+  load([svgObj('d', [dup])], ['d']);
+  apply(2, 'round');
+  const dc = (st().project.scene.objects[0] as ImportedSvg).paths[0]!;
+  out(`closed polyline with duplicate closing point, no curves: toast "${lastToast}"; area ${f(Math.abs(shoelace(compilationPolylines(dc, IDENTITY_TRANSFORM, 0.0005)[0]!.points as Vec2[])))} exp ${f(400 - 4 * filletLoss(2, Math.PI / 2))}`);
+});
+
+it('G kinds, history, files, G-code, tabs, guards', () => {
+  out('== G');
+  const sqPts = [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }];
+  const sq = poly(sqPts, true);
+  // Line burn length oracle
+  load([svgObj('a', [pathOf([sq])], { ...IDENTITY_TRANSFORM, x: 30, y: 30 })], ['a']);
+  const before = serializeProject(st().project);
+  const b0 = burn(st().project);
+  const r = apply(2, 'round');
+  const after = serializeProject(st().project);
+  const b1 = burn(st().project);
+  out(`Line burn square 20 r=2: lit ${f(b0.len)} -> ${f(b1.len)} exp ${f(80 - 16 + 4 * Math.PI)}; undo+${r.undoAdded}; toast "${lastToast}"`);
+  st().undo();
+  const undone = serializeProject(st().project);
+  st().redo();
+  const redone = serializeProject(st().project);
+  const re = deserializeProject(after);
+  const b2 = re.kind === 'ok' ? burn(re.project) : null;
+  out(`   undo==before ${undone === before}; redo==after ${redone === after}; reopen gcode same ${b2?.gcode === b1.gcode}`);
+  // re-apply round on already rounded: corners now line-arc, so none
+  const r2 = apply(2, 'round');
+  out(`   second round: changed ${r2.changed} toast "${lastToast}"`);
+  const r3 = apply(0, 'remove');
+  const b3 = burn(st().project);
+  out(`   remove: changed ${r3.changed} toast "${lastToast}"; lit ${f(b3.len)} exp 80`);
+
+  // kerf on Line layer after fillet
+  load([svgObj('a', [pathOf([sq])], { ...IDENTITY_TRANSFORM, x: 30, y: 30 })], ['a'], layerOf('line', { kerfOffsetMm: 0.5 } as any));
+  apply(2, 'round');
+  const bk = burn(st().project);
+  out(`   kerf 0.5 outward? lit ${f(bk.len)}; exp outward offset of rounded square (r 2.5) ${f(80 - 4 * 2 * 2 + 4 * (Math.PI / 2) * 2.5)} or inward (r 1.5) ${f(80 - 16 + 4 * (Math.PI / 2) * 1.5)}`);
+
+  // guards
+  for (const v of [0, -2, NaN, Infinity, 1e9, 1e-12]) {
+    load([svgObj('a', [pathOf([sq])])], ['a']);
+    const g = apply(v, 'round');
+    out(`   radius ${v}: changed ${g.changed} undo+${g.undoAdded} toast "${lastToast}"`);
+  }
+
+  // kinds: rect shape, text-ish, locked, polyline shape, group
+  const rectShape = {
+    kind: 'shape', id: 'rect', transform: IDENTITY_TRANSFORM, operationIds: ['L'], color: '#ff0000',
+    spec: { kind: 'rect', widthMm: 20, heightMm: 20, cornerRadiusMm: 0 },
+    bounds: { minX: 0, minY: 0, maxX: 20, maxY: 20 },
+    paths: [{ color: '#ff0000', polylines: [{ closed: true, points: sqPts }] }],
+  } as unknown as SceneObject;
+  load([rectShape], ['rect']);
+  const rr = apply(2, 'round');
+  out(`rect shape (rectangle tool): changed ${rr.changed} toast "${lastToast}"`);
+  const pen = {
+    kind: 'shape', id: 'pen', transform: IDENTITY_TRANSFORM, operationIds: ['L'], color: '#ff0000',
+    spec: { kind: 'polyline', points: sqPts, closed: true },
+    bounds: { minX: 0, minY: 0, maxX: 20, maxY: 20 },
+    paths: [{ color: '#ff0000', polylines: [{ closed: true, points: sqPts }] }],
+  } as unknown as SceneObject;
+  load([pen], ['pen']);
+  const pr = apply(2, 'round');
+  const penAfter = st().project.scene.objects[0] as any;
+  out(`pen polyline shape: changed ${pr.changed} toast "${lastToast}"; spec points ${penAfter.spec.points.length}; has curves ${penAfter.paths[0].curves !== undefined}`);
+  const sp = serializeProject(st().project);
+  const rp = deserializeProject(sp);
+  const ro = rp.kind === 'ok' ? (rp.project.scene.objects[0] as any) : null;
+  const wa = ro ? Math.abs(shoelace(compilationPolylines(ro.paths[0], ro.transform, 0.0005)[0]!.points as Vec2[])) : NaN;
+  out(`   pen reopened: area ${f(wa)} exp ${f(400 - 4 * filletLoss(2, Math.PI / 2))}; curves kept ${ro?.paths[0].curves !== undefined}`);
+
+  const locked = svgObj('lk', [pathOf([sq])], IDENTITY_TRANSFORM, { locked: true } as any);
+  load([locked], ['lk']);
+  apply(2, 'round');
+  out(`locked only: toast "${lastToast}"`);
+
+  // tabs placed by hand on the bottom edge mid and near the start corner
+  const tabbed = svgObj('t', [pathOf([sq])], IDENTITY_TRANSFORM, { laserTabAnchors: [{ layerColor: '#ff0000', pathIndex: 0, polylineIndex: 0, pathT: 0.125 }, { layerColor: '#ff0000', pathIndex: 0, polylineIndex: 0, pathT: 0.01 }] } as any);
+  load([tabbed], ['t']);
+  const locate0 = createCncTabAnchorPositionResolver(st().project.scene.objects[0] as any);
+  const p0 = (st().project.scene.objects[0] as any).laserTabAnchors.map((a: any) => locate0(a));
+  apply(2, 'round');
+  const o1 = st().project.scene.objects[0] as any;
+  const locate1 = createCncTabAnchorPositionResolver(o1);
+  const p1 = o1.laserTabAnchors.map((a: any) => locate1(a));
+  out(`tabs: before ${JSON.stringify(p0)} after ${JSON.stringify(p1)} toast "${lastToast}"`);
+
+  // dense-corner stress: closed 20000-gon jagged outline
+  const n = 20000;
+  const jag: Vec2[] = Array.from({ length: n }, (_, k) => {
+    const a = (2 * Math.PI * k) / n;
+    const R = 50 + (k % 2 === 0 ? 0 : 0.3);
+    return { x: 100 + R * Math.cos(a), y: 100 + R * Math.sin(a) };
+  });
+  load([svgObj('j', [{ color: '#ff0000', polylines: [{ closed: true, points: jag }] }])], ['j']);
+  const t0 = performance.now();
+  apply(0.05, 'round');
+  const t1 = performance.now();
+  out(`dense 20000-corner jagged outline r=0.05: ${f(t1 - t0, 0)} ms; toast "${lastToast}"`);
+});

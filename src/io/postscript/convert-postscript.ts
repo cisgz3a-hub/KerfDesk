@@ -33,8 +33,10 @@ const NOTE_TEXT: Readonly<Record<string, (count: number) => string>> = {
 };
 
 export type PostscriptOptions = {
-  /** Milliseconds for the run's time limit; tests pass a scripted clock. */
+  /** The run's clock, in milliseconds; tests pass a scripted one. */
   readonly clock?: () => number;
+  /** The run's time limit; the import worker allows longer than the window. */
+  readonly milliseconds?: number;
 };
 
 export function convertPostscript(
@@ -44,7 +46,7 @@ export function convertPostscript(
   try {
     const text = postscriptText(bytes);
     const illustrator = isIllustratorFile(text);
-    const vm = createPsVm(options.clock);
+    const vm = createPsVm(options.clock, options.milliseconds);
     const program = illustrator ? prepareIllustrator(vm, text) : text;
     vm.run(new PsTokenizer(program, (name) => immediate(vm, name)));
     if (vm.painted.length === 0) return { kind: 'error', reason: noPathsReason(illustrator) };

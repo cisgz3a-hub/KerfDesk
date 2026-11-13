@@ -2,6 +2,7 @@
 // Environment queries answer as a plain LanguageLevel 2 interpreter would, so
 // prologs that probe for features take their simplest branch.
 
+import { compositeSize, setEntry } from './ps-budget';
 import type { OpTable } from './ps-ops-stack';
 import { ExitSignal, HaltSignal, StopSignal, type PsVm } from './ps-vm';
 import {
@@ -90,7 +91,7 @@ export const DICT_OPS: OpTable = {
   },
   def: (vm) => {
     const value = vm.pop();
-    vm.currentDict.map.set(dictKey(vm.pop()), value);
+    setEntry(vm.currentDict, dictKey(vm.pop()), value);
   },
   load: (vm) => {
     const key = dictKey(vm.pop());
@@ -115,7 +116,7 @@ export const DICT_OPS: OpTable = {
     const value = vm.pop();
     const key = dictKey(vm.pop());
     const dict = [...vm.dicts].reverse().find((d) => d.map.has(key)) ?? vm.currentDict;
-    dict.map.set(key, value);
+    setEntry(dict, key, value);
   },
   undef: (vm) => {
     const key = dictKey(vm.pop());
@@ -134,7 +135,7 @@ export const DICT_OPS: OpTable = {
     if (items.length % 2 !== 0)
       throw new PsError('rangecheck', 'A dictionary needs key/value pairs.');
     for (let i = 0; i < items.length; i += 2)
-      dict.map.set(dictKey(items[i] ?? null), items[i + 1] ?? null);
+      setEntry(dict, dictKey(items[i] ?? null), items[i + 1] ?? null);
     vm.push(dict);
   },
   '[': (vm) => vm.push(PS_MARK),
@@ -148,6 +149,7 @@ export const DICT_OPS: OpTable = {
   },
   aload: (vm) => {
     const array = vm.popArray();
+    vm.charge(array.items.length);
     for (const item of array.items) vm.push(item);
     vm.push(array);
   },
@@ -254,6 +256,7 @@ function forOperator(vm: PsVm): void {
 function forallOperator(vm: PsVm): void {
   const proc = vm.popArray();
   const target = vm.pop();
+  vm.charge(compositeSize(target));
   loop(() => {
     if (typeof target !== 'object' || target === null)
       throw new PsError('typecheck', 'forall needs an array, string or dictionary.');
@@ -301,7 +304,7 @@ function putOperator(vm: PsVm): void {
   const target = vm.pop();
   if (typeof target !== 'object' || target === null)
     throw new PsError('typecheck', 'put needs an array, string or dictionary.');
-  if (target.kind === 'dict') target.map.set(dictKey(key), value);
+  if (target.kind === 'dict') setEntry(target, dictKey(key), value);
   else if (target.kind === 'array') target.items[indexOf(key, target.items.length)] = value;
   else if (target.kind === 'string' && typeof value === 'number') {
     const i = indexOf(key, target.value.length);
@@ -314,6 +317,7 @@ function putIntervalOperator(vm: PsVm): void {
   const values = vm.pop();
   const start = vm.popInteger();
   const target = vm.pop();
+  vm.charge(compositeSize(values));
   const arrays = [target, values].map(asArray);
   if (arrays[0] && arrays[1]) {
     const into = arrays[0];
@@ -361,14 +365,13 @@ function size(vm: PsVm): number {
   return n;
 }
 
+const COMPOSITES: ReadonlySet<string> = new Set(['array', 'string', 'dict']);
+
 function lengthOf(value: PsValue): number {
-  if (typeof value !== 'object' || value === null)
+  if (typeof value === 'object' && value?.kind === 'name') return value.name.length;
+  if (typeof value !== 'object' || value === null || !COMPOSITES.has(value.kind))
     throw new PsError('typecheck', 'length needs a composite.');
-  if (value.kind === 'array') return value.items.length;
-  if (value.kind === 'string') return value.value.length;
-  if (value.kind === 'dict') return value.map.size;
-  if (value.kind === 'name') return value.name.length;
-  throw new PsError('typecheck', 'length needs a composite.');
+  return compositeSize(value);
 }
 
 function withExec(value: PsValue, exec: boolean): PsValue {

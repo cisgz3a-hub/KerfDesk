@@ -6,6 +6,7 @@ import {
 } from '../../core/job/job-bounds';
 import type { PreparedOutput } from '../../io/gcode';
 import { isVerifiedFrameValid, type FrameVerification } from '../state/frame-verification';
+import { framesZRotary, withoutRotaryZOffset } from '../state/framed-run-rotary';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
 import { frameVerificationBlockedMessage } from './frame-verification-policy';
 import type { PreparedJobMetrics } from './prepared-job-metrics';
@@ -37,11 +38,21 @@ export function requiredFrameIssueFromPrepared(args: {
       ? preparedFrameBounds(args.prepared)
       : args.measuredFrameBounds;
   if (bounds === null) return null;
-  const valid = isVerifiedFrameValid(args.machine.frameVerification ?? null, {
-    boundsSignature: frameBoundsSignature(bounds),
-    wco: args.machine.wcoCache ?? null,
-    workOriginActive: args.machine.workOriginActive === true,
-  });
+  // On a rotary that turns on Z the Frame's own `G92 Z0` moves the Z offset
+  // after the Frame recorded it, as Frame completion allows (ADR-695 Amendment 5).
+  const zRotary = framesZRotary(args.prepared.project);
+  const recorded = args.machine.frameVerification ?? null;
+  const wco = args.machine.wcoCache ?? null;
+  const valid = isVerifiedFrameValid(
+    zRotary && recorded !== null
+      ? { ...recorded, wco: withoutRotaryZOffset(recorded.wco) }
+      : recorded,
+    {
+      boundsSignature: frameBoundsSignature(bounds),
+      wco: zRotary ? withoutRotaryZOffset(wco) : wco,
+      workOriginActive: args.machine.workOriginActive === true,
+    },
+  );
   return valid ? null : frameVerificationBlockedMessage();
 }
 

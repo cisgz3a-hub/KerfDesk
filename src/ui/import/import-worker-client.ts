@@ -2,6 +2,7 @@ import type { ParseDxfResult } from '../../io/dxf';
 import type { GcodePreviewParseResult } from './gcode-preview-timing';
 import type { GcodeInspectionContext } from '../gcode-inspector/gcode-inspection-source';
 import type { ParseHpglResult } from '../../io/hpgl';
+import type { PostscriptConversion } from '../../io/postscript';
 import type {
   ImportWorkerRequest,
   ImportWorkerResponse,
@@ -88,6 +89,14 @@ export function parseHpglOffThread(
     options,
   );
   return packed === null ? null : packed.then(unpackHpglResult);
+}
+
+/** EPS, PostScript or Illustrator 3–8 to SVG text in the import worker (ADR-700 Amd 3). */
+export function convertPostscriptOffThread(
+  blob: Blob,
+  options: ImportWorkerRequestOptions = {},
+): Promise<PostscriptConversion> | null {
+  return request({ kind: 'postscript', blob }, 'postscript', options);
 }
 
 export function parseStlOffThread(

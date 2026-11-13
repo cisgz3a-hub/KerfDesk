@@ -1,5 +1,4 @@
 import { useCallback, useState, type ComponentType } from 'react';
-import { primaryOperationForObject } from '../../core/scene';
 import { ConnectionHelpHost, showConnectionHelp } from '../help/ConnectionHelpDialog';
 import { HelpNoticeHost } from '../help/HelpNoticeDialogs';
 import { openHelpNotice } from '../help/help-notices';
@@ -15,7 +14,7 @@ import { useToastStore } from '../state/toast-store';
 import { OptimizationSettingsDialog } from '../laser/OptimizationSettingsDialog';
 import { LabsSettingsDialog } from '../laser/LabsSettingsDialog';
 import { RotarySetupHost } from '../laser/RotarySetupHost';
-import { AdjustImageDialog, type AdjustImageApply } from '../raster/AdjustImageDialog';
+import { AdjustImageDialogHost } from './AdjustImageDialogHost';
 import { PhotoEngravingDialogHost } from '../raster/PhotoEngravingDialogHost';
 import { type ConvertibleVector } from '../raster/vector-to-bitmap';
 import { usePlatform } from '../app/platform-context';
@@ -73,8 +72,9 @@ type SettingsDialogKind =
   | 'focus'
   | null;
 
+// Adjust Image keeps the id of the image it was opened on (T14R-P2-1).
 export function CommandShell(): JSX.Element {
-  const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
+  const [adjustImageId, setAdjustImageId] = useState<string | null>(null);
   const [boxGeneratorOpen, setBoxGeneratorOpen] = useState(false);
   const [boxFitTestOpen, setBoxFitTestOpen] = useState(false);
   const materialTestDialogOpen = useUiStore((state) => state.materialTestDialogOpen);
@@ -93,7 +93,7 @@ export function CommandShell(): JSX.Element {
     requestImportImage: onImagePick,
     requestMultiFileTrace: () => setSettingsDialog('multi-file-trace'),
     requestConvertToBitmap: () => useUiStore.getState().openConvertBitmapDialog(),
-    requestAdjustImage: () => setAdjustDialogOpen(true),
+    requestAdjustImage: () => setAdjustImageId(selectedRaster?.id ?? null),
     requestGcodeInspector: gcodeInspector.open,
     requestBoxGenerator: () => setBoxGeneratorOpen(true),
     requestBarcodeGenerator: () => useBarcodeDialogStore.getState().open({ mode: 'insert' }),
@@ -127,9 +127,9 @@ export function CommandShell(): JSX.Element {
       <WorkspaceTopBar />
       <WorkspaceContextBar commands={commands} />
       <BitmapDialog />
-      {adjustDialogOpen && selectedRaster !== null ? (
-        <AdjustDialog image={selectedRaster} onClose={() => setAdjustDialogOpen(false)} />
-      ) : null}
+      {adjustImageId === null ? null : (
+        <AdjustImageDialogHost imageId={adjustImageId} onClose={() => setAdjustImageId(null)} />
+      )}
       <GeneratorDialogs
         boxOpen={boxGeneratorOpen}
         onBoxClose={() => setBoxGeneratorOpen(false)}
@@ -319,30 +319,6 @@ function OptimizationDialog(props: { readonly onClose: () => void }): JSX.Elemen
         props.onClose();
         pushToast('Updated optimization settings.', 'success');
       }}
-    />
-  );
-}
-
-function AdjustDialog(props: {
-  readonly image: NonNullable<ReturnType<typeof useSelectedRaster>>;
-  readonly onClose: () => void;
-}): JSX.Element | null {
-  const layer = useStore((s) => primaryOperationForObject(props.image, s.project.scene.layers));
-  const setRasterImageAdjustments = useStore((s) => s.setRasterImageAdjustments);
-  if (layer === null) return null;
-  const onApply = (patch: AdjustImageApply): void => {
-    props.onClose();
-    setRasterImageAdjustments(props.image.id, patch.imagePatch, {
-      id: layer.id,
-      patch: patch.layerPatch,
-    });
-  };
-  return (
-    <AdjustImageDialog
-      image={props.image}
-      layer={layer}
-      onCancel={props.onClose}
-      onApply={onApply}
     />
   );
 }

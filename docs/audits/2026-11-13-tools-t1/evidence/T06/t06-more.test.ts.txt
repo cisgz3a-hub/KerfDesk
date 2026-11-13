@@ -1,0 +1,217 @@
+// T06 Fill Selection: ownership, bindings and what burns, through the real store action
+// and the real prepareOutput -> G-code path.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  applyTransform,
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  operationIdsForObject,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type Transform,
+} from '../t06-main/src/core/scene';
+import { effectiveOperationForObject } from '../t06-main/src/core/effective-output';
+import { prepareOutput } from '../t06-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t06-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t06-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t06-main/src/io/project/deserialize-project';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { bbox, gridArea, hatchArea, litMoves, rowsOf, totalLen, type Vec } from './decode';
+
+const log: string[] = [];
+const out = (s: string) => log.push(s);
+const flush = () => writeFileSync('C:/Users/stolk/kd-t1/zz-t06/t06-more.log', log.join('\n'));
+
+beforeEach(() => resetStore());
+
+function sq(x0: number, y0: number, w: number, h = w): Vec[] {
+  return [
+    { x: x0, y: y0 },
+    { x: x0 + w, y: y0 },
+    { x: x0 + w, y: y0 + h },
+    { x: x0, y: y0 + h },
+  ];
+}
+
+function obj(
+  id: string,
+  contours: ReadonlyArray<{ pts: Vec[]; closed?: boolean }>,
+  opIds: string[] | undefined,
+  extra: Partial<ImportedSvg> = {},
+  transform: Transform = IDENTITY_TRANSFORM,
+): ImportedSvg {
+  const all = contours.flatMap((c) => c.pts);
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: {
+      minX: Math.min(...all.map((p) => p.x)),
+      minY: Math.min(...all.map((p) => p.y)),
+      maxX: Math.max(...all.map((p) => p.x)),
+      maxY: Math.max(...all.map((p) => p.y)),
+    },
+    transform,
+    ...(opIds === undefined ? {} : { operationIds: opIds }),
+    paths: [
+      {
+        color: '#000000',
+        polylines: contours.map((c) => ({ closed: c.closed ?? true, points: c.pts })),
+      },
+    ],
+    ...extra,
+  };
+}
+
+function layer(id: string, mode: 'line' | 'fill', patch: Partial<Layer> = {}): Layer {
+  const colors: Record<string, string> = { L: '#ff0000', F: '#0000ff', C: '#00aa00', E: '#888800' };
+  return { ...createLayer({ id, color: colors[id] ?? '#123456', name: id, mode }), ...patch };
+}
+
+function load(objects: ImportedSvg[], layers: Layer[], selected: string[]): void {
+  const base = createProject();
+  const project: Project = {
+    ...base,
+    optimization: { ...DEFAULT_PROJECT_OPTIMIZATION },
+    scene: { ...base.scene, objects, layers, groups: [] },
+  };
+  useStore.setState({
+    project,
+    selectedObjectId: selected[0] ?? null,
+    additionalSelectedIds: new Set(selected.slice(1)),
+    undoStack: [],
+    redoStack: [],
+    dirty: false,
+  });
+}
+
+function burn(project: Project) {
+  const prepared = prepareOutput(project);
+  const emitted = emitPreparedGcode(prepared);
+  const moves = litMoves(emitted.gcode, project.device);
+  const adv = prepared.ok ? (prepared.advisories ?? []).map((a) => a.code) : [];
+  const blocking = prepared.ok ? [] : prepared.preflight.issues.map((i) => `${i.code}:${i.message}`);
+  return { gcode: emitted.gcode, moves, adv, blocking, ok: prepared.ok };
+}
+
+function inBox(m: { from: Vec; to: Vec }, b: { minX: number; minY: number; maxX: number; maxY: number }) {
+  const p = { x: (m.from.x + m.to.x) / 2, y: (m.from.y + m.to.y) / 2 };
+  return p.x >= b.minX - 0.05 && p.x <= b.maxX + 0.05 && p.y >= b.minY - 0.05 && p.y <= b.maxY + 0.05;
+}
+
+function opsOf(id: string) {
+  const s = useStore.getState().project.scene;
+  const o = s.objects.find((x) => x.id === id)!;
+  return operationIdsForObject(o, s.layers).map((oid) => {
+    const l = s.layers.find((x) => x.id === oid)!;
+    const e = effectiveOperationForObject(l, o);
+    return `${oid}(${e.mode} p${e.power} s${e.speed} sp${e.hatchSpacingMm})`;
+  });
+}
+
+const fill = () => useStore.getState().fillSelectionSeparately();
+const state = () => useStore.getState();
+
+
+it('H: already-Fill artwork sharing its Fill operation', () => {
+  out('== H already fill, shared');
+  load(
+    [obj('a', [{ pts: sq(0, 0, 20) }], ['F'], {}, { ...IDENTITY_TRANSFORM, x: 100, y: 100 }), obj('b', [{ pts: sq(0, 0, 20) }], ['F'], {}, { ...IDENTITY_TRANSFORM, x: 150, y: 100 })],
+    [layer('F', 'fill', { power: 25, speed: 3000, hatchSpacingMm: 0.2, hatchAngleDeg: 45 })],
+    ['a'],
+  );
+  const before = burn(state().project);
+  const aBox = { minX: 100, minY: 100, maxX: 120, maxY: 120 };
+  const ab = before.moves.filter((m) => inBox(m, aBox));
+  out(`before a ${opsOf('a')} lit len ${totalLen(ab).toFixed(1)} S ${[...new Set(ab.map((m) => m.s))]} F ${[...new Set(ab.map((m) => m.f))]}`);
+  fill();
+  const after = burn(state().project);
+  const aa = after.moves.filter((m) => inBox(m, aBox));
+  const op = state().project.scene.layers.find((l) => l.id !== 'F')!;
+  out(`after a ${opsOf('a')} b ${opsOf('b')} newOp angle ${op.hatchAngleDeg} lit len ${totalLen(aa).toFixed(1)} S ${[...new Set(aa.map((m) => m.s))]} F ${[...new Set(aa.map((m) => m.f))]}`);
+  flush();
+});
+
+it('I: artwork-own Mode written through the store action the inspector calls', () => {
+  out('== I own mode');
+  load([obj('m', [{ pts: sq(0, 0, 20) }], ['L'], {}, { ...IDENTITY_TRANSFORM, x: 100, y: 100 })], [layer('L', 'line', { power: 60 })], ['m']);
+  state().setObjectsOperationOverrideForOperation(['m'], 'L', { power: 20 });
+  state().setObjectsOperationOverrideForOperation(['m'], 'L', { mode: 'line' });
+  out(`override now ${JSON.stringify(state().project.scene.objects[0]!.operationOverride)}`);
+  const u0 = state().undoStack.length;
+  const b = burn(state().project);
+  fill();
+  const a = burn(state().project);
+  out(`after fill: layer L mode ${state().project.scene.layers[0]!.mode}; effective ${opsOf('m')}; undo +${state().undoStack.length - u0}; dirty ${state().dirty}; lit len before ${totalLen(b.moves).toFixed(1)} after ${totalLen(a.moves).toFixed(1)}; rows after ${rowsOf(a.moves)}`);
+  fill();
+  out(`second press: undo +${state().undoStack.length - u0}`);
+  flush();
+});
+
+it('J: output-off operation, shared vs unshared', () => {
+  out('== J output off');
+  load([obj('a', [{ pts: sq(0, 0, 20) }], ['L'], {}, { ...IDENTITY_TRANSFORM, x: 100, y: 100 }), obj('b', [{ pts: sq(0, 0, 20) }], ['L'], {}, { ...IDENTITY_TRANSFORM, x: 150, y: 100 })], [layer('L', 'line', { output: false })], ['a']);
+  fill();
+  const r1 = burn(state().project);
+  out(`shared, output off: new op output ${state().project.scene.layers.find((l) => l.id !== 'L')!.output}; lit len ${totalLen(r1.moves).toFixed(1)}`);
+  load([obj('a', [{ pts: sq(0, 0, 20) }], ['L'], {}, { ...IDENTITY_TRANSFORM, x: 100, y: 100 })], [layer('L', 'line', { output: false })], ['a']);
+  fill();
+  const r2 = burn(state().project);
+  out(`unshared, output off: op output ${state().project.scene.layers[0]!.output}; lit len ${totalLen(r2.moves).toFixed(1)}; ok ${r2.ok} ${r2.blocking.join('|')}`);
+  flush();
+});
+
+it('K: open path advisory location', () => {
+  out('== K open path advisory');
+  load([obj('open', [{ pts: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }], closed: false }], ['L'], {}, { ...IDENTITY_TRANSFORM, x: 100, y: 100 })], [layer('L', 'line')], ['open']);
+  fill();
+  const prepared = prepareOutput(state().project);
+  const emitted = emitPreparedGcode(prepared);
+  out(`prepared ok ${prepared.ok}; advisories ${JSON.stringify(prepared.ok ? prepared.advisories : null)}; preflight ${JSON.stringify((prepared as { preflight?: unknown }).preflight)?.slice(0, 600)}; emitted.preflight ${JSON.stringify(emitted.preflight)?.slice(0, 600)}`);
+  out(`lit moves ${litMoves(emitted.gcode, state().project.device).length}`);
+  flush();
+});
+
+it('L: mixed raster + vector selection', () => {
+  out('== L mixed');
+  const base = createProject();
+  const raster = {
+    kind: 'raster-image' as const, id: 'img', source: 'img.png', dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    pixelWidth: 1, pixelHeight: 1, bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 }, transform: IDENTITY_TRANSFORM,
+    color: '#808080', dither: 'grayscale' as const, linesPerMm: 10, lumaBase64: 'gA==', operationIds: ['I'],
+  };
+  useStore.setState({
+    project: { ...base, scene: { ...base.scene, objects: [raster, obj('v', [{ pts: sq(0, 0, 20) }], ['I'])], layers: [layer('I', 'line', { mode: 'image' })], groups: [] } },
+    selectedObjectId: 'img', additionalSelectedIds: new Set(['v']), undoStack: [], redoStack: [],
+  });
+  fill();
+  const s = state().project.scene;
+  out(`layers ${s.layers.map((l) => `${l.id}:${l.mode}`)}; img ops ${operationIdsForObject(s.objects[0]!, s.layers)}; v ops ${opsOf('v')}`);
+  flush();
+});
+
+it('N: two overlapping separate objects selected onto one Fill', () => {
+  out('== N overlap across objects');
+  load([obj('a', [{ pts: sq(0, 0, 20) }], ['L'], {}, { ...IDENTITY_TRANSFORM, x: 100, y: 100 }), obj('b', [{ pts: sq(10, 10, 20) }], ['L'], {}, { ...IDENTITY_TRANSFORM, x: 100, y: 100 }), obj('c', [{ pts: sq(0, 0, 5) }], ['L'], {}, { ...IDENTITY_TRANSFORM, x: 10, y: 10 })], [layer('L', 'line')], ['a', 'b']);
+  fill();
+  const r = burn(state().project);
+  const sp = state().project.scene.layers.find((l) => l.mode === 'fill')!.hatchSpacingMm;
+  const m = r.moves.filter((x) => inBox(x, { minX: 100, minY: 100, maxX: 130, maxY: 130 }));
+  out(`hatchArea ${(totalLen(m) * sp).toFixed(1)} (union 700, xor 600) layers ${state().project.scene.layers.map((l) => l.id + ':' + l.mode)}`);
+  flush();
+});
+
+it('O: mixed open + closed preflight', () => {
+  out('== O mixed open preflight');
+  load([obj('open', [{ pts: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }], closed: false }], ['L'], {}, { ...IDENTITY_TRANSFORM, x: 100, y: 100 }), obj('closed', [{ pts: sq(0, 0, 20) }], ['L'], {}, { ...IDENTITY_TRANSFORM, x: 150, y: 100 })], [layer('L', 'line')], ['open', 'closed']);
+  fill();
+  const prepared = prepareOutput(state().project);
+  const emitted = emitPreparedGcode(prepared);
+  out(`ok ${prepared.ok} advisories ${JSON.stringify(prepared.ok ? prepared.advisories : null)} emitted.preflight ${JSON.stringify(emitted.preflight).slice(0, 500)}`);
+  flush();
+});

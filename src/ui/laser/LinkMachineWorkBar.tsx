@@ -1,5 +1,6 @@
 // The Live Motion bar for a job on a controller link outside the laser store:
-// a Moshiboard over USB or a Ruida over the network (ADR-705 Amendment 3).
+// every source in LINK_MACHINE_SOURCES, a Moshiboard or K40 over USB or a
+// Ruida over the network (ADR-705 Amendments 3 and 6).
 // Their panels sit in the Machine details popover, which unmounts on any
 // outside click, so this always-mounted bar keeps an Abort reachable from any
 // window state while the link works (PROJECT.md non-negotiable 9; code quality

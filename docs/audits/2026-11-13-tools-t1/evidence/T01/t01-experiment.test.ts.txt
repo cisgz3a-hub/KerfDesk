@@ -1,0 +1,58 @@
+// T01: the experiment record captured on Generate stores each cell's burned settings.
+import { describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { generateMaterialTestGrid } from '../t01-main/src/core/job/material-test-grid';
+import { createProject } from '../t01-main/src/core/scene';
+import { DEFAULT_DEVICE_PROFILE } from '../t01-main/src/core/devices';
+import { captureGridExperiment } from '../t01-main/src/ui/material-library/capture-material-experiment';
+
+const out: string[] = [];
+const base = {
+  speedMin: 1000,
+  speedMax: 3000,
+  powerMin: 10,
+  powerMax: 40,
+  passesMin: 1,
+  passesMax: 4,
+  intervalMinMm: 0.05,
+  intervalMaxMm: 0.2,
+  speed: 1500,
+  power: 30,
+  passes: 1,
+  intervalMm: 0.1,
+  cellWidthMm: 5,
+  cellHeightMm: 5,
+  gapMm: 1,
+  maxFeedMmPerMin: 6000,
+  accelMmPerSec2: 500,
+};
+
+describe('experiment capture', () => {
+  for (const [row, col, mode] of [
+    ['speed', 'passes', 'fill'],
+    ['interval', 'power', 'fill'],
+    ['passes', 'speed', 'line'],
+    ['power', 'interval', 'fill'],
+  ] as const) {
+    it(`${row} x ${col} ${mode}`, () => {
+      const grid = generateMaterialTestGrid({ ...base, rows: 3, columns: 3, rowParameter: row, columnParameter: col, mode });
+      const exp = captureGridExperiment(createProject(DEFAULT_DEVICE_PROFILE), grid, 'exp-1', '2026-11-13T00:00:00Z');
+      const bad: string[] = [];
+      for (const c of exp.cells) {
+        const g = grid.cells.find((x) => x.row === c.row && x.column === c.column)!;
+        const s = c.process.steps[0]!.settings;
+        const cmp: [string, number | undefined, number | undefined][] = [
+          ['power', s.power, g.power],
+          ['speed', s.speed, g.effectiveSpeed],
+          ['passes', s.passes, g.passes],
+          ...(mode === 'fill' ? ([['hatch', s.hatchSpacingMm, g.intervalMm]] as [string, number | undefined, number | undefined][]) : []),
+        ];
+        for (const [k, a, b] of cmp) if (a !== b) bad.push(`${c.id} ${k}: recipe ${a} vs cell ${b}`);
+        if (c.process.steps.length !== 1) bad.push(`${c.id}: ${c.process.steps.length} steps`);
+      }
+      out.push(`${row} x ${col} ${mode}: ${bad.length === 0 ? 'all match' : bad.join('; ')}`);
+      expect(true).toBe(true);
+    });
+  }
+  it('log', () => writeFileSync('C:/Users/stolk/kd-t1/zz-t01/t01-experiment.log', out.join('\n')));
+});

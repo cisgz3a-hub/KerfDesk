@@ -2,8 +2,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parseSvg } from '../svg/parse-svg';
+import { HAIRLINE_STROKE_WIDTH } from '../svg/hairline-stroke';
 import { convertPostscript } from './convert-postscript';
-import { PS_LIMITS } from './ps-vm';
+import { PS_LIMITS, PS_STEP_MESSAGE, psTimeMessage } from './ps-budget';
 
 const bytes = (text: string): Uint8Array => new TextEncoder().encode(text);
 const golden = (name: string): Uint8Array =>
@@ -18,6 +19,8 @@ function ok(text: string | Uint8Array) {
 function pathData(svg: string): string[] {
   return [...svg.matchAll(/ d="([^"]*)"/g)].map((m) => m[1] ?? '');
 }
+
+const PS_TINY_RULE = '%!PS-Adobe-3.0\n0 0 moveto 50 0.0000012 lineto stroke\nshowpage\n';
 
 const EPS = (body: string, box = '0 0 100 100'): string =>
   `%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: ${box}\n%%EndComments\n${body}\nshowpage\n%%EOF\n`;
@@ -91,6 +94,49 @@ describe('artwork with no height or width (audit C2 D1-P2-4)', () => {
 
   it('leaves artwork with both dimensions unchanged', () => {
     expect(ok(PS('0 0 moveto 72 36 lineto stroke')).svg).toContain('viewBox="0 0 72 36"');
+  });
+});
+
+describe('zero-width strokes and tiny rules (E1-P1-3, E1-P3-1)', () => {
+  function colours(text: string): string[] {
+    const result = ok(text);
+    const parsed = parseSvg({ svgText: result.svg, id: 'ps', source: 'hairline.ps' });
+    return (parsed.object?.paths ?? []).map((path) => path.color).sort();
+  }
+  const AI8 = (body: string): string =>
+    '%!PS-Adobe-3.0 EPSF-3.0\n%%Creator: Adobe Illustrator(R) 8.0\n%%BoundingBox: 0 0 100 100\n' +
+    '%%EndProlog\n' +
+    body +
+    '\n';
+
+  it('keeps a 0 setlinewidth hairline beside a stroked path', () => {
+    const body =
+      '0 setlinewidth 1 0 0 setrgbcolor 0 0 moveto 50 0 lineto stroke ' +
+      '2 setlinewidth 0 0 1 setrgbcolor 0 10 moveto 50 10 lineto stroke';
+    expect(colours(EPS(body))).toEqual(['#0000ff', '#ff0000']);
+  });
+
+  it('keeps a 0 setlinewidth hairline beside a fill-only path', () => {
+    const body =
+      '0 setlinewidth 1 0 0 setrgbcolor 0 0 moveto 50 0 lineto stroke ' +
+      '0 0 1 setrgbcolor 0 20 10 10 rectfill';
+    expect(colours(EPS(body))).toEqual(['#0000ff', '#ff0000']);
+  });
+
+  it('keeps an Illustrator 0 w hairline beside a fill', () => {
+    const body = '1 0 0 0 K 0 w 0 0 m 50 0 L S 0 0 0 1 k 0 20 m 10 20 L 10 30 L 0 30 L f';
+    expect(colours(AI8(body))).toHaveLength(2);
+  });
+
+  it('writes a width that rounds to zero as the hairline', () => {
+    const svg = ok(EPS('1e-9 setlinewidth 0 0 moveto 50 50 lineto stroke')).svg;
+    expect(svg).toContain(`stroke-width="${HAIRLINE_STROKE_WIDTH}"`);
+  });
+
+  it('imports a rule whose height is under a millionth of a millimetre', () => {
+    const result = ok(PS_TINY_RULE);
+    const parsed = parseSvg({ svgText: result.svg, id: 'ps', source: 'tiny.ps' });
+    expect(parsed.object).not.toBeNull();
   });
 });
 
@@ -168,36 +214,73 @@ describe('PostScript language subset', () => {
     expect(looping).toEqual({ kind: 'error', reason: expect.stringMatching(/loop forever/) });
   });
 
-  describe('bounds every run in work and time (ADR-700 Amd 2)', () => {
-    const tooLong = { kind: 'error', reason: expect.stringMatching(/takes too long/) };
+  describe('bounds every run in work and time (ADR-700 Amd 2, 3)', () => {
+    const stepLimit = { kind: 'error', reason: PS_STEP_MESSAGE };
+    const anyLimit = { kind: 'error', reason: expect.any(String) };
     const timed = (program: string) => {
       const started = performance.now();
       const result = convertPostscript(bytes(program));
       return { result, ms: performance.now() - started };
     };
+    const PATH = (points: number): string => `0 0 moveto 1 1 ${points} { dup lineto } for `;
+    const DICT = (entries: number): string =>
+      `/a 1 dict def /b 1 dict def 0 1 ${entries} { a exch 0 put } for `;
 
     it.each([
-      ['a procedure with nothing in it', EPS('{} loop')],
-      ['the same inside stopped', EPS('{ {} loop } stopped pop')],
-      ['a counted run of it', EPS('1e15 {} repeat')],
-      ['large allocations', EPS('{ 100000 array pop } loop')],
-      ['large copies', EPS('/s 100000 string def { s 0 100000 getinterval pop } loop')],
-      [
-        'an Illustrator script',
-        '%!PS-Adobe-3.0 EPSF-3.0\n%%Creator: Adobe Illustrator(R) 8.0\n%%EndProlog\n{} loop\n',
-      ],
-    ])('ends %s with the budget error', (_label, program) => {
+      EPS('{} loop'),
+      EPS('{ {} loop } stopped pop'),
+      EPS('1e15 {} repeat'),
+      EPS('{ 100000 array pop } loop'),
+      EPS('/s 100000 string def { s 0 100000 getinterval pop } loop'),
+      '%!PS-Adobe-3.0 EPSF-3.0\n%%Creator: Adobe Illustrator(R) 8.0\n%%EndProlog\n{} loop\n',
+    ])('ends step-bound program %# with the step limit', (program) => {
       const { result, ms } = timed(program);
-      expect(result).toEqual(tooLong);
+      expect(result).toEqual(stepLimit);
       expect(ms).toBeLessThan(PS_LIMITS.milliseconds);
     });
 
-    it('ends a run that outlasts the time limit even within the step budget', () => {
+    it.each([
+      EPS(PATH(200_000) + '{ pathbbox clear } loop'),
+      EPS(PATH(200_000) + '{ gsave grestore } loop'),
+      EPS(PATH(50_000) + '{ gsave stroke grestore } loop'),
+      EPS(PATH(300_000) + '{ gsave } loop'),
+      EPS(DICT(50_000) + '{ a b copy pop } loop'),
+      EPS(DICT(50_000) + '{ a { pop pop exit } forall } loop'),
+      EPS('0 1 99980 {} for { 99980 1 roll } loop'),
+      EPS('/a 99000 array def { a aload clear } loop'),
+      EPS('/a 99000 array def /b 99000 array def { b 0 a putinterval } loop'),
+    ])('ends size-bound program %# with a limit, well inside the time limit', (program) => {
+      const { result, ms } = timed(program);
+      expect(result).toEqual(anyLimit);
+      expect(ms).toBeLessThan(PS_LIMITS.milliseconds);
+    });
+
+    it('caps the entries of one dictionary', () => {
+      expect(convertPostscript(bytes(EPS(DICT(150_000))))).toEqual({
+        kind: 'error',
+        reason: expect.stringMatching(/dictionary is too large/),
+      });
+    });
+
+    it('still reads a file that fills and then strokes one large path', () => {
+      const program = EPS(PATH(1_000_000) + 'gsave fill grestore stroke');
+      const result = convertPostscript(bytes(program), { milliseconds: 60_000 });
+      expect(result.kind).toBe('ok');
+    });
+
+    it('ends a run that outlasts its time limit with its own message', () => {
       const program = bytes(EPS('2000000 { 1 pop } repeat 0 0 moveto 1 1 lineto stroke'));
       expect(convertPostscript(program).kind).toBe('ok');
       let now = 0;
       const clock = (): number => (now += 1_000);
-      expect(convertPostscript(program, { clock })).toEqual(tooLong);
+      expect(convertPostscript(program, { clock })).toEqual({
+        kind: 'error',
+        reason: psTimeMessage(PS_LIMITS.milliseconds),
+      });
+      expect(convertPostscript(program, { clock, milliseconds: 30_000 })).toEqual({
+        kind: 'error',
+        reason: psTimeMessage(30_000),
+      });
     });
   });
 

@@ -1,0 +1,403 @@
+// T07 Close Open Fill Contours: eligibility in the world frame, closing segment,
+// what burns (prepareOutput -> G-code) vs an independent area oracle, shared Line paths,
+// curves kept exactly, Undo/Redo and save/reopen.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  applyTransform,
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  type ColoredPath,
+  type CurveSubpath,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type Transform,
+} from '../t06-main/src/core/scene';
+import { prepareOutput } from '../t06-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t06-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t06-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t06-main/src/io/project/deserialize-project';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { selectedOpenFillContourCounts } from '../t06-main/src/ui/common/fill-diagnostics';
+import { gridArea, hatchArea, litMoves, totalLen, type LitMove, type Vec } from './decode';
+
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t07/t07-burn.log', log.join('\n'));
+};
+
+beforeEach(() => resetStore());
+
+const FILL_SPEED = 1500;
+const LINE_SPEED = 300;
+
+function layer(id: string, mode: 'line' | 'fill', patch: Partial<Layer> = {}): Layer {
+  const colors: Record<string, string> = { L: '#ff0000', F: '#0000ff' };
+  return {
+    ...createLayer({ id, color: colors[id] ?? '#123456', name: id, mode }),
+    ...(mode === 'line' ? { speed: LINE_SPEED, power: 80 } : { speed: FILL_SPEED, power: 30 }),
+    ...patch,
+  };
+}
+
+function svgObj(
+  id: string,
+  paths: ColoredPath[],
+  opIds: string[] | undefined,
+  transform: Transform,
+  extra: Partial<ImportedSvg> = {},
+): ImportedSvg {
+  const all = paths.flatMap((p) => p.polylines.flatMap((pl) => pl.points));
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: {
+      minX: Math.min(...all.map((p) => p.x)),
+      minY: Math.min(...all.map((p) => p.y)),
+      maxX: Math.max(...all.map((p) => p.x)),
+      maxY: Math.max(...all.map((p) => p.y)),
+    },
+    transform,
+    ...(opIds === undefined ? {} : { operationIds: opIds }),
+    paths,
+    ...extra,
+  };
+}
+
+function openPath(pts: Vec[], color = '#000000'): ColoredPath {
+  return { color, polylines: [{ closed: false, points: pts }] };
+}
+
+function load(objects: SceneObject[], layers: Layer[], selected: string[]): void {
+  const base = createProject();
+  const project: Project = {
+    ...base,
+    optimization: { ...DEFAULT_PROJECT_OPTIMIZATION },
+    scene: { ...base.scene, objects, layers, groups: [] },
+  };
+  useStore.setState({
+    project,
+    selectedObjectId: selected[0] ?? null,
+    additionalSelectedIds: new Set(selected.slice(1)),
+    undoStack: [],
+    redoStack: [],
+    dirty: false,
+  });
+}
+
+function burn(project: Project) {
+  const prepared = prepareOutput(project);
+  const emitted = prepared.ok ? emitPreparedGcode(prepared) : { gcode: '' };
+  const moves = litMoves(emitted.gcode, project.device);
+  const adv = prepared.ok ? (prepared.advisories ?? []).map((a) => a.code) : [];
+  const blocking = prepared.ok
+    ? []
+    : prepared.preflight.issues.map((i) => `${i.code}:${i.message.slice(0, 90)}`);
+  return { gcode: emitted.gcode, moves, adv, blocking, ok: prepared.ok };
+}
+
+const fillMoves = (m: ReadonlyArray<LitMove>) => m.filter((x) => x.f === FILL_SPEED);
+const lineMoves = (m: ReadonlyArray<LitMove>) => m.filter((x) => x.f === LINE_SPEED);
+const st = () => useStore.getState();
+const counts = () =>
+  selectedOpenFillContourCounts(st().project, st().selectedObjectId, st().additionalSelectedIds);
+const f3 = (n: number) => n.toFixed(3);
+
+// U-shaped square 20 x 10 local, start at (0,0), ending at (gx, gy) near the start.
+function nearSquare(gx: number, gy: number): Vec[] {
+  return [
+    { x: 0, y: 0 },
+    { x: 20, y: 0 },
+    { x: 20, y: 10 },
+    { x: 0, y: 10 },
+    { x: gx, y: gy },
+  ];
+}
+
+function areaCase(name: string, pts: Vec[], t: Transform) {
+  load([svgObj('a', [openPath(pts)], ['F'], t)], [layer('F', 'fill', { hatchSpacingMm: 0.05 })], ['a']);
+  const c0 = counts();
+  const b0 = burn(st().project);
+  const undoBefore = st().undoStack.length;
+  const p0 = st().project;
+  st().closeSelectedOpenFillContours();
+  const changed = st().project !== p0;
+  const c1 = counts();
+  const b1 = burn(st().project);
+  const world = pts.map((p) => applyTransform(p, t));
+  const gap = Math.hypot(world[0]!.x - world.at(-1)!.x, world[0]!.y - world.at(-1)!.y);
+  const oracle = gridArea([world], 'evenodd', 0.02);
+  out(
+    `${name}: worldGap ${f3(gap)} counts before open=${c0.openCount} closeable=${c0.closeableCount} | before burn ok=${b0.ok} fillLen=${f3(totalLen(fillMoves(b0.moves)))} blocking=${b0.blocking.join('|')} adv=${b0.adv.join(',')} | changed=${changed} undo+${st().undoStack.length - undoBefore} counts after open=${c1.openCount} | after hatchArea=${f3(hatchArea(fillMoves(b1.moves), 0.05))} oracle=${f3(oracle)} ok=${b1.ok} blocking=${b1.blocking.join('|')}`,
+  );
+}
+
+it('A: gap measured in world frame; area of the closed result', () => {
+  out('== A world-frame gap and area');
+  const at = { ...IDENTITY_TRANSFORM, x: 100, y: 100 };
+  areaCase('identity gap0.3y', nearSquare(0, 0.3), at);
+  areaCase('identity gap0.6y', nearSquare(0, 0.6), at);
+  areaCase('identity gap0.5y (boundary)', nearSquare(0, 0.5), at);
+  areaCase('scaleY3 local0.3y -> world0.9', nearSquare(0, 0.3), { ...at, scaleY: 3 });
+  areaCase('scale0.25 local1.6y -> world0.4', nearSquare(0, 1.6), { ...at, scaleX: 0.25, scaleY: 0.25 });
+  areaCase('rot37 mirrorX scale2x0.5 local0.4y -> world0.2', nearSquare(0, 0.4), {
+    ...at,
+    rotationDeg: 37,
+    mirrorX: true,
+    scaleX: 2,
+    scaleY: 0.5,
+  });
+  areaCase('scale2x0.5 local0.3x -> world0.6', nearSquare(0.3, 0), { ...at, scaleX: 2, scaleY: 0.5 });
+  areaCase('diag gap 0.3,0.3 rot200 mirrorY', nearSquare(0.3, 0.3), { ...at, rotationDeg: 200, mirrorY: true });
+  areaCase('gap 1e-5 (already closed enough)', nearSquare(0, 1e-5), at);
+  areaCase('gap 2e-4', nearSquare(0, 2e-4), at);
+});
+
+it('B: a path shared by Fill and Line operations', () => {
+  out('== B shared Fill+Line path');
+  for (const kerf of [0, 0.2]) {
+    for (const tabs of [false, true]) {
+      const t = { ...IDENTITY_TRANSFORM, x: 100, y: 100 };
+      load(
+        [svgObj('a', [openPath(nearSquare(0, 0.4))], ['F', 'L'], t)],
+        [
+          layer('F', 'fill', { hatchSpacingMm: 0.1 }),
+          layer('L', 'line', { kerfOffsetMm: kerf, tabsEnabled: tabs, tabSizeMm: 1, tabsPerShape: 4 }),
+        ],
+        ['a'],
+      );
+      const b0 = burn(st().project);
+      st().closeSelectedOpenFillContours();
+      const b1 = burn(st().project);
+      const l0 = lineMoves(b0.moves);
+      const l1 = lineMoves(b1.moves);
+      const bb = (m: LitMove[]) => {
+        const xs = m.flatMap((x) => [x.from.x, x.to.x]);
+        const ys = m.flatMap((x) => [x.from.y, x.to.y]);
+        return `[${f3(Math.min(...xs))},${f3(Math.min(...ys))}]-[${f3(Math.max(...xs))},${f3(Math.max(...ys))}]`;
+      };
+      out(
+        `kerf=${kerf} tabs=${tabs}: before ok=${b0.ok} line len ${f3(totalLen(l0))} moves ${l0.length} box ${l0.length ? bb(l0) : '-'} fillLen ${f3(totalLen(fillMoves(b0.moves)))} blocking ${b0.blocking.join('|')} | after ok=${b1.ok} line len ${f3(totalLen(l1))} moves ${l1.length} box ${l1.length ? bb(l1) : '-'} fillLen ${f3(totalLen(fillMoves(b1.moves)))} adv ${b1.adv.join(',')}`,
+      );
+    }
+  }
+  // Path-level ops: path 0 on Fill only, path 1 (same object) on Line only; both open near-closed.
+  const t = { ...IDENTITY_TRANSFORM, x: 100, y: 100 };
+  load(
+    [
+      svgObj(
+        'm',
+        [
+          { ...openPath(nearSquare(0, 0.3)), operationIds: ['F'] },
+          { ...openPath(nearSquare(0, 0.3).map((p) => ({ x: p.x + 30, y: p.y }))), operationIds: ['L'] },
+        ],
+        undefined,
+        t,
+      ),
+    ],
+    [layer('F', 'fill'), layer('L', 'line')],
+    ['m'],
+  );
+  const before = st().project.scene.objects[0] as ImportedSvg;
+  st().closeSelectedOpenFillContours();
+  const after = st().project.scene.objects[0] as ImportedSvg;
+  out(
+    `mixed object: fill path closed=${after.paths[0]!.polylines[0]!.closed} line path unchanged=${JSON.stringify(after.paths[1]) === JSON.stringify(before.paths[1])}`,
+  );
+  // Object override turns a Line operation into Fill for this object only.
+  load(
+    [svgObj('o', [openPath(nearSquare(0, 0.3))], ['L'], t, { operationOverride: { byOperation: { L: { mode: 'fill' } } } } as never)],
+    [layer('L', 'line')],
+    ['o'],
+  );
+  out(`override L->fill: counts ${JSON.stringify(counts())}`);
+});
+
+function cubicArcPath(gapDeg: number, r: number): { path: ColoredPath; curve: CurveSubpath } {
+  // Circle of radius r from angle gap/2 to 360-gap/2 using 4 cubic segments (open).
+  const a0 = (gapDeg / 2) * (Math.PI / 180);
+  const a1 = (2 * Math.PI) - a0;
+  const n = 4;
+  const segs: CurveSubpath['segments'][number][] = [];
+  const pt = (a: number) => ({ x: r * Math.cos(a), y: r * Math.sin(a) });
+  const step = (a1 - a0) / n;
+  const k = (4 / 3) * Math.tan(step / 4);
+  const pts: Vec[] = [pt(a0)];
+  for (let i = 0; i < n; i++) {
+    const s = a0 + i * step;
+    const e = s + step;
+    const ps = pt(s);
+    const pe = pt(e);
+    segs.push({
+      kind: 'cubic',
+      control1: { x: ps.x - k * r * Math.sin(s), y: ps.y + k * r * Math.cos(s) },
+      control2: { x: pe.x + k * r * Math.sin(e), y: pe.y - k * r * Math.cos(e) },
+      to: pe,
+    });
+    for (let j = 1; j <= 16; j++) pts.push(pt(s + (j / 16) * step));
+  }
+  const curve: CurveSubpath = { start: pt(a0), closed: false, segments: segs };
+  return { curve, path: { color: '#000000', polylines: [{ closed: false, points: pts }], curves: [curve] } };
+}
+
+it('C: curves keep their exact shape; filled area equals circle minus chord segment', () => {
+  out('== C cubic arc');
+  const r = 10;
+  for (const gapMm of [0.2, 0.3]) {
+    const gapDeg = (2 * Math.asin(gapMm / 2 / r) * 180) / Math.PI;
+    const { path, curve } = cubicArcPath(gapDeg, r);
+    const t = { ...IDENTITY_TRANSFORM, x: 100, y: 100, rotationDeg: 15, scaleX: 1.5, scaleY: 1.5 };
+    load([svgObj('c', [path], ['F'], t)], [layer('F', 'fill', { hatchSpacingMm: 0.05 })], ['c']);
+    const c0 = counts();
+    st().closeSelectedOpenFillContours();
+    const o = st().project.scene.objects[0] as ImportedSvg;
+    const nc = o.paths[0]!.curves![0]!;
+    const segsSame = JSON.stringify(nc.segments.slice(0, curve.segments.length)) === JSON.stringify(curve.segments);
+    const extra = nc.segments.slice(curve.segments.length);
+    const b1 = burn(st().project);
+    // Oracle: scaled circle area minus circular segment cut by the chord (exact).
+    const R = r * 1.5;
+    const theta = (gapDeg * Math.PI) / 180; // the missing arc angle
+    const segArea = (R * R * (theta - Math.sin(theta))) / 2;
+    const oracle = Math.PI * R * R - segArea;
+    out(
+      `gap ${gapMm}mm local (${f3(gapMm * 1.5)} world): counts ${JSON.stringify(c0)} closed=${nc.closed} originalSegmentsIdentical=${segsSame} extra=${JSON.stringify(extra)} start=${JSON.stringify(nc.start)} compatClosed=${o.paths[0]!.polylines[0]!.closed} | hatchArea ${f3(hatchArea(fillMoves(b1.moves), 0.05))} oracle ${f3(oracle)} ok=${b1.ok}`,
+    );
+  }
+});
+
+it('D: undo, redo, save/reopen, locked, empty, no-eligible', () => {
+  out('== D history and messaging');
+  const t = { ...IDENTITY_TRANSFORM, x: 100, y: 100, rotationDeg: 33, scaleX: 1.3, scaleY: 0.7, mirrorX: true };
+  load(
+    [
+      svgObj('a', [openPath(nearSquare(0, 0.3))], ['F'], t),
+      svgObj('b', [openPath(nearSquare(0, 0.3))], ['F'], { ...t, x: 150 }),
+    ],
+    [layer('F', 'fill')],
+    ['a'],
+  );
+  const p0 = st().project;
+  const s0 = serializeProject(p0);
+  const g0 = burn(p0).gcode;
+  st().closeSelectedOpenFillContours();
+  const p1 = st().project;
+  const g1 = burn(p1).gcode;
+  out(`b (unselected) untouched: ${p1.scene.objects[1] === p0.scene.objects[1]}`);
+  st().undo();
+  out(`undo exact: ${serializeProject(st().project) === s0} gcode same ${burn(st().project).gcode === g0} dirty=${st().dirty}`);
+  st().redo();
+  out(`redo exact: ${st().project === p1 || serializeProject(st().project) === serializeProject(p1)} gcode same ${burn(st().project).gcode === g1}`);
+  const re = deserializeProject(serializeProject(st().project));
+  out(`reopen kind ${re.kind} gcode same ${re.kind === 'ok' ? burn(re.project).gcode === g1 : 'n/a'}`);
+  // second run is a no-op
+  const u = st().undoStack.length;
+  st().closeSelectedOpenFillContours();
+  out(`second run adds undo: ${st().undoStack.length - u}`);
+  // locked
+  load([svgObj('a', [openPath(nearSquare(0, 0.3))], ['F'], t, { locked: true })], [layer('F', 'fill')], ['a']);
+  out(`locked counts ${JSON.stringify(counts())}`);
+  // output-off fill layer
+  load([svgObj('a', [openPath(nearSquare(0, 0.3))], ['F'], t)], [layer('F', 'fill', { output: false })], ['a']);
+  out(`output-off counts ${JSON.stringify(counts())}`);
+  // fill layer not visible
+  load([svgObj('a', [openPath(nearSquare(0, 0.3))], ['F'], t)], [layer('F', 'fill', { visible: false })], ['a']);
+  out(`invisible-layer counts ${JSON.stringify(counts())}`);
+});
+
+it('E: self-crossing and odd shapes', () => {
+  out('== E odd shapes');
+  const at = { ...IDENTITY_TRANSFORM, x: 100, y: 100 };
+  // bowtie whose ends are 0.3 apart
+  areaCase('bowtie open', [{ x: 0, y: 0 }, { x: 30, y: 20 }, { x: 30, y: 0 }, { x: 0, y: 20 }, { x: 0, y: 0.3 }], at);
+  // centerline scribble: out and back (zero-area sliver)
+  areaCase('out-and-back sliver', [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 0.1 }, { x: 0, y: 0.2 }], at);
+  // closing segment crosses the shape: hook whose end comes back across its start edge
+  areaCase('closing segment crosses an edge', [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0.2, y: 10 }, { x: 0.2, y: -0.2 }], at);
+  // tiny contour, 0.8 mm across
+  areaCase('tiny 0.8mm C', nearSquare(0, 0.3).map((p) => ({ x: p.x * 0.04, y: p.y * 0.08 })), at);
+});
+
+it('F: pen shape node count, unrepairable messaging, text object', async () => {
+  out('== F pen shape / unrepairable / text');
+  const { createPolyline } = await import('../t06-main/src/core/shapes');
+  const pts = [
+    { x: 0, y: 0 },
+    { x: 20, y: 0 },
+    { x: 25, y: 10 },
+    { x: 20, y: 20 },
+    { x: 0, y: 20 },
+    { x: 0.2, y: 0.2 },
+  ];
+  const at = { ...IDENTITY_TRANSFORM, x: 100, y: 100 };
+  const pen = createPolyline({ id: 'pen', color: '#0000ff', spec: { closed: false, points: pts }, transform: at });
+  load([{ ...pen, operationIds: ['F'] } as SceneObject], [layer('F', 'fill', { hatchSpacingMm: 0.05 })], ['pen']);
+  const c0 = counts();
+  st().closeSelectedOpenFillContours();
+  const s = st().project.scene.objects[0] as SceneObject & { spec: { points: Vec[]; closed: boolean } };
+  const b = burn(st().project);
+  out(`pen: counts ${JSON.stringify(c0)} spec points before ${pts.length} after ${s.spec.points.length} closed=${s.spec.closed} fill area ${f3(hatchArea(fillMoves(b.moves), 0.05))}`);
+  // Unrepairable: shape (polyline) with two subpaths
+  const two = { ...pen, paths: [{ ...pen.paths[0]!, polylines: [...pen.paths[0]!.polylines, ...pen.paths[0]!.polylines], curves: [...pen.paths[0]!.curves!, ...pen.paths[0]!.curves!] }] };
+  load([{ ...two, operationIds: ['F'] } as SceneObject], [layer('F', 'fill')], ['pen']);
+  out(`two-subpath pen shape: counts ${JSON.stringify(counts())}`);
+  // Curves and polylines that do not pair
+  const unpaired = svgObj('u', [{ ...openPath(nearSquare(0, 0.3)), curves: [] }], ['F'], at);
+  load([unpaired], [layer('F', 'fill')], ['u']);
+  out(`unpaired curves: counts ${JSON.stringify(counts())}`);
+  // Text object with an open glyph contour
+  const text = {
+    kind: 'text', id: 't', content: 'C', fontKey: 'x', sizeMm: 10, alignment: 'left', lineHeight: 1, letterSpacing: 0,
+    color: '#0000ff', bounds: { minX: 0, minY: 0, maxX: 20, maxY: 10 }, transform: at, operationIds: ['F'],
+    paths: [openPath(nearSquare(0, 0.3), '#0000ff')],
+  } as unknown as SceneObject;
+  load([text], [layer('F', 'fill')], ['t']);
+  st().closeSelectedOpenFillContours();
+  const tt = st().project.scene.objects[0] as SceneObject & { paths: ColoredPath[] };
+  out(`text: closed=${tt.paths[0]!.polylines[0]!.closed} kind=${tt.kind}`);
+});
+
+function sampleCubic(p0: Vec, c1: Vec, c2: Vec, p3: Vec, n: number): Vec[] {
+  const r: Vec[] = [];
+  for (let i = 1; i <= n; i++) {
+    const t = i / n;
+    const u = 1 - t;
+    r.push({
+      x: u * u * u * p0.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * p3.x,
+      y: u * u * u * p0.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * p3.y,
+    });
+  }
+  return r;
+}
+
+it('G: cubic arc closed by the tool vs authored-closed control vs dense oracle', () => {
+  out('== G cubic control');
+  const r = 10;
+  const gapMm = 0.3;
+  const gapDeg = (2 * Math.asin(gapMm / 2 / r) * 180) / Math.PI;
+  const { path, curve } = cubicArcPath(gapDeg, r);
+  const t = { ...IDENTITY_TRANSFORM, x: 100, y: 100, rotationDeg: 15, scaleX: 1.5, scaleY: 1.5 };
+  load([svgObj('c', [path], ['F'], t)], [layer('F', 'fill', { hatchSpacingMm: 0.05 })], ['c']);
+  st().closeSelectedOpenFillContours();
+  const repaired = burn(st().project);
+  const closedCurve: CurveSubpath = { ...curve, closed: true, segments: [...curve.segments, { kind: 'line', to: curve.start }] };
+  const control = { ...path, polylines: [{ closed: true, points: [...path.polylines[0]!.points, path.polylines[0]!.points[0]!] }], curves: [closedCurve] };
+  load([svgObj('c', [control], ['F'], t)], [layer('F', 'fill', { hatchSpacingMm: 0.05 })], ['c']);
+  const ctl = burn(st().project);
+  const dense: Vec[] = [curve.start];
+  let p = curve.start;
+  for (const s of curve.segments) {
+    if (s.kind !== 'cubic') continue;
+    dense.push(...sampleCubic(p, s.control1, s.control2, s.to, 400));
+    p = s.to;
+  }
+  const world = dense.map((q) => applyTransform(q, t));
+  out(`repaired hatch ${f3(hatchArea(fillMoves(repaired.moves), 0.05))} control hatch ${f3(hatchArea(fillMoves(ctl.moves), 0.05))} gcode identical ${repaired.gcode === ctl.gcode} dense-cubic grid oracle ${f3(gridArea([world], 'evenodd', 0.05))}`);
+});

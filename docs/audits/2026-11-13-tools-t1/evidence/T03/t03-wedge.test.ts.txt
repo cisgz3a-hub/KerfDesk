@@ -1,0 +1,135 @@
+// T03 Tone Calibration: burn the generated wedge through prepareOutput and
+// decode each patch's lit share / energy against the tone its label states.
+import { describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  DEFAULT_DEVICE_PROFILE,
+  emitProject,
+  fmt,
+  inset,
+  litMoves,
+  patchStats,
+  projectForScene,
+  type Box,
+} from './harness';
+import { generateToneCalibrationWedge } from '../t01-main/src/core/job/tone-calibration-wedge';
+import {
+  DEFAULT_TONE_WEDGE_DRAFT,
+  photoBurnSettings,
+  seededToneWedgeDraft,
+  toneWedgeOptions,
+  type ToneWedgeDraft,
+  type ToneCalibrationSeed,
+} from '../t01-main/src/ui/calibration/tone-calibration-draft';
+import { createLayer, type DeviceProfile } from '../t01-main/src/core/scene';
+import { rotaryYScale } from '../t01-main/src/core/devices/rotary';
+
+const log: string[] = [];
+
+type Case = {
+  title: string;
+  draft?: Partial<ToneWedgeDraft>;
+  seed?: ToneCalibrationSeed | null;
+  device?: Partial<DeviceProfile>;
+  laserMaxPowerS?: number;
+  opPatch?: Record<string, unknown>;
+  dump?: string;
+};
+
+const seedOp = (patch: Record<string, unknown>): ToneCalibrationSeed => ({
+  sourceName: 'photo.png',
+  settings: { ...createLayer({ id: 'p', color: '#000000', mode: 'image' }), ...patch } as never,
+});
+
+const CASES: Case[] = [
+  { title: 'default draft (Jarvis 254 DPI 30% 3000, 11 patches, 8 mm)', dump: 'default.gcode' },
+  { title: 'Grayscale', draft: { ditherAlgorithm: 'grayscale' } },
+  { title: 'Grayscale, minPower 10 via seed', seed: seedOp({ ditherAlgorithm: 'grayscale', minPower: 10, power: 40, speed: 2000, linesPerMm: 10 }) },
+  { title: 'Stucki 300 DPI', draft: { ditherAlgorithm: 'stucki', dpi: '300' } },
+  { title: 'Floyd 1270 DPI 50%', draft: { ditherAlgorithm: 'floyd-steinberg', dpi: '1270', power: '50', patchSizeMm: '5' } },
+  { title: 'Atkinson', draft: { ditherAlgorithm: 'atkinson' } },
+  { title: 'Ordered', draft: { ditherAlgorithm: 'ordered' } },
+  { title: 'Light marks (Negative)', draft: { marking: 'light' } },
+  { title: 'Light marks Grayscale', draft: { marking: 'light', ditherAlgorithm: 'grayscale' } },
+  { title: '$30=255 device', device: { maxPowerS: 255 } },
+  { title: 'session $30 override 255', laserMaxPowerS: 255 },
+  { title: '6 patches 3 mm gap 0', draft: { patchCount: '6', patchSizeMm: '3', gapMm: '0' } },
+  { title: '21 patches 50 mm gap 10', draft: { patchCount: '21', patchSizeMm: '50', gapMm: '10', dpi: '100' } },
+  { title: 'unidirectional seed', seed: seedOp({ ditherAlgorithm: 'jarvis', imageBidirectional: false, power: 30, speed: 3000, linesPerMm: 10 }) },
+  { title: 'overscan 0 seed', seed: seedOp({ ditherAlgorithm: 'jarvis', imageOverscanMm: 0, power: 30, speed: 3000, linesPerMm: 10 }) },
+  { title: 'scan offset 0.2 seed', seed: seedOp({ ditherAlgorithm: 'jarvis', bidirectionalScanOffsetMm: 0.2, power: 30, speed: 3000, linesPerMm: 10 }) },
+  { title: 'passes 2 seed', seed: seedOp({ ditherAlgorithm: 'jarvis', passes: 2, power: 30, speed: 3000, linesPerMm: 10 }) },
+  { title: 'seed with tone curve (must be dropped)', seed: seedOp({ ditherAlgorithm: 'grayscale', power: 30, speed: 3000, linesPerMm: 10, photoToneCurve: { label: 'X', points: [{ input: 0, output: 0 }, { input: 128, output: 230 }, { input: 255, output: 255 }] } }) },
+  { title: 'seed with power multiplier 0.25 on 60%', seed: { sourceName: 'p', settings: photoBurnSettings({ ...createLayer({ id: 'p', color: '#000000', mode: 'image' }), power: 60, ditherAlgorithm: 'grayscale', linesPerMm: 10 } as never, { powerScale: 0.25 } as never) } },
+  { title: 'rotary chuck 20mm/rot 60mm', device: { rotary: { enabled: true, type: 'chuck', mmPerRotation: 20, objectDiameterMm: 60 } as never } },
+];
+
+function runCase(c: Case): void {
+  const device: DeviceProfile = { ...DEFAULT_DEVICE_PROFILE, ...(c.device ?? {}) } as DeviceProfile;
+  const seed = c.seed ?? null;
+  const draft = seed === null ? { ...DEFAULT_TONE_WEDGE_DRAFT, ...(c.draft ?? {}) } : { ...seededToneWedgeDraft(seed, DEFAULT_TONE_WEDGE_DRAFT), ...(c.draft ?? {}) };
+  const options = toneWedgeOptions(draft, seed);
+  const wedge = generateToneCalibrationWedge(options);
+  const layer = wedge.scene.layers.find((l) => l.id === wedge.operationId)!;
+  const { gcode, ok, prepared } = emitProject(projectForScene(wedge.scene, device), c.laserMaxPowerS);
+  if (c.dump) writeFileSync('C:/Users/stolk/kd-t1/zz-t03/' + c.dump, gcode);
+  const yScale = device.rotary?.enabled ? rotaryYScale(device.rotary as never) : 1;
+  const moves = litMoves(gcode, device, yScale);
+  const sCeil = c.laserMaxPowerS ?? device.maxPowerS;
+  const sMax = Math.round((layer.power / 100) * sCeil);
+  const sMin = Math.round((layer.minPower / 100) * sCeil);
+  const interval = 1 / layer.linesPerMm;
+  log.push(`\n## ${c.title}`);
+  log.push(`ok=${ok} dither=${layer.ditherAlgorithm} lpmm=${fmt(layer.linesPerMm)} power=${layer.power} minPower=${layer.minPower} speed=${layer.speed} neg=${layer.negativeImage} curve=${layer.photoToneCurve ? 'PRESENT' : 'none'} passes=${layer.passes} sMax=${sMax} sMin=${sMin} yScale=${fmt(yScale)}`);
+  if (!ok) log.push(`diagnostics: ${JSON.stringify((prepared as { diagnostics?: unknown }).diagnostics ?? prepared).slice(0, 600)}`);
+  const imageMoves = moves.filter((m) => Math.abs(m.from.y - m.to.y) < 1e-6);
+  const fs = new Set(imageMoves.map((m) => m.f));
+  const allS = new Set(imageMoves.map((m) => m.s));
+  log.push(`lit moves=${moves.length}, F set=${[...fs].join(',')}, max S=${Math.max(...allS)}`);
+  let worst = 0;
+  const passes = Math.max(1, Math.floor(layer.passes));
+  for (const p of wedge.patches) {
+    const core = inset(p.bounds as Box, 1);
+    const st = patchStats(imageMoves, core, sMax, interval);
+    const commanded = p.commandedPercent / 100;
+    // Dithers: lit share ~ commanded and S == sMax. Grayscale: S per line from the formula.
+    const isGray = layer.ditherAlgorithm === 'grayscale';
+    const expectS = isGray
+      ? commanded <= 0
+        ? 0
+        : Math.round(sMin + commanded * (sMax - sMin))
+      : commanded > 0 ? sMax : 0;
+    const measured = isGray ? st.energy / passes : st.coverage / passes;
+    const expected = isGray ? (expectS / sMax) : commanded;
+    const err = measured - expected;
+    worst = Math.max(worst, Math.abs(err));
+    log.push(
+      `patch ${p.index} label=${p.label} luma=${p.burnLuma} commanded=${fmt(p.commandedPercent, 2)}% ` +
+        `measured=${fmt(measured * 100, 2)}% expected=${fmt(expected * 100, 2)}% err=${fmt(err * 100, 2)}pp ` +
+        `S={${st.sValues.join(',')}} expectS=${expectS} rows=${st.rows}`,
+    );
+  }
+  // Stray: lit image moves outside every patch (allow 0.3 mm edge), and outside labels band.
+  const strayImage = imageMoves.filter((m) => {
+    const y = m.from.y;
+    const inPatchRow = wedge.patches.some((p) => y >= p.bounds.minY - 0.3 && y <= p.bounds.maxY + 0.3);
+    if (!inPatchRow) return false; // label rows checked separately
+    const lo = Math.min(m.from.x, m.to.x);
+    const hi = Math.max(m.from.x, m.to.x);
+    return !wedge.patches.some((p) => lo >= p.bounds.minX - 0.3 && hi <= p.bounds.maxX + 0.3);
+  });
+  log.push(`worst patch error=${fmt(worst * 100, 2)}pp; image moves crossing a gap or outside patches: ${strayImage.length}` +
+    (strayImage.length ? ` e.g. ${JSON.stringify(strayImage.slice(0, 3))}` : ''));
+}
+
+describe('T03 tone wedge burns', () => {
+  for (const c of CASES) {
+    it(c.title, () => {
+      runCase(c);
+      expect(true).toBe(true);
+    });
+  }
+  it('write log', () => {
+    writeFileSync('C:/Users/stolk/kd-t1/zz-t03/t03-wedge.log', log.join('\n'));
+  });
+});

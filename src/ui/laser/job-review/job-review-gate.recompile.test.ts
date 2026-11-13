@@ -21,7 +21,7 @@ import { useLaserStore } from '../../state/laser-store';
 import { initialLaserState } from '../../state/laser-store-helpers';
 import type { LastCompletedReceipt } from '../../state/recovery';
 import { resetStore } from '../../state/test-helpers';
-import { prepareCurrentStartJob } from '../start-job-source';
+import { prepareCurrentStartJob, startMachineInputsKey } from '../start-job-source';
 import { currentReplayExecutionSignature } from '../start-job-execution-tracking';
 import { runJobReviewGate } from './job-review-gate';
 import { useJobReviewStore } from './job-review-store';
@@ -71,6 +71,7 @@ async function reviewBundle() {
   const app = useStore.getState();
   const laser = useLaserStore.getState();
   const camera = useCameraStore.getState();
+  const preparedMachineInputsKey = startMachineInputsKey(app.project, laser, camera);
   const prepared = await prepareCurrentStartJob(app, laser, camera, undefined, false);
   if (!prepared.ok) throw new Error(`Review preparation failed: ${prepared.messages.join(' / ')}`);
   return {
@@ -79,6 +80,7 @@ async function reviewBundle() {
     laser,
     prepared,
     laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
+    preparedMachineInputsKey,
   };
 }
 
@@ -124,10 +126,12 @@ beforeEach(() => {
     startJob: vi.fn(async () => undefined),
   });
   useJobReviewStore.getState().close();
+  useCameraStore.setState({ placementActive: false, confirmedPositionEpoch: null });
 });
 
 afterEach(() => {
   useJobReviewStore.getState().close();
+  useCameraStore.setState({ placementActive: false, confirmedPositionEpoch: null });
   useLaserStore.setState({ ...initialLaserState(), startJob: originalStartJob });
   vi.restoreAllMocks();
 });
@@ -150,6 +154,16 @@ describe('Job Review recompiles on Confirm when one reuse input changed', () => 
       // J05: a controller fact only the machine-inputs key holds.
       input: 'the controller reported new overrides',
       change: () => useLaserStore.setState({ ovCache: { feed: 120, rapid: 100, spindle: 100 } }),
+    },
+    {
+      // C2 verification E3-P2-1: camera facts are not on the controller state,
+      // so only the key taken when the compile was prepared shows them.
+      input: 'camera placement was turned on',
+      change: () => useCameraStore.setState({ placementActive: true }),
+    },
+    {
+      input: 'a camera position was confirmed',
+      change: () => useCameraStore.setState({ confirmedPositionEpoch: 1 }),
     },
     {
       // J06 sits behind J05: every input of the coordinate key is also a

@@ -11,7 +11,7 @@ import { frameProofReset } from '../state/laser-session-reset';
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { framedRunReadinessIssue } from './framed-run-readiness';
 import { currentReplayExecutionSignature } from './start-job-execution-tracking';
-import { prepareCurrentStartJob } from './start-job-source';
+import { prepareCurrentStartJob, startMachineInputsKey } from './start-job-source';
 import { frameVerificationBounds, reportFrameRefusal } from './frame-dispatch-support';
 import type { ReviewedStartBundle } from './job-review';
 import { laserPowerScaleStillCurrent } from './connected-laser-power-scale';
@@ -57,12 +57,20 @@ export async function prepareFramedStartReview(
   const app = useStore.getState();
   const laser = useLaserStore.getState();
   const candidate = permit.candidate;
+  const camera = useCameraStore.getState();
+  // The machine and camera facts this compile reads, taken before it reads
+  // them: Job Review reuses the compile at Confirm only while they still hold
+  // (C2 verification E3-P2-1). A permit's own earlier compile has none.
+  const preparedMachineInputsKey =
+    candidate.authorizationContext === undefined
+      ? startMachineInputsKey(app.project, laser, camera)
+      : undefined;
   const prepared =
     candidate.authorizationContext === undefined
       ? await prepareCurrentStartJob(
           app,
           laser,
-          useCameraStore.getState(),
+          camera,
           candidate.preparedStart.jobOrigin,
           false,
           signal,
@@ -88,6 +96,7 @@ export async function prepareFramedStartReview(
       candidate.authorizationContext === undefined
         ? currentOutputScope(app)
         : candidate.outputScope,
+    ...(preparedMachineInputsKey === undefined ? {} : { preparedMachineInputsKey }),
     ...(candidate.frameWcsNormalizationWarning === undefined
       ? {}
       : { frameWcsNormalizationWarning: candidate.frameWcsNormalizationWarning }),

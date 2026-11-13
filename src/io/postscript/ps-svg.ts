@@ -3,6 +3,7 @@
 // PostScript point is one SVG user unit; width and height carry millimetres.
 
 import { unionBox } from '../../core/geometry/box-math';
+import { hairlineSafeStrokeWidth } from '../svg/hairline-stroke';
 import { curveSubpathBounds } from '../../core/scene';
 import type { PsBox } from './ps-source';
 import type { PaintedPath, Subpath, Vec } from './ps-types';
@@ -46,7 +47,7 @@ function pathElement(path: PaintedPath, flip: (p: Vec) => string): string {
     '" stroke="' +
     (path.stroke ?? 'none') +
     '" stroke-width="' +
-    num(path.strokeWidth) +
+    hairlineSafeStrokeWidth(num(path.strokeWidth)) +
     '"/>'
   );
 }
@@ -104,7 +105,8 @@ function withMinimumSize(box: PsBox, painted: readonly PaintedPath[]): PsBox {
 }
 
 function grownAxis(min: number, max: number, size: number): readonly [number, number] {
-  if (max - min > 1e-6) return [min, max];
+  // Kept only when its millimetre size survives num()'s rounding (E1-P3-1).
+  if (num((max - min) * MM_PER_POINT) !== '0') return [min, max];
   const middle = (min + max) / 2;
   return [middle - size / 2, middle + size / 2];
 }

@@ -1,0 +1,162 @@
+// @vitest-environment jsdom
+// T05: drive the real FocusTestDialog: boundaries, Cancel, Generate, Undo/Redo,
+// save/reopen byte identity, off-bed sizes.
+import { describe, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { FocusTestDialog } from '../t01-main/src/ui/calibration/FocusTestDialog';
+import { useStore } from '../t01-main/src/ui/state/store';
+import { resetStore } from '../t01-main/src/ui/state/test-helpers';
+import { emitGcode } from '../t01-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t01-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t01-main/src/io/project/deserialize-project';
+import { DEFAULT_DEVICE_PROFILE } from '../t01-main/src/core/devices';
+
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const out: string[] = [];
+let root: Root | null = null;
+let closed = 0;
+function mount(): void {
+  document.body.innerHTML = '';
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  root = createRoot(host);
+  closed = 0;
+  act(() => root!.render(<FocusTestDialog onClose={() => (closed += 1)} />));
+}
+function unmount(): void {
+  act(() => root?.unmount());
+  root = null;
+}
+function input(label: string): HTMLInputElement {
+  const l = [...document.querySelectorAll('label')].find((x) => x.textContent?.trim().startsWith(label));
+  const i = l?.querySelector('input');
+  if (!i) throw new Error(`no input ${label}`);
+  return i as HTMLInputElement;
+}
+function setValue(i: HTMLInputElement, v: string): void {
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    setter.call(i, v);
+    i.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+function button(name: string): HTMLButtonElement {
+  const b = [...document.querySelectorAll('button')].find((x) => x.textContent?.trim() === name);
+  if (!b) throw new Error(`no button ${name}`);
+  return b as HTMLButtonElement;
+}
+function status(): string {
+  return (document.querySelector('[role="alert"]')?.textContent ?? document.querySelector('[role="status"]')?.textContent ?? '').slice(0, 170);
+}
+
+const CASES: [string, string][] = [
+  ['Samples', '0'],
+  ['Samples', '1'],
+  ['Samples', '2'],
+  ['Samples', '101'],
+  ['Samples', '102'],
+  ['Samples', '2.5'],
+  ['Samples', '-3'],
+  ['Samples', '1e2'],
+  ['Samples', ''],
+  ['Minimum Z offset', '2'],
+  ['Minimum Z offset', '3'],
+  ['Minimum Z offset', 'Infinity'],
+  ['Minimum Z offset', '-1000.0001'],
+  ['Maximum Z offset', '-1.9995'],
+  ['Line length', '0.5'],
+  ['Line length', '1001'],
+  ['Sample spacing', '0.05'],
+  ['Cut speed', '0'],
+  ['Cut speed', '-5'],
+  ['Power', '0.04'],
+  ['Power', '0.05'],
+  ['Power', '100.5'],
+  ['Z travel speed', '0'],
+  ['Z travel speed', 'NaN'],
+];
+
+describe('T05 dialog', () => {
+  it('boundaries', () => {
+    for (const [label, value] of CASES) {
+      resetStore();
+      mount();
+      setValue(input(label), value);
+      out.push(`${label}=${JSON.stringify(value)} -> Generate ${button('Generate').disabled ? 'disabled' : 'ENABLED'} | ${status()}`);
+      unmount();
+    }
+  });
+
+  it('collapsing offsets', () => {
+    resetStore();
+    mount();
+    setValue(input('Samples'), '5');
+    setValue(input('Minimum Z offset'), '-0.001');
+    setValue(input('Maximum Z offset'), '0.001');
+    out.push(`5 x -0.001..0.001 -> ${button('Generate').disabled ? 'disabled' : 'ENABLED'} | ${status()}`);
+    unmount();
+  });
+
+  it('cancel, generate, undo, redo, save/reopen', () => {
+    resetStore();
+    const before = useStore.getState().project;
+    mount();
+    setValue(input('Samples'), '7');
+    act(() => button('Cancel').click());
+    out.push(`Cancel: closed=${closed} project unchanged=${useStore.getState().project === before} undo=${useStore.getState().undoStack.length}`);
+    unmount();
+    mount();
+    setValue(input('Samples'), '7');
+    setValue(input('Minimum Z offset'), '-1.3');
+    setValue(input('Maximum Z offset'), '2.9');
+    act(() => {
+      (document.querySelector('form') as HTMLFormElement).requestSubmit();
+    });
+    const gen = useStore.getState().project;
+    out.push(`Generate: closed=${closed} layers=${gen.scene.layers.length} undo=${useStore.getState().undoStack.length} names=${gen.scene.layers.map((l) => l.name).join(' | ')}`);
+    const g1 = emitGcode(gen).gcode;
+    act(() => useStore.getState().undo());
+    out.push(`Undo: scene equals before=${JSON.stringify(useStore.getState().project.scene) === JSON.stringify(before.scene)}`);
+    act(() => useStore.getState().redo());
+    const redo = useStore.getState().project;
+    const g2 = emitGcode(redo).gcode;
+    out.push(`Redo: gcode identical=${g1 === g2} (len ${g1.length})`);
+    const text = serializeProject(redo);
+    const back = deserializeProject(text);
+    if (back.kind !== 'ok') {
+      out.push(`Reopen FAILED: ${JSON.stringify(back)}`);
+    } else {
+      const g3 = emitGcode(back.project).gcode;
+      out.push(`Save/reopen: schema=${JSON.parse(text).schemaVersion} gcode identical=${g1 === g3} focus kept=${back.project.scene.layers.filter((l) => l.focusTest).length}`);
+      const tampered = text.replace('"offsetMm": -1.3', '"offsetMm": -1.3000001');
+      const t = deserializeProject(tampered);
+      out.push(`Tampered offset -1.3000001: ${t.kind} ${t.kind === 'invalid' ? t.reason.slice(0, 120) : ''}`);
+      const tampered2 = text.replace('"offsetMm": -1.3', '"offsetMm": 5000');
+      const t2 = deserializeProject(tampered2);
+      out.push(`Tampered offset 5000: ${t2.kind} ${t2.kind === 'invalid' ? t2.reason.slice(0, 120) : ''}`);
+      const tampered3 = text.replace('"travelFeedMmPerMin": 300', '"travelFeedMmPerMin": -300');
+      const t3 = deserializeProject(tampered3);
+      out.push(`Tampered travel -300: ${t3.kind} ${t3.kind === 'invalid' ? t3.reason.slice(0, 120) : ''}`);
+    }
+    unmount();
+  });
+
+  it('off-bed sizes are accepted', () => {
+    resetStore();
+    mount();
+    setValue(input('Samples'), '101');
+    setValue(input('Sample spacing'), '100');
+    setValue(input('Line length'), '1000');
+    out.push(`101 x spacing 100, line 1000 on ${DEFAULT_DEVICE_PROFILE.bedWidth}x${DEFAULT_DEVICE_PROFILE.bedHeight}: Generate ${button('Generate').disabled ? 'disabled' : 'ENABLED'} | ${status().slice(0, 60)}`);
+    act(() => {
+      (document.querySelector('form') as HTMLFormElement).requestSubmit();
+    });
+    const r = emitGcode(useStore.getState().project);
+    out.push(`  emit: gcode len=${r.gcode.length} preflight ok=${(r.preflight as { ok: boolean }).ok} issues=${JSON.stringify((r.preflight as { issues: { code: string; message: string }[] }).issues.map((i) => `${i.code}: ${i.message.slice(0, 100)}`))}`);
+    unmount();
+    writeFileSync('C:/Users/stolk/kd-t1/zz-t05/t05-dialog.log', out.join('\n'));
+  });
+});

@@ -4,7 +4,11 @@
 
 import { useState } from 'react';
 import { create } from 'zustand';
-import { MAX_SHEAR_DEG } from '../../core/geometry/shear-bake';
+import {
+  MAX_SHEAR_DEG,
+  SHEAR_FLATTENS_MESSAGE,
+  shearKeepsShape,
+} from '../../core/geometry/shear-bake';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
 
@@ -47,7 +51,9 @@ function ShearDialog(): JSX.Element {
       ? `Enter both angles in degrees, from -${MAX_SHEAR_DEG} to ${MAX_SHEAR_DEG}.`
       : ax === 0 && ay === 0
         ? 'Enter a horizontal or vertical angle other than 0.'
-        : null;
+        : !shearKeepsShape(ax, ay)
+          ? SHEAR_FLATTENS_MESSAGE
+          : null;
   const valid = problem === null && ax !== null && ay !== null;
   const field = (label: string, value: string, set: (next: string) => void) => (
     <label className="lf-field">

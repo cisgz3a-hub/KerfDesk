@@ -1,0 +1,42 @@
+// T04 edge inputs the dialog lets through: blank power (0 %), blank overscan,
+// interval and width below the field minimums.
+import { describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { DEFAULT_DEVICE_PROFILE, decodeSwatch, generateScanOffsetCalibrationPattern, litMoves, projectForScene, type ScanOffsetCalibrationPatternOptions } from './harness';
+import { prepareOutput } from '../t01-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t01-main/src/io/gcode/emit-gcode';
+
+const BASE: ScanOffsetCalibrationPatternOptions = { mode: 'baseline', steps: 2, speedMin: 1000, speedMax: 5000, power: 12, swatchWidthMm: 50, swatchHeightMm: 10, hatchSpacingMm: 0.5, overscanMm: 5, gapMm: 4 };
+
+describe('T04 edges', () => {
+  it('runs', () => {
+    const log: string[] = [];
+    const cases: [string, Partial<ScanOffsetCalibrationPatternOptions>][] = [
+      ['power 0 (blank Power box)', { power: 0 }],
+      ['interval 0.01 (dialog accepts)', { hatchSpacingMm: 0.01, swatchHeightMm: 1 }],
+      ['width 0.5 (dialog accepts)', { swatchWidthMm: 0.5 }],
+      ['height 1e4 (dialog accepts; bed 400)', { swatchHeightMm: 1e4 }],
+      ['overscan 0 (blank Overscan box)', { overscanMm: 0 }],
+    ];
+    for (const [title, patch] of cases) {
+      const device = DEFAULT_DEVICE_PROFILE;
+      const p = generateScanOffsetCalibrationPattern({ ...BASE, ...patch }, device);
+      const prepared = prepareOutput(projectForScene(p.scene, device), {});
+      const pf = (prepared as { preflight?: { issues?: { code: string; severity: string; message?: string }[] } }).preflight;
+      const issues = (pf?.issues ?? []).map((i) => `${i.severity}:${i.code}`);
+      if (!prepared.ok) {
+        log.push(`${title}: ok=false issues ${issues.join(', ')}`);
+        continue;
+      }
+      const out = emitPreparedGcode(prepared); if (title.startsWith('overscan 0') || title.startsWith('width 0.5')) writeFileSync('C:/Users/stolk/kd-t1/zz-t04/' + title.split(' ')[0] + title.split(' ')[1] + '.gcode', out.gcode);
+      const moves = litMoves(out.gcode, device);
+      const c0 = p.cells[0]!;
+      const r = decodeSwatch(c0.bounds, moves);
+      const ys = r.rows.map((x) => x.y);
+      const step = ys.length > 1 ? (ys[ys.length - 1]! - ys[0]!) / (ys.length - 1) : NaN;
+      log.push(`${title}: ok=true layerPower ${p.scene.layers[0]!.power} bounds ${JSON.stringify(c0.bounds)} litMoves ${moves.length} rows ${r.rows.length} meanStep ${step.toFixed(4)} S ${r.sValues.join(',')} issues ${issues.join(', ')}`);
+    }
+    writeFileSync('C:/Users/stolk/kd-t1/zz-t04/t04-edge.log', log.join('\n'));
+    expect(log.length).toBe(cases.length);
+  });
+});

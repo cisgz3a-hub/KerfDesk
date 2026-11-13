@@ -1,0 +1,154 @@
+// @vitest-environment jsdom
+// T11 follow-ups: exact-fit asymmetry through store + G-code, remove spike through
+// store, neighbour blocking, dense smooth stress.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  type ColoredPath,
+  type CurveSubpath,
+  type ImportedSvg,
+  type Project,
+  type SceneObject,
+  type Vec2,
+} from '../t06-main/src/core/scene';
+import { flattenCurveSubpath } from '../t06-main/src/core/scene/curve-path';
+import { filletCurveCorners } from '../t06-main/src/core/geometry/curve-fillet';
+import { prepareOutput } from '../t06-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t06-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t06-main/src/ui/state/toast-store';
+import { litMoves } from '../zz-t07/decode';
+
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t11/t11b.log', log.join('\n'));
+};
+beforeEach(() => resetStore());
+const f = (n: number, d = 3) => n.toFixed(d);
+const st = () => useStore.getState();
+const SPEED = 1234;
+function flat(c: CurveSubpath, tol = 0.01): Vec2[] {
+  const r = flattenCurveSubpath(c, { toleranceMm: tol, segmentBudget: 2_000_000 });
+  if (r.kind !== 'ok') throw new Error('flatten');
+  return [...r.polyline.points];
+}
+function poly(points: Vec2[], closed: boolean): CurveSubpath {
+  return { start: points[0]!, segments: points.slice(1).map((to) => ({ kind: 'line' as const, to })), closed };
+}
+function svgObj(id: string, curves: CurveSubpath[]): ImportedSvg {
+  const paths: ColoredPath[] = [{ color: '#ff0000', polylines: curves.map((c) => ({ points: flat(c), closed: c.closed })), curves }];
+  const all = paths.flatMap((p) => p.polylines.flatMap((pl) => pl.points));
+  return {
+    kind: 'imported-svg', id, source: `${id}.svg`,
+    bounds: { minX: Math.min(...all.map((p) => p.x)), minY: Math.min(...all.map((p) => p.y)), maxX: Math.max(...all.map((p) => p.x)), maxY: Math.max(...all.map((p) => p.y)) },
+    transform: { ...IDENTITY_TRANSFORM, x: 20, y: 20 }, operationIds: ['L'], paths,
+  } as ImportedSvg;
+}
+function load(objects: SceneObject[]): void {
+  const base = createProject();
+  const layer = { ...createLayer({ id: 'L', color: '#ff0000', name: 'L', mode: 'line' }), speed: SPEED, power: 30 };
+  const project: Project = { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers: [layer], groups: [] } };
+  useStore.setState({ project, selectedObjectId: objects[0]!.id, additionalSelectedIds: new Set(), undoStack: [], redoStack: [], selectedPathNodes: [] } as any);
+}
+let toast = '';
+function apply(r: number, a: 'round' | 'reverse' | 'remove') {
+  useToastStore.setState({ toasts: [] } as any);
+  st().filletSelection(r, a);
+  toast = ((useToastStore.getState() as any).toasts ?? []).map((t: any) => t.message).join(' | ');
+}
+function burn() {
+  const p = prepareOutput(st().project);
+  const g = p.ok ? emitPreparedGcode(p).gcode : '';
+  const m = litMoves(g, st().project.device).filter((x) => x.f === SPEED);
+  const xs = m.flatMap((x) => [x.from.x, x.to.x]);
+  const ys = m.flatMap((x) => [x.from.y, x.to.y]);
+  return { ok: p.ok, len: m.reduce((s, x) => s + x.len, 0), bbox: m.length ? `x ${f(Math.min(...xs))}..${f(Math.max(...xs))} y ${f(Math.min(...ys))}..${f(Math.max(...ys))}` : 'none', issues: p.ok ? '' : JSON.stringify((p as any).preflight ?? (p as any).issues ?? p).slice(0, 300) };
+}
+
+it('exact-fit radius through the store and G-code', () => {
+  for (const [name, w, h, r] of [['1x0.5 in rect, r 1/4 in', 25.4, 12.7, 6.35], ['30x10 slot r5', 30, 10, 5], ['10x10 square r5 (circle)', 10, 10, 5]] as const) {
+    load([svgObj('a', [poly([{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: h }, { x: 0, y: h }], true)])]);
+    const b0 = burn();
+    apply(r, 'round');
+    const b1 = burn();
+    const exp = 2 * (w + h) - 8 * r + 2 * Math.PI * r;
+    const kinds = ((st().project.scene.objects[0] as ImportedSvg).paths[0]!.curves![0]!.segments).map((s) => (s.kind === 'elliptical-arc' ? 'A' : 'l')).join('');
+    out(`${name}: toast "${toast}"; lit ${f(b0.len)} -> ${f(b1.len)}, exp all-round ${f(exp)}; segs ${kinds}; burn bbox ${b1.bbox}`);
+  }
+});
+
+it('remove fillets on a tapered slot through the store', () => {
+  const half = (1 * Math.PI) / 180;
+  const R1 = 5, R2 = 4.5;
+  const L = (R1 - R2) / Math.sin(half);
+  const n = { x: -Math.sin(half), y: Math.cos(half) };
+  const p1 = { x: R1 * n.x, y: R1 * n.y + 10 };
+  const p2 = { x: L + R2 * n.x, y: R2 * n.y + 10 };
+  const q2 = { x: L + R2 * n.x, y: -R2 * n.y + 10 };
+  const q1 = { x: R1 * n.x, y: -R1 * n.y + 10 };
+  const slot: CurveSubpath = {
+    start: p1,
+    segments: [
+      { kind: 'line', to: p2 },
+      { kind: 'elliptical-arc', radiusX: R2, radiusY: R2, rotationDeg: 0, largeArc: false, sweep: false, to: q2 },
+      { kind: 'line', to: q1 },
+      { kind: 'elliptical-arc', radiusX: R1, radiusY: R1, rotationDeg: 0, largeArc: true, sweep: false, to: p1 },
+    ],
+    closed: true,
+  };
+  load([svgObj('s', [slot])]);
+  const b0 = burn();
+  apply(0, 'remove');
+  const b1 = burn();
+  out(`tapered slot (2 deg taper, ends R5/R4.5, length ${f(L)}): before lit ${f(b0.len)} bbox ${b0.bbox}; remove toast "${toast}"; after ok=${b1.ok} lit ${f(b1.len)} bbox ${b1.bbox} ${b1.issues}`);
+  // a 10 deg taper keyhole-ish: arcs ~170 deg
+  for (const taperDeg of [10, 30, 60]) {
+    const h = (taperDeg / 2) * (Math.PI / 180);
+    const Rb = 6, Rs = 3;
+    const LL = (Rb - Rs) / Math.sin(h);
+    const nn = { x: -Math.sin(h), y: Math.cos(h) };
+    const s: CurveSubpath = {
+      start: { x: Rb * nn.x, y: Rb * nn.y + 10 },
+      segments: [
+        { kind: 'line', to: { x: LL + Rs * nn.x, y: Rs * nn.y + 10 } },
+        { kind: 'elliptical-arc', radiusX: Rs, radiusY: Rs, rotationDeg: 0, largeArc: false, sweep: false, to: { x: LL + Rs * nn.x, y: -Rs * nn.y + 10 } },
+        { kind: 'line', to: { x: Rb * nn.x, y: -Rb * nn.y + 10 } },
+        { kind: 'elliptical-arc', radiusX: Rb, radiusY: Rb, rotationDeg: 0, largeArc: true, sweep: false, to: { x: Rb * nn.x, y: Rb * nn.y + 10 } },
+      ],
+      closed: true,
+    };
+    load([svgObj('k', [s])]);
+    const c0 = burn();
+    apply(0, 'remove');
+    const c1 = burn();
+    out(`taper ${taperDeg} deg (R6 big end, R3 small end, centres ${f(LL)} apart): bbox ${c0.bbox} -> ${c1.bbox}; toast "${toast}"; spike tip beyond arc ${f(Rs / Math.sin(h) - Rs)} mm`);
+  }
+});
+
+it('neighbour that cannot fit blocks a corner that fits', () => {
+  // A(0,0) B(40,0) C(40,1.5) D(39.5,1.5)... make corner C: sides B-C 1.5 and C-D 0.5
+  const pts = [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 1.5 }, { x: 39.5, y: 1.5 }, { x: 39.5, y: 20 }, { x: 0, y: 20 }];
+  const all = filletCurveCorners(poly(pts, true), 1, 'round');
+  const b = filletCurveCorners(poly(pts, true), 1, 'round', [1]);
+  out(`corner B (sides 40 and 1.5, r1 needs 1): all-corners count ${all?.count} (B rounded? ${all ? flat(all.curve).some((p) => Math.abs(p.x - 40) > 1e-6 && Math.abs(p.x - 40) < 1 && p.y > 0 && p.y < 1) : false}); picked B alone count ${b?.count ?? 0}`);
+});
+
+it('dense smooth stress', () => {
+  for (const n of [5000, 20000]) {
+    const pts = Array.from({ length: n }, (_, k) => ({ x: 100 + 50 * Math.cos((2 * Math.PI * k) / n), y: 100 + 50 * Math.sin((2 * Math.PI * k) / n) }));
+    load([{ ...svgObj('j', [poly(pts.slice(0, 4), true)]), paths: [{ color: '#ff0000', polylines: [{ closed: true, points: pts }] }] } as ImportedSvg]);
+    const t0 = performance.now();
+    apply(1, 'round');
+    const t1 = performance.now();
+    const t2 = performance.now();
+    const b = burn();
+    const t3 = performance.now();
+    out(`smooth ${n}-gon R50 r=1: fillet ${f(t1 - t0, 0)} ms toast "${toast}"; G-code ${f(t3 - t2, 0)} ms lit ${f(b.len)} (circle ${f(2 * Math.PI * 50)})`);
+  }
+});

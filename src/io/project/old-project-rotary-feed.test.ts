@@ -14,6 +14,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { createPolyline } from '../../core/shapes';
 import { deserializeProject } from './deserialize-project';
 import { rotaryFeedChange, rotaryFeedChangeMessage } from './old-project-rotary-feed';
 
@@ -170,5 +171,30 @@ describe('which old rotary projects changed (ADR-127 Amd 4)', () => {
     expect(rotaryFeedChangeMessage(change ?? { yScale: 1, ratio: 1 })).toContain(
       'as little as 0.25×',
     );
+  });
+
+  // Code quality audit C2 verify E1-P2-3 (ADR-127 Amd 7): a pen line, shape
+  // or text is read from its own paths, as an imported outline is.
+  function penLine(to: { x: number; y: number }): Project {
+    const base = createProject({ ...DEFAULT_DEVICE_PROFILE, maxFeed: 6000, rotary: CHUCK });
+    const line = createPolyline({
+      id: 'P1',
+      color: '#ff0000',
+      spec: { points: [{ x: 10, y: 10 }, to], closed: false },
+      fairingMode: 'exact',
+    });
+    const operation = createLayer({ id: 'L1', color: '#ff0000' });
+    return { ...base, scene: addLayer(addObject(base.scene, line), operation) };
+  }
+
+  it('stays quiet for a pen-tool line along X (1.00×)', () => {
+    expect(rotaryFeedChange(penLine({ x: 50, y: 10 }))).toEqual([]);
+  });
+
+  it('names 1.40× for a pen-tool line at 45°, not the worst case', () => {
+    const k = 40 / (Math.PI * 80);
+    const [change] = rotaryFeedChange(penLine({ x: 40, y: 40 }));
+    expect(change?.ratio).toBeCloseTo(1 / Math.hypot(Math.SQRT1_2, k * Math.SQRT1_2), 6);
+    expect(rotaryFeedChangeMessage(change ?? { yScale: 1, ratio: 1 })).toContain('up to 1.40×');
   });
 });

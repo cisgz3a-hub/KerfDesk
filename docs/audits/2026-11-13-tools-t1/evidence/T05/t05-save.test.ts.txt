@@ -1,0 +1,38 @@
+// T05: what Save G-code / .rd routes say about a Focus Test job.
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { DEFAULT_DEVICE_PROFILE } from '../t01-main/src/core/devices';
+import { generateFocusTest } from '../t01-main/src/core/job/focus-test';
+import { createProject, DEFAULT_PROJECT_OPTIMIZATION } from '../t01-main/src/core/scene';
+import { prepareOutput } from '../t01-main/src/io/gcode/prepare-output';
+import { detectMachineJobWarnings } from '../t01-main/src/ui/laser/machine-job-warnings';
+import { emitRdFile } from '../t01-main/src/io/rd/emit-rd';
+import { emitEgvFile } from '../t01-main/src/io/egv/emit-egv';
+
+it('save warnings', () => {
+  const out: string[] = [];
+  const scene = generateFocusTest({ steps: 9, minOffsetMm: -2, maxOffsetMm: 2, lineLengthMm: 20, spacingMm: 3, speed: 1200, power: 10, travelFeedMmPerMin: 300 });
+  const base = createProject(DEFAULT_DEVICE_PROFILE);
+  const project = { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, ...scene } };
+  const prepared = prepareOutput(project);
+  out.push(`prepared ok=${prepared.ok} advisories=${JSON.stringify((prepared as { advisories?: unknown[] }).advisories ?? [])}`);
+  const w = detectMachineJobWarnings(project, null, null, prepared);
+  out.push(`Save G-code job warnings (${w.length}): ${JSON.stringify(w).slice(0, 600)}`);
+  const travel = { ...project, device: { ...DEFAULT_DEVICE_PROFILE, capabilities: [...(DEFAULT_DEVICE_PROFILE.capabilities ?? []), 'z-axis' as const], zTravelMm: 1, zTravelConfirmed: true } };
+  const p2 = prepareOutput(travel);
+  const w2 = detectMachineJobWarnings(travel, null, null, p2);
+  out.push(`zTravel 1 mm, sweep 4 mm: Save G-code job warnings (${w2.length}): ${JSON.stringify(w2).slice(0, 600)}`);
+  try {
+    const rd = emitRdFile(project);
+    out.push(`emitRdFile on GRBL profile: ok=${rd.ok} ${rd.ok ? `bytes=${rd.bytes.length}` : JSON.stringify(rd.messages)}`);
+  } catch (e) {
+    out.push(`emitRdFile threw ${(e as Error).message}`);
+  }
+  try {
+    const egv = emitEgvFile(project);
+    out.push(`emitEgvFile on GRBL profile: ok=${egv.ok} ${egv.ok ? '' : JSON.stringify((egv as { messages?: unknown }).messages)}`);
+  } catch (e) {
+    out.push(`emitEgvFile threw ${(e as Error).message}`);
+  }
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t05/t05-save.log', out.join('\n'));
+});

@@ -1,0 +1,211 @@
+// T05 Focus Test: decode the emitted program with an independent reader and
+// check relative-Z safety, return-to-start, modal restore, laser-off Z, feed
+// after the Z move, and that each burned line sits at its named offset.
+import { describe, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { decode } from './decode';
+import {
+  DEFAULT_DEVICE_PROFILE,
+  NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+  toSceneCoords,
+  type DeviceProfile,
+} from '../t01-main/src/core/devices';
+import {
+  focusTestOffsets,
+  focusTestOptionsIssue,
+  generateFocusTest,
+  focusTestWarnings,
+  type FocusTestOptions,
+} from '../t01-main/src/core/job/focus-test';
+import { createProject, DEFAULT_PROJECT_OPTIMIZATION, type Project, type Scene } from '../t01-main/src/core/scene';
+import { prepareOutput } from '../t01-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode, emitGcode } from '../t01-main/src/io/gcode/emit-gcode';
+
+const log: string[] = [];
+const note = (s: string): void => {
+  log.push(s);
+};
+
+const BASE: FocusTestOptions = {
+  steps: 9,
+  minOffsetMm: -2,
+  maxOffsetMm: 2,
+  lineLengthMm: 20,
+  spacingMm: 3,
+  speed: 1200,
+  power: 10,
+  travelFeedMmPerMin: 300,
+};
+
+type Case = {
+  title: string;
+  options?: Partial<FocusTestOptions>;
+  device?: Partial<DeviceProfile>;
+  mutateScene?: (scene: Scene) => Scene;
+  project?: (p: Project) => Project;
+  emitOptions?: Parameters<typeof emitGcode>[1];
+  noLabelCheck?: boolean;
+};
+
+export function projectFor(scene: Scene, device: DeviceProfile): Project {
+  const base = createProject(device);
+  return { ...base, device, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, ...scene } };
+}
+
+const CASES: Case[] = [
+  { title: 'defaults 9 x -2..2 grbl-dynamic' },
+  { title: 'grbl-compatible (M3 constant)', device: { gcodeDialect: { dialectId: 'grbl-compatible' } } },
+  { title: 'neotronics-4040-safe profile', device: { ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } },
+  { title: '7 samples -1.3..2.9 (fractional)', options: { steps: 7, minOffsetMm: -1.3, maxOffsetMm: 2.9 } },
+  { title: '4 samples 0..1 (thirds)', options: { steps: 4, minOffsetMm: 0, maxOffsetMm: 1 } },
+  { title: '2 samples negative only -5..-1', options: { steps: 2, minOffsetMm: -5, maxOffsetMm: -1 } },
+  { title: '3 samples positive 0.5..3', options: { steps: 3, minOffsetMm: 0.5, maxOffsetMm: 3 } },
+  { title: '101 samples -1..1, spacing 0.5', options: { steps: 101, minOffsetMm: -1, maxOffsetMm: 1, spacingMm: 0.5 } },
+  { title: '3 samples -0.0015..0.0015 (rounding)', options: { steps: 3, minOffsetMm: -0.0015, maxOffsetMm: 0.0015 } },
+  { title: '6 samples -0.0024..0.0026 (sub-um step)', options: { steps: 6, minOffsetMm: -0.0024, maxOffsetMm: 0.0026 } },
+  { title: '11 samples -1000..1000 (max range)', options: { steps: 11, minOffsetMm: -1000, maxOffsetMm: 1000 } },
+  { title: 'Z feed 300 > maxFeed 200', device: { maxFeed: 200 } },
+  { title: 'fractional maxFeed 250.75, travel 9999', device: { maxFeed: 250.75 }, options: { travelFeedMmPerMin: 9999 } },
+  { title: 'cut speed 9000 > maxFeed 6000', options: { speed: 9000 } },
+  {
+    title: 'passes 3 on every sample',
+    mutateScene: (s) => ({ ...s, layers: s.layers.map((l) => ({ ...l, passes: 3 })) }),
+  },
+  {
+    title: 'air assist M8 on every sample',
+    device: { airAssistCommand: 'M8' },
+    mutateScene: (s) => ({ ...s, layers: s.layers.map((l) => ({ ...l, airAssist: true })) }),
+  },
+  {
+    title: 'reversed layer order (last sample first)',
+    mutateScene: (s) => ({ ...s, layers: [...s.layers].reverse() }),
+  },
+  {
+    title: 'rear-right origin',
+    device: { origin: 'rear-right', homing: { enabled: true, direction: 'rear-right' } },
+  },
+  {
+    title: 'current-position placement',
+    emitOptions: { jobOrigin: { startFrom: 'current-position', anchor: 'front-left', currentPosition: { x: 30, y: 40 } } },
+    noLabelCheck: true,
+  },
+  {
+    title: 'chuck rotary on Y',
+    device: { rotary: { enabled: true, type: 'chuck', mmPerRotation: 20, objectDiameterMm: 60 } },
+    noLabelCheck: true,
+  },
+  {
+    title: 'roller rotary on A',
+    device: { rotary: { enabled: true, type: 'roller', mmPerRotation: 360, objectDiameterMm: 60, rollerDiameterMm: 20, axis: 'A' } as never },
+    noLabelCheck: true,
+  },
+  {
+    title: 'chuck rotary on Z (turn under Z)',
+    device: { rotary: { enabled: true, type: 'chuck', mmPerRotation: 20, objectDiameterMm: 60, axis: 'Z' } as never },
+    noLabelCheck: true,
+  },
+  { title: 'controllerKind grblhal', device: { controllerKind: 'grblhal' } },
+  { title: 'controllerKind fluidnc', device: { controllerKind: 'fluidnc' } },
+  { title: 'controllerKind marlin', device: { controllerKind: 'marlin', gcodeDialect: { dialectId: 'marlin-inline' } } },
+  { title: 'controllerKind smoothieware', device: { controllerKind: 'smoothieware' } },
+  { title: 'controllerKind ruida', device: { controllerKind: 'ruida' } },
+  { title: 'controllerKind lihuiyu (K40)', device: { controllerKind: 'lihuiyu' } },
+  { title: 'controllerKind moshi', device: { controllerKind: 'moshi' } },
+];
+
+function runCase(c: Case): void {
+  const options = { ...BASE, ...c.options };
+  const device: DeviceProfile = { ...DEFAULT_DEVICE_PROFILE, ...c.device };
+  note(`\n## ${c.title}`);
+  const issue = focusTestOptionsIssue(options);
+  if (issue !== null) {
+    note(`  options refused: ${issue}`);
+    return;
+  }
+  let scene = generateFocusTest(options);
+  if (c.mutateScene) scene = c.mutateScene(scene);
+  let project = projectFor(scene, device);
+  if (c.project) project = c.project(project);
+  let gcode: string;
+  let preflight: unknown;
+  try {
+    const r = emitGcode(project, c.emitOptions ?? {});
+    gcode = r.gcode;
+    preflight = r.preflight;
+  } catch (e) {
+    note(`  THREW: ${(e as Error).message}`);
+    return;
+  }
+  const pf = preflight as { ok?: boolean; issues?: { code: string; message: string }[] } | undefined;
+  if (gcode === '') {
+    note(`  no program. preflight ok=${pf?.ok} issues=${JSON.stringify(pf?.issues?.map((i) => `${i.code}: ${i.message}`))}`);
+    return;
+  }
+  const safe = c.title.replace(/[^a-z0-9]+/gi, '-');
+  writeFileSync(`C:/Users/stolk/kd-t1/zz-t05/out/${safe}.gcode`, gcode);
+  const d = decode(gcode);
+  const offsets = focusTestOffsets(options);
+  const offUm = offsets.map((o) => Math.round(o * 1000));
+  const expZFeed = Math.min(options.travelFeedMmPerMin, device.maxFeed);
+  const expCut = Math.min(options.speed, device.maxFeed);
+  note(`  lines=${d.lines} zMoves=${d.zMoves.length} burns=${d.burns.length} finalZ(um)=${d.finalZ} finalRelative=${d.finalRelative} maxAbsZ(um)=${d.maxAbsZ}`);
+  note(`  G20 lines: ${d.g20Lines.length}; XY in G91: ${d.xyInRelative.length}; Z in G90: ${d.zInAbsolute.length}`);
+  for (const bad of d.xyInRelative.slice(0, 3)) note(`    XY-in-G91 L${bad.line}: ${bad.text}`);
+  for (const bad of d.zInAbsolute.slice(0, 3)) note(`    Z-in-G90 L${bad.line}: ${bad.text}`);
+  const zLit = d.zMoves.filter((z) => z.laser || z.sModal !== 0);
+  note(`  Z moves with laser on or S!=0: ${zLit.length}`);
+  for (const z of zLit.slice(0, 3)) note(`    L${z.line}: ${z.text} laser=${z.laser} S=${z.sModal}`);
+  const zFeeds = [...new Set(d.zMoves.map((z) => z.f))];
+  note(`  Z feeds seen: ${zFeeds.join(',')} expected ${expZFeed}`);
+  const nonzeroPairs = offUm.filter((o) => o !== 0).length * (scene.layers[0]?.passes ?? 1 ? 1 : 1);
+  note(`  expected nonzero samples=${nonzeroPairs}, Z moves/2=${d.zMoves.length / 2}`);
+  const badStart = d.zAtSampleComment.filter((c2) => c2.z !== 0 || c2.relative);
+  note(`  sample headers=${d.zAtSampleComment.length}, headers with Z!=0 or G91: ${badStart.length}`);
+  const burnFeeds = [...new Set(d.burns.map((b) => b.f))];
+  note(`  burn F values: ${burnFeeds.join(',')} expected ${expCut}`);
+  const burnS = [...new Set(d.burns.map((b) => b.s))];
+  note(`  burn S values: ${burnS.join(',')}`);
+  if (!c.noLabelCheck) {
+    const seen = new Map<number, Set<number>>();
+    let unmapped = 0;
+    for (const b of d.burns) {
+      const p0 = toSceneCoords({ x: b.x0, y: b.y0 }, device);
+      const p1 = toSceneCoords({ x: b.x1, y: b.y1 }, device);
+      const sy = (p0.y + p1.y) / 2;
+      const idx = Math.round((sy - 10) / options.spacingMm);
+      if (idx < 0 || idx >= options.steps || Math.abs(sy - (10 + idx * options.spacingMm)) > 0.01) {
+        unmapped++;
+        continue;
+      }
+      const set = seen.get(idx) ?? new Set<number>();
+      set.add(b.z);
+      seen.set(idx, set);
+    }
+    let mism = 0;
+    const layerNames = scene.layers.map((l) => l.name);
+    for (let i = 0; i < options.steps; i++) {
+      const zs = [...(seen.get(i) ?? [])];
+      const named = layerNames.find((nm) => nm.startsWith(`Focus ${i + 1}:`)) ?? '?';
+      const namedUm = Math.round(Number(/Z (-?[\d.]+) mm/.exec(named)?.[1]) * 1000);
+      if (zs.length !== 1 || zs[0] !== offUm[i] || namedUm !== offUm[i]) {
+        mism++;
+        if (mism <= 5) note(`    sample ${i + 1} "${named}" burned at Z(um)=${zs.join('/')} expected ${offUm[i]}`);
+      }
+    }
+    note(`  label check: ${options.steps - mism}/${options.steps} samples burned exactly at their named Z; unmapped burns=${unmapped}`);
+  }
+  note(`  warnings(JobReview): ${JSON.stringify(focusTestWarnings(scene.layers, device).map((w) => w.slice(0, 60)))}`);
+}
+
+describe('T05 focus motion', () => {
+  it('runs all cases', () => {
+    for (const c of CASES) {
+      try {
+        runCase(c);
+      } catch (e) {
+        note(`  HARNESS ERROR: ${(e as Error).stack?.split('\n').slice(0, 3).join(' | ')}`);
+      }
+    }
+    writeFileSync('C:/Users/stolk/kd-t1/zz-t05/t05-motion.log', log.join('\n'));
+  });
+});

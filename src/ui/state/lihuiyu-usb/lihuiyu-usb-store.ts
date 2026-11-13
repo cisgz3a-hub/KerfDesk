@@ -180,8 +180,11 @@ async function home(set: Set, get: Get): Promise<void> {
   const current = live;
   if (current === null || get().phase !== 'idle') return;
   set({ phase: 'homing', message: 'Homing…', tone: 'info' });
-  const result = await current.link.send({ payload: lhyCommandPayload('IPP'), waitFinish: false });
-  if (live !== current) return;
+  const sent = current.link.send({ payload: lhyCommandPayload('IPP'), waitFinish: false });
+  current.runDone = sent;
+  const result = await sent;
+  // Abort owns a Home it stopped (C2 verification E2-P3-1).
+  if (live !== current || get().phase !== 'homing') return;
   set({
     phase: 'idle',
     head: result.ok ? { x: 0, y: 0 } : null,
@@ -202,11 +205,14 @@ async function jog(set: Set, get: Get, dxMm: number, dyMm: number): Promise<void
   const writer = new LhyWriter();
   writer.rapidMove(dx, dy);
   set({ phase: 'jogging', framed: null, message: 'Jogging (laser off)…', tone: 'info' });
-  const result = await current.link.stream(lhyPayloads(writer.stream()), {
-    cancelled: () => false,
+  current.cancel = false;
+  const sent = current.link.stream(lhyPayloads(writer.stream()), {
+    cancelled: () => current.cancel,
     held: () => false,
   });
-  if (live !== current) return;
+  current.runDone = sent;
+  const result = await sent;
+  if (live !== current || get().phase !== 'jogging') return;
   const head = get().head;
   set({
     phase: 'idle',
@@ -240,7 +246,9 @@ async function run(set: Set, get: Get, kind: 'frame' | 'job', job: LihuiyuUsbJob
   set({
     phase,
     statusCode: code,
-    advisories: frame ? [] : job.advisories,
+    // The job's warnings show from its Frame on, as on Moshi and Ruida (C2
+    // verification E2-P2-1); a finished Frame keeps them.
+    advisories: job.advisories,
     message: frame ? 'Framing (laser off)…' : 'Sending the job…',
     tone: 'info',
   });
@@ -353,11 +361,20 @@ async function holdOrRelease(
   set({ phase: to, message: `${verb} acknowledged by the board.`, tone: 'info' });
 }
 
+// Home and Jog too: Ctrl+. and ABORT MOTION reset the board whatever moves it
+// (C2 verification E2-P3-1).
+const STOPPABLE: ReadonlySet<LihuiyuUsbPhase> = new Set([
+  'homing',
+  'jogging',
+  'framing',
+  'running',
+  'paused',
+]);
+
 async function abort(set: Set, get: Get): Promise<void> {
   const current = live;
   const phase = get().phase;
-  if (current === null || (phase !== 'framing' && phase !== 'running' && phase !== 'paused'))
-    return;
+  if (current === null || !STOPPABLE.has(phase)) return;
   current.cancel = true;
   set({ phase: 'stopping', message: 'Stopping: resetting the board…', tone: 'warning' });
   // The packet in flight gets its verdict first; then the reset goes out.

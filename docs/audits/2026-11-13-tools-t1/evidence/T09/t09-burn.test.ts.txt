@@ -1,0 +1,447 @@
+// @vitest-environment jsdom
+// T09 Leave White Unburned: burn oracle through the real store action and the real
+// prepareOutput -> G-code path. Oracle: a point burns iff the topmost (last painted)
+// Fill shape containing it, in the original artwork, is not paper white.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  applyTransform,
+  createLayer,
+  pathUsesOperation,
+  type ColoredPath,
+  type Project,
+  type SceneObject,
+  type Transform,
+} from '../t06-main/src/core/scene';
+import { countBurningImportedWhites } from '../t06-main/src/core/geometry/burning-imported-white';
+import { prepareOutput } from '../t06-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t06-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t06-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t06-main/src/io/project/deserialize-project';
+import { importAsOlderBuild, importSvg } from '../t06-main/src/__fixtures__/white-fill-burn';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t06-main/src/ui/state/toast-store';
+import { litMoves, totalLen, type LitMove, type Vec } from './decode';
+
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t09/t09-burn.log', log.join('\n'));
+};
+beforeEach(() => resetStore());
+const st = () => useStore.getState();
+const svg = (content: string, w = 60, h = 60) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${h}mm" viewBox="0 0 ${w} ${h}">${content}</svg>`;
+
+type Shape = { rings: Vec[][]; white: boolean; label: string };
+
+function fillShapes(project: Project): Shape[] {
+  const shapes: Shape[] = [];
+  for (const o of project.scene.objects) {
+    if (o.kind !== 'imported-svg') continue;
+    o.paths.forEach((p, i) => {
+      const fillOp = project.scene.layers.some(
+        (l) => l.mode === 'fill' && l.output && pathUsesOperation(o, p, l),
+      );
+      if (!fillOp) return;
+      shapes.push({
+        rings: p.polylines.map((pl) => pl.points.map((pt) => applyTransform(pt, o.transform))),
+        white: p.color.toLowerCase() === '#ffffff' && p.whiteInk === undefined,
+        label: `${o.id}#${i}${p.color}`,
+      });
+    });
+  }
+  return shapes;
+}
+
+function insideEO(pt: Vec, rings: Vec[][]): boolean {
+  let hit = false;
+  for (const poly of rings)
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i, i += 1) {
+      const a = poly[i]!;
+      const b = poly[j]!;
+      if (a.y > pt.y !== b.y > pt.y) {
+        const x = ((b.x - a.x) * (pt.y - a.y)) / (b.y - a.y) + a.x;
+        if (pt.x < x) hit = !hit;
+      }
+    }
+  return hit;
+}
+
+function shouldBurn(pt: Vec, shapes: Shape[]): boolean {
+  for (let k = shapes.length - 1; k >= 0; k -= 1) {
+    if (insideEO(pt, shapes[k]!.rings)) return !shapes[k]!.white;
+  }
+  return false;
+}
+
+function boxOf(shapes: Shape[]) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const s of shapes) for (const r of s.rings) for (const p of r) {
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+function expectedArea(shapes: Shape[], step = 0.1): number {
+  const b = boxOf(shapes);
+  let n = 0;
+  for (let y = b.minY + step / 2; y < b.maxY; y += step)
+    for (let x = b.minX + step / 2; x < b.maxX; x += step) if (shouldBurn({ x, y }, shapes)) n += 1;
+  return n * step * step;
+}
+
+function burn(project: Project) {
+  const prepared = prepareOutput(project);
+  const emitted = emitPreparedGcode(prepared);
+  return { moves: litMoves(emitted.gcode, project.device), ok: prepared.ok, gcode: emitted.gcode };
+}
+
+/** Lit length (fill rows only = horizontal moves) split by oracle. */
+function classify(moves: LitMove[], shapes: Shape[]) {
+  let good = 0, bad = 0, nonRow = 0;
+  for (const m of moves) {
+    if (Math.abs(m.to.y - m.from.y) > 1e-6) { nonRow += m.len; continue; }
+    const n = Math.max(1, Math.ceil(m.len / 0.02));
+    for (let i = 0; i < n; i += 1) {
+      const t = (i + 0.5) / n;
+      const p = { x: m.from.x + t * (m.to.x - m.from.x), y: m.from.y + t * (m.to.y - m.from.y) };
+      if (shouldBurn(p, shapes)) good += m.len / n; else bad += m.len / n;
+    }
+  }
+  return { good, bad, nonRow };
+}
+
+function spacing(project: Project): number {
+  return project.scene.layers.find((l) => l.mode === 'fill')?.hatchSpacingMm ?? NaN;
+}
+
+function whitePathCount(project: Project): number {
+  return project.scene.objects.reduce(
+    (n, o) => n + ('paths' in o ? (o.paths as ColoredPath[]).filter((p) => p.color.toLowerCase() === '#ffffff' && p.whiteInk !== 'kept').length : 0),
+    0,
+  );
+}
+
+function describeScene(project: Project): string {
+  return project.scene.objects
+    .map((o) =>
+      'paths' in o
+        ? `${o.id}[imp=${(o as { svgImport?: { id: string; mode?: string } }).svgImport?.id ?? '-'}:${(o as { svgImport?: { mode?: string } }).svgImport?.mode ?? '-'}] ` +
+          (o.paths as ColoredPath[]).map((p) => `${p.color}${p.whiteInk ? '/' + p.whiteInk : ''}{${(p.operationIds ?? o.operationIds ?? ['by-color']).join(',')}}`).join(' ')
+        : o.id,
+    )
+    .join(' | ') + ' || layers ' + project.scene.layers.map((l) => `${l.id}:${l.mode}:${l.color}:out=${l.output}`).join(', ');
+}
+
+function lastToast(): string {
+  const t = useToastStore.getState() as unknown as { toasts?: { message: string }[] };
+  return t.toasts?.at(-1)?.message ?? '(none)';
+}
+
+/** Run the tool on the current store project; report oracle vs burn. */
+function runTool(name: string, oracleFrom?: Project) {
+  const before = st().project;
+  const shapes = fillShapes(oracleFrom ?? before);
+  const count = countBurningImportedWhites(before.scene);
+  const bBefore = burn(before);
+  const cBefore = classify(bBefore.moves, shapes);
+  const whitesBefore = whitePathCount(before);
+  const returned = st().leaveSavedWhiteUnburned();
+  const after = st().project;
+  const bAfter = burn(after);
+  const cAfter = classify(bAfter.moves, shapes);
+  const sp = spacing(after);
+  const area = expectedArea(shapes);
+  out(`== ${name}`);
+  out(`  scene before: ${describeScene(before)}`);
+  out(`  scene after : ${describeScene(after)}`);
+  out(`  count(before)=${count} returned=${returned} whitePaths ${whitesBefore}->${whitePathCount(after)} toast="${lastToast()}" countAfter=${countBurningImportedWhites(after.scene)}`);
+  out(`  oracle area ${area.toFixed(1)} mm2 -> expected row length ${(area / sp).toFixed(1)} (spacing ${sp})`);
+  out(`  BEFORE rows good ${cBefore.good.toFixed(1)} bad(lit where oracle says paper) ${cBefore.bad.toFixed(1)} nonRow ${cBefore.nonRow.toFixed(1)}`);
+  out(`  AFTER  rows good ${cAfter.good.toFixed(1)} bad ${cAfter.bad.toFixed(1)} nonRow ${cAfter.nonRow.toFixed(1)} total ${totalLen(bAfter.moves).toFixed(1)} ok=${bAfter.ok}`);
+  return { before, after, bBefore, bAfter, cBefore, cAfter, shapes, count, returned };
+}
+
+function setObjects(fn: (o: SceneObject, i: number) => SceneObject) {
+  useStore.setState((s) => ({
+    project: { ...s.project, scene: { ...s.project.scene, objects: s.project.scene.objects.map(fn) } },
+  }));
+}
+
+const DIAMOND = 'M20 10 L30 20 L20 30 L10 20 Z';
+
+it('A: basic geometry cases (older-build projects)', () => {
+  // A1 white over dark: hole
+  importAsOlderBuild(svg(`<rect x="5" y="5" width="30" height="30" fill="#000"/><path d="${DIAMOND}" fill="#fff"/>`));
+  runTool('A1 white over dark (diamond hole)');
+  resetStore();
+  // A2 white under dark
+  importAsOlderBuild(svg(`<rect x="0" y="0" width="40" height="40" fill="#fff"/><circle cx="20" cy="20" r="10" fill="#000"/>`));
+  runTool('A2 white background under dark');
+  resetStore();
+  // A3 nested white/dark/white
+  importAsOlderBuild(
+    svg(`<rect x="0" y="0" width="40" height="40" fill="#000"/><rect x="5" y="5" width="30" height="30" fill="#fff"/><rect x="10" y="10" width="20" height="20" fill="#000"/><rect x="15" y="15" width="10" height="10" fill="#fff"/>`),
+  );
+  runTool('A3 nested B/W/B/W (oracle 700+300=1000 mm2)');
+  resetStore();
+  // A4 white bar across two dark shapes
+  importAsOlderBuild(svg(`<rect x="0" y="0" width="20" height="40" fill="#000"/><circle cx="40" cy="20" r="10" fill="#c00"/><rect x="5" y="15" width="45" height="10" fill="white"/>`));
+  runTool('A4 white bar across two darker shapes');
+  resetStore();
+  // A5 white partly outside dark
+  importAsOlderBuild(svg(`<rect x="0" y="0" width="20" height="20" fill="#000"/><rect x="10" y="10" width="20" height="20" fill="#fff"/>`));
+  runTool('A5 white partly overlapping dark');
+  resetStore();
+  // A6 near white
+  importAsOlderBuild(svg(`<rect x="0" y="0" width="30" height="30" fill="#000"/><path d="${DIAMOND}" fill="#fefefe"/>`));
+  runTool('A6 near-white #fefefe (ADR: a colour like any other)');
+  resetStore();
+  // A7 white stroke only
+  importAsOlderBuild(svg(`<rect x="0" y="0" width="30" height="30" fill="#000"/><path d="${DIAMOND}" fill="none" stroke="#fff" stroke-width="2"/>`));
+  runTool('A7 white stroke over dark');
+  resetStore();
+  // A8 white touching dark edge only (shared edge)
+  importAsOlderBuild(svg(`<rect x="0" y="0" width="20" height="20" fill="#000"/><rect x="20" y="0" width="20" height="20" fill="#fff"/>`));
+  runTool('A8 white touching dark edge');
+  resetStore();
+  // A9 white text-like shape: two white letters on a plate
+  importAsOlderBuild(svg(`<rect x="0" y="0" width="60" height="20" fill="#000"/><path d="M5 4 H13 V7 H8 V9 H12 V12 H8 V16 H5 Z" fill="#FFFFFF"/><path d="M16 4 H19 V13 H24 V16 H16 Z" fill="#FFFFFF"/>`));
+  runTool('A9 white letters on plate');
+});
+
+it('B: fresh-import variants (Amendment 1 marks kept)', () => {
+  importSvg(svg(`<rect x="0" y="0" width="30" height="30" fill="#000"/><path d="${DIAMOND}" fill="#fff" fill-opacity="0.5"/>`));
+  out(`== B1 fresh translucent white: count ${countBurningImportedWhites(st().project.scene)} scene ${describeScene(st().project)}`);
+  resetStore();
+  importSvg(svg(`<defs><linearGradient id="g"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#00f"/></linearGradient></defs><rect x="0" y="0" width="30" height="30" fill="url(#g)"/><path d="${DIAMOND}" fill="#fff"/>`));
+  out(`== B2 fresh gradient under solid white: count ${countBurningImportedWhites(st().project.scene)} scene ${describeScene(st().project)}`);
+  st().undo();
+  out(`   after Undo (white kept): count ${countBurningImportedWhites(st().project.scene)} scene ${describeScene(st().project)}`);
+  resetStore();
+  // Older build: translucent white is stripped -> counted as paper (Amd 4 Not covered)
+  importAsOlderBuild(svg(`<rect x="0" y="0" width="30" height="30" fill="#000"/><path d="${DIAMOND}" fill="#fff" fill-opacity="0.5"/>`));
+  runTool('B3 older-build translucent white (known Amd 4 limit)');
+});
+
+it('C: transforms', () => {
+  const T: Transform = { x: 100, y: 80, scaleX: 2, scaleY: 1, rotationDeg: 30, mirrorX: true, mirrorY: false };
+  importAsOlderBuild(svg(`<rect x="5" y="5" width="30" height="30" fill="#000"/><path d="${DIAMOND}" fill="#fff"/>`));
+  setObjects((o) => ({ ...o, transform: T }) as SceneObject);
+  runTool('C1 one part, rotated 30 mirrored scaled 2x1');
+  resetStore();
+  // multi-part import: dark fill, a stroke, white fill -> 3 objects
+  importAsOlderBuild(svg(`<rect x="5" y="5" width="30" height="30" fill="#000"/><line x1="0" y1="45" x2="40" y2="45" stroke="#00f"/><path d="${DIAMOND}" fill="#fff"/>`));
+  out(`C2 multipart scene: ${describeScene(st().project)}`);
+  // rotate whole selection by 37 deg via the store
+  const ids = st().project.scene.objects.map((o) => o.id);
+  useStore.setState({ selectedObjectId: ids[0]!, additionalSelectedIds: new Set(ids.slice(1)) });
+  st().rotateSelectionBy(37);
+  st().flipSelection('horizontal' as never);
+  out(`  transforms: ${st().project.scene.objects.map((o) => JSON.stringify(o.transform)).join(' ; ')}`);
+  runTool('C2 multipart import rotated 37 + flipped together');
+  resetStore();
+  // C3: user moved only the white part of a multipart import 5 mm right
+  importAsOlderBuild(svg(`<rect x="5" y="5" width="30" height="30" fill="#000"/><line x1="0" y1="45" x2="40" y2="45" stroke="#00f"/><path d="${DIAMOND}" fill="#fff"/>`));
+  setObjects((o, i) => (i === 2 ? ({ ...o, transform: { ...o.transform, x: o.transform.x + 5 } } as SceneObject) : o));
+  runTool('C3 multipart, white part alone nudged 5 mm');
+});
+
+it('D: copies of a multipart logo', () => {
+  importAsOlderBuild(svg(`<rect x="5" y="5" width="30" height="30" fill="#000"/><line x1="0" y1="45" x2="40" y2="45" stroke="#00f"/><path d="${DIAMOND}" fill="#fff"/>`));
+  const ids = st().project.scene.objects.map((o) => o.id);
+  useStore.setState({ selectedObjectId: ids[0]!, additionalSelectedIds: new Set(ids.slice(1)) });
+  st().duplicateSelection();
+  // move copies away
+  const n = ids.length;
+  setObjects((o, i) => (i >= n ? ({ ...o, transform: { ...o.transform, x: o.transform.x + 80 } } as SceneObject) : o));
+  runTool('D1 Duplicate of a 3-part logo (dark, stroke, white): copy parts lose svgImport');
+  resetStore();
+  importAsOlderBuild(svg(`<rect x="5" y="5" width="30" height="30" fill="#000"/><line x1="0" y1="45" x2="40" y2="45" stroke="#00f"/><path d="${DIAMOND}" fill="#fff"/>`));
+  const ids2 = st().project.scene.objects.map((o) => o.id);
+  useStore.setState({ selectedObjectId: ids2[0]!, additionalSelectedIds: new Set(ids2.slice(1)) });
+  st().copySelection();
+  st().pasteClipboard();
+  setObjects((o, i) => (i >= 3 ? ({ ...o, transform: { ...o.transform, x: o.transform.x + 80 } } as SceneObject) : o));
+  runTool('D2 Paste of a 3-part logo');
+});
+
+it('E: Line operations on the same artwork', () => {
+  // E1 dark path also on a Line (cut) op
+  importAsOlderBuild(svg(`<rect x="5" y="5" width="30" height="30" fill="#000"/><path d="${DIAMOND}" fill="#fff"/>`));
+  {
+    const s = st().project.scene;
+    const cut = { ...createLayer({ id: 'CUT', color: '#ff00ff', name: 'Cut', mode: 'line' }), power: 77 };
+    const objects = s.objects.map((o) =>
+      'paths' in o
+        ? ({
+            ...o,
+            paths: (o.paths as ColoredPath[]).map((p) => {
+              const ids = s.layers.filter((l) => pathUsesOperation(o, p, l)).map((l) => l.bindingOperationId ?? l.id);
+              return p.color === '#000000' ? { ...p, operationIds: [...ids, 'CUT'] } : { ...p, operationIds: ids };
+            }),
+          } as SceneObject)
+        : o,
+    );
+    useStore.setState({ project: { ...st().project, scene: { ...s, objects, layers: [...s.layers, cut] } } });
+  }
+  const r = runTool('E1 dark square also on a Line cut op');
+  const cutLen = (moves: LitMove[]) => totalLen(moves.filter((m) => m.s > 0 && Math.abs(m.to.y - m.from.y) > 1e-6));
+  out(`  non-row (cut) lit length before ${cutLen(r.bBefore.moves).toFixed(2)} after ${cutLen(r.bAfter.moves).toFixed(2)}; square perimeter 120, diamond perimeter ${(4 * Math.hypot(10, 10)).toFixed(2)}`);
+  resetStore();
+  // E2 white path also on a Line op (e.g. outline of the white to engrave/cut)
+  importAsOlderBuild(svg(`<rect x="5" y="5" width="30" height="30" fill="#000"/><path d="${DIAMOND}" fill="#fff"/>`));
+  {
+    const s = st().project.scene;
+    const cut = { ...createLayer({ id: 'CUT', color: '#ff00ff', name: 'Cut', mode: 'line' }), power: 77 };
+    const objects = s.objects.map((o) =>
+      'paths' in o
+        ? ({
+            ...o,
+            paths: (o.paths as ColoredPath[]).map((p) => {
+              const ids = s.layers.filter((l) => pathUsesOperation(o, p, l)).map((l) => l.bindingOperationId ?? l.id);
+              return p.color === '#ffffff' ? { ...p, operationIds: [...ids, 'CUT'] } : { ...p, operationIds: ids };
+            }),
+          } as SceneObject)
+        : o,
+    );
+    useStore.setState({ project: { ...st().project, scene: { ...s, objects, layers: [...s.layers, cut] } } });
+  }
+  const r2 = runTool('E2 white diamond also on a Line op');
+  out(`  non-row lit length before ${cutLen(r2.bBefore.moves).toFixed(2)} after ${cutLen(r2.bAfter.moves).toFixed(2)}; CUT layer present after: ${st().project.scene.layers.some((l) => l.id === 'CUT')}`);
+  resetStore();
+  // E3 Line-mode import whose operation the user switched to Fill
+  importAsOlderBuild(svg(`<rect x="5" y="5" width="30" height="30" fill="#000"/><path d="${DIAMOND}" fill="#fff"/>`));
+  {
+    const s = st().project.scene;
+    const objects = s.objects.map((o) => ('svgImport' in o && o.svgImport ? ({ ...o, svgImport: { ...o.svgImport, mode: 'line' } } as SceneObject) : o));
+    useStore.setState({ project: { ...st().project, scene: { ...s, objects } } });
+  }
+  runTool('E3 svgImport.mode line but operations are Fill');
+});
+
+it('F: history, file round trip, group membership', () => {
+  importAsOlderBuild(svg(`<rect x="5" y="5" width="30" height="30" fill="#000"/><path d="${DIAMOND}" fill="#fff"/>`));
+  const original = st().project;
+  const ids = original.scene.objects.map((o) => o.id);
+  useStore.setState({ selectedObjectId: ids[0]!, additionalSelectedIds: new Set() });
+  st().groupSelection();
+  const grouped = st().project;
+  out(`== F groups before: ${JSON.stringify(grouped.scene.groups)}`);
+  const g0 = burn(grouped).gcode;
+  st().leaveSavedWhiteUnburned();
+  const after = st().project;
+  const gAfter = burn(after).gcode;
+  out(`  groups after: ${JSON.stringify(after.scene.groups)} undo label: ${JSON.stringify((st() as unknown as { undoLabels?: unknown }).undoLabels ?? null)}`);
+  st().undo();
+  const undone = st().project;
+  out(`  undo: gcode equal to before ${burn(undone).gcode === g0}; scene equal ignoring kept marks ${JSON.stringify(stripKept(undone)) === JSON.stringify(stripKept(grouped))}; count after undo ${countBurningImportedWhites(undone.scene)}; dirty ${st().dirty}`);
+  st().redo();
+  out(`  redo: gcode equal to after ${burn(st().project).gcode === gAfter}; scene identical ${JSON.stringify(st().project.scene) === JSON.stringify(after.scene)}`);
+  const text = serializeProject(st().project);
+  const reopened = deserializeProject(typeof text === 'string' ? text : (text as { text: string }).text);
+  if (reopened.kind !== 'ok') { out(`  reopen failed ${reopened.kind}`); return; }
+  out(`  save/reopen: gcode equal ${burn(reopened.project).gcode === gAfter}; count ${countBurningImportedWhites(reopened.project.scene)}`);
+  // second run is a no-op
+  const n2 = st().leaveSavedWhiteUnburned();
+  out(`  second run returned ${n2}; undo depth ${st().undoStack.length}`);
+});
+
+function stripKept(p: Project) {
+  return p.scene.objects.map((o) => ('paths' in o ? (o.paths as ColoredPath[]).map(({ whiteInk: _w, ...rest }) => rest) : o));
+}
+
+const MULTI = svg(`<rect x="5" y="5" width="30" height="30" fill="#000"/><line x1="0" y1="45" x2="40" y2="45" stroke="#00f"/><path d="M20 10 L30 20 L20 30 L10 20 Z" fill="#fff"/>`);
+const SINGLE = svg(`<rect x="5" y="5" width="30" height="30" fill="#000"/><path d="M20 10 L30 20 L20 30 L10 20 Z" fill="#fff"/>`);
+const cutOf = (moves: LitMove[], s: number) => totalLen(moves.filter((m) => m.s === s));
+
+function addLineOpFor(ids: string[]): string {
+  useStore.setState({ selectedObjectId: ids[0]!, additionalSelectedIds: new Set(ids.slice(1)) });
+  const before = new Set(st().project.scene.layers.map((l) => l.id));
+  st().addOperationForSelection();
+  const added = st().project.scene.layers.find((l) => !before.has(l.id))!;
+  useStore.setState((s) => ({
+    project: { ...s.project, scene: { ...s.project.scene, layers: s.project.scene.layers.map((l) => (l.id === added.id ? { ...l, mode: 'line', power: 77 } : l)) } },
+  }));
+  return added.id;
+}
+
+it('G: UI-built Line op, break apart, group, near-white, op sharing', () => {
+  importAsOlderBuild(SINGLE);
+  const lineId = addLineOpFor([st().project.scene.objects[0]!.id]);
+  const sOf = () => {
+    const l = st().project.scene.layers.find((x) => x.id === lineId);
+    return l ? Math.round((l.power / 100) * 1000) : -1;
+  };
+  const sLine = sOf();
+  const g1 = runTool('G1 single-part logo + Add operation (Line) on whole logo');
+  out(`  line-op S=${sLine} cut length before ${cutOf(g1.bBefore.moves, sLine).toFixed(2)} after ${cutOf(g1.bAfter.moves, sLine).toFixed(2)} (square 120 + diamond 56.57)`);
+  resetStore();
+  importAsOlderBuild(MULTI);
+  const lineId2 = addLineOpFor([st().project.scene.objects[0]!.id]);
+  const l2 = st().project.scene.layers.find((x) => x.id === lineId2)!;
+  const s2 = Math.round((l2.power / 100) * 1000);
+  const g2 = runTool('G2 multipart logo, Add operation (Line) on the dark badge part only');
+  out(`  line-op S=${s2} cut length before ${cutOf(g2.bBefore.moves, s2).toFixed(2)} after ${cutOf(g2.bAfter.moves, s2).toFixed(2)} (square 120; diamond 56.57)`);
+  out(`  S values present after: ${[...new Set(g2.bAfter.moves.map((m) => m.s))].join(',')}`);
+  resetStore();
+  // G3 break apart
+  importAsOlderBuild(SINGLE);
+  useStore.setState({ selectedObjectId: st().project.scene.objects[0]!.id, additionalSelectedIds: new Set() });
+  st().breakApartSelection();
+  runTool('G3 single-part logo after Break Apart');
+  resetStore();
+  // G4 groups
+  importAsOlderBuild(MULTI);
+  const ids = st().project.scene.objects.map((o) => o.id);
+  useStore.setState({ selectedObjectId: ids[0]!, additionalSelectedIds: new Set(ids.slice(1)) });
+  st().groupSelection();
+  out(`== G4 groups before ${JSON.stringify(st().project.scene.groups)}`);
+  runTool('G4 multipart grouped');
+  out(`  groups after ${JSON.stringify(st().project.scene.groups)}; selection ${st().selectedObjectId} + ${[...st().additionalSelectedIds].join(',')}`);
+  resetStore();
+  // G5 near-white / white stroke on fresh import (no knock-out step -> already "older")
+  importSvg(svg(`<rect x="0" y="0" width="30" height="30" fill="#000"/><path d="M15 5 L25 15 L15 25 L5 15 Z" fill="#fefefe"/>`));
+  runTool('G5 near-white #fefefe over black');
+  resetStore();
+  importSvg(svg(`<rect x="0" y="0" width="30" height="30" fill="#000"/><path d="M15 5 L25 15 L15 25 L5 15 Z" fill="none" stroke="#fff" stroke-width="2"/>`));
+  runTool('G6 white stroke over black');
+  resetStore();
+  importSvg(svg(`<rect x="0" y="0" width="30" height="30" fill="#000"/><path d="M15 5 L25 15 L15 25 L5 15 Z" fill="#fff" fill-opacity="0.5"/>`));
+  setObjects((o) => ('paths' in o ? ({ ...o, paths: (o.paths as ColoredPath[]).map(({ whiteInk: _w, ...p }) => p) } as SceneObject) : o));
+  runTool('G7 translucent white saved by 1.0.29 (marks absent; known Amd 4 limit)');
+  resetStore();
+  // G8 white and dark on ONE shared Fill op
+  importAsOlderBuild(SINGLE);
+  const op0 = st().project.scene.layers[0]!.id;
+  useStore.setState({ selectedObjectId: st().project.scene.objects[0]!.id, additionalSelectedIds: new Set() });
+  st().useOperationForSelection(op0);
+  runTool('G8 white and dark on one shared Fill op');
+  resetStore();
+  // G9 Array of multipart
+  importAsOlderBuild(MULTI);
+  const ids9 = st().project.scene.objects.map((o) => o.id);
+  useStore.setState({ selectedObjectId: ids9[0]!, additionalSelectedIds: new Set(ids9.slice(1)) });
+  st().placeSelectionCopies([{ dx: 0, dy: 0, rotationDeg: 0 }, { dx: 60, dy: 0, rotationDeg: 0 }, { dx: 120, dy: 0, rotationDeg: 0 }]);
+  runTool('G9 Array x3 of a multipart logo');
+});
+
+it('H: Line op on the white part only; locked artwork', () => {
+  importAsOlderBuild(MULTI);
+  const white = st().project.scene.objects[2]!.id;
+  const lineId = addLineOpFor([white]);
+  const l = st().project.scene.layers.find((x) => x.id === lineId)!;
+  const s = Math.round((l.power / 100) * 1000);
+  const h = runTool('H1 multipart logo, Add operation (Line) on the white diamond part only');
+  out(`  line-op ${lineId} S=${s} cut length before ${cutOf(h.bBefore.moves, s).toFixed(2)} after ${cutOf(h.bAfter.moves, s).toFixed(2)}; op still in list: ${st().project.scene.layers.some((x) => x.id === lineId)}`);
+  st().undo();
+  out(`  after Undo: op back ${st().project.scene.layers.some((x) => x.id === lineId)}; cut ${cutOf(burn(st().project).moves, s).toFixed(2)}`);
+  resetStore();
+  importAsOlderBuild(SINGLE);
+  setObjects((o) => ({ ...o, locked: true }) as SceneObject);
+  runTool('H2 locked single-part logo');
+  out(`  locked kept: ${st().project.scene.objects.map((o) => o.locked).join(',')}`);
+});

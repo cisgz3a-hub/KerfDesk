@@ -5,9 +5,11 @@
 // per program (ADR-705 Amendment 1). A .rd layer carries one speed, so each
 // rotary layer is split into parts by speed class: every cut is classed by the
 // feed that moves the surface at the layer speed, in geometric steps, and
-// each class becomes its own part at that speed. Moves keep their order within
-// a part; a part reaches each of its cuts by a laser-off move. No mid-layer
-// speed command is relied on, since none is verified on a controller.
+// each class becomes its own part at that speed. No mid-layer speed command
+// is relied on, since none is verified on a controller. Amendments 7 and 8:
+// within a class, runs of cuts keep their path order and burn in the order
+// rd-rotary-order.ts picks, short in laser-off travel and kind to the
+// rotary's backlash; the strokes still burn in pieces, which Rotary Setup says.
 
 import {
   surfaceFeedDoseRise,
@@ -20,15 +22,25 @@ import {
   type RdMotionPart,
   type RdMotionStep,
 } from './rd-motion-plan';
+import { nextGroup, orderedPieceSteps, type Head } from './rd-rotary-order';
 
 /** Speed classes tried in turn, as the ratio between neighbouring classes. */
 const CLASS_STEPS = [1.05, 1.1, 1.2] as const;
 
+/** What the speed classes and the Max feed leave of the set dose. */
+export type RdRotaryDose = Pick<RdRotaryParts, 'minDose' | 'maxDose' | 'held'>;
+
 export type RdRotaryParts = {
   readonly parts: ReadonlyArray<RdMotionPart>;
-  /** The lowest and highest dose any cut gets, as a share of the set dose. */
+  /** The lowest and highest dose the speed classes leave, as a share of the set dose. */
   readonly minDose: number;
   readonly maxDose: number;
+  /** Layers whose strokes round the part the Max feed holds back (ADR-127 Amd 7). */
+  readonly held: ReadonlyArray<{
+    readonly layerId: string;
+    readonly speed: number;
+    readonly rise: number;
+  }>;
 };
 
 /** The parts split by surface-matched speed, in the finest classes that fit
@@ -45,7 +57,9 @@ export function splitRdPartsBySurfaceSpeed(
   return null;
 }
 
-type Class = { readonly speed: number; readonly steps: RdMotionStep[]; at: RdMotionStep | null };
+type Class = { readonly key: number; readonly speed: number; readonly pieces: OpenPiece[] };
+type OpenPiece = { readonly start: RdMotionStep; readonly cuts: RdMotionStep[] };
+type Held = { readonly layerId: string; readonly speed: number; rise: number };
 
 function splitAll(
   parts: ReadonlyArray<RdMotionPart>,
@@ -53,31 +67,32 @@ function splitAll(
   classStep: number,
 ): RdRotaryParts {
   const out: RdMotionPart[] = [];
-  let minDose = Number.POSITIVE_INFINITY;
-  let maxDose = 0;
+  const spread = { min: Number.POSITIVE_INFINITY, max: 0 };
+  const held = new Map<string, Held>();
+  let head: Head = { at: null, dir: 0 };
   for (const part of parts) {
-    const layerFeed = part.group.speed;
-    const classes = new Map<number, Class>();
-    let previous: RdMotionStep | null = null;
-    for (const step of part.steps) {
-      if (step.cut && previous !== null) {
-        const { key, speed, dose } = classify(previous, step, layerFeed, match, classStep);
-        minDose = Math.min(minDose, dose);
-        maxDose = Math.max(maxDose, dose);
-        const target = classes.get(key) ?? { speed, steps: [], at: null };
-        classes.set(key, target);
-        if (target.at === null || !samePoint(target.at, previous)) {
-          target.steps.push({ xUm: previous.xUm, yUm: previous.yUm, cut: false });
-        }
-        target.steps.push(step);
-        target.at = step;
-      }
-      previous = step;
-    }
-    for (const { speed, steps } of classes.values()) {
+    const classes = classifyPart(part, match, classStep, spread, held);
+    // ADR-127 Amd 7 and 8 (C2 verify E1-P2-2, E3-P2-2): each class burns
+    // whole, its pieces in the order rd-rotary-order.ts picks, and the next
+    // class is the one that order would go on into from where the last left
+    // the head and the rotary.
+    const left = [...classes.values()].sort((a, b) => a.key - b.key);
+    while (left.length > 0) {
+      const [group] = left.splice(
+        nextGroup(
+          left.map((entry) => entry.pieces),
+          head,
+          part.bounds,
+        ),
+        1,
+      );
+      if (group === undefined) break;
+      const next = orderedPieceSteps(group.pieces, head, part.bounds);
+      head = next.head;
+      const steps = next.steps;
       out.push({
         part: out.length,
-        group: { ...part.group, speed },
+        group: { ...part.group, speed: group.speed },
         steps,
         bounds: boundsOf(steps),
       });
@@ -85,9 +100,50 @@ function splitAll(
   }
   return {
     parts: out,
-    minDose: Number.isFinite(minDose) ? minDose : 1,
-    maxDose: maxDose || 1,
+    minDose: Number.isFinite(spread.min) ? spread.min : 1,
+    maxDose: spread.max || 1,
+    held: [...held.values()].filter((entry) => Math.round(entry.rise * 100) > 100),
   };
+}
+
+function classifyPart(
+  part: RdMotionPart,
+  match: RotaryFeedMatch,
+  classStep: number,
+  spread: { min: number; max: number },
+  held: Map<string, Held>,
+): Map<number, Class> {
+  const layerFeed = part.group.speed;
+  const classes = new Map<number, Class>();
+  let previous: RdMotionStep | null = null;
+  let open: { key: number; piece: OpenPiece } | null = null;
+  for (const step of part.steps) {
+    if (!step.cut || previous === null) {
+      open = null;
+      previous = step;
+      continue;
+    }
+    const cut = classify(previous, step, layerFeed, match, classStep);
+    spread.min = Math.min(spread.min, cut.classDose);
+    spread.max = Math.max(spread.max, cut.classDose);
+    noteHold(held, part.group.layerId, layerFeed, cut.holdRise);
+    if (open === null || open.key !== cut.key) {
+      const target = classes.get(cut.key) ?? { key: cut.key, speed: cut.speed, pieces: [] };
+      classes.set(cut.key, target);
+      open = { key: cut.key, piece: { start: previous, cuts: [] } };
+      target.pieces.push(open.piece);
+    }
+    open.piece.cuts.push(step);
+    previous = step;
+  }
+  return classes;
+}
+
+function noteHold(held: Map<string, Held>, layerId: string, speed: number, rise: number): void {
+  if (rise <= 1) return;
+  const seen = held.get(layerId);
+  if (seen === undefined) held.set(layerId, { layerId, speed, rise });
+  else seen.rise = Math.max(seen.rise, rise);
 }
 
 function classify(
@@ -96,19 +152,25 @@ function classify(
   layerFeed: number,
   match: RotaryFeedMatch,
   classStep: number,
-): { readonly key: number; readonly speed: number; readonly dose: number } {
+): {
+  readonly key: number;
+  readonly speed: number;
+  readonly classDose: number;
+  readonly holdRise: number;
+} {
   const a = { x: from.xUm / 1000, y: from.yUm / 1000 };
   const b = { x: to.xUm / 1000, y: to.yUm / 1000 };
   const held = surfaceMatchedFeed(layerFeed, a, b, match);
-  // The feed that would move the surface at the layer speed, before any hold.
-  const wanted = held * surfaceFeedDoseRise(layerFeed, a, b, match);
   const key = Math.round(Math.log(held / layerFeed) / Math.log(classStep));
   const speed = Math.min(layerFeed * classStep ** key, Math.max(layerFeed, match.maxFeedMmPerMin));
-  return { key, speed, dose: wanted / speed };
-}
-
-function samePoint(a: RdMotionStep, b: RdMotionStep): boolean {
-  return a.xUm === b.xUm && a.yUm === b.yUm;
+  // The Max feed's hold and the class's rounding, apart, so each is named for
+  // what it is (E1-P3-2).
+  return {
+    key,
+    speed,
+    classDose: held / speed,
+    holdRise: surfaceFeedDoseRise(layerFeed, a, b, match),
+  };
 }
 
 function boundsOf(steps: ReadonlyArray<RdMotionStep>): RdBoundsUm {

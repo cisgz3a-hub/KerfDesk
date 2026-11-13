@@ -423,6 +423,26 @@ export function withoutInactiveLaserLeadSettings<T extends Partial<LayerOperatio
     : withoutLaserLeadSettings(settings);
 }
 
+/** A Scan Offset Test coupon (ADR-052) burns its baseline swatches two-way with
+ * an explicit 0 mm offset and the uncalibrated-scan override, so the zipper can
+ * be measured. Those values describe the coupon, not a reusable process: on
+ * ordinary artwork they skip the device's offset table and the require-verified
+ * one-way fallback (tools audit T1, T04-P2-1). Settings taken from a coupon for
+ * reuse (process recipes, Make Default, Copy settings, material presets) drop
+ * them; settings from any other source come back unchanged. */
+export function withoutCalibrationCouponOverrides<T extends Partial<LayerOperationSettings>>(
+  source: { readonly scanOffsetCalibrationMode?: ScanOffsetCalibrationMode | undefined },
+  settings: T,
+): T {
+  if (source.scanOffsetCalibrationMode === undefined) return settings;
+  const {
+    allowUncalibratedBidirectionalScan: _allow,
+    bidirectionalScanOffsetMm: _offset,
+    ...rest
+  } = settings;
+  return rest as T;
+}
+
 export function createLayerSubLayer(
   layer: Layer,
   args: {

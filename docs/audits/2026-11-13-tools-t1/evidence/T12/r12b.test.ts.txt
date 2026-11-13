@@ -1,0 +1,89 @@
+// T12 refuter extra probes: drawn polyline shape, legacy two-subpath polyline shape,
+// and a selection where every target is refused inside the loop (no toast?).
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  applyTransform,
+  createLayer,
+  createProject,
+  IDENTITY_TRANSFORM,
+  transformedBBox,
+  type Project,
+  type SceneObject,
+} from '../t06-main/src/core/scene';
+import { createPolyline } from '../t06-main/src/core/shapes/create-polyline';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t06-main/src/ui/state/toast-store';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t12r/r12b.log';
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync(LOG, log.join('\n'));
+};
+const st = () => useStore.getState();
+beforeEach(() => resetStore());
+
+function load(objects: SceneObject[]): void {
+  const base = createProject();
+  const layer = createLayer({ id: 'lay', color: '#ff0000', name: 'lay', mode: 'line' });
+  const project: Project = { ...base, scene: { ...base.scene, objects: objects.map((o) => ({ ...o, operationIds: ['lay'] })) as SceneObject[], layers: [layer], groups: [] } };
+  useStore.setState({ project, selectedObjectId: objects[0]!.id, additionalSelectedIds: new Set(objects.slice(1).map((o) => o.id)), undoStack: [], redoStack: [] } as never);
+}
+function shear(ax: number, ay: number): string {
+  useToastStore.setState({ toasts: [] } as never);
+  st().shearSelection(ax, ay);
+  return ((useToastStore.getState() as { toasts?: { message: string }[] }).toasts ?? []).map((t) => t.message).join(' | ');
+}
+
+it('drawn polyline shape', () => {
+  const shape = createPolyline({
+    id: 'pl',
+    color: '#ff0000',
+    spec: { kind: 'polyline', points: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 10 }, { x: 0, y: 10 }], closed: true } as never,
+    transform: { ...IDENTITY_TRANSFORM, x: 50, y: 50 },
+  });
+  load([shape]);
+  const before = st().project.scene.objects[0] as typeof shape;
+  const bb0 = transformedBBox(before);
+  const msg = shear(30, 0);
+  const after = st().project.scene.objects[0] as typeof shape;
+  const bb1 = transformedBBox(after);
+  const spec0 = (before.spec as { points: unknown[] }).points.length;
+  const spec1 = (after.spec as { points: unknown[] }).points.length;
+  // Oracle: world shear about the box centre on the stored polyline points.
+  const c = { x: (bb0.minX + bb0.maxX) / 2, y: (bb0.minY + bb0.maxY) / 2 };
+  const k = Math.tan(Math.PI / 6);
+  const w0 = before.paths[0]!.polylines[0]!.points.map((p) => applyTransform(p, before.transform)).map((p) => ({ x: p.x + k * (p.y - c.y), y: p.y }));
+  const w1 = after.paths[0]!.polylines[0]!.points.map((p) => applyTransform(p, after.transform));
+  let worst = 0;
+  for (const p of w0) worst = Math.max(worst, Math.min(...w1.map((q) => Math.hypot(p.x - q.x, p.y - q.y))));
+  out(`polyline shape 30/0: toast="${msg}" undo=${st().undoStack.length} box ${(bb0.maxX - bb0.minX).toFixed(3)} -> ${(bb1.maxX - bb1.minX).toFixed(3)} (oracle ${(20 + 10 * k).toFixed(3)}) spec points ${spec0} -> ${spec1} worst oracle vertex dev ${worst.toFixed(4)} mm, kind ${after.kind}`);
+});
+
+it('legacy polyline shape with two subpaths (sync returns null)', () => {
+  const shape = createPolyline({
+    id: 'pl2',
+    color: '#ff0000',
+    spec: { kind: 'polyline', points: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 10 }], closed: false } as never,
+    transform: { ...IDENTITY_TRANSFORM, x: 50, y: 50 },
+  });
+  const extra = { closed: false, points: [{ x: 0, y: 5 }, { x: 5, y: 5 }] };
+  const legacy = { ...shape, paths: [{ ...shape.paths[0]!, curves: undefined, polylines: [...shape.paths[0]!.polylines, extra] }] } as unknown as SceneObject;
+  load([legacy]);
+  const p0 = JSON.stringify(st().project);
+  const msg = shear(30, 0);
+  out(`legacy 2-subpath polyline shape alone 30/0: toast="${msg}" undo=${st().undoStack.length} unchanged=${JSON.stringify(st().project) === p0}`);
+});
+
+it('zero-scale imported object alone', () => {
+  const o = {
+    kind: 'imported-svg', id: 'z', source: 'z.svg', bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+    transform: { ...IDENTITY_TRANSFORM, x: 10, y: 10, scaleX: 0 },
+    paths: [{ color: '#ff0000', polylines: [{ closed: true, points: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }] }] }],
+  } as unknown as SceneObject;
+  load([o]);
+  const msg = shear(30, 0);
+  out(`scaleX 0 object alone 30/0: toast="${msg}" undo=${st().undoStack.length}`);
+});

@@ -1,0 +1,234 @@
+// T01 Material Test: decode what each cell burns from emitted G-code and
+// compare with its burned labels. Report-style: prints mismatches.
+import { describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  DEFAULT_DEVICE_PROFILE,
+  emit,
+  generateMaterialTestGrid,
+  labels,
+  litMoves,
+  perCell,
+  burnOrder,
+  allXY,
+  name,
+  type DeviceProfile,
+  type MaterialTestGridOptions,
+} from './harness';
+
+const log: string[] = [];
+function note(s: string): void {
+  log.push(s);
+}
+
+type Case = {
+  title: string;
+  options: MaterialTestGridOptions;
+  device?: Partial<DeviceProfile>;
+  laserMaxPowerS?: number;
+};
+
+const BASE: MaterialTestGridOptions = {
+  mode: 'fill',
+  rowParameter: 'speed',
+  columnParameter: 'power',
+  rows: 10,
+  columns: 10,
+  speedMin: 1000,
+  speedMax: 3000,
+  powerMin: 10,
+  powerMax: 40,
+  passesMin: 1,
+  passesMax: 5,
+  intervalMinMm: 0.05,
+  intervalMaxMm: 0.2,
+  speed: 1500,
+  power: 30,
+  passes: 1,
+  intervalMm: 0.1,
+  cellWidthMm: 5,
+  cellHeightMm: 5,
+  gapMm: 1,
+};
+
+const CASES: Case[] = [
+  { title: 'default fill speed x power', options: BASE },
+  { title: 'default fill, $30=255 session', options: BASE, laserMaxPowerS: 255 },
+  { title: 'default fill, profile S=255', options: BASE, device: { maxPowerS: 255 } },
+  { title: 'default fill, profile S=1 (virtual)', options: BASE, device: { maxPowerS: 1 } },
+  { title: 'default fill, profile S=100', options: BASE, device: { maxPowerS: 100 } },
+  {
+    title: 'power 10-20 x 7 cols (fractional power labels)',
+    options: { ...BASE, rows: 2, columns: 7, powerMin: 10, powerMax: 20 },
+  },
+  {
+    title: 'power 0-100 x 20 cols, 3 rows',
+    options: { ...BASE, rows: 3, columns: 20, powerMin: 0, powerMax: 100 },
+  },
+  {
+    title: 'fill power rows x speed cols',
+    options: { ...BASE, rowParameter: 'power', columnParameter: 'speed', rows: 4, columns: 5 },
+  },
+  {
+    title: 'fill speed rows capped by profile 2000',
+    options: { ...BASE, rows: 5, columns: 3, speedMin: 1000, speedMax: 9000 },
+    device: { maxFeed: 2000 },
+  },
+  {
+    title: 'fill speed fractional request 1234.9..2000.75',
+    options: { ...BASE, rows: 4, columns: 2, speedMin: 1234.9, speedMax: 2000.75 },
+  },
+  {
+    title: 'fill fractional profile ceiling 0.125',
+    options: { ...BASE, rows: 2, columns: 2, speedMin: 1000, speedMax: 2000 },
+    device: { maxFeed: 0.125 },
+  },
+  {
+    title: 'fill fractional profile ceiling 0.001',
+    options: { ...BASE, rows: 2, columns: 2, speedMin: 1000, speedMax: 2000 },
+    device: { maxFeed: 0.001 },
+  },
+  {
+    title: 'fill speed x passes',
+    options: { ...BASE, columnParameter: 'passes', rows: 3, columns: 5, passesMin: 1, passesMax: 5 },
+  },
+  {
+    title: 'fill interval x power',
+    options: { ...BASE, rowParameter: 'interval', columnParameter: 'power', rows: 4, columns: 3 },
+  },
+  {
+    title: 'line speed x passes (cut start)',
+    options: {
+      ...BASE,
+      mode: 'line',
+      rowParameter: 'speed',
+      columnParameter: 'passes',
+      rows: 10,
+      columns: 5,
+      speedMin: 60,
+      speedMax: 600,
+      passesMin: 1,
+      passesMax: 5,
+      power: 100,
+    },
+  },
+  {
+    title: 'line speed x power',
+    options: { ...BASE, mode: 'line', rows: 4, columns: 4 },
+  },
+  {
+    title: 'line power x passes',
+    options: { ...BASE, mode: 'line', rowParameter: 'power', columnParameter: 'passes', rows: 3, columns: 3, passesMin: 1, passesMax: 3 },
+  },
+  { title: '1x1', options: { ...BASE, rows: 1, columns: 1 } },
+  { title: 'reversed ranges', options: { ...BASE, rows: 3, columns: 3, speedMin: 3000, speedMax: 1000, powerMin: 40, powerMax: 10 } },
+  { title: 'equal min/max', options: { ...BASE, rows: 3, columns: 3, speedMin: 2000, speedMax: 2000, powerMin: 25, powerMax: 25 } },
+  { title: 'max grid 20x20 (request 50x50)', options: { ...BASE, rows: 50, columns: 50 } },
+  { title: 'origin rear-right', options: { ...BASE, rows: 3, columns: 3 }, device: { origin: 'rear-right' } },
+  { title: 'origin center', options: { ...BASE, rows: 3, columns: 3 }, device: { origin: 'center' } },
+  { title: 'big cells 20x20 x 30mm (off bed?)', options: { ...BASE, rows: 20, columns: 20, cellWidthMm: 30, cellHeightMm: 30 } },
+  {
+    title: 'line profile maxFeed 600 (labels at 1500?)',
+    options: { ...BASE, mode: 'line', rows: 2, columns: 2, speedMin: 100, speedMax: 500 },
+    device: { maxFeed: 600 },
+  },
+];
+
+function parsePercent(text: string): number {
+  return Number(text);
+}
+
+describe('T01 per-cell decode', () => {
+  for (const c of CASES) {
+    it(c.title, () => {
+      const device: DeviceProfile = { ...DEFAULT_DEVICE_PROFILE, ...(c.device ?? {}) };
+      const grid = generateMaterialTestGrid({
+        ...c.options,
+        maxFeedMmPerMin: device.maxFeed,
+        accelMmPerSec2: device.accelMmPerSec2,
+      });
+      const out = emit(grid, device, c.laserMaxPowerS);
+      const maxS = c.laserMaxPowerS ?? device.maxPowerS;
+      note(`\n## ${c.title}`);
+      note(`ok=${out.ok} cells=${grid.cells.length} rowP=${grid.rowParameter} colP=${grid.columnParameter} mode=${grid.mode}`);
+      if (!out.ok || out.gcode === '') {
+        note(`NO GCODE: ${JSON.stringify(out.preflight).slice(0, 600)}`);
+        return;
+      }
+      const pf = out.preflight as { issues?: { code: string; message: string }[] };
+      if (pf.issues && pf.issues.length > 0)
+        note(`preflight: ${pf.issues.map((i) => i.code).join(', ')}`);
+      const moves = litMoves(out.gcode, device);
+      const { cells, labelMoves, stray } = perCell(grid, moves);
+      const lab = labels(grid);
+      const colLabels = lab.filter((l) => l.id.startsWith('material-test-power-c')).map((l) => l.text);
+      const rowLabels = lab.filter((l) => l.id.startsWith('material-test-speed-r')).map((l) => l.text);
+      note(`rowLabels=${rowLabels.join('|')}`);
+      note(`colLabels=${colLabels.join('|')}`);
+      note(`layer names: ${grid.scene.layers.map((l) => l.name).join(' || ')}`);
+      const mismatches: string[] = [];
+      for (const cell of grid.cells) {
+        const r = cells.get(name(cell))!;
+        const rowLabel = rowLabels[cell.row]!;
+        const colLabel = colLabels[cell.column]!;
+        const labelFor = (p: string): string | undefined =>
+          grid.rowParameter === p ? rowLabel : grid.columnParameter === p ? colLabel : undefined;
+        if (r.litLen === 0) {
+          mismatches.push(`${r.name}: nothing burned (power ${cell.power})`);
+          continue;
+        }
+        // speed
+        const sl = labelFor('speed');
+        if (r.fWords.length !== 1) mismatches.push(`${r.name}: F words ${r.fWords.join(',')}`);
+        if (sl !== undefined && Number(r.fWords[0]) !== Number(sl))
+          mismatches.push(`${r.name}: F${r.fWords[0]} vs speed label ${sl}`);
+        if (sl !== undefined && r.fWords[0] !== sl)
+          mismatches.push(`${r.name}: F word text '${r.fWords[0]}' vs label text '${sl}'`);
+        // power
+        const pl = labelFor('power');
+        if (r.sValues.length !== 1) mismatches.push(`${r.name}: S values ${r.sValues.join(',')}`);
+        const burnedPct = (r.sValues[0]! / maxS) * 100;
+        const expectedPct = pl !== undefined ? parsePercent(pl) : cell.power;
+        const tol = maxS >= 100 ? 50 / maxS + 1e-9 : 0.05 + 1e-9;
+        if (Math.abs(burnedPct - expectedPct) > tol)
+          mismatches.push(`${r.name}: S${r.sValues[0]} = ${burnedPct.toFixed(3)}% vs ${pl !== undefined ? 'label' : 'fixed'} ${expectedPct}%`);
+        // passes
+        if (grid.mode === 'line') {
+          const per = 2 * (cell.bounds.maxX - cell.bounds.minX + cell.bounds.maxY - cell.bounds.minY);
+          const ratio = r.litLen / per;
+          const pal = labelFor('passes');
+          const expectedPasses = pal !== undefined ? Number(pal) : cell.passes;
+          if (Math.abs(ratio - expectedPasses) > 0.02)
+            mismatches.push(`${r.name}: traced ${ratio.toFixed(3)} perimeters vs passes ${expectedPasses}`);
+        }
+      }
+      if (grid.mode === 'fill' && (grid.rowParameter === 'passes' || grid.columnParameter === 'passes')) {
+        const row0 = grid.cells.filter((x) => x.row === 0).map((x) => cells.get(name(x))!.litLen.toFixed(1));
+        note(`fill passes row0 litLen: ${row0.join(', ')}`);
+      }
+      // order (gentlest first)
+      const order = burnOrder(grid, moves);
+      const generated = grid.cells.map(name);
+      if (order.join() !== generated.join()) note(`ORDER differs: ${order.slice(0, 12).join(',')} ...`);
+      // labels
+      const lf = [...new Set(labelMoves.map((m) => m.fWord))];
+      const ls = [...new Set(labelMoves.map((m) => m.s))];
+      note(`label moves=${labelMoves.length} F=${lf.join(',')} S=${ls.join(',')}; stray lit moves=${stray.length}`);
+      if (stray.length > 0) note(`stray sample: ${JSON.stringify(stray.slice(0, 3))}`);
+      // label/cell overlap
+      for (const l of lab)
+        for (const cell of grid.cells) {
+          const b = cell.bounds;
+          const ov = !(l.bounds.maxX <= b.minX || l.bounds.minX >= b.maxX || l.bounds.maxY <= b.minY || l.bounds.minY >= b.maxY);
+          if (ov) mismatches.push(`label ${l.id} overlaps ${name(cell)}`);
+        }
+      const xy = allXY(out.gcode, device);
+      note(`machine XY extent: X ${xy.minX}..${xy.maxX} Y ${xy.minY}..${xy.maxY} (bed ${device.bedWidth}x${device.bedHeight})`);
+      note(mismatches.length === 0 ? 'per-cell: ALL MATCH' : `MISMATCHES (${mismatches.length}):\n  ${mismatches.slice(0, 25).join('\n  ')}`);
+      expect(true).toBe(true);
+    });
+  }
+  it('write log', () => {
+    writeFileSync('C:/Users/stolk/kd-t1/zz-t01/t01-burn.log', log.join('\n'));
+  });
+});

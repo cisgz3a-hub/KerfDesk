@@ -1,0 +1,188 @@
+// T01 audit harness: decode emitted G-code per Material Test cell.
+import { DEFAULT_DEVICE_PROFILE, toSceneCoords, type DeviceProfile } from '../t01-main/src/core/devices';
+import {
+  generateMaterialTestGrid,
+  type MaterialTestCell,
+  type MaterialTestGrid,
+  type MaterialTestGridOptions,
+} from '../t01-main/src/core/job/material-test-grid';
+import { createProject, DEFAULT_PROJECT_OPTIMIZATION, type Project } from '../t01-main/src/core/scene';
+import { prepareOutput } from '../t01-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t01-main/src/io/gcode/emit-gcode';
+
+export type Vec = { x: number; y: number };
+export type LitMove = { from: Vec; to: Vec; f: number; s: number; fWord: string; len: number };
+
+export function projectFor(grid: MaterialTestGrid, device: DeviceProfile): Project {
+  const base = createProject(device);
+  return {
+    ...base,
+    device,
+    optimization: { ...DEFAULT_PROJECT_OPTIMIZATION },
+    scene: { ...base.scene, ...grid.scene },
+  };
+}
+
+export function emit(
+  grid: MaterialTestGrid,
+  device: DeviceProfile,
+  laserMaxPowerS?: number,
+): { gcode: string; preflight: unknown; ok: boolean } {
+  const prepared = prepareOutput(
+    projectFor(grid, device),
+    laserMaxPowerS === undefined ? {} : { laserMaxPowerS },
+  );
+  const out = emitPreparedGcode(prepared);
+  return { gcode: out.gcode, preflight: out.preflight, ok: prepared.ok };
+}
+
+export function litMoves(gcode: string, device: DeviceProfile, yScale = 1): LitMove[] {
+  let x = 0;
+  let y = 0;
+  let s = 0;
+  let f = 0;
+  let fWord = '';
+  let g = 0;
+  let laserOn = false;
+  const moves: LitMove[] = [];
+  for (const raw of gcode.split('\n')) {
+    const line = raw.replace(/;.*$/, '').replace(/\(.*?\)/g, '').toUpperCase();
+    const words = [...line.matchAll(/([A-Z])\s*(-?\d*\.?\d+)/g)];
+    const map = new Map<string, string>();
+    const ms: number[] = [];
+    for (const [, letter, value] of words) {
+      if (letter === 'M') ms.push(Number(value));
+      else map.set(letter!, value!);
+    }
+    for (const m of ms) {
+      if (m === 3 || m === 4) laserOn = true;
+      if (m === 5) laserOn = false;
+    }
+    const gv = map.get('G');
+    if (gv !== undefined) {
+      const gn = Number(gv);
+      if (gn === 0 || gn === 1 || gn === 2 || gn === 3) g = gn;
+    }
+    if (map.has('F')) {
+      f = Number(map.get('F'));
+      fWord = map.get('F')!;
+    }
+    if (map.has('S')) s = Number(map.get('S'));
+    const nx = map.has('X') ? Number(map.get('X')) : x;
+    const ny = map.has('Y') ? Number(map.get('Y')) / yScale : y;
+    if ((map.has('X') || map.has('Y')) && g === 1 && laserOn && s > 0) {
+      const from = toSceneCoords({ x, y }, device);
+      const to = toSceneCoords({ x: nx, y: ny }, device);
+      moves.push({ from, to, f, s, fWord, len: Math.hypot(to.x - from.x, to.y - from.y) });
+    }
+    x = nx;
+    y = ny;
+  }
+  return moves;
+}
+
+export function mid(m: LitMove): Vec {
+  return { x: (m.from.x + m.to.x) / 2, y: (m.from.y + m.to.y) / 2 };
+}
+
+export function inside(p: Vec, b: { minX: number; minY: number; maxX: number; maxY: number }, tol = 0.02): boolean {
+  return p.x >= b.minX - tol && p.x <= b.maxX + tol && p.y >= b.minY - tol && p.y <= b.maxY + tol;
+}
+
+export function labels(grid: MaterialTestGrid): { id: string; text: string; bounds: { minX: number; minY: number; maxX: number; maxY: number } }[] {
+  return grid.scene.objects.flatMap((o) =>
+    o.kind === 'imported-svg' && o.source?.startsWith('calibration-label:')
+      ? [
+          {
+            id: o.id,
+            text: o.source.slice('calibration-label:'.length),
+            bounds: {
+              minX: o.transform.x + o.bounds.minX,
+              minY: o.transform.y + o.bounds.minY,
+              maxX: o.transform.x + o.bounds.maxX,
+              maxY: o.transform.y + o.bounds.maxY,
+            },
+          },
+        ]
+      : [],
+  );
+}
+
+export type CellReport = {
+  name: string;
+  fWords: string[];
+  sValues: number[];
+  litLen: number;
+  rowYs: number;
+};
+
+export function perCell(grid: MaterialTestGrid, moves: LitMove[]): {
+  cells: Map<string, CellReport>;
+  labelMoves: LitMove[];
+  stray: LitMove[];
+} {
+  const cells = new Map<string, CellReport>();
+  const ys = new Map<string, Set<number>>();
+  for (const c of grid.cells) {
+    cells.set(name(c), { name: name(c), fWords: [], sValues: [], litLen: 0, rowYs: 0 });
+    ys.set(name(c), new Set());
+  }
+  const labelList = labels(grid);
+  const labelMoves: LitMove[] = [];
+  const stray: LitMove[] = [];
+  for (const m of moves) {
+    const p = mid(m);
+    const cell = grid.cells.find((c) => inside(p, c.bounds));
+    if (cell !== undefined) {
+      const r = cells.get(name(cell))!;
+      if (!r.fWords.includes(m.fWord)) r.fWords.push(m.fWord);
+      if (!r.sValues.includes(m.s)) r.sValues.push(m.s);
+      r.litLen += m.len;
+      ys.get(name(cell))!.add(Number(p.y.toFixed(3)));
+      continue;
+    }
+    if (labelList.some((l) => inside(p, l.bounds, 0.05))) labelMoves.push(m);
+    else stray.push(m);
+  }
+  for (const [k, v] of ys) cells.get(k)!.rowYs = v.size;
+  return { cells, labelMoves, stray };
+}
+
+export function name(c: MaterialTestCell): string {
+  return `r${c.row}c${c.column}`;
+}
+
+export function burnOrder(grid: MaterialTestGrid, moves: LitMove[]): string[] {
+  const order: string[] = [];
+  for (const m of moves) {
+    const cell = grid.cells.find((c) => inside(mid(m), c.bounds));
+    if (cell !== undefined && !order.includes(name(cell))) order.push(name(cell));
+  }
+  return order;
+}
+
+export function allXY(gcode: string, device: DeviceProfile): { minX: number; maxX: number; minY: number; maxY: number } {
+  let x = 0;
+  let y = 0;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const raw of gcode.split('\n')) {
+    const line = raw.replace(/;.*$/, '').toUpperCase();
+    const mx = /X\s*(-?\d*\.?\d+)/.exec(line);
+    const my = /Y\s*(-?\d*\.?\d+)/.exec(line);
+    if (!mx && !my) continue;
+    if (mx) x = Number(mx[1]);
+    if (my) y = Number(my[1]);
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+  void device;
+  return { minX, maxX, minY, maxY };
+}
+
+export { generateMaterialTestGrid, DEFAULT_DEVICE_PROFILE };
+export type { MaterialTestGridOptions, MaterialTestGrid, DeviceProfile };

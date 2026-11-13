@@ -36,6 +36,18 @@ export function withoutRotaryZ<T extends ZSnapshot>(snapshot: T): T {
   };
 }
 
+/** A work offset without its Z, for a Z-rotary job's Frame-first check at
+ * Start (C2 verification E3-P3-3). The Frame's verification record is taken
+ * before the Frame runs, and the Frame's own `G92 Z0` then moves the Z offset,
+ * so the first Start after any turn found Z "moved" and asked for a second
+ * Frame. The job itself opens with `G92 Z0` too, so the Z offset places
+ * nothing; X and Y stay compared. */
+export function withoutRotaryZOffset(
+  wco: WorkCoordinateOffset | null,
+): WorkCoordinateOffset | null {
+  return zeroZ(wco);
+}
+
 function zeroZ<T extends StatusAxes | WorkCoordinateOffset>(axes: T | null): T | null {
   return axes === null ? null : { ...axes, z: 0 };
 }

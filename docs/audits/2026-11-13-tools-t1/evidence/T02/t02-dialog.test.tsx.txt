@@ -1,0 +1,164 @@
+// @vitest-environment jsdom
+// T02: Interval Test through the real IntervalDialog: Undo / Redo / Cancel,
+// validation of interval values, feed note, Escape.
+import { describe, expect, it, beforeEach } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { IntervalDialog } from '../t01-main/src/ui/commands/CalibrationGridDialogs';
+import { useStore } from '../t01-main/src/ui/state/store';
+import { resetStore, svgObj } from '../t01-main/src/ui/state/test-helpers';
+
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+let roots: Root[] = [];
+function cleanup(): void {
+  for (const r of roots) act(() => r.unmount());
+  roots = [];
+  document.body.innerHTML = '';
+}
+function render(el: JSX.Element): void {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  roots.push(root);
+  act(() => root.render(el));
+}
+function button(name: string): HTMLButtonElement {
+  const b = [...document.querySelectorAll('button')].find((x) => x.textContent?.trim() === name);
+  if (!b) throw new Error(`no button ${name}`);
+  return b as HTMLButtonElement;
+}
+function click(el: HTMLElement): void {
+  act(() => {
+    el.click();
+  });
+}
+function input(label: string): HTMLInputElement {
+  const i = document.querySelector(`input[aria-label="${label}"]`);
+  if (!i) throw new Error(`no input ${label}`);
+  return i as HTMLInputElement;
+}
+function setValue(i: HTMLInputElement, v: string): void {
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    setter.call(i, v);
+    i.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+function alertText(): string {
+  return document.querySelector('[role="alert"]')?.textContent ?? '(no alert)';
+}
+function statusText(): string {
+  return [...document.querySelectorAll('[role="status"]')].map((n) => n.textContent).join(' / ');
+}
+
+const out: string[] = [];
+
+beforeEach(() => {
+  cleanup();
+  resetStore();
+  try {
+    localStorage.clear();
+  } catch {
+    /* ignore */
+  }
+});
+
+describe('interval dialog', () => {
+  it('Generate, Undo, Redo', () => {
+    useStore.getState().importSvgObject(svgObj('user-art', ['#ff0000']));
+    useStore.setState({ undoStack: [], redoStack: [], dirty: false });
+    const before = useStore.getState().project;
+    let closed = 0;
+    render(<IntervalDialog onClose={() => closed++} />);
+    click(button('Generate'));
+    const generated = useStore.getState().project;
+    out.push(
+      `generate: closed=${closed} objects=${generated.scene.objects.length} layers=${generated.scene.layers.length} userArtKept=${generated.scene.objects.some((o) => o.id === 'user-art')} undoDepth=${useStore.getState().undoStack.length} dirty=${useStore.getState().dirty}`,
+    );
+    out.push(`layer names: ${generated.scene.layers.map((l) => `${l.name} [${l.mode} ${l.hatchSpacingMm} ${l.speed} ${l.power}]`).join(' ; ')}`);
+    useStore.getState().undo();
+    const undone = useStore.getState().project;
+    out.push(`undo: scene restored=${JSON.stringify(undone.scene) === JSON.stringify(before.scene)} undoDepth=${useStore.getState().undoStack.length}`);
+    useStore.getState().redo();
+    const redone = useStore.getState().project;
+    out.push(`redo: scene equals generated=${JSON.stringify(redone.scene) === JSON.stringify(generated.scene)}`);
+    expect(true).toBe(true);
+  });
+
+  it('Cancel leaves nothing', () => {
+    useStore.getState().importSvgObject(svgObj('user-art', ['#ff0000']));
+    useStore.setState({ undoStack: [], redoStack: [], dirty: false });
+    const before = useStore.getState().project;
+    const ls = localStorage.length;
+    let closed = 0;
+    render(<IntervalDialog onClose={() => closed++} />);
+    setValue(input('Steps'), '3');
+    click(button('Cancel'));
+    const after = useStore.getState();
+    out.push(`cancel: closed=${closed} sameProject=${after.project === before} undo=${after.undoStack.length} dirty=${after.dirty} localStorage ${ls}->${localStorage.length}`);
+  });
+
+  it('Escape closes without change', () => {
+    const before = useStore.getState().project;
+    let closed = 0;
+    render(<IntervalDialog onClose={() => closed++} />);
+    act(() => {
+      document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    out.push(`escape: closed=${closed} sameProject=${useStore.getState().project === before}`);
+  });
+
+  it('interval values the dialog accepts or refuses', () => {
+    const cases: [string, string, string][] = [
+      ['Min interval', '0.0635', '400 DPI pitch'],
+      ['Min interval', '0.0847', '300 DPI pitch'],
+      ['Min interval', '0.0508', '500 DPI pitch'],
+      ['Max interval', '0.125', 'October register example'],
+      ['Max interval', '0.127', '200 DPI pitch'],
+      ['Min interval', '0.07', 'two-decimal value'],
+      ['Min interval', '0.04', 'below floor'],
+      ['Max interval', '20', 'larger than 8 mm swatch'],
+      ['Max interval', '1e9', 'absurd'],
+      ['Steps', '21', 'over max'],
+      ['Steps', '2.5', 'fraction'],
+      ['Speed', '1234.5', 'fractional speed'],
+      ['Power', '33.3', 'fractional power'],
+      ['Swatch size', '6.35', 'quarter inch'],
+    ];
+    for (const [label, value, why] of cases) {
+      cleanup();
+      try {
+        localStorage.clear();
+      } catch {
+        /* ignore */
+      }
+      render(<IntervalDialog onClose={() => undefined} />);
+      setValue(input(label), value);
+      out.push(`${label}=${value} (${why}): Generate disabled=${button('Generate').disabled}; alert="${alertText()}"`);
+    }
+  });
+
+  it('max interval 20 on 8 mm swatch generates', () => {
+    render(<IntervalDialog onClose={() => undefined} />);
+    setValue(input('Steps'), '3');
+    setValue(input('Min interval'), '0.1');
+    setValue(input('Max interval'), '20');
+    click(button('Generate'));
+    const p = useStore.getState().project;
+    out.push(`max 20: layers ${p.scene.layers.map((l) => l.name).join(' ; ')}`);
+  });
+
+  it('feed note with fractional ceiling', () => {
+    useStore.setState({ project: { ...useStore.getState().project, device: { ...useStore.getState().project.device, maxFeed: 1234.9 } } });
+    render(<IntervalDialog onClose={() => undefined} />);
+    out.push(`ceiling 1234.9: note="${statusText()}"`);
+    click(button('Generate'));
+    const p = useStore.getState().project;
+    out.push(`ceiling 1234.9: speed label layer names ${p.scene.layers.slice(0, 1).map((l) => l.name).join(';')}; speed-label source ${p.scene.objects.filter((o) => o.id === 'interval-test-effective-speed-label').map((o) => (o as { source?: string }).source).join()}`);
+  });
+
+  it('log', () => writeFileSync('C:/Users/stolk/kd-t1/zz-t02/t02-dialog.log', out.join('\n')));
+});

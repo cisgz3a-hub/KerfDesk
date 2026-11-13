@@ -198,6 +198,32 @@ describe('Lihuiyu USB store', () => {
     expect(simulator.decoder.moves.every((move) => !move.laser)).toBe(true);
   });
 
+  // ADR-703 Amendment 2 (C2 verification E2-P3-1): Ctrl+. and ABORT MOTION
+  // reset the board during a Jog or a Home too, and the head is then unknown.
+  it.each([
+    ['a Jog', () => store().jog(10, 5)],
+    ['a Home', () => store().home()],
+  ])('Abort during %s resets the board', async (_label, move) => {
+    const simulator = await connectedHomed();
+    const moving = move();
+    expect(activeLinkMachineWork()).not.toBeNull();
+    await activeLinkMachineWork()?.abort();
+    await moving;
+    expect(simulator.resets).toBe(1);
+    expect(store().phase).toBe('idle');
+    expect(store().head).toBeNull();
+  });
+
+  // C2 verification E2-P2-1: the job's warnings show from its Frame on, as on
+  // Moshi and Ruida, so the operator reads them before Start.
+  it('shows the job warnings from the Frame on', async () => {
+    const simulator = await connectedHomed();
+    const job = zigzagJob(4);
+    await store().frame(job);
+    simulator.drain();
+    expect(store().advisories).toEqual(job.advisories);
+  });
+
   it('sends a packet again when the board rejects its checksum', async () => {
     const simulator = await connectedHomed();
     const job = zigzagJob(2);

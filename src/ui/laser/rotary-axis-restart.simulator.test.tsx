@@ -26,6 +26,7 @@ import {
   drive,
   frameUntilPermit,
   harness,
+  startFramedJob,
   installRecoveryStressHooks,
   tick,
   STRESS_TIMEOUT_MS,
@@ -181,6 +182,36 @@ describe('a rotary on Z, stock GRBL simulator', () => {
 
       await frameUntilPermit();
       expect(useLaserStore.getState().framedRun).not.toBeNull();
+      expect(useLaserStore.getState().lastWriteError).toBeNull();
+    },
+    STRESS_TIMEOUT_MS,
+  );
+
+  it(
+    'starts after one Frame when the part was turned (C2 verification E3-P3-3)',
+    async () => {
+      const zRotary: RotarySetup = {
+        ...A_ROTARY,
+        axis: 'Z',
+        axisConfirmed: 'Z',
+        mmPerRotation: 40,
+      };
+      const h = await harness({ project: square(zRotary, 'grbl-v1.1') });
+      useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'front-left' } });
+      // Turn the part first, so the Frame's own G92 Z0 moves the Z offset.
+      await drive(useLaserStore.getState().jog({ dz: 7, feed: 1500 }));
+      await tick(1_500);
+      await drive(useLaserStore.getState().jog({ dx: 20, dy: 30, feed: 3_000 }));
+      await tick(1_500);
+      await drive(useLaserStore.getState().setOriginHere());
+      await tick(1_500);
+
+      // startFramedJob frames once and fails unless Start streams that permit.
+      const { running } = await startFramedJob(h.repository);
+      await drive(running);
+      await tick(1_500);
+
+      expect(h.simulator.state().g92?.z).toBeCloseTo(7, 3);
       expect(useLaserStore.getState().lastWriteError).toBeNull();
     },
     STRESS_TIMEOUT_MS,

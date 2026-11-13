@@ -87,6 +87,14 @@ test('a busy conversion keeps Shift+Tab inside its remaining Cancel control', as
     },
   ]);
   await (await toolbarCommand(page, 'Import...')).click();
+  // The import's success toast now stays up long enough to read (ADR-708), so
+  // it would still be showing when the dialog opens. A modal hosts the toast
+  // row inside itself, where its Dismiss button is a real Tab stop. This test
+  // is about the dialog's own controls, so the toast is closed first.
+  await page
+    .getByRole('button', { name: /^Dismiss success notification: Imported focus\.svg/ })
+    .click();
+  await expect(page.locator('.lf-toast')).toHaveCount(0);
   await page.getByRole('button', { name: 'More commands', exact: true }).click();
   await page
     .getByRole('menu', { name: 'More commands', exact: true })
@@ -97,6 +105,8 @@ test('a busy conversion keeps Shift+Tab inside its remaining Cancel control', as
   await expect(dialog.getByRole('progressbar', { name: 'Converting to bitmap' })).toBeVisible();
   const cancel = dialog.getByRole('button', { name: 'Cancel', exact: true });
   await expect(cancel).toBeFocused();
+  // Cancel is the only stop left in the dialog's Tab cycle.
+  await expect(dialog.locator('.lf-toast')).toHaveCount(0);
   await cancel.press('Shift+Tab');
   await expect(cancel).toBeFocused();
   await cancel.press('Tab');

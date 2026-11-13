@@ -1,0 +1,41 @@
+// Flattened (stored polyline + G-code) accuracy of an eccentric sheared arc chain.
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type CurveSubpath, type ImportedSvg } from '../t06-main/src/core/scene';
+import { flattenCurveSubpath } from '../t06-main/src/core/scene/curve-path';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { prepareOutput } from '../t06-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t06-main/src/io/gcode/emit-gcode';
+import { decode, hausdorff, sample, segsDist, shearW, type Curve } from './geo12';
+
+it('eccentric arcs', () => {
+  const lines: string[] = [];
+  for (const [N, r, ax, ay] of [[3, 1, 85, 0], [3, 1, 60, 0], [3, 1, 30, 0], [3, 10, 85, 0], [1, 10, 80, 0], [3, 1, 0, 85]] as const) {
+    resetStore();
+    const segs: any[] = [];
+    for (let i = 0; i < N; i++) segs.push({ kind: 'elliptical-arc', radiusX: r, radiusY: r, rotationDeg: 0, largeArc: false, sweep: i % 2 === 0, to: { x: 2 * r * (i + 1), y: 0 } });
+    const wavy: CurveSubpath = { start: { x: 0, y: 0 }, segments: segs, closed: false };
+    const a = flattenCurveSubpath(wavy, { toleranceMm: 0.05 }) as any;
+    const o = { kind: 'imported-svg', id: 'a', source: 'a.svg', bounds: { minX: Math.min(...a.polyline.points.map((q: any) => q.x)), minY: Math.min(...a.polyline.points.map((q: any) => q.y)), maxX: Math.max(...a.polyline.points.map((q: any) => q.x)), maxY: Math.max(...a.polyline.points.map((q: any) => q.y)) }, transform: { ...IDENTITY_TRANSFORM, x: 100, y: 100 }, operationIds: ['L'],
+      paths: [{ color: '#ff0000', polylines: [a.polyline], curves: [wavy] }] } as unknown as ImportedSvg;
+    const base = createProject();
+    const layer = { ...createLayer({ id: 'L', color: '#ff0000', name: 'L', mode: 'line' }), speed: 777, power: 30 };
+    useStore.setState({ project: { ...base, scene: { ...base.scene, objects: [o], layers: [layer], groups: [] } }, selectedObjectId: 'a', additionalSelectedIds: new Set(), undoStack: [], redoStack: [] } as any);
+    const before = sample(wavy as unknown as Curve, 2000).map((p) => ({ x: p.x + 100, y: p.y + 100 }));
+    const bb = { minY: Math.min(...before.map((p) => p.y)), maxY: Math.max(...before.map((p) => p.y)), minX: Math.min(...before.map((p) => p.x)), maxX: Math.max(...before.map((p) => p.x)) };
+    const c = { x: (bb.minX + bb.maxX) / 2, y: (bb.minY + bb.maxY) / 2 };
+    useStore.getState().shearSelection(ax, ay);
+    const res = useStore.getState().project.scene.objects[0] as any;
+    const oracle = before.map((p) => shearW(p, c, ax, ay));
+    const curvePts = sample(res.paths[0].curves[0], 2000).map((p: any) => ({ x: p.x + 100, y: p.y + 100 }));
+    const polyPts = res.paths[0].polylines[0].points.map((p: any) => ({ x: p.x + 100, y: p.y + 100 }));
+    const p = prepareOutput(useStore.getState().project) as any;
+    const g = decode(emitPreparedGcode(p).gcode);
+    const gs = g.segs.map(([a1, b1]) => [{ x: a1.x, y: 400 - a1.y }, { x: b1.x, y: 400 - b1.y }] as any);
+    let gmax = 0; for (const q of oracle) gmax = Math.max(gmax, segsDist(gs, q));
+    const s0 = res.paths[0].curves[0].segments[0];
+    lines.push(`N${N} r${r} (${ax},${ay}): stored arc rx ${s0.radiusX.toFixed(4)} ry ${s0.radiusY.toFixed(4)} rot ${s0.rotationDeg.toFixed(3)}; devCurve ${hausdorff(curvePts, oracle).toFixed(4)} devPoly ${hausdorff(polyPts, oracle).toFixed(4)} (poly pts ${polyPts.length}) gcode oracle→burn ${gmax.toFixed(4)} gcode segs ${gs.length}`);
+  }
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t12/t12c.log', lines.join('\n'));
+});

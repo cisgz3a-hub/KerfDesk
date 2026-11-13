@@ -1,0 +1,72 @@
+// T02: Interval Test on rotary. Groups lit scan lines by machine X into
+// swatches, then measures the surface Y step (emitted Y step / k).
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { DEFAULT_DEVICE_PROFILE, emit, generateIntervalTestGrid, type DeviceProfile } from './harness';
+import { rotaryYScale } from '../t01-main/src/core/devices/rotary';
+
+function rawLit(gcode: string): { x0: number; x1: number; y0: number; y1: number; f: number; s: number }[] {
+  let x = 0, y = 0, s = 0, f = 0, g = 0;
+  let on = false;
+  const out: { x0: number; x1: number; y0: number; y1: number; f: number; s: number }[] = [];
+  for (const raw of gcode.split('\n')) {
+    const line = raw.replace(/;.*$/, '').toUpperCase();
+    const w = new Map<string, number>();
+    for (const m of line.matchAll(/([A-Z])\s*(-?\d*\.?\d+)/g)) {
+      if (m[1] === 'M') {
+        const v = Number(m[2]);
+        if (v === 3 || v === 4) on = true;
+        if (v === 5) on = false;
+      } else w.set(m[1]!, Number(m[2]));
+    }
+    if (w.has('G') && [0, 1, 2, 3].includes(w.get('G')!)) g = w.get('G')!;
+    if (w.has('F')) f = w.get('F')!;
+    if (w.has('S')) s = w.get('S')!;
+    const nx = w.get('X') ?? x;
+    const ny = w.get('Y') ?? y;
+    if ((w.has('X') || w.has('Y')) && g === 1 && on && s > 0) out.push({ x0: x, x1: nx, y0: y, y1: ny, f, s });
+    x = nx;
+    y = ny;
+  }
+  return out;
+}
+
+it('rotary interval steps', () => {
+  const log: string[] = [];
+  const setups = [
+    { name: 'chuck 20mm/rot, 60mm dia', rotary: { enabled: true, type: 'chuck', mmPerRotation: 20, objectDiameterMm: 60 } },
+    { name: 'roller 40mm/rot, 80mm obj, 20mm roller', rotary: { enabled: true, type: 'roller', mmPerRotation: 40, objectDiameterMm: 80, rollerDiameterMm: 20 } },
+    { name: 'roller no roller dia (k=1)', rotary: { enabled: true, type: 'roller', mmPerRotation: 40, objectDiameterMm: 80 } },
+  ];
+  for (const st of setups) {
+    const device = { ...DEFAULT_DEVICE_PROFILE, rotary: st.rotary } as unknown as DeviceProfile;
+    const k = rotaryYScale(device.rotary!);
+    const grid = generateIntervalTestGrid({ steps: 10, speed: 1500, power: 30, intervalMinMm: 0.08, intervalMaxMm: 0.2, swatchSizeMm: 8, gapMm: 2, maxFeedMmPerMin: device.maxFeed });
+    const out = emit(grid, device);
+    log.push(`\n## ${st.name} k=${k} ok=${out.ok}`);
+    if (!out.ok) {
+      log.push(JSON.stringify(out.preflight).slice(0, 800));
+      continue;
+    }
+    const lit = rawLit(out.gcode).filter((m) => Math.abs(m.y1 - m.y0) < 1e-9 && m.f === 1500 && m.s === 300);
+    const xs = lit.map((m) => (m.x0 + m.x1) / 2);
+    log.push(`scan lines ${lit.length}; X range ${Math.min(...xs).toFixed(3)}..${Math.max(...xs).toFixed(3)}; Y range ${Math.min(...lit.map((m) => m.y0)).toFixed(3)}..${Math.max(...lit.map((m) => m.y0)).toFixed(3)}`);
+    // Swatch columns by machine X: cells are 8 mm wide with 2 mm gaps starting at the min X.
+    const minX = Math.min(...lit.map((m) => Math.min(m.x0, m.x1)));
+    for (const c of grid.cells) {
+      const cx0 = minX + c.step * 10;
+      const mine = lit.filter((m) => {
+        const mx = (m.x0 + m.x1) / 2;
+        return mx >= cx0 - 0.5 && mx <= cx0 + 8.5;
+      });
+      const ys = [...new Set(mine.map((m) => m.y0))].sort((a, b) => a - b);
+      const diffs = ys.slice(1).map((y, i) => y - ys[i]!);
+      const meanSurf = ys.length > 1 ? (ys[ys.length - 1]! - ys[0]!) / (ys.length - 1) / k : NaN;
+      const spanSurf = ys.length ? (ys[ys.length - 1]! - ys[0]!) / k : NaN;
+      log.push(
+        `step ${c.step} interval ${c.intervalMm}: lines ${ys.length} emitted step min ${Math.min(...diffs).toFixed(4)} max ${Math.max(...diffs).toFixed(4)} | surface mean ${meanSurf.toFixed(6)} (label ${c.intervalMm}) err ${(meanSurf - c.intervalMm).toFixed(6)} | surface span ${spanSurf.toFixed(3)} mm | min/max surface step ${(Math.min(...diffs) / k).toFixed(4)}/${(Math.max(...diffs) / k).toFixed(4)}`,
+      );
+    }
+  }
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t02/t02-rotary.log', log.join('\n'));
+});

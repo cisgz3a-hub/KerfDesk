@@ -136,7 +136,10 @@ function filletNode(
   const corner = lineCorner(contour, node);
   if (corner === null) return null;
   const distance = tangentDistance(corner, radius, mode);
-  if (distance > corner.inLength - EPS || distance > corner.outLength - EPS) return null;
+  // `fittingCorners` already decided this corner fits. An arc may reach the
+  // very end of a side, where its neighbour's arc begins (a 10 mm square at
+  // r 5): refusing that left every other corner sharp (T11-P2-1).
+  if (distance > corner.inLength + EPS || distance > corner.outLength + EPS) return null;
   const { point, u, v, theta } = corner;
   const t1 = add(point, scale(u, distance));
   const t2 = add(point, scale(v, distance));
@@ -153,17 +156,49 @@ function filletNode(
     sweep: cross(sub(t1, center), sub(t2, center)) > 0,
     to: t2,
   };
-  return replaceCorner(contour, corner.corner, [{ kind: 'line', to: t1 }, arc], t2);
+  // A side the arcs use up entirely leaves no line between them.
+  const lead = nearPoint(t1, segmentStart(contour, corner.corner.incoming))
+    ? []
+    : [{ kind: 'line' as const, to: t1 }];
+  const next = replaceCorner(contour, corner.corner, [...lead, arc], t2);
+  const outgoing =
+    corner.corner.outgoing === 0 && contour.closed ? 0 : corner.corner.incoming + lead.length + 1;
+  const after = next.segments[outgoing];
+  return after?.kind === 'line' && nearPoint(after.to, t2)
+    ? { ...next, segments: next.segments.filter((_, index) => index !== outgoing) }
+    : next;
 }
 
-/** Replaces each tangent arc or cubic between two lines with the lines' sharp corner. */
+function nearPoint(a: Vec2, b: Vec2): boolean {
+  return Math.hypot(a.x - b.x, a.y - b.y) <= 1e-7;
+}
+
+// Remove with no corner picked skips a "fillet" whose sides meet more than this
+// many chord lengths away: a corner sharper than about 14°, such as a tapered
+// slot's rounded end, which would grow into a spike far outside the artwork
+// (T11-P2-2). Picking the arc's node removes it anyway.
+const MAX_UNPICKED_CORNER_REACH = 4;
+
+/**
+ * Replaces each tangent arc or cubic between two lines with the lines' sharp
+ * corner. With `nodes`, only a curve that starts or ends at a picked node
+ * changes (T11R-P2-1).
+ */
 export function removeCurveFillets(
   curve: CurveSubpath,
+  nodes?: ReadonlyArray<number>,
 ): { readonly curve: CurveSubpath; readonly count: number } | null {
   let contour = contourSegments(curve, curve.closed);
+  const nodeTotal = nodeCount(contour);
+  const picked = nodes === undefined ? null : new Set(nodes);
+  // Indices are those of the original contour: removal goes from the last
+  // segment down, so a removal never shifts an index still to be visited.
+  const chosen = (index: number) =>
+    picked === null || picked.has(index) || picked.has((index + 1) % nodeTotal);
   let count = 0;
   for (let index = contour.segments.length - 1; index >= 0; index -= 1) {
-    const next = removeFilletAt(contour, index);
+    if (!chosen(index)) continue;
+    const next = removeFilletAt(contour, index, picked === null);
     if (next === null) continue;
     contour = next;
     count += 1;
@@ -214,7 +249,7 @@ function tangentSpan(
   return { before, t1, t2, dIn, dOut };
 }
 
-function removeFilletAt(contour: Contour, index: number): Contour | null {
+function removeFilletAt(contour: Contour, index: number, limitReach: boolean): Contour | null {
   const span = filletSpan(contour, index);
   if (span === null) return null;
   const { before, t1, t2, dIn, dOut } = span;
@@ -224,6 +259,8 @@ function removeFilletAt(contour: Contour, index: number): Contour | null {
   const s = cross(sub(t2, t1), dOut) / denom;
   const r = cross(sub(t2, t1), dIn) / denom;
   if (s <= 0 || r >= 0) return null;
+  const reach = Math.max(s, -r) / vectorLength(sub(t2, t1));
+  if (limitReach && !(reach <= MAX_UNPICKED_CORNER_REACH)) return null;
   const corner = add(t1, scale(dIn, s));
   const last = contour.segments.length - 1;
   const segments = contour.segments

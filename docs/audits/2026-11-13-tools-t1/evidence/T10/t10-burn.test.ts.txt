@@ -1,0 +1,451 @@
+// @vitest-environment jsdom
+// T10 Close Paths with Tolerance: how far the burned outline moves when ends meet
+// (polylines, cubics, elliptical arcs), world-frame gaps, which ends are joined,
+// guard values, Undo/Redo/save-reopen, and the result message.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  applyTransform,
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  type ColoredPath,
+  type CurveSubpath,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type Transform,
+} from '../t06-main/src/core/scene';
+import { compilationPolylines } from '../t06-main/src/core/job/compilation-polylines';
+import { closePathsWithinTolerance } from '../t06-main/src/core/geometry/close-within-tolerance';
+import { prepareOutput } from '../t06-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t06-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t06-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t06-main/src/io/project/deserialize-project';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t06-main/src/ui/state/toast-store';
+import { litMoves, totalLen, type Vec } from '../zz-t07/decode';
+
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t10/t10-burn.log', log.join('\n'));
+};
+beforeEach(() => resetStore());
+
+const LINE_SPEED = 1234;
+const f3 = (n: number) => n.toFixed(3);
+const st = () => useStore.getState();
+
+function lineLayer(extra: Partial<Layer> = {}): Layer {
+  return { ...createLayer({ id: 'L', color: '#ff0000', name: 'L', mode: 'line' }), speed: LINE_SPEED, power: 30, ...extra };
+}
+
+function svgObj(id: string, paths: ColoredPath[], transform: Transform, extra: Partial<ImportedSvg> = {}): ImportedSvg {
+  const all = paths.flatMap((p) => p.polylines.flatMap((pl) => pl.points));
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: {
+      minX: Math.min(...all.map((p) => p.x)),
+      minY: Math.min(...all.map((p) => p.y)),
+      maxX: Math.max(...all.map((p) => p.x)),
+      maxY: Math.max(...all.map((p) => p.y)),
+    },
+    transform,
+    operationIds: ['L'],
+    paths,
+    ...extra,
+  };
+}
+
+function load(objects: SceneObject[], selected: string[], layer: Layer = lineLayer()): void {
+  const base = createProject();
+  const project: Project = {
+    ...base,
+    optimization: { ...DEFAULT_PROJECT_OPTIMIZATION },
+    scene: { ...base.scene, objects, layers: [layer], groups: [] },
+  };
+  useStore.setState({
+    project,
+    selectedObjectId: selected[0] ?? null,
+    additionalSelectedIds: new Set(selected.slice(1)),
+    undoStack: [],
+    redoStack: [],
+    dirty: false,
+  });
+}
+
+function burn(project: Project) {
+  const prepared = prepareOutput(project);
+  const emitted = prepared.ok ? emitPreparedGcode(prepared) : { gcode: '' };
+  const moves = litMoves(emitted.gcode, project.device).filter((m) => m.f === LINE_SPEED);
+  return { gcode: emitted.gcode, moves, ok: prepared.ok };
+}
+
+let lastToast = '';
+function apply(tol: number, mode: 'bridge' | 'move-ends') {
+  const p0 = st().project;
+  const u0 = st().undoStack.length;
+  useToastStore.setState({ toasts: [] });
+  st().closeSelectedPathsWithTolerance(tol, mode);
+  const toasts = useToastStore.getState().toasts;
+  lastToast = toasts.length > 0 ? toasts.map((t) => t.message).join(' | ') : '(no toast)';
+  return { changed: st().project !== p0, undoAdded: st().undoStack.length - u0 };
+}
+
+// ---------- independent sampling / deviation ----------
+function densify(pts: ReadonlyArray<Vec>, step = 0.05, closed = false): Vec[] {
+  const res: Vec[] = [];
+  const list = closed && pts.length > 0 ? [...pts, pts[0]!] : pts;
+  for (let i = 0; i + 1 < list.length; i++) {
+    const a = list[i]!;
+    const b = list[i + 1]!;
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / step));
+    for (let k = 0; k < n; k++) res.push({ x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n });
+  }
+  if (list.length > 0) res.push(list.at(-1)!);
+  return res;
+}
+function segDist(p: Vec, a: Vec, b: Vec): number {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const l2 = dx * dx + dy * dy;
+  const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+function distToPolyline(p: Vec, poly: ReadonlyArray<Vec>): number {
+  let d = Infinity;
+  for (let i = 0; i + 1 < poly.length; i++) d = Math.min(d, segDist(p, poly[i]!, poly[i + 1]!));
+  if (poly.length === 1) d = Math.hypot(p.x - poly[0]!.x, p.y - poly[0]!.y);
+  return d;
+}
+/** max distance from any point of `a` (densified) to polyline `b`. */
+function oneSided(a: ReadonlyArray<Vec>, b: ReadonlyArray<Vec>): number {
+  let m = 0;
+  for (const p of densify(a, 0.1)) m = Math.max(m, distToPolyline(p, b));
+  return m;
+}
+function len(pts: ReadonlyArray<Vec>): number {
+  let s = 0;
+  for (let i = 0; i + 1 < pts.length; i++) s += Math.hypot(pts[i + 1]!.x - pts[i]!.x, pts[i + 1]!.y - pts[i]!.y);
+  return s;
+}
+const deg = (d: number) => (d * Math.PI) / 180;
+function circ(cx: number, cy: number, r: number, a0: number, a1: number, n = 720): Vec[] {
+  const pts: Vec[] = [];
+  for (let i = 0; i <= n; i++) {
+    const a = deg(a0 + ((a1 - a0) * i) / n);
+    pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+  }
+  return pts;
+}
+function cubicPts(p0: Vec, c1: Vec, c2: Vec, p3: Vec, n = 400): Vec[] {
+  const pts: Vec[] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, u = 1 - t;
+    pts.push({
+      x: u * u * u * p0.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * p3.x,
+      y: u * u * u * p0.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * p3.y,
+    });
+  }
+  return pts;
+}
+const world = (pts: ReadonlyArray<Vec>, t: Transform) => pts.map((p) => applyTransform(p, t));
+
+function compiledWorld(path: ColoredPath, t: Transform): Vec[][] {
+  return compilationPolylines(path, t, 0.01).map((pl) => world(pl.closed ? [...pl.points, pl.points[0]!] : pl.points, t));
+}
+
+// ---------- A: elliptical arcs (DXF ARC / SVG A) with Move ends together ----------
+it('A arcs: move-ends', () => {
+  out('== A elliptical arcs, move-ends');
+  const r = 20;
+  const P = (a: number): Vec => ({ x: r * Math.cos(deg(a)), y: r * Math.sin(deg(a)) });
+  const cases: Array<{ name: string; curve: CurveSubpath; orig: Vec[] }> = [
+    {
+      name: 'one arc 5..355 deg (DXF ARC)',
+      curve: { start: P(5), closed: false, segments: [{ kind: 'elliptical-arc', radiusX: r, radiusY: r, rotationDeg: 0, largeArc: true, sweep: true, to: P(355) }] },
+      orig: circ(0, 0, r, 5, 355),
+    },
+    {
+      name: 'two arcs 5..180..355',
+      curve: {
+        start: P(5),
+        closed: false,
+        segments: [
+          { kind: 'elliptical-arc', radiusX: r, radiusY: r, rotationDeg: 0, largeArc: false, sweep: true, to: P(180) },
+          { kind: 'elliptical-arc', radiusX: r, radiusY: r, rotationDeg: 0, largeArc: false, sweep: true, to: P(355) },
+        ],
+      },
+      orig: circ(0, 0, r, 5, 355),
+    },
+    {
+      name: 'four arcs 5..90..180..270..355',
+      curve: {
+        start: P(5),
+        closed: false,
+        segments: [90, 180, 270, 355].map((a) => ({ kind: 'elliptical-arc' as const, radiusX: r, radiusY: r, rotationDeg: 0, largeArc: false, sweep: true, to: P(a) })),
+      },
+      orig: circ(0, 0, r, 5, 355),
+    },
+    {
+      name: 'slot: arc 95..265 + line + arc -85..85 open at gap (line missing)',
+      // a slot whose final line is missing: arc, line, arc; ends 1 mm apart
+      curve: {
+        start: { x: 10, y: 5 },
+        closed: false,
+        segments: [
+          { kind: 'line', to: { x: -10, y: 5 } },
+          { kind: 'elliptical-arc', radiusX: 5, radiusY: 5, rotationDeg: 0, largeArc: false, sweep: true, to: { x: -10, y: -5 } },
+          { kind: 'line', to: { x: 10, y: -5 } },
+          { kind: 'elliptical-arc', radiusX: 5, radiusY: 5, rotationDeg: 0, largeArc: false, sweep: true, to: { x: 11, y: 4.9 } },
+        ],
+      },
+      orig: [],
+    },
+  ];
+  for (const c of cases) {
+    const path0: ColoredPath = { color: '#ff0000', curves: [c.curve], polylines: compilationPolylines({ color: '#ff0000', curves: [c.curve], polylines: [] }, IDENTITY_TRANSFORM, 0.05) };
+    const before = compiledWorld(path0, IDENTITY_TRANSFORM)[0]!;
+    const orig = c.orig.length > 0 ? c.orig : before;
+    const gap = Math.hypot(before[0]!.x - before.at(-1)!.x, before[0]!.y - before.at(-1)!.y);
+    for (const t of [IDENTITY_TRANSFORM, { x: 50, y: 60, scaleX: 1.5, scaleY: 0.6, rotationDeg: 33, mirrorX: true, mirrorY: false } as Transform]) {
+      const tol = 5;
+      load([svgObj('a', [path0], t)], ['a']);
+      const b0 = burn(st().project);
+      const r1 = apply(tol, 'move-ends');
+      const obj = st().project.scene.objects[0] as ImportedSvg;
+      const after = compiledWorld(obj.paths[0]!, t)[0]!;
+      const compat = world(obj.paths[0]!.polylines[0]!.points, t);
+      const b1 = burn(st().project);
+      const ow = world(orig, t);
+      const wgap = Math.hypot(ow[0]!.x - ow.at(-1)!.x, ow[0]!.y - ow.at(-1)!.y);
+      out(
+        `${c.name} | T=${t === IDENTITY_TRANSFORM ? 'identity' : 'rot33 1.5x0.6 mirX'} local gap ${f3(gap)} world gap ${f3(wgap)} tol ${tol}: changed=${r1.changed} toast="${lastToast}"\n` +
+          `   compiled curve after: ${after.length} pts, length ${f3(len(after))} (orig ${f3(len(ow))}); max dev result->orig ${f3(oneSided(after, ow))}; orig->result ${f3(oneSided(ow, after))}; allowed ~${f3(wgap / 2)}\n` +
+          `   compat polyline after: max dev ->orig ${f3(oneSided(compat, ow))}; orig->compat ${f3(oneSided(ow, compat))}; compat vs curve ${f3(Math.max(oneSided(compat, after), oneSided(after, compat)))}\n` +
+          `   burn: lit length before ${f3(totalLen(b0.moves))} after ${f3(totalLen(b1.moves))}`,
+      );
+      if (t === IDENTITY_TRANSFORM) {
+        // save/reopen + undo
+        const saved = serializeProject(st().project);
+        const re = deserializeProject(saved);
+        const g2 = re.kind === 'ok' ? burn(re.project).gcode : 'FAIL';
+        st().undo();
+        const undone = burn(st().project).gcode;
+        out(`   reopen gcode same ${g2 === b1.gcode}; undo gcode == before ${undone === b0.gcode}`);
+      }
+    }
+    // bridge for comparison
+    load([svgObj('a', [path0], IDENTITY_TRANSFORM)], ['a']);
+    apply(5, 'bridge');
+    const obj = st().project.scene.objects[0] as ImportedSvg;
+    const after = compiledWorld(obj.paths[0]!, IDENTITY_TRANSFORM)[0]!;
+    out(`   bridge: max dev result->orig ${f3(oneSided(after, orig))} (closing line only, gap ${f3(gap)}); orig->result ${f3(oneSided(orig, after))}; length ${f3(len(after))}`);
+  }
+});
+
+// ---------- B: cubics and polylines with move-ends, transformed ----------
+it('B cubic + polyline move-ends deviation', () => {
+  out('== B cubic and polyline move-ends');
+  // C shape from two cubics (approx half circles) open by g at the right
+  const k = 0.5523 * 20;
+  const p0 = { x: 0, y: 1.5 };
+  const mid = { x: 0, y: 40 };
+  const curve: CurveSubpath = {
+    start: { x: 0, y: 0 },
+    closed: false,
+    segments: [
+      { kind: 'cubic', control1: { x: -k * 2, y: 0 }, control2: { x: -k * 2, y: 40 }, to: mid },
+      { kind: 'cubic', control1: { x: k * 2, y: 40 }, control2: { x: k * 2, y: 1.5 }, to: p0 },
+    ],
+  };
+  const orig = [
+    ...cubicPts({ x: 0, y: 0 }, { x: -k * 2, y: 0 }, { x: -k * 2, y: 40 }, mid),
+    ...cubicPts(mid, { x: k * 2, y: 40 }, { x: k * 2, y: 1.5 }, p0).slice(1),
+  ];
+  const path0: ColoredPath = { color: '#ff0000', curves: [curve], polylines: compilationPolylines({ color: '#ff0000', curves: [curve], polylines: [] }, IDENTITY_TRANSFORM, 0.05) };
+  for (const t of [IDENTITY_TRANSFORM, { x: 50, y: 60, scaleX: 3, scaleY: 0.5, rotationDeg: 71, mirrorX: true, mirrorY: false } as Transform]) {
+    load([svgObj('a', [path0], t)], ['a']);
+    const ow = world(orig, t);
+    const wgap = Math.hypot(ow[0]!.x - ow.at(-1)!.x, ow[0]!.y - ow.at(-1)!.y);
+    const r1 = apply(wgap + 0.01, 'move-ends');
+    const obj = st().project.scene.objects[0] as ImportedSvg;
+    const after = compiledWorld(obj.paths[0]!, t)[0]!;
+    const compat = world(obj.paths[0]!.polylines[0]!.points, t);
+    out(`cubic C world gap ${f3(wgap)}: changed=${r1.changed}; dev result->orig ${f3(oneSided(after, ow))} orig->result ${f3(oneSided(ow, after))} (half gap ${f3(wgap / 2)}); compat vs curve ${f3(Math.max(oneSided(compat, after), oneSided(after, compat)))}; start==end ${f3(Math.hypot(after[0]!.x - after.at(-1)!.x, after[0]!.y - after.at(-1)!.y))}`);
+    // refused just below
+    load([svgObj('a', [path0], t)], ['a']);
+    const r2 = apply(wgap - 0.01, 'move-ends');
+    out(`   tol = world gap - 0.01: changed=${r2.changed} toast="${lastToast}"`);
+  }
+  // plain polyline, non-uniform scale: local gap along x 1 -> world 3 (scaleX 3)
+  const pts = [{ x: 1, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 10 }, { x: 0, y: 10 }, { x: 0, y: 0 }];
+  const t = { x: 10, y: 10, scaleX: 3, scaleY: 0.5, rotationDeg: 20, mirrorX: false, mirrorY: true } as Transform;
+  for (const tol of [1, 2.99, 3]) {
+    load([svgObj('a', [{ color: '#ff0000', polylines: [{ closed: false, points: pts }] }], t)], ['a']);
+    const r = apply(tol, 'move-ends');
+    const obj = st().project.scene.objects[0] as ImportedSvg;
+    const pl = obj.paths[0]!.polylines[0]!;
+    const w = world(pl.closed ? [...pl.points, pl.points[0]!] : pl.points, t);
+    out(`polyline local gap 1 (world 3) tol ${tol}: changed=${r.changed} dev ${f3(oneSided(w, world(pts, t)))} toast="${lastToast}"`);
+  }
+});
+
+// ---------- C: which ends: multi-subpath, two objects, end near another's end ----------
+it('C which ends join', () => {
+  out('== C which ends');
+  const A = [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 10 }];
+  const B = [{ x: 20.3, y: 10 }, { x: 0, y: 10 }, { x: 0, y: 0.3 }];
+  for (const mode of ['bridge', 'move-ends'] as const) {
+    for (const tol of [1, 25]) {
+      load([svgObj('a', [{ color: '#ff0000', polylines: [{ closed: false, points: A }, { closed: false, points: B }] }], IDENTITY_TRANSFORM)], ['a']);
+      apply(tol, mode);
+      const obj = st().project.scene.objects[0] as ImportedSvg;
+      out(`one object, two subpaths that form a rectangle (0.3 mm cross gaps, own gaps ~22): ${mode} tol ${tol}: polylines=${obj.paths[0]!.polylines.length} closed=${obj.paths[0]!.polylines.map((p) => p.closed).join(',')} toast="${lastToast}"`);
+    }
+    for (const tol of [1, 25]) {
+      load(
+        [
+          svgObj('a', [{ color: '#ff0000', polylines: [{ closed: false, points: A }] }], IDENTITY_TRANSFORM),
+          svgObj('b', [{ color: '#ff0000', polylines: [{ closed: false, points: B }] }], IDENTITY_TRANSFORM),
+        ],
+        ['a', 'b'],
+      );
+      apply(tol, mode);
+      const objs = st().project.scene.objects as ImportedSvg[];
+      out(`two objects, same rectangle halves: ${mode} tol ${tol}: closed=${objs.map((o) => o.paths[0]!.polylines[0]!.closed).join(',')} toast="${lastToast}"`);
+    }
+  }
+});
+
+// ---------- D: guard values on the action ----------
+it('D guard values', () => {
+  out('== D guard values on store action');
+  const near = [{ x: 0, y: 0.4 }, { x: 20, y: 0 }, { x: 20, y: 10 }, { x: 0, y: 10 }, { x: 0, y: 0 }];
+  const far = [{ x: 30, y: 0 }, { x: 50, y: 0 }, { x: 50, y: 10 }, { x: 30, y: 10 }, { x: 60, y: 30 }];
+  const exact = [{ x: 70, y: 0 }, { x: 90, y: 0 }, { x: 90, y: 10 }, { x: 70, y: 0 }];
+  for (const tol of [0, -0, -1, NaN, Infinity, -Infinity, 1e-300, 1e308, Number.MAX_VALUE]) {
+    for (const mode of ['bridge', 'move-ends'] as const) {
+      load([svgObj('a', [{ color: '#ff0000', polylines: [{ closed: false, points: near }, { closed: false, points: far }, { closed: false, points: exact }] }], IDENTITY_TRANSFORM)], ['a']);
+      const r = apply(tol, mode);
+      const obj = st().project.scene.objects[0] as ImportedSvg;
+      out(`tol ${tol} ${mode}: changed=${r.changed} undo+${r.undoAdded} closed=${obj.paths[0]!.polylines.map((p) => p.closed).join(',')} toast="${lastToast}"`);
+    }
+  }
+  // core direct, Infinity
+  const res = closePathsWithinTolerance([{ color: '#ff0000', polylines: [{ closed: false, points: far }] }], IDENTITY_TRANSFORM, Infinity, 'move-ends');
+  out(`core Infinity move-ends on 36 mm gap: closed ${res.closed}; end moved to ${JSON.stringify(res.paths[0]!.polylines[0]!.points[0])}`);
+  // float equality: local 0.2 x scale 5 at (-7.7, 33.1) (T08-P3-5 case)
+  const t: Transform = { x: 3.3, y: 7.1, scaleX: 5, scaleY: 5, rotationDeg: 0, mirrorX: false, mirrorY: false };
+  const pts = [{ x: -7.7, y: 33.1 }, { x: 12.3, y: 33.1 }, { x: 12.3, y: 43.1 }, { x: -7.7, y: 43.1 }, { x: -7.7, y: 33.3 }];
+  load([svgObj('a', [{ color: '#ff0000', polylines: [{ closed: false, points: pts }] }], t)], ['a']);
+  const w0 = applyTransform(pts[0]!, t), w1 = applyTransform(pts.at(-1)!, t);
+  const r = apply(1, 'bridge');
+  out(`nominal world gap 1.000 (computed ${Math.hypot(w0.x - w1.x, w0.y - w1.y).toPrecision(17)}) tol 1: changed=${r.changed} toast="${lastToast}"`);
+});
+
+// ---------- E: kinds, locked, groups, Fill/Image layer, kerf, undo/redo ----------
+it('E kinds and history', () => {
+  out('== E kinds, locked, layers, history');
+  const sq = [{ x: 0, y: 0.5 }, { x: 20, y: 0 }, { x: 20, y: 10 }, { x: 0, y: 10 }, { x: 0, y: 0 }];
+  const shape = {
+    kind: 'shape',
+    id: 'pen',
+    transform: IDENTITY_TRANSFORM,
+    operationIds: ['L'],
+    color: '#ff0000',
+    spec: { kind: 'polyline', points: sq, closed: false },
+    bounds: { minX: 0, minY: 0, maxX: 20, maxY: 10 },
+    paths: [{ color: '#ff0000', polylines: [{ closed: false, points: sq }] }],
+  } as unknown as SceneObject;
+  const locked = svgObj('lk', [{ color: '#ff0000', polylines: [{ closed: false, points: sq }] }], IDENTITY_TRANSFORM, { locked: true });
+  const plain = svgObj('a', [{ color: '#ff0000', polylines: [{ closed: false, points: sq }] }], { ...IDENTITY_TRANSFORM, x: 40 });
+  load([shape, locked, plain], ['pen', 'lk', 'a']);
+  const before = serializeProject(st().project);
+  const g0 = burn(st().project);
+  const r = apply(1, 'move-ends');
+  const after = serializeProject(st().project);
+  const g1 = burn(st().project);
+  const pen = st().project.scene.objects.find((o) => o.id === 'pen') as unknown as { spec: { points: Vec[]; closed: boolean }; paths: ColoredPath[] };
+  const lk = st().project.scene.objects.find((o) => o.id === 'lk') as ImportedSvg;
+  out(`pen polyline + locked + svg, move-ends tol 1: changed=${r.changed} undo+${r.undoAdded} toast="${lastToast}"; pen spec closed=${pen.spec.closed} spec pts=${pen.spec.points.length} first=${JSON.stringify(pen.spec.points[0])} last=${JSON.stringify(pen.spec.points.at(-1))}; locked closed=${lk.paths[0]!.polylines[0]!.closed}`);
+  out(`   lit length ${f3(totalLen(g0.moves))} -> ${f3(totalLen(g1.moves))}`);
+  st().undo();
+  const undone = serializeProject(st().project);
+  st().redo();
+  const redone = serializeProject(st().project);
+  const re = deserializeProject(after);
+  const g2 = re.kind === 'ok' ? burn(re.project).gcode : 'FAIL';
+  out(`   undo==before ${undone === before}; redo==after ${redone === after}; reopen gcode same ${g2 === g1.gcode}`);
+  const r2 = apply(1, 'move-ends');
+  out(`   second apply: changed=${r2.changed} undo+${r2.undoAdded} toast="${lastToast}"`);
+
+  // locked only
+  load([locked], ['lk']);
+  const r3 = apply(1, 'bridge');
+  out(`locked only: changed=${r3.changed} toast="${lastToast}"`);
+
+  // kerf + Line layer: bridge closes and kerf now offsets the closed contour
+  for (const mode of ['bridge', 'move-ends'] as const) {
+    load([svgObj('a', [{ color: '#ff0000', polylines: [{ closed: false, points: sq }] }], IDENTITY_TRANSFORM)], ['a'], lineLayer({ kerfOffsetMm: 0.5 }));
+    const k0 = burn(st().project);
+    apply(1, mode);
+    const k1 = burn(st().project);
+    const pts = k1.moves.flatMap((m) => [m.from, m.to]);
+    const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+    out(`kerf 0.5 outward, ${mode}: lit length ${f3(totalLen(k0.moves))} -> ${f3(totalLen(k1.moves))}; burn bbox x ${f3(Math.min(...xs))}..${f3(Math.max(...xs))} y ${f3(Math.min(...ys))}..${f3(Math.max(...ys))}`);
+  }
+});
+
+// ---------- F: real imports (DXF ARC, SVG A) through the store action ----------
+import { parseDxf } from '../t06-main/src/io/dxf/parse-dxf';
+import { parseSvg } from '../t06-main/src/io/svg/parse-svg';
+it('F real imports', () => {
+  out('== F real imports, move-ends');
+  const dxf = [[0, 'SECTION'], [2, 'ENTITIES'], [0, 'ARC'], [8, '0'], [10, '0'], [20, '0'], [40, '20'], [50, '5'], [51, '355'], [0, 'ENDSEC'], [0, 'EOF']]
+    .map(([c, v]) => `${c}\n${v}`).join('\n') + '\n';
+  const d = parseDxf({ dxfText: dxf, id: 'dxf', source: 'arc.dxf' });
+  const svgText = '<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="0 0 100 100"><path d="M 69.92 51.74 A 20 20 0 1 1 69.92 48.26" fill="none" stroke="#ff0000"/></svg>';
+  const s = parseSvg({ svgText, id: 'svg', source: 'arc.svg' });
+  for (const [name, object] of [['DXF ARC 5..355 r20', d.kind === 'ok' ? d.object : null], ['SVG path A r20 gap 3.48', (s as { object?: unknown }).object ?? null]] as const) {
+    if (object === null || object === undefined) { out(`${name}: import failed ${JSON.stringify(d.kind)}`); continue; }
+    const o = { ...(object as ImportedSvg), operationIds: ['L'] } as ImportedSvg;
+    const segs = o.paths.map((p) => p.curves?.map((c) => c.segments.map((g) => g.kind).join('+')).join(';')).join(' / ');
+    load([o], [o.id]);
+    const b0 = burn(st().project);
+    const r = apply(5, 'move-ends');
+    const b1 = burn(st().project);
+    out(`${name}: segments [${segs}] move-ends tol 5: changed=${r.changed} toast="${lastToast}" lit length ${f3(totalLen(b0.moves))} -> ${f3(totalLen(b1.moves))}`);
+    load([o], [o.id]);
+    apply(5, 'bridge');
+    const b2 = burn(st().project);
+    out(`   bridge tol 5: lit length ${f3(totalLen(b0.moves))} -> ${f3(totalLen(b2.moves))}`);
+  }
+});
+
+// ---------- G: Optimize Shapes output (arc fitting) then move-ends ----------
+import { optimizeObjectPaths } from '../t06-main/src/core/geometry/shape-optimize/optimize-object';
+import { DEFAULT_SHAPE_OPTIMIZE_OPTIONS } from '../t06-main/src/core/geometry/shape-optimize/shape-optimize-options';
+it('G optimize then close', () => {
+  out('== G Optimize Shapes then Close Paths With Tolerance (move-ends)');
+  for (const [a0, a1, r] of [[5, 355, 20], [10, 350, 20], [5, 355, 5], [20, 340, 10], [5, 175, 20]] as const) {
+    for (const fitWith of ['lines-arcs-curves', 'lines-arcs'] as const) {
+      const pts = circ(0, 0, r, a0, a1, 360);
+      const base = svgObj('a', [{ color: '#ff0000', polylines: [{ closed: false, points: pts }] }], IDENTITY_TRANSFORM);
+      const opt = optimizeObjectPaths(base as never, { ...DEFAULT_SHAPE_OPTIMIZE_OPTIONS, fitWith });
+      const o = { ...base, paths: opt.paths } as ImportedSvg;
+      const segs = o.paths.map((p) => p.curves?.map((c) => c.segments.map((g) => g.kind[0]).join('')).join(';') ?? 'polyline').join(' / ');
+      load([o], ['a']);
+      const b0 = burn(st().project);
+      const gap = Math.hypot(pts[0]!.x - pts.at(-1)!.x, pts[0]!.y - pts.at(-1)!.y);
+      const r1 = apply(Math.max(gap + 0.01, 0.5), 'move-ends');
+      const b1 = burn(st().project);
+      out(`arc ${a0}..${a1} r${r} (gap ${f3(gap)}) optimized ${fitWith} -> segments [${segs}]; move-ends: changed=${r1.changed} toast="${lastToast}" lit ${f3(totalLen(b0.moves))} -> ${f3(totalLen(b1.moves))}`);
+    }
+  }
+});

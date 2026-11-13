@@ -1,0 +1,60 @@
+// T06: Fill Selection on a sole-owner operation linked to a cut recipe (ADR-496 s6).
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { captureMaterialRecipe } from '../t06-main/src/core/material-library';
+import { createLayer, IDENTITY_TRANSFORM, primaryOperationForObject, type Layer, type LayerMode } from '../t06-main/src/core/scene';
+import { createRectangle } from '../t06-main/src/core/shapes/primitives';
+import { MATERIAL_LIBRARY_FORMAT, MATERIAL_LIBRARY_SCHEMA_VERSION, type MaterialLibraryDocument, type MaterialPreset } from '../t06-main/src/io/material-library';
+import { prepareOutput } from '../t06-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t06-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t06-main/src/ui/state/store';
+import { resetStore } from '../t06-main/src/ui/state/test-helpers';
+import { litMoves, rowsOf, totalLen } from './decode';
+
+function preset(id: string, mode: LayerMode, settings: Partial<Layer>, extra = {}): MaterialPreset {
+  return { id, materialName: 'Birch plywood', thicknessMm: 3, description: id,
+    recipe: captureMaterialRecipe({ ...createLayer({ id, color: '#000000', mode }), ...settings }), revision: 'rev-1', ...extra };
+}
+const LIBRARY: MaterialLibraryDocument = {
+  format: MATERIAL_LIBRARY_FORMAT, librarySchemaVersion: MATERIAL_LIBRARY_SCHEMA_VERSION, libraryId: 'shop', name: 'Shop',
+  entries: [
+    preset('birch-3-cut', 'line', { power: 90, speed: 400, passes: 2 }, { operation: 'cut' }),
+    preset('birch-3-engrave', 'fill', { power: 35, speed: 3000 }, { operation: 'engrave' }),
+  ],
+};
+const log: string[] = [];
+beforeEach(() => { resetStore(); useStore.getState().setMaterialLibrary(LIBRARY); useStore.getState().setJobLaserMaterial({ name: 'Birch plywood', thicknessMm: 3, autoApplyRecipes: true }); });
+
+function draw(id: string, color: string, x: number) {
+  useStore.getState().drawShape(createRectangle({ id, color, spec: { widthMm: 20, heightMm: 10, cornerRadiusMm: 0 }, transform: { ...IDENTITY_TRANSFORM, x, y: 5 } }));
+}
+function op(id: string): Layer {
+  const s = useStore.getState().project.scene;
+  return primaryOperationForObject(s.objects.find((o) => o.id === id)!, s.layers)!;
+}
+const fmt = (l: Layer) => `${l.id} ${l.mode} p${l.power} s${l.speed} passes${l.passes} preset=${l.materialBinding?.presetId ?? '-'}`;
+function gc() {
+  const p = useStore.getState().project;
+  const m = litMoves(emitPreparedGcode(prepareOutput(p)).gcode, p.device);
+  return `lit len ${totalLen(m).toFixed(1)} rows ${rowsOf(m)} S ${[...new Set(m.map((x) => x.s))]} F ${[...new Set(m.map((x) => x.f))]}`;
+}
+
+it('M: sole-owner cut recipe vs inspector mode switch vs shared', () => {
+  draw('r', '#0000ff', 5);
+  log.push(`drawn: ${fmt(op('r'))}`);
+  useStore.setState({ selectedObjectId: 'r', additionalSelectedIds: new Set() });
+  useStore.getState().fillSelectionSeparately();
+  log.push(`Fill Selection (sole owner): ${fmt(op('r'))} | ${gc()}`);
+  resetStore(); useStore.getState().setMaterialLibrary(LIBRARY); useStore.getState().setJobLaserMaterial({ name: 'Birch plywood', thicknessMm: 3, autoApplyRecipes: true });
+  draw('r', '#0000ff', 5);
+  useStore.getState().setLayerParam(op('r').id, { mode: 'fill' });
+  log.push(`Inspector Fill switch: ${fmt(op('r'))} | ${gc()}`);
+  // no library: plain cut settings
+  resetStore();
+  draw('r', '#0000ff', 5);
+  useStore.getState().setLayerParam(op('r').id, { power: 90, speed: 300 });
+  useStore.setState({ selectedObjectId: 'r', additionalSelectedIds: new Set() });
+  useStore.getState().fillSelectionSeparately();
+  log.push(`No library, hand cut 90/300, Fill Selection: ${fmt(op('r'))} | ${gc()}`);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t06/t06-recipe.log', log.join('\n'));
+});

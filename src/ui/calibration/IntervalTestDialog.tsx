@@ -23,7 +23,7 @@ type IntervalTestField = {
   readonly label: string;
   readonly min: number;
   readonly max: number | undefined;
-  readonly step: number | undefined;
+  readonly step: number | 'any' | undefined;
 };
 
 const DEFAULT_DRAFT: IntervalTestDraft = {
@@ -45,8 +45,8 @@ const FIELD_SPECS: ReadonlyArray<IntervalTestField> = [
   { key: 'steps', label: 'Steps', min: 1, max: 20, step: undefined },
   { key: 'speed', label: 'Speed', min: 1, max: undefined, step: undefined },
   { key: 'power', label: 'Power', min: 0, max: 100, step: undefined },
-  { key: 'intervalMinMm', label: 'Min interval', min: 0.05, max: undefined, step: 0.01 },
-  { key: 'intervalMaxMm', label: 'Max interval', min: 0.05, max: undefined, step: 0.01 },
+  { key: 'intervalMinMm', label: 'Min interval', min: 0.05, max: undefined, step: 'any' },
+  { key: 'intervalMaxMm', label: 'Max interval', min: 0.05, max: undefined, step: 'any' },
   { key: 'swatchSizeMm', label: 'Swatch size', min: 1, max: undefined, step: 0.1 },
   { key: 'gapMm', label: 'Gap', min: 0, max: undefined, step: 0.1 },
 ];

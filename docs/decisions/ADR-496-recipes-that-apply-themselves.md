@@ -113,3 +113,31 @@ Verification: `CutSettingsDialog.process-reseed.test.tsx` drives the inspector's
 the switch shows and applies 35 % / 3000 mm/min linked to the Fill preset, equal to the inspector
 switch and emitting `S350 F3000`; an edit after the switch stays on top of the recipe in one undo
 step; edits before the switch keep the shown values; switching back restores the stored values.
+
+### Amendment 2 - Fill Selection switches as the inspector does and keeps a tuned Fill (2026-11-13)
+
+Tools audit T1, tool T06 (Fill Selection), findings T06-P1-1 and T06-P2-1.
+
+- **T06-P1-1.** When the selected artwork owns its operation, Fill Selection switched that operation
+  to Fill in place with a bare mode change, so §6 never ran. A drawn shape linked to the job
+  material's cut recipe was hatched at the cut recipe's power, speed and passes (with real LightBurn
+  libraries, 11.7× to 24.7× the energy of the engrave recipe) and stayed linked to the cut preset,
+  with no warning before Start.
+- **T06-P2-1.** When the selection shared a tuned Fill with unselected artwork, the separated copy
+  was seeded as a new operation under §4 (defaults, then the best recipe), so its tuned settings
+  were lost: 25 % / 3000 mm/min / 0.2 mm / 45° became 30 % / 1500 mm/min / 0.1 mm / 0°, about 4.8×
+  the energy. The tool's own in-place path and Make unique both keep those settings.
+
+1. **The in-place switch is §6's switch.** Fill Selection on an operation that only the selection
+   uses switches it through `sceneWithModeSwitchRecipe`, as the inspector's Fill switch does: an
+   operation still as its linked recipe left it takes the best Fill recipe and its link; an edited
+   one keeps its settings.
+2. **A Fill is copied, not reseeded.** When the selection burns through exactly one Fill operation
+   (with no sub-layers), the separated operation copies that Fill's settings and recipe link under a
+   new id and colour, as Make unique does. Otherwise it is created and seeded as §4 says.
+3. Fill Selection still moves the selection to that one Fill operation alone, as its tooltip says.
+
+Verification: `fill-selection-recipe.test.ts`: a drawn shape linked to the cut recipe becomes
+35 % / 3000 mm/min / 1 pass linked to the engrave preset, equal to the inspector switch; an edited
+cut keeps its power and speed; one of two artworks sharing a tuned Fill keeps 25 % / 3000 mm/min /
+0.2 mm / 45°. Three of its four cases fail before this amendment.

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { parseDxf } from './parse-dxf';
 import {
   bulgeSegment,
+  isFullEllipseSweep,
   normalizedSweep,
   sampleArc,
   sampleCircle,
@@ -102,10 +104,15 @@ describe('normalizedSweep (ADR-700 Amd 2)', () => {
       [TURN, 0],
       [-1, 2],
       [5, -9],
-      [0, 3 * TURN],
       [2, 2 - TURN],
     ];
     for (const [start, end] of cases) expect(normalizedSweep(start, end)).toBe(looped(start, end));
+  });
+
+  it('drops whole turns from an ELLIPSE sweep, as ARC does', () => {
+    expect(normalizedSweep(0, TURN + Math.PI / 2)).toBeCloseTo(Math.PI / 2, 12);
+    expect(normalizedSweep(1, 1 + 2 * TURN)).toBe(TURN);
+    expect(normalizedSweep(0.3, 0.3 + TURN * (1 + 1e-15))).toBe(TURN);
   });
 
   it('works out any parameters in one step, within one turn', () => {
@@ -119,5 +126,59 @@ describe('normalizedSweep (ADR-700 Amd 2)', () => {
       expect(sweep).toBeGreaterThan(0);
       expect(sweep).toBeLessThanOrEqual(TURN);
     }
+  });
+});
+
+describe('a full ELLIPSE written with rounded radians (E3-P1-1)', () => {
+  const TURN = Math.PI * 2;
+
+  it.each(['6.28319', '6.2832', '6.28318531', '6.283185307', '6.28318'])('closes 0 → %s', (end) => {
+    expect(normalizedSweep(0, Number(end))).toBe(TURN);
+    expect(isFullEllipseSweep(0, Number(end))).toBe(true);
+  });
+
+  it('closes every s → s + 2π printed to 4 to 10 decimals', () => {
+    let state = 7;
+    for (let decimals = 4; decimals <= 10; decimals += 1) {
+      for (let i = 0; i < 2000; i += 1) {
+        state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+        const start = (state / 2 ** 32) * TURN;
+        const written = (value: number): number => Number(value.toFixed(decimals));
+        expect(isFullEllipseSweep(written(start), written(start + TURN))).toBe(true);
+      }
+    }
+  });
+
+  it.each([
+    [0, 1e-5],
+    [6.28318, 0],
+    [1, 1.001],
+    [0, TURN + 0.01],
+  ])('keeps the small sweep %s → %s small', (start, end) => {
+    expect(normalizedSweep(start, end)).toBeLessThan(0.02);
+    expect(isFullEllipseSweep(start, end)).toBe(false);
+  });
+
+  it('imports 0 → 6.28319 as the closed outline, not a dot', () => {
+    const tags: Array<[number, string]> = [
+      [0, 'SECTION'],
+      [2, 'ENTITIES'],
+      [0, 'ELLIPSE'],
+      [10, '0'],
+      [20, '0'],
+      [11, '69'],
+      [21, '0'],
+      [40, '0.5'],
+      [41, '0'],
+      [42, '6.28319'],
+      [0, 'ENDSEC'],
+      [0, 'EOF'],
+    ];
+    const dxfText = tags.map(([code, value]) => `${code}\n${value}\n`).join('');
+    const result = parseDxf({ dxfText, id: 'e', source: 'e.dxf' });
+    if (result.kind !== 'ok' || result.object === null) throw new Error('no ellipse imported');
+    const { bounds, paths } = result.object;
+    expect(bounds.maxX - bounds.minX).toBeCloseTo(138, 3);
+    expect(paths[0]?.polylines[0]?.closed).toBe(true);
   });
 });

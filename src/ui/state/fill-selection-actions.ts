@@ -7,6 +7,7 @@ import {
   operationIdsForObject,
   sceneObjectUsesOperation,
   updateLayer,
+  type Layer,
   type Project,
   type Scene,
   type SceneObject,
@@ -17,7 +18,7 @@ import { defaultSettingsForOperation, type LayerDefaultsState } from './layer-de
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
 import { seedFreshCncLayer } from './cnc-auto-seeding';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
-import { seedFreshLaserLayer } from './laser-recipe-seeding';
+import { sceneWithModeSwitchRecipe, seedFreshLaserLayer } from './laser-recipe-seeding';
 import type { MaterialLibraryDocument } from '../../io/material-library';
 
 export type FillSelectionActions = {
@@ -60,7 +61,7 @@ function fillSelectionMutation(
   const scene =
     sharedOperationId !== null &&
     !unselectedObjectUsesOperation(state.project.scene, selectedIds, sharedOperationId)
-      ? ensureOperationIsFill(state.project.scene, sharedOperationId)
+      ? ensureOperationIsFill(state, sharedOperationId)
       : isolateSelectionToNewFillOperation(state, selectedIds);
   if (scene === state.project.scene) return {};
   return {
@@ -81,6 +82,28 @@ function isolateSelectionToNewFillOperation(
     mode: 'fill',
     name: selectedIds.size === 1 ? `${artworkOperationName(first)} Fill` : 'Selection Fill',
   });
+  const sourceFill = soleFillOperationOfSelection(state.project.scene, selectedIds);
+  const operation =
+    sourceFill === null
+      ? freshFillOperation(state, created)
+      : // The selection already burns through one Fill: the separated copy keeps
+        // its tuned settings and recipe link, as Make unique does (T06-P2-1).
+        {
+          ...sourceFill,
+          id: created.operation.id,
+          name: created.operation.name,
+          color: created.operation.color,
+        };
+  const objects = state.project.scene.objects.map((object) =>
+    selectedIds.has(object.id) ? bindSceneObjectToOperations(object, [operation.id]) : object,
+  );
+  return pruneOrphanLayers(addLayer({ ...state.project.scene, objects }, operation));
+}
+
+function freshFillOperation(
+  state: FillSelectionState,
+  created: ReturnType<typeof createArtworkOperation>,
+): Layer {
   const defaults = defaultSettingsForOperation(
     state.layerDefaults,
     [created.object],
@@ -91,24 +114,47 @@ function isolateSelectionToNewFillOperation(
     mode: 'fill' as const,
   };
   const machine = state.project.machine;
-  const operation =
-    machine?.kind === 'cnc'
-      ? seedFreshCncLayer(withDefaults, {
-          device: state.project.device,
-          machine,
-          liveCaps: state.cncLiveCaps,
-        })
-      : seedFreshLaserLayer(withDefaults, state.project, state.materialLibrary ?? null);
-  const objects = state.project.scene.objects.map((object) =>
-    selectedIds.has(object.id) ? bindSceneObjectToOperations(object, [operation.id]) : object,
-  );
-  return pruneOrphanLayers(addLayer({ ...state.project.scene, objects }, operation));
+  return machine?.kind === 'cnc'
+    ? seedFreshCncLayer(withDefaults, {
+        device: state.project.device,
+        machine,
+        liveCaps: state.cncLiveCaps,
+      })
+    : seedFreshLaserLayer(withDefaults, state.project, state.materialLibrary ?? null);
 }
 
-function ensureOperationIsFill(scene: Scene, operationId: string): Scene {
+/** The one Fill operation the selection burns through, when there is exactly
+ * one and it carries no sub-layers (their ids follow the operation's id). */
+function soleFillOperationOfSelection(
+  scene: Scene,
+  selectedIds: ReadonlySet<string>,
+): Layer | null {
+  const fills = new Map<string, Layer>();
+  for (const object of scene.objects) {
+    if (!selectedIds.has(object.id)) continue;
+    for (const id of operationIdsForObject(object, scene.layers)) {
+      const layer = scene.layers.find((candidate) => candidate.id === id);
+      if (layer?.mode === 'fill') fills.set(layer.id, layer);
+    }
+  }
+  const [only] = fills.values();
+  return fills.size === 1 && only !== undefined && only.subLayers.length === 0 ? only : null;
+}
+
+// The same switch as the inspector's Fill mode (setLayerParam): an operation
+// still as its linked recipe left it takes the best Fill recipe, so a cut
+// switched to Fill does not engrave at cutting power (ADR-496 §6, T06-P1-1).
+function ensureOperationIsFill(state: FillSelectionState, operationId: string): Scene {
+  const scene = state.project.scene;
   const operation = scene.layers.find((candidate) => candidate.id === operationId);
   if (operation === undefined || operation.mode === 'fill') return scene;
-  return updateLayer(scene, operation.id, { mode: 'fill' });
+  return sceneWithModeSwitchRecipe(
+    state.project,
+    updateLayer(scene, operation.id, { mode: 'fill' }),
+    operation.id,
+    { mode: 'fill' },
+    state.materialLibrary ?? null,
+  );
 }
 
 function selectedVectorObjectIds(state: FillSelectionState): ReadonlySet<string> {

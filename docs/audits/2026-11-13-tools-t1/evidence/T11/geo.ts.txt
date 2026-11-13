@@ -1,0 +1,130 @@
+// Refuter's own geometry + G-code decoding, independent of the app's flatten/decode.
+export type V = { x: number; y: number };
+type Seg =
+  | { kind: 'line'; to: V }
+  | { kind: 'cubic'; control1: V; control2: V; to: V }
+  | { kind: 'elliptical-arc'; radiusX: number; radiusY: number; rotationDeg: number; largeArc: boolean; sweep: boolean; to: V };
+export type Curve = { start: V; segments: ReadonlyArray<Seg>; closed: boolean };
+
+// Circular SVG arc (rx=ry, rotation 0) from endpoints: centre + angles.
+export function arcCentre(a: V, b: V, r: number, large: boolean, sweep: boolean) {
+  const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const d = Math.hypot(dx, dy);
+  const rr = Math.max(r, d / 2);
+  const h = Math.sqrt(Math.max(0, rr * rr - (d / 2) ** 2));
+  const nx = -dy / d, ny = dx / d;
+  const sign = large !== sweep ? 1 : -1;
+  const c = { x: mx + sign * h * nx, y: my + sign * h * ny };
+  const t0 = Math.atan2(a.y - c.y, a.x - c.x);
+  let t1 = Math.atan2(b.y - c.y, b.x - c.x);
+  let dt = t1 - t0;
+  if (sweep && dt < 0) dt += 2 * Math.PI;
+  if (!sweep && dt > 0) dt -= 2 * Math.PI;
+  return { c, r: rr, t0, dt };
+}
+
+export function sample(curve: Curve, step = 0.01): V[] {
+  const pts: V[] = [curve.start];
+  let cur = curve.start;
+  for (const s of curve.segments) {
+    if (s.kind === 'line') pts.push(s.to);
+    else if (s.kind === 'cubic') {
+      const n = 400;
+      for (let i = 1; i <= n; i++) {
+        const t = i / n, u = 1 - t;
+        pts.push({
+          x: u * u * u * cur.x + 3 * u * u * t * s.control1.x + 3 * u * t * t * s.control2.x + t * t * t * s.to.x,
+          y: u * u * u * cur.y + 3 * u * u * t * s.control1.y + 3 * u * t * t * s.control2.y + t * t * t * s.to.y,
+        });
+      }
+    } else {
+      const { c, r, t0, dt } = arcCentre(cur, s.to, s.radiusX, s.largeArc, s.sweep);
+      const n = Math.max(8, Math.ceil((Math.abs(dt) * r) / step));
+      for (let i = 1; i <= n; i++) {
+        const t = t0 + (dt * i) / n;
+        pts.push({ x: c.x + r * Math.cos(t), y: c.y + r * Math.sin(t) });
+      }
+    }
+    cur = s.to;
+  }
+  return pts;
+}
+
+export function area(pts: V[]): number {
+  let a = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i]!, q = pts[(i + 1) % pts.length]!;
+    a += p.x * q.y - q.x * p.y;
+  }
+  return Math.abs(a) / 2;
+}
+
+export function perimeter(pts: V[], closed: boolean): number {
+  let l = 0;
+  for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i]!.x - pts[i - 1]!.x, pts[i]!.y - pts[i - 1]!.y);
+  if (closed) l += Math.hypot(pts[0]!.x - pts.at(-1)!.x, pts[0]!.y - pts.at(-1)!.y);
+  return l;
+}
+
+export function bbox(pts: V[]) {
+  return {
+    minX: Math.min(...pts.map((p) => p.x)), maxX: Math.max(...pts.map((p) => p.x)),
+    minY: Math.min(...pts.map((p) => p.y)), maxY: Math.max(...pts.map((p) => p.y)),
+  };
+}
+
+// Distance from point p to the closed outline pts.
+export function distTo(pts: V[], p: V): number {
+  let best = Infinity;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i]!, b = pts[(i + 1) % pts.length]!;
+    const abx = b.x - a.x, aby = b.y - a.y;
+    const L = abx * abx + aby * aby;
+    const t = L === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / L));
+    best = Math.min(best, Math.hypot(a.x + t * abx - p.x, a.y + t * aby - p.y));
+  }
+  return best;
+}
+
+// G-code decoder: lit = laser on (M3/M4) and S>0 on G1/G2/G3. Handles I/J arcs. Machine coords.
+export function decode(gcode: string) {
+  let x = 0, y = 0, s = 0, g = 0, on = false;
+  let lit = 0;
+  const pts: V[] = [];
+  let g2g3 = 0;
+  for (const raw of gcode.split('\n')) {
+    const line = raw.replace(/;.*$/, '').replace(/\(.*?\)/g, '').toUpperCase();
+    const w = new Map<string, number>();
+    for (const m of line.matchAll(/([A-Z])\s*(-?\d*\.?\d+)/g)) {
+      if (m[1] === 'M') {
+        const n = Number(m[2]);
+        if (n === 3 || n === 4) on = true;
+        if (n === 5) on = false;
+      } else if (m[1] === 'G') {
+        const n = Number(m[2]);
+        if (n >= 0 && n <= 3) g = n;
+      } else w.set(m[1]!, Number(m[2]));
+    }
+    if (w.has('S')) s = w.get('S')!;
+    const nx = w.get('X') ?? x, ny = w.get('Y') ?? y;
+    if ((w.has('X') || w.has('Y')) && on && s > 0 && g >= 1) {
+      if (g === 1) {
+        lit += Math.hypot(nx - x, ny - y);
+        pts.push({ x, y }, { x: nx, y: ny });
+      } else {
+        g2g3 += 1;
+        const c = { x: x + (w.get('I') ?? 0), y: y + (w.get('J') ?? 0) };
+        const r = Math.hypot(x - c.x, y - c.y);
+        let a0 = Math.atan2(y - c.y, x - c.x), a1 = Math.atan2(ny - c.y, nx - c.x);
+        let d = a1 - a0;
+        if (g === 3 && d <= 0) d += 2 * Math.PI;
+        if (g === 2 && d >= 0) d -= 2 * Math.PI;
+        lit += Math.abs(d) * r;
+        for (let i = 0; i <= 16; i++) pts.push({ x: c.x + r * Math.cos(a0 + (d * i) / 16), y: c.y + r * Math.sin(a0 + (d * i) / 16) });
+      }
+    }
+    x = nx; y = ny;
+  }
+  return { lit, pts, g2g3, box: pts.length ? bbox(pts) : null };
+}

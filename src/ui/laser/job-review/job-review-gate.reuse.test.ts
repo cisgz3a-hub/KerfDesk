@@ -18,7 +18,7 @@ import { useLaserStore } from '../../state/laser-store';
 import { initialLaserState } from '../../state/laser-store-helpers';
 import { captureLaserModeStartSnapshot } from '../../state/laser-mode-start-evidence';
 import { resetStore } from '../../state/test-helpers';
-import { prepareCurrentStartJob } from '../start-job-source';
+import { prepareCurrentStartJob, startMachineInputsKey } from '../start-job-source';
 import { runJobReviewGate } from './job-review-gate';
 import { useJobReviewStore } from './job-review-store';
 import { captureJobReviewModels } from './testing';
@@ -68,6 +68,7 @@ async function unframedReviewBundle() {
   const app = useStore.getState();
   const laser = useLaserStore.getState();
   const camera = useCameraStore.getState();
+  const preparedMachineInputsKey = startMachineInputsKey(app.project, laser, camera);
   const prepared = await prepareCurrentStartJob(app, laser, camera, undefined, false);
   if (!prepared.ok)
     throw new Error(`Frame review preparation failed: ${prepared.messages.join(' / ')}`);
@@ -77,6 +78,7 @@ async function unframedReviewBundle() {
     laser,
     prepared,
     laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
+    preparedMachineInputsKey,
   };
 }
 

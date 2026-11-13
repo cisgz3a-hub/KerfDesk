@@ -1,0 +1,51 @@
+// T01: Save and reopen a Material Test project; the emitted G-code must be byte-identical.
+import { describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { DEFAULT_DEVICE_PROFILE, generateMaterialTestGrid, projectFor } from './harness';
+import { serializeProject } from '../t01-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t01-main/src/io/project/deserialize-project';
+import { emitGcode } from '../t01-main/src/io/gcode/emit-gcode';
+
+const out: string[] = [];
+const base = {
+  speedMin: 1000,
+  speedMax: 3000,
+  powerMin: 10,
+  powerMax: 40,
+  passesMin: 1,
+  passesMax: 4,
+  intervalMinMm: 0.05,
+  intervalMaxMm: 0.2,
+  speed: 1500,
+  power: 30,
+  passes: 1,
+  intervalMm: 0.1,
+  cellWidthMm: 5,
+  cellHeightMm: 5,
+  gapMm: 1,
+  maxFeedMmPerMin: 6000,
+  accelMmPerSec2: 500,
+};
+
+describe('round trip', () => {
+  for (const [row, col, mode] of [
+    ['speed', 'power', 'fill'],
+    ['speed', 'passes', 'line'],
+    ['interval', 'speed', 'fill'],
+  ] as const) {
+    it(`${row} x ${col} ${mode}`, () => {
+      const grid = generateMaterialTestGrid({ ...base, rows: 4, columns: 4, rowParameter: row, columnParameter: col, mode });
+      const project = projectFor(grid, DEFAULT_DEVICE_PROFILE);
+      const before = emitGcode(project).gcode;
+      const loaded = deserializeProject(serializeProject(project));
+      if (loaded.kind !== 'ok') {
+        out.push(`${row}x${col}: load ${loaded.kind} ${'reason' in loaded ? loaded.reason : ''}`);
+        return;
+      }
+      const after = emitGcode(loaded.project).gcode;
+      out.push(`${row} x ${col} ${mode}: ${before === after ? 'identical' : 'DIFFERENT'} (${before.length} bytes)`);
+      expect(after).toBe(before);
+    });
+  }
+  it('log', () => writeFileSync('C:/Users/stolk/kd-t1/zz-t01/t01-roundtrip.log', out.join('\n')));
+});
