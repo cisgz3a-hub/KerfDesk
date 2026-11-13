@@ -1,0 +1,25 @@
+export default {
+  root: 'C:/Users/stolk/kd-t1/zz-t17r',
+  define: {
+    __BUILD_TIME__: JSON.stringify('2026-11-13T00:00:00Z'),
+    __GIT_SHA__: JSON.stringify('49ced452b'),
+    __APP_VERSION__: JSON.stringify('0.0.0-t17'),
+  },
+  server: { fs: { strict: false } },
+  esbuild: { jsx: 'automatic' },
+  resolve: {
+    alias: {
+      'virtual:pwa-register/react':
+        'C:/Users/stolk/kd-t1/t13-main/src/__fixtures__/pwa-register-stub.ts',
+      'react-dom': 'C:/Users/stolk/kd-t1/t13-main/node_modules/react-dom',
+      react: 'C:/Users/stolk/kd-t1/t13-main/node_modules/react',
+    },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: false,
+    include: ['*.test.tsx', '*.test.ts'],
+    setupFiles: ['C:/Users/stolk/kd-t1/t13-main/src/__fixtures__/jsdom-canvas-setup.ts'],
+    testTimeout: 600000,
+  },
+};

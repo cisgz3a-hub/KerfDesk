@@ -1,0 +1,287 @@
+// T14 auditor: Adjust Image dialog -> store -> prepareOutput -> G-code, decoded
+// per pixel and compared with an independent oracle (own tone curve, own
+// dither implementations from published kernels, own S scaling).
+import { afterEach, it, vi } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { act, createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { Simulate } from 'react-dom/test-utils';
+import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../t13-main/src/core/devices';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type Layer, type Project, type RasterImage } from '../t13-main/src/core/scene';
+import { primaryOperationForObject } from '../t13-main/src/core/scene/operation-binding';
+import { prepareOutput } from '../t13-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t13-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t13-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t13-main/src/io/project/deserialize-project';
+import { useStore } from '../t13-main/src/ui/state/store';
+import { resetStore } from '../t13-main/src/ui/state/test-helpers';
+import { AdjustImageDialog, type AdjustImageApply } from '../t13-main/src/ui/raster/AdjustImageDialog';
+import { drawAdjustImagePreview } from '../t13-main/src/ui/raster/AdjustImageDialog.preview';
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t14/t14a.log';
+const log: string[] = [];
+const out = (s: string) => { log.push(s); writeFileSync(LOG, log.join('\n')); };
+const st = () => useStore.getState();
+afterEach(() => vi.restoreAllMocks());
+
+// ---------- fixture ----------
+const W = 32, H = 8;
+function ramp(): Uint8Array {
+  const l = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const v = Math.round((x * 255) / (W - 1)) + (y % 2 === 0 ? -6 : 6) + (y >> 1);
+    l[y * W + x] = Math.max(0, Math.min(255, v));
+  }
+  return l;
+}
+const b64 = (u: Uint8Array) => Buffer.from(u).toString('base64');
+function mkImage(id: string, luma: Uint8Array, x0: number, extra: Partial<RasterImage> = {}): RasterImage {
+  return { kind: 'raster-image', id, source: `${id}.png`, dataUrl: 'data:image/png;base64,iVBORw0KGgo=', pixelWidth: W, pixelHeight: H,
+    bounds: { minX: x0, minY: 10, maxX: x0 + W, maxY: 10 + H }, transform: IDENTITY_TRANSFORM, color: '#808080', dither: 'threshold', linesPerMm: 1,
+    lumaBase64: b64(luma), ...extra } as RasterImage;
+}
+function mkLayer(extra: Partial<Layer> = {}): Layer {
+  return { ...createLayer({ id: 'img', color: '#808080', name: 'Image', mode: 'image' }), power: 80, minPower: 0, speed: 3000, linesPerMm: 1,
+    ditherAlgorithm: 'grayscale', dotWidthCorrectionMm: 0, ...extra } as Layer;
+}
+function load(objects: RasterImage[], layer: Layer, device: DeviceProfile = DEFAULT_DEVICE_PROFILE): void {
+  resetStore();
+  const base = createProject(device);
+  useStore.setState({ project: { ...base, scene: { ...base.scene, objects, layers: [layer], groups: [] } }, undoStack: [], redoStack: [], dirty: false } as never);
+}
+
+// ---------- G-code decode ----------
+function gcodeOf(p: Project): string {
+  const r = prepareOutput(p);
+  if (!r.ok) return `NOT OK ${JSON.stringify((r as never as { preflight: unknown }).preflight).slice(0, 400)}`;
+  return emitPreparedGcode(r).gcode;
+}
+// Returns S per scene pixel for an image at bounds minX=x0, minY=10 (1 px = 1 mm).
+function decode(g: string, x0: number, bedH: number): Float64Array {
+  const s = new Float64Array(W * H);
+  let x = 0, y = 0, S = 0, mode = 0;
+  for (const raw of g.split('\n')) {
+    const line = raw.replace(/;.*$/, '').trim(); if (!line) continue;
+    const m = line.match(/^G0?([0-3])(?![0-9])/); if (m) mode = Number(m[1]);
+    const nx = line.match(/X(-?[\d.]+)/), ny = line.match(/Y(-?[\d.]+)/), ns = line.match(/S(-?[\d.]+)/);
+    if (ns) S = Number(ns[1]);
+    const x1 = nx ? Number(nx[1]) : x; const y1 = ny ? Number(ny[1]) : y;
+    if (mode === 1 && S > 0 && nx && y1 === y) {
+      const row = Math.round(bedH - y - 10 - 0.5);
+      const lo = Math.min(x, x1), hi = Math.max(x, x1);
+      for (let px = 0; px < W; px++) { const c = x0 + px + 0.5; if (c > lo && c < hi && row >= 0 && row < H) s[row * W + px] = S; }
+    }
+    x = x1; y = y1;
+  }
+  return s;
+}
+
+// ---------- oracle ----------
+function oracleTone(level: number, b: number, c: number, g: number): number {
+  // LightBurn-style: brightness offset b% of full scale, contrast about mid-grey,
+  // gamma as exponent 1/g (ADR-671: higher gamma lightens). Each stage clamps; one rounding.
+  let v = level;
+  v = Math.min(255, Math.max(0, v + (b / 100) * 255));
+  v = Math.min(255, Math.max(0, (v - 128) * (1 + c / 100) + 128));
+  v = 255 * Math.pow(v / 255, 1 / g);
+  return Math.round(v);
+}
+const KERNELS: Record<string, { k: number[][]; d: number }> = {
+  'floyd-steinberg': { k: [[1, 0, 7], [-1, 1, 3], [0, 1, 5], [1, 1, 1]], d: 16 },
+  jarvis: { k: [[1, 0, 7], [2, 0, 5], [-2, 1, 3], [-1, 1, 5], [0, 1, 7], [1, 1, 5], [2, 1, 3], [-2, 2, 1], [-1, 2, 3], [0, 2, 5], [1, 2, 3], [2, 2, 1]], d: 48 },
+  stucki: { k: [[1, 0, 8], [2, 0, 4], [-2, 1, 2], [-1, 1, 4], [0, 1, 8], [1, 1, 4], [2, 1, 2], [-2, 2, 1], [-1, 2, 2], [0, 2, 4], [1, 2, 2], [2, 2, 1]], d: 42 },
+  atkinson: { k: [[1, 0, 1], [2, 0, 1], [-1, 1, 1], [0, 1, 1], [1, 1, 1], [0, 2, 1]], d: 8 },
+  burkes: { k: [[1, 0, 8], [2, 0, 4], [-2, 1, 2], [-1, 1, 4], [0, 1, 8], [1, 1, 4], [2, 1, 2]], d: 32 },
+  sierra3: { k: [[1, 0, 5], [2, 0, 3], [-2, 1, 2], [-1, 1, 4], [0, 1, 5], [1, 1, 4], [2, 1, 2], [-1, 2, 2], [0, 2, 3], [1, 2, 2]], d: 32 },
+  sierra2: { k: [[1, 0, 4], [2, 0, 3], [-2, 1, 1], [-1, 1, 2], [0, 1, 3], [1, 1, 2], [2, 1, 1]], d: 16 },
+  'sierra-lite': { k: [[1, 0, 2], [-1, 1, 1], [0, 1, 1]], d: 4 },
+};
+// Standard 4x4 Bayer index matrix -> thresholds (i + 0.5) * 16
+const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]].map((r) => r.map((i) => i * 16 + 8));
+function oracleS(luma: Uint8Array, alg: string, sMax: number, sMin: number): Float64Array {
+  const o = new Float64Array(luma.length);
+  if (alg === 'grayscale') { for (let i = 0; i < luma.length; i++) { const t = (255 - luma[i]!) / 255; o[i] = t <= 0 ? 0 : Math.round(sMin + t * (sMax - sMin)); } return o; }
+  if (alg === 'threshold') { for (let i = 0; i < luma.length; i++) o[i] = luma[i]! < 128 ? sMax : 0; return o; }
+  if (alg === 'ordered') { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) o[y * W + x] = luma[y * W + x]! < BAYER[y % 4]![x % 4]! ? sMax : 0; return o; }
+  const K = KERNELS[alg]!; const buf = Float64Array.from(luma);
+  for (let y = 0; y < H; y++) {
+    const ltr = y % 2 === 0;
+    for (let k = 0; k < W; k++) {
+      const x = ltr ? k : W - 1 - k; const i = y * W + x; const old = buf[i]!; const q = old < 128 ? 0 : 255; const e = old - q;
+      o[i] = q === 0 ? sMax : 0;
+      for (const [dx0, dy, w] of K.k) { const xx = x + (ltr ? dx0! : -dx0!), yy = y + dy!; if (xx < 0 || xx >= W || yy >= H) continue; buf[yy * W + xx] += (e * w!) / K.d; }
+    }
+  }
+  return o;
+}
+function flipY<T extends Uint8Array | Float64Array>(a: T): T { const o = (a instanceof Uint8Array ? new Uint8Array(a.length) : new Float64Array(a.length)) as T; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) o[(H - 1 - y) * W + x] = a[y * W + x]!; return o; }
+function diff(a: Float64Array, b: Float64Array): { n: number; max: number; first: string } {
+  let n = 0, max = 0, first = '';
+  for (let i = 0; i < a.length; i++) { const d = Math.abs(a[i]! - b[i]!); if (d > 1e-9) { n++; if (!first) first = `px(${i % W},${Math.floor(i / W)}) got ${a[i]} want ${b[i]}`; } max = Math.max(max, d); }
+  return { n, max, first };
+}
+
+// ---------- dialog driver ----------
+type Step = { kind: 'num'; name: string; value: string } | { kind: 'dither'; value: string } | { kind: 'toggle'; name: string };
+async function runDialog(imageId: string, steps: Step[], finish: 'ok' | 'cancel' = 'ok'): Promise<{ applied: AdjustImageApply | null; fieldValues: Record<string, string> }> {
+  const image = st().project.scene.objects.find((o) => o.id === imageId) as RasterImage;
+  const layer = primaryOperationForObject(image, st().project.scene.layers)!;
+  let applied: AdjustImageApply | null = null;
+  let closed = false;
+  // Same as CommandShell.tsx AdjustDialog onApply
+  const onApply = (patch: AdjustImageApply) => { applied = patch; closed = true; st().setRasterImageAdjustments(image.id, patch.imagePatch, { id: layer.id, patch: patch.layerPatch }); };
+  const host = document.createElement('div'); document.body.appendChild(host);
+  let root: Root | null = null;
+  await act(async () => { root = createRoot(host); root.render(createElement(AdjustImageDialog, { image, layer, onApply, onCancel: () => { closed = true; } })); });
+  const fieldValues: Record<string, string> = {};
+  for (const n of ['brightness', 'contrast', 'gamma', 'minPower', 'imageDpi', 'lineIntervalMm', 'dotWidthCorrectionMm']) fieldValues[n] = host.querySelector<HTMLInputElement>(`input[name="${n}"]`)?.value ?? '?';
+  fieldValues['dither'] = host.querySelector<HTMLInputElement>('input[name="ditherAlgorithm"]:checked')?.value ?? '?';
+  fieldValues['negative'] = String(host.querySelector<HTMLInputElement>('input[name="negativeImage"]')?.checked);
+  for (const s of steps) {
+    if (s.kind === 'num') { const el = host.querySelector<HTMLInputElement>(`input[name="${s.name}"]`)!; act(() => { el.value = s.value; Simulate.change(el); }); act(() => { Simulate.blur(el); }); }
+    else if (s.kind === 'dither') { const el = host.querySelector<HTMLInputElement>(`input[name="ditherAlgorithm"][value="${s.value}"]`)!; act(() => el.click()); }
+    else { const el = host.querySelector<HTMLInputElement>(`input[name="${s.name}"]`)!; act(() => { el.checked = !el.checked; Simulate.change(el); }); }
+  }
+  if (finish === 'ok') await act(async () => { Simulate.submit(host.querySelector('form')!); });
+  else { const cancel = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Cancel')!; await act(async () => { Simulate.click(cancel); }); }
+  await act(async () => root!.unmount()); host.remove();
+  void closed;
+  return { applied, fieldValues };
+}
+const num = (name: string, value: string): Step => ({ kind: 'num', name, value });
+
+// ---------- A: dialog -> burn per pixel ----------
+type Case = { b: number; c: number; g: number; neg: boolean; alg: string; minP: number; power: number; maxS: number };
+const CASES: Case[] = [
+  { b: 0, c: 0, g: 1, neg: false, alg: 'grayscale', minP: 0, power: 80, maxS: 1000 },
+  { b: 20, c: 30, g: 1.8, neg: false, alg: 'grayscale', minP: 10, power: 80, maxS: 1000 },
+  { b: -40, c: -25, g: 0.5, neg: true, alg: 'grayscale', minP: 20, power: 60, maxS: 255 },
+  { b: 100, c: 100, g: 5, neg: false, alg: 'grayscale', minP: 5, power: 100, maxS: 1000 },
+  { b: -100, c: -100, g: 0.1, neg: true, alg: 'grayscale', minP: 5, power: 100, maxS: 1000 },
+  { b: 7, c: -60, g: 3.3, neg: false, alg: 'grayscale', minP: 50, power: 70, maxS: 255 },
+  ...['threshold', 'ordered', 'floyd-steinberg', 'jarvis', 'stucki', 'atkinson', 'burkes', 'sierra3', 'sierra2', 'sierra-lite'].map((alg) => ({ b: 15, c: 40, g: 2.2, neg: false, alg, minP: 30, power: 75, maxS: 1000 })),
+  ...['threshold', 'floyd-steinberg', 'jarvis', 'ordered'].map((alg) => ({ b: -10, c: 20, g: 0.7, neg: true, alg, minP: 0, power: 50, maxS: 255 })),
+];
+
+it('A dialog settings reach every emitted pixel', async () => {
+  const luma = ramp();
+  out(`source row 0: ${[...luma.slice(0, W)].join(',')}`);
+  for (const k of CASES) {
+    const device = { ...DEFAULT_DEVICE_PROFILE, maxPowerS: k.maxS };
+    // start from a layer with a different dither so the dialog must change it
+    load([mkImage('im', luma, 10)], mkLayer({ power: k.power, ditherAlgorithm: k.alg === 'jarvis' ? 'stucki' : 'jarvis' }), device);
+    const steps: Step[] = [num('brightness', String(k.b)), num('contrast', String(k.c)), num('gamma', String(k.g)), { kind: 'dither', value: k.alg }, num('minPower', String(k.minP))];
+    if (k.neg) steps.push({ kind: 'toggle', name: 'negativeImage' });
+    const { applied } = await runDialog('im', steps);
+    const img = st().project.scene.objects[0] as RasterImage; const lay = st().project.scene.layers[0]!;
+    const stored = `img b${img.brightness} c${img.contrast} g${img.gamma} | layer ${lay.ditherAlgorithm} min${lay.minPower} neg${lay.negativeImage} lpm${lay.linesPerMm} | undo ${st().undoStack.length}`;
+    const tone = luma.map((v) => { const t = oracleTone(v, k.b, k.c, k.g); return k.neg ? 255 - t : t; });
+    const sMax = Math.round((k.power / 100) * k.maxS); const sMin = Math.round((Math.min(k.minP, k.power) / 100) * k.maxS);
+    // compile dithers in machine orientation (front-left origin: Y flipped), so dither the flipped grid
+    const want = flipY(oracleS(flipY(tone), k.alg, sMax, sMin));
+    const g = gcodeOf(st().project);
+    const got = decode(g, 10, device.bedHeight);
+    const d = diff(got, want);
+    let lit = 0; for (const v of got) if (v > 0) lit++;
+    out(`A ${JSON.stringify(k)} -> ${stored}; applied ${applied === null ? 'NONE' : 'yes'}; lit ${lit}/${W * H}; diff ${d.n} px max ${d.max} ${d.first}${g.startsWith('NOT OK') ? ' ' + g : ''}`);
+  }
+});
+
+// ---------- B: preview vs burn (1 px = 1 burn cell, preview at source size) ----------
+it('B Processed preview vs burn', () => {
+  const luma = ramp();
+  for (const alg of ['grayscale', 'threshold', 'ordered', 'floyd-steinberg', 'jarvis', 'stucki', 'atkinson', 'blue-noise']) {
+    for (const powerScale of [100, 50]) {
+      const image = mkImage('im', luma, 10, { brightness: 12, contrast: 25, gamma: 1.6, ...(powerScale === 100 ? {} : { powerScale }) });
+      const layer = mkLayer({ ditherAlgorithm: alg as Layer['ditherAlgorithm'], minPower: 20, power: 80 });
+      load([image], layer);
+      const got = decode(gcodeOf(st().project), 10, DEFAULT_DEVICE_PROFILE.bedHeight);
+      const sMaxBurn = Math.max(...got);
+      vi.stubGlobal('CanvasRenderingContext2D', vi.fn());
+      const canvas = document.createElement('canvas'); const put = vi.fn();
+      vi.spyOn(canvas, 'getContext').mockReturnValue({ putImageData: put } as unknown as CanvasRenderingContext2D);
+      drawAdjustImagePreview(canvas, image, { brightness: 12, contrast: 25, gamma: 1.6, ditherAlgorithm: alg as Layer['ditherAlgorithm'], minPower: 20, negativeImage: false, passThrough: false, invertDisplay: false }, 'processed', 80);
+      const data = (put.mock.calls[0]?.[0] as ImageData).data;
+      // preview grey -> darkness fraction; burn S / burn full-power S -> darkness fraction
+      const fullS = Math.round(0.8 * 1000 * powerScale / 100);
+      let maxD = 0, n = 0; let sumP = 0, sumB = 0;
+      for (let i = 0; i < W * H; i++) { const p = (255 - data[i * 4]!) / 255; const bb = got[i]! / fullS; sumP += p; sumB += bb; const dd = Math.abs(p - bb); if (dd > 1 / 255 + 1e-9) n++; maxD = Math.max(maxD, dd); }
+      out(`B ${alg} powerScale ${powerScale}: preview ${canvas.width}x${canvas.height}; pixels differing > 1 level ${n}/${W * H}; max ${(maxD * 255).toFixed(1)} levels; mean darkness preview ${(sumP / (W * H)).toFixed(4)} burn ${(sumB / (W * H)).toFixed(4)} (burn max S ${sMaxBurn}, full ${fullS})`);
+      vi.unstubAllGlobals(); vi.restoreAllMocks();
+    }
+  }
+});
+
+// ---------- C: ownership, Undo/Redo, Cancel, save/reopen ----------
+it('C ownership / history / files', async () => {
+  const luma = ramp();
+  const A = mkImage('A', luma, 10, { operationOverride: { byOperation: { img: { ditherAlgorithm: 'jarvis', minPower: 7 } } } } as Partial<RasterImage>);
+  const B = mkImage('B', luma, 60);
+  load([A, B], mkLayer({ ditherAlgorithm: 'floyd-steinberg', minPower: 3, negativeImage: false }));
+  const bed = DEFAULT_DEVICE_PROFILE.bedHeight;
+  const before = JSON.stringify(st().project);
+  const g0 = gcodeOf(st().project); const B0 = decode(g0, 60, bed);
+  // C1: Cancel after edits
+  const c = await runDialog('A', [num('brightness', '33'), { kind: 'dither', value: 'grayscale' }, { kind: 'toggle', name: 'negativeImage' }], 'cancel');
+  out(`C1 Cancel: applied ${c.applied === null ? 'none' : 'YES'}; project unchanged ${JSON.stringify(st().project) === before}; undo ${st().undoStack.length}; dirty ${st().dirty}`);
+  // C2: OK on A (owns an override)
+  const r = await runDialog('A', [num('brightness', '33'), { kind: 'dither', value: 'grayscale' }, num('minPower', '12'), { kind: 'toggle', name: 'negativeImage' }]);
+  out(`C2 dialog opened on A with: ${JSON.stringify(r.fieldValues)}`);
+  const pA = st().project.scene.objects.find((o) => o.id === 'A') as RasterImage; const pB = st().project.scene.objects.find((o) => o.id === 'B') as RasterImage; const L = st().project.scene.layers[0]!;
+  out(`C2 after OK on A: A b${pA.brightness} override ${JSON.stringify(pA.operationOverride)}; layer dither ${L.ditherAlgorithm} min ${L.minPower} neg ${L.negativeImage}; B b${pB.brightness} override ${JSON.stringify(pB.operationOverride)}; undo entries ${st().undoStack.length}`);
+  const g1 = gcodeOf(st().project); const B1 = decode(g1, 60, bed); const A1 = decode(g1, 10, bed);
+  const wantA = oracleS(luma.map((v) => 255 - oracleTone(v, 33, 0, 1)), 'grayscale', 800, 120);
+  out(`C2 B burn unchanged: diff ${diff(B1, B0).n}; A burn vs oracle (grayscale, min 12%, neg): diff ${JSON.stringify(diff(A1, wantA))}`);
+  const after = JSON.stringify(st().project);
+  st().undo();
+  out(`C3 one Undo restores exactly: ${JSON.stringify(st().project) === before}; Redo: ${(st().redo(), JSON.stringify(st().project) === after)}`);
+  // C4: save / reopen
+  const text = serializeProject(st().project);
+  const re = deserializeProject(text) as { kind: string; project?: Project; reason?: string };
+  const g2 = re.project ? gcodeOf(re.project) : `LOAD ${re.kind} ${re.reason}`;
+  out(`C4 save/reopen: load ${re.kind}; G-code identical ${g2 === g1}`);
+  if (re.project) { load(re.project.scene.objects as RasterImage[], re.project.scene.layers[0]!); const rr = await runDialog('A', [], 'cancel'); out(`C4 reopened dialog on A shows ${JSON.stringify(rr.fieldValues)}`); }
+  // C5: OK on B (no override) writes the operation; A keeps its own
+  load([A, B], mkLayer({ ditherAlgorithm: 'floyd-steinberg', minPower: 3 }));
+  const gA0 = decode(gcodeOf(st().project), 10, bed);
+  await runDialog('B', [{ kind: 'dither', value: 'threshold' }, num('brightness', '-20')]);
+  const L5 = st().project.scene.layers[0]!; const A5 = st().project.scene.objects.find((o) => o.id === 'A') as RasterImage;
+  const gA5 = decode(gcodeOf(st().project), 10, bed);
+  out(`C5 OK on B: layer dither ${L5.ditherAlgorithm}; A override ${JSON.stringify(A5.operationOverride)} b${A5.brightness}; A burn changed px ${diff(gA5, gA0).n}; undo ${st().undoStack.length}`);
+  // C6: OK with no changes at all
+  load([A, B], mkLayer({ ditherAlgorithm: 'floyd-steinberg', minPower: 3 }));
+  const b6 = JSON.stringify(st().project);
+  await runDialog('B', []);
+  out(`C6 OK unchanged on B: project identical ${JSON.stringify(st().project) === b6}; undo ${st().undoStack.length}; dirty ${st().dirty}`);
+  // C7: layer with an out-of-range stored density (2 lines/mm == 0.5 mm interval) kept on OK
+  load([mkImage('B', luma, 60)], mkLayer({ linesPerMm: 0.5 }));
+  const r7 = await runDialog('B', [num('brightness', '5')]);
+  out(`C7 stored 0.5 l/mm: dialog showed ${r7.fieldValues['lineIntervalMm']} mm / ${r7.fieldValues['imageDpi']} dpi; after OK layer lpm ${st().project.scene.layers[0]!.linesPerMm}`);
+});
+
+// ---------- D: boundaries ----------
+it('D boundaries typed into the dialog', async () => {
+  const luma = ramp();
+  for (const [name, value] of [['brightness', '150'], ['brightness', '-1e9'], ['contrast', '-101'], ['gamma', '0'], ['gamma', '0.05'], ['gamma', '7'], ['gamma', 'abc'], ['gamma', 'Infinity'], ['brightness', 'NaN'], ['minPower', '95'], ['minPower', '-5'], ['imageDpi', '0'], ['imageDpi', '100000'], ['dotWidthCorrectionMm', '5']] as const) {
+    load([mkImage('im', luma, 10, { brightness: 10, gamma: 1.5 })], mkLayer({ power: 80, minPower: 10 }));
+    const r = await runDialog('im', [num(name, value)]);
+    const img = st().project.scene.objects[0] as RasterImage; const L = st().project.scene.layers[0]!;
+    out(`D ${name}=${value}: patch ${JSON.stringify(r.applied)} -> image b${img.brightness} c${img.contrast} g${img.gamma}; layer min ${L.minPower} lpm ${L.linesPerMm} dw ${L.dotWidthCorrectionMm}`);
+  }
+});
+
+// ---------- E: transparent background (over-white luma from import) ----------
+it('E transparent pixels', async () => {
+  // logo: black bar inside, rest transparent -> imports as luma 255 (over white); alpha is not stored
+  const luma = new Uint8Array(W * H).fill(255);
+  for (let y = 2; y < 6; y++) for (let x = 8; x < 24; x++) luma[y * W + x] = 0;
+  for (const [label, steps] of [['negative', [{ kind: 'toggle', name: 'negativeImage' }]], ['brightness -30', [num('brightness', '-30')]], ['contrast -50', [num('contrast', '-50')]], ['gamma 0.3', [num('gamma', '0.3')]]] as Array<[string, Step[]]>) {
+    load([mkImage('im', luma, 10)], mkLayer({ ditherAlgorithm: 'grayscale' }));
+    await runDialog('im', steps);
+    const got = decode(gcodeOf(st().project), 10, DEFAULT_DEVICE_PROFILE.bedHeight);
+    let bg = 0, bgS = 0; for (let i = 0; i < got.length; i++) if (luma[i] === 255 && got[i]! > 0) { bg++; bgS = got[i]!; }
+    out(`E ${label}: transparent-surround pixels burning ${bg}/${W * H - 64} at S ${bgS}`);
+  }
+});

@@ -1,0 +1,82 @@
+// T15 refuter R3: Photo engraving opened on a 3D Sliced photo (ADR-699: passes
+// = slice count). Own method: per-cell burn count summed over compiled raster
+// groups from prepareOutput (group.passes x burned cells).
+import { writeFileSync } from 'node:fs';
+import { act, createElement } from 'react';
+import { createRoot } from 'react-dom/client';
+import { Simulate } from 'react-dom/test-utils';
+import { expect, test } from 'vitest';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type Layer, type RasterImage } from '../t13-main/src/core/scene';
+import { prepareOutput } from '../t13-main/src/io/gcode/prepare-output';
+import { useStore } from '../t13-main/src/ui/state/store';
+import { resetStore } from '../t13-main/src/ui/state/test-helpers';
+import { PhotoEngravingDialogHost } from '../t13-main/src/ui/raster/PhotoEngravingDialogHost';
+import { openPhotoEngraving, usePhotoEngravingStore } from '../t13-main/src/ui/raster/photo-engraving-store';
+import { laserOperationDetail } from '../t13-main/src/ui/laser/job-review/job-review-detail-facts';
+import type { RasterGroup } from '../t13-main/src/core/job/job';
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+class NoopWorker { onmessage = null; onerror = null; onmessageerror = null; postMessage(): void {} terminate(): void {} }
+(globalThis as { Worker?: unknown }).Worker = NoopWorker;
+const out: string[] = [];
+const log = (s: string): void => { out.push(s); writeFileSync('C:/Users/stolk/kd-t1/zz-t15r/r3.log', out.join('\n')); };
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+const W = 80, H = 40, PASSES = 20;
+function load(): void {
+  resetStore();
+  const l = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) l[y * W + x] = Math.round((255 * x) / (W - 1));
+  const image = {
+    kind: 'raster-image', id: 'S', source: 'stamp.png', dataUrl: 'data:image/png;base64,iVBORw0KGgo=', pixelWidth: W, pixelHeight: H,
+    bounds: { minX: 10, minY: 10, maxX: 18, maxY: 14 }, transform: IDENTITY_TRANSFORM, color: '#808080',
+    dither: 'threshold', linesPerMm: 1, lumaBase64: Buffer.from(l).toString('base64'), operationIds: ['deep'],
+  } as RasterImage;
+  const layer = { ...createLayer({ id: 'deep', color: '#808080', name: 'Deep photo', mode: 'image' }), power: 80, minPower: 0,
+    speed: 3000, linesPerMm: 10, passes: PASSES, ditherAlgorithm: '3d-sliced', dotWidthCorrectionMm: 0 } as Layer;
+  const base = createProject();
+  useStore.setState({ project: { ...base, scene: { ...base.scene, objects: [image], layers: [layer], groups: [] } },
+    undoStack: [], redoStack: [], dirty: false, selectedObjectId: 'S', additionalSelectedIds: new Set() } as never);
+}
+function burns(tag: string): { total: number; maxPerCell: number; darkQ: number; lightQ: number } {
+  const p = prepareOutput(useStore.getState().project);
+  if (!p.ok) throw new Error('prepare failed');
+  const groups = p.job.groups.filter((g): g is RasterGroup => g.kind === 'raster');
+  const g0 = groups[0]!;
+  const count = new Uint16Array(g0.pixelWidth * g0.pixelHeight);
+  for (const g of groups) for (let y = 0; y < g.pixelHeight; y++) {
+    const row = g.rowProvider ? g.rowProvider(y) : g.sValues.subarray(y * g.pixelWidth, (y + 1) * g.pixelWidth);
+    for (let x = 0; x < g.pixelWidth; x++) if ((row[x] ?? 0) > 0) count[y * g.pixelWidth + x] += g.passes;
+  }
+  let total = 0, max = 0, dq = 0, lq = 0, nq = 0;
+  for (let y = 0; y < g0.pixelHeight; y++) for (let x = 0; x < g0.pixelWidth; x++) {
+    const c = count[y * g0.pixelWidth + x]!; total += c; max = Math.max(max, c);
+    if (x < g0.pixelWidth / 4) { dq += c; nq++; } if (x >= (3 * g0.pixelWidth) / 4) lq += c;
+  }
+  const r = { total, maxPerCell: max, darkQ: dq / nq, lightQ: lq / nq };
+  log(`${tag}: raster groups ${groups.length} (passes ${groups.map((g) => g.passes).join(',')}); cell-burns ${total}; max burns on one cell ${max}; mean burns per cell, darkest quarter ${r.darkQ.toFixed(1)}, lightest quarter ${r.lightQ.toFixed(1)}`);
+  const layer = useStore.getState().project.scene.layers[0]!;
+  log(`${tag}: Job Review detail line: ${laserOperationDetail(layer)} | passes ${layer.passes}`);
+  return r;
+}
+
+test('R3: open Photo engraving on a 3D Sliced photo and press Apply (nothing touched)', async () => {
+  load();
+  const before = burns('before');
+  const host = document.createElement('div'); document.body.appendChild(host);
+  const root = createRoot(host);
+  openPhotoEngraving();
+  await act(async () => { root.render(createElement(PhotoEngravingDialogHost)); });
+  for (let i = 0; i < 40 && host.querySelector('form') === null; i++) await act(async () => { await sleep(50); });
+  const proc = host.querySelector('select[aria-label="Photo processing"]') as HTMLSelectElement | null;
+  const text = host.textContent ?? '';
+  log(`dialog Photo processing shows: ${proc?.value} (options ${[...(proc?.options ?? [])].map((o) => o.value).join(',')})`);
+  log(`dialog text mentions 3D/sliced: ${/3d|slic/i.test(text)}; mentions pass count "${PASSES}": ${new RegExp(`\\b${PASSES}\\b.*pass|pass.*\\b${PASSES}\\b`, 'i').test(text)}; mentions "pass": ${/pass/i.test(text)}`);
+  const form = host.querySelector('form')!;
+  await act(async () => { Simulate.submit(form); await sleep(20); });
+  const img = useStore.getState().project.scene.objects[0] as RasterImage;
+  log(`after Apply: dialog open ${usePhotoEngravingStore.getState().session !== null}; undo entries ${useStore.getState().undoStack.length}; override ${JSON.stringify(img.operationOverride?.byOperation?.['deep'])}`);
+  const after = burns('after');
+  await act(async () => { root.unmount(); }); host.remove();
+  expect(after.total).toBeGreaterThan(before.total);
+});

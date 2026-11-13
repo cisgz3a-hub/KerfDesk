@@ -1,0 +1,69 @@
+// T21b: what "original" means after Crop Image (and so Flatten, which uses the same bake).
+import { expect, it, vi } from 'vitest';
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { deflateSync, crc32, inflateSync } from 'node:zlib';
+import { IDENTITY_TRANSFORM, type RasterImage, type SceneObject } from '../t13-main/src/core/scene';
+import type { PlatformAdapter } from '../t13-main/src/platform/types';
+import { saveOriginalImage } from '../t13-main/src/ui/app/save-original-image';
+import { cropMaskedRasterImage } from '../t13-main/src/ui/raster/crop-image';
+import { lumaToRgba, lumaToBase64 } from '../t13-main/src/ui/raster/luma-bitmap';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t21/t21b.log';
+writeFileSync(LOG, '');
+const log = (...a: unknown[]) => appendFileSync(LOG, a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ') + '\n');
+
+function chunk(type: string, data: Uint8Array): Uint8Array {
+  const out = new Uint8Array(12 + data.length);
+  const v = new DataView(out.buffer);
+  v.setUint32(0, data.length);
+  out.set(new TextEncoder().encode(type), 4);
+  out.set(data, 8);
+  v.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
+  return out;
+}
+function pngRgba(w: number, h: number, rgba: Uint8ClampedArray | Uint8Array): Uint8Array {
+  const ihdr = new Uint8Array(13);
+  const v = new DataView(ihdr.buffer);
+  v.setUint32(0, w); v.setUint32(4, h); ihdr[8] = 8; ihdr[9] = 6;
+  const raw = new Uint8Array(h * (1 + w * 4));
+  for (let y = 0; y < h; y++) raw.set(rgba.subarray(y * w * 4, (y + 1) * w * 4), y * (1 + w * 4) + 1);
+  const parts = [Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', new Uint8Array())];
+  const out = new Uint8Array(parts.reduce((s, p) => s + p.length, 0)); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+}
+function firstPixel(png: Uint8Array): number[] {
+  // IDAT is the 3rd chunk in our encoder
+  let off = 8; const v = new DataView(png.buffer, png.byteOffset);
+  for (;;) { const len = v.getUint32(off); const t = String.fromCharCode(...png.subarray(off + 4, off + 8)); if (t === 'IDAT') { const raw = inflateSync(png.subarray(off + 8, off + 8 + len)); return [...raw.subarray(1, 5)]; } off += 12 + len; }
+}
+const W = 40, H = 20;
+function maskRect(id: string, x0: number, y0: number, x1: number, y1: number): SceneObject {
+  const pts = [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
+  return { kind: 'shape', id, spec: { kind: 'polyline', points: pts, closed: true }, color: '#000000', layerId: 'mask', bounds: { minX: x0, minY: y0, maxX: x1, maxY: y1 }, transform: IDENTITY_TRANSFORM, paths: [{ color: '#000000', polylines: [{ points: pts, closed: true }] }] } as unknown as SceneObject;
+}
+
+it('Crop turns the colour original into a grey, cropped, mask-whitened PNG that Save Original saves under the original name', async () => {
+  const rgba = new Uint8ClampedArray(W * H * 4);
+  for (let i = 0; i < W * H; i++) { rgba[i * 4] = 220; rgba[i * 4 + 1] = 40; rgba[i * 4 + 2] = 40; rgba[i * 4 + 3] = 255; }
+  const original = pngRgba(W, H, rgba);
+  const luma = new Uint8Array(W * H).fill(Math.round(0.299 * 220 + 0.587 * 40 + 0.114 * 40));
+  const image: RasterImage = {
+    kind: 'raster-image', id: 'img', source: 'dog.png', dataUrl: `data:image/png;base64,${Buffer.from(original).toString('base64')}`,
+    lumaBase64: lumaToBase64(luma), pixelWidth: W, pixelHeight: H, bounds: { minX: 0, minY: 0, maxX: 40, maxY: 20 },
+    transform: IDENTITY_TRANSFORM, color: '#808080', dither: 'floyd-steinberg', linesPerMm: 10, imageMaskId: 'm',
+  } as RasterImage;
+  // The production encoder is lumaToBitmap = lumaToRgba + canvas PNG; same RGBA, Node PNG encoder in place of canvas.
+  const encode = (r: { width: number; height: number; luma: Uint8Array }) => {
+    const px = lumaToRgba(r as never);
+    return { dataUrl: `data:image/png;base64,${Buffer.from(pngRgba(r.width, r.height, px)).toString('base64')}`, lumaBase64: lumaToBase64(r.luma) };
+  };
+  const cropped = await cropMaskedRasterImage(image, maskRect('m', 10, 5, 30, 15), encode as never);
+  const written: Blob[] = []; const picked: unknown[] = [];
+  const platform = { pickFileForSave: vi.fn(async (o: unknown) => { picked.push(o); return { displayName: 'dog.png', write: async (b: Blob) => { written.push(b); } }; }) } as unknown as PlatformAdapter;
+  await saveOriginalImage({ platform, image: cropped, format: 'png', pushToast: () => undefined });
+  const out = await new Promise<Uint8Array>((res) => { const r = new FileReader(); r.onload = () => res(new Uint8Array(r.result as ArrayBuffer)); r.readAsArrayBuffer(written[0]!); });
+  const dims = new DataView(out.buffer, out.byteOffset).getUint32(16);
+  log('original', W, 'x', H, 'first px RGBA', firstPixel(original), 'source', image.source);
+  log('after Crop: source', cropped.source, 'pixels', cropped.pixelWidth, 'x', cropped.pixelHeight, 'saved width', dims, 'saved first px RGBA', firstPixel(out), 'suggested', picked[0], 'editorDocument kept', cropped.editorDocument !== undefined);
+  expect(cropped.source).toBe('dog.png');
+});

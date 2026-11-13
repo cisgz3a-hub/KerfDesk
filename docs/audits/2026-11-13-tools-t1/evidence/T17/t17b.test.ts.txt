@@ -1,0 +1,118 @@
+import { it } from 'vitest';
+import type { Layer, RasterImage, SceneObject } from '../t13-main/src/core/scene';
+import { cropMaskedRasterImage } from '../t13-main/src/ui/raster/crop-image';
+import { burnedSegments, circle, encode, gcodeOf, imageLayer, logger, maskLayer, mkImage, mkMask, patternLuma, project, rect, sMap, xf, edgeDist, type P, type SMap } from './t17-common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t17/t17b.log');
+
+function inEO(p: P, contours: P[][]): boolean {
+  let inside = false;
+  for (const c of contours) for (let i = 0; i < c.length; i++) {
+    const a = c[i]!, b = c[(i + 1) % c.length]!;
+    if (a.y > p.y === b.y > p.y) continue;
+    const x = a.x + ((p.y - a.y) / (b.y - a.y)) * (b.x - a.x);
+    if (p.x < x) inside = !inside;
+  }
+  return inside;
+}
+
+/** Edge-ring statistics: inside the mask, how S changes vs distance from the mask edge. */
+let CK = ''; let CD: Float32Array | null = null; let CI: Uint8Array | null = null;
+function cache(m: SMap, mask: P[][]) {
+  const key = `${m.nx}x${m.ny}:${JSON.stringify(mask[0]![0])}`;
+  if (key === CK) return;
+  CK = key; CD = new Float32Array(m.s.length); CI = new Uint8Array(m.s.length);
+  for (let j = 0; j < m.ny; j++) for (let i = 0; i < m.nx; i++) {
+    const p = { x: m.x0 + (i + 0.5) * m.g, y: m.y0 + (j + 0.5) * m.g }; const k = j * m.nx + i;
+    CI[k] = inEO(p, mask) ? 1 : 0; CD[k] = edgeDist(p, mask);
+  }
+}
+function ringStats(m: SMap, mask: P[][], bands: number[]) {
+  cache(m, mask);
+  const res: Record<string, { n: number; meanS: number; maxS: number; atMax: number }> = {};
+  const acc = bands.map(() => ({ n: 0, sum: 0, max: 0, full: 0 }));
+  let outsideBurn = 0; let maxOutside = 0;
+  for (let j = 0; j < m.ny; j++) for (let i = 0; i < m.nx; i++) {
+    const k = j * m.nx + i; const s = m.s[k]!;
+    const inside = CI![k] === 1;
+    const d = CD![k]!;
+    if (!inside) { if (s > 0) { outsideBurn++; maxOutside = Math.max(maxOutside, d); } continue; }
+    for (let b = 0; b < bands.length; b++) if (d <= bands[b]! && (b === 0 || d > bands[b - 1]!)) { const a = acc[b]!; a.n++; a.sum += s; a.max = Math.max(a.max, s); if (s >= 800) a.full++; }
+  }
+  bands.forEach((b, k) => { const a = acc[k]!; res[`<=${b}`] = { n: a.n, meanS: Math.round(a.sum / Math.max(1, a.n)), maxS: a.max, atMax: Math.round((100 * a.full) / Math.max(1, a.n)) }; });
+  return { bands: res, outsideBurnMm2: Math.round(outsideBurn * m.g * m.g * 1000) / 1000, maxOutsideMm: Math.round(maxOutside * 1000) / 1000 };
+}
+
+async function ring(name: string, image: RasterImage, mask: SceneObject, local: P[][], layerExtra: Partial<Layer>, region: { x0: number; y0: number; x1: number; y1: number }) {
+  const masked = { ...image, imageMaskId: mask.id } as RasterImage;
+  const layer = imageLayer(layerExtra);
+  const pitch = 1 / layer.linesPerMm;
+  const t0 = performance.now();
+  const cropped = await cropMaskedRasterImage(masked, mask, encode);
+  const ms = performance.now() - t0;
+  const gB = gcodeOf(project([masked, mask], [layer, maskLayer()]));
+  const gA = gcodeOf(project([cropped, mask], [layer, maskLayer()]));
+  const ms2 = local.map((c) => c.map((p) => xf(p, mask.transform)));
+  const bands = [pitch / 2, pitch, 2 * pitch, 4 * pitch, 1000];
+  const B = ringStats(sMap(burnedSegments(gB), pitch, region, 0.02), ms2, bands);
+  const A = ringStats(sMap(burnedSegments(gA), pitch, region, 0.02), ms2, bands);
+  out(`${name} (crop ${ms.toFixed(0)} ms, px ${image.pixelWidth}x${image.pixelHeight} -> ${cropped.pixelWidth}x${cropped.pixelHeight})\n   BEFORE ${JSON.stringify(B)}\n   AFTER  ${JSON.stringify(A)}`);
+}
+
+it('B1: edge ring inside the mask, realistic sources, Negative and positive', async () => {
+  const BOX = { x: 10, y: 10, w: 40, h: 30 };
+  const R = { x0: 8, y0: 8, x1: 52, y1: 42 };
+  const ell = circle(30.03, 24.97, 15.2, 11.3, 180);
+  for (const [dpi, lpm] of [[96, 10], [300, 10]] as const) {
+    const W = Math.round((40 / 25.4) * dpi), H = Math.round((30 / 25.4) * dpi);
+    const flatLight = patternLuma(W, H, 'flat', 200);
+    const flatDark = patternLuma(W, H, 'flat', 60);
+    await ring(`B1 ${dpi} dpi (${W}x${H}), ${lpm} l/mm, NEGATIVE, grayscale, flat luma 200, ellipse`, mkImage('R', W, H, BOX, undefined, {}, flatLight), mkMask('M', [ell]), [ell], { negativeImage: true, linesPerMm: lpm }, R);
+    await ring(`B1 ${dpi} dpi, ${lpm} l/mm, NEGATIVE, jarvis, flat 200`, mkImage('R', W, H, BOX, undefined, {}, flatLight), mkMask('M', [ell]), [ell], { negativeImage: true, linesPerMm: lpm, ditherAlgorithm: 'jarvis' }, R);
+    await ring(`B1 ${dpi} dpi, ${lpm} l/mm, positive, grayscale, flat luma 60`, mkImage('R', W, H, BOX, undefined, {}, flatDark), mkMask('M', [ell]), [ell], { linesPerMm: lpm }, R);
+  }
+});
+
+it('B2: thin mask (0.4 mm wide ring) over a 0.5 mm-pixel image', async () => {
+  const BOX = { x: 10, y: 10, w: 20, h: 20 };
+  const R = { x0: 8, y0: 8, x1: 32, y1: 32 };
+  const outer = circle(20.05, 19.95, 6.2, 6.2, 180), inner = circle(20.05, 19.95, 5.8, 5.8, 180).reverse();
+  const dark = patternLuma(40, 40, 'flat', 0);
+  const masked = { ...mkImage('R', 40, 40, BOX, undefined, {}, dark), imageMaskId: 'M' } as RasterImage;
+  const mask = mkMask('M', [outer, inner]);
+  const layer = imageLayer({ ditherAlgorithm: 'threshold', linesPerMm: 10 });
+  const cropped = await cropMaskedRasterImage(masked, mask, encode);
+  const sB = burnedSegments(gcodeOf(project([masked, mask], [layer, maskLayer()])));
+  const sA = burnedSegments(gcodeOf(project([cropped, mask], [layer, maskLayer()])));
+  const len = (s: { a: P; b: P }[]) => Math.round(s.reduce((t, q) => t + Math.hypot(q.b.x - q.a.x, q.b.y - q.a.y), 0) * 100) / 100;
+  out(`B2 thin ring 0.4 mm, black image 0.5 mm px, threshold 10 l/mm: burned length before ${len(sB)} mm, after ${len(sA)} mm (oracle area 2*pi*6*0.4=${(2 * Math.PI * 6 * 0.4).toFixed(2)} mm2 -> ${(2 * Math.PI * 6 * 0.4 * 10).toFixed(1)} mm of line)`);
+});
+
+it('B3: threshold oracle — after-crop burned cells sample the same source pixels (no half-pixel shift)', async () => {
+  const BOX = { x: 10, y: 10, w: 20, h: 20 };
+  const W = 40, H = 40; const luma = patternLuma(W, H);
+  const circ = circle(20.05, 19.95, 7.3);
+  const masked = { ...mkImage('R', W, H, BOX, undefined, {}, luma), imageMaskId: 'M' } as RasterImage;
+  const mask = mkMask('M', [circ]);
+  const cropped = await cropMaskedRasterImage(masked, mask, encode);
+  for (const lpm of [5, 7, 10]) {
+    const layer = imageLayer({ ditherAlgorithm: 'threshold', linesPerMm: lpm });
+    for (const [label, img] of [['before', masked], ['after', cropped]] as const) {
+      const segs = burnedSegments(gcodeOf(project([img, mask], [layer, maskLayer()])));
+      // sample each burned segment at 0.01 mm steps, away from source-pixel boundaries (>0.03 mm), inside mask by >0.3 mm
+      let n = 0, bad = 0;
+      for (const s of segs) {
+        const L = Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y);
+        for (let t = 0.005; t < L; t += 0.01) {
+          const p = { x: s.a.x + ((s.b.x - s.a.x) * t) / L, y: s.a.y + ((s.b.y - s.a.y) * t) / L };
+          if (!inEO(p, [circ]) || edgeDist(p, [circ]) < 0.3) continue;
+          const fx = (p.x - 10) / 0.5, fy = (p.y - 10) / 0.5;
+          if (Math.abs(fx - Math.round(fx)) < 0.06 || Math.abs(fy - Math.round(fy)) < 0.06) continue;
+          const v = luma[Math.floor(fy) * W + Math.floor(fx)]!;
+          n++; if (!(v < 128)) bad++;
+        }
+      }
+      out(`B3 ${lpm} l/mm ${label}: burned samples ${n}, on a source pixel that should NOT burn (luma>=128): ${bad}`);
+    }
+  }
+});

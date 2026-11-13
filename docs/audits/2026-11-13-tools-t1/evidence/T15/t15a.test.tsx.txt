@@ -1,0 +1,105 @@
+// T15 A: real dialog (recipe, fields, Apply) -> store -> prepareOutput -> G-code,
+// decoded per cell, against an independent oracle and the worker preview's pixels.
+import { it } from 'vitest';
+import type { RasterImage } from '../t13-main/src/core/scene';
+import { useToastStore } from '../t13-main/src/ui/state/toast-store';
+import {
+  applyBtn, areaMean, curveLut, decode, DEV, diffN, ditherS, gcodeOf, load, logger, mkImage, mkLayer, mountHost, open, oracleAutoTones,
+  photoLuma, processing, readFields, recipe, st, toneLut, type, unmount, unsharp, wait, workerLog, type Curve,
+} from './t15-common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t15/t15a.log');
+
+type Scenario = {
+  name: string; W: number; H: number; lpmStored: number; dpiTyped?: string; recipeId?: string; alg?: string;
+  stored?: Record<string, unknown>; typed?: [string, string][]; curve?: Curve; power?: number; minPower?: number; passes?: number;
+};
+const CURVE: Curve = { label: 'Birch 4040', points: [{ input: 0, output: 0 }, { input: 90, output: 60 }, { input: 200, output: 185 }, { input: 255, output: 255 }] };
+
+const SCEN: Scenario[] = [
+  { name: 'A1 wood before preview, then FS, 1:1 at 10 l/mm', W: 48, H: 32, lpmStored: 10, recipeId: 'wood', alg: 'floyd-steinberg' },
+  { name: 'A2 slate (light marks), Jarvis, 2:1 reduction, DPI typed 254 over stored 5 l/mm', W: 96, H: 64, lpmStored: 5, dpiTyped: '254', recipeId: 'slate', alg: 'jarvis' },
+  { name: 'A3 blue noise (wood recipe kept), 1:1', W: 48, H: 32, lpmStored: 10, recipeId: 'wood' },
+  { name: 'A4 Grayscale op, power 70 min 20, passes 2, op tone curve, typed tones+sharpen', W: 48, H: 32, lpmStored: 10, stored: { ditherAlgorithm: 'grayscale' }, curve: CURVE, power: 70, minPower: 20, passes: 2,
+    typed: [['Photo brightness', '-12.5'], ['Photo contrast', '33.3'], ['Photo midtones (gamma)', '1.7'], ['Photo sharpen amount (%)', '80'], ['Photo sharpen radius (lines)', '1']] },
+  { name: 'A5 Stucki, light marks typed, curve on op, sharpen 200/2.5', W: 96, H: 64, lpmStored: 10, dpiTyped: '127', alg: 'stucki', curve: CURVE,
+    typed: [['Photo brightness', '8'], ['Photo contrast', '-20'], ['Photo midtones (gamma)', '0.6'], ['Photo sharpen amount (%)', '200'], ['Photo sharpen radius (lines)', '2.5']] },
+];
+
+it('A dialog -> burn per cell vs oracle and preview', async () => {
+  for (const sc of SCEN) {
+    const luma = photoLuma(sc.W, sc.H);
+    const box = { x: 20, y: 30, w: 4.8, h: 3.2 };
+    const layer = mkLayer({ linesPerMm: sc.lpmStored, power: sc.power ?? 80, minPower: sc.minPower ?? 0, passes: sc.passes ?? 1,
+      ...(sc.curve ? { photoToneCurve: sc.curve } : {}), ...(sc.stored ?? {}) } as never);
+    load([mkImage('ph', luma, sc.W, sc.H, box)], [layer]);
+    workerLog.length = 0;
+    useToastStore.setState({ toasts: [] } as never);
+    const d = await mountHost();
+    await open();
+    const f0 = readFields();
+    if (sc.recipeId) await recipe(sc.recipeId);
+    await wait(500);
+    const fRecipe = readFields();
+    if (sc.alg) await processing(sc.alg);
+    if (sc.dpiTyped) await type('Photo engraving DPI', sc.dpiTyped);
+    if (sc.name.startsWith('A5')) { const sel = document.querySelector<HTMLSelectElement>('select[title^="Choose whether"]')!; const { Simulate } = await import('react-dom/test-utils'); const { act } = await import('react'); await act(async () => { sel.value = 'light'; Simulate.change(sel); }); }
+    for (const [l, v] of sc.typed ?? []) await type(l, v);
+    await wait(600);
+    const fFinal = readFields();
+    const lastPreview = workerLog[workerLog.length - 1];
+    const undoBefore = st().undoStack.length;
+    await applyBtn();
+    await wait(50);
+    const toasts = (useToastStore.getState() as unknown as { toasts: { message: string }[] }).toasts.map((t) => t.message);
+    const img = st().project.scene.objects[0] as RasterImage;
+    const op = st().project.scene.layers[0]!;
+    out(`\n== ${sc.name}`);
+    out(`fields open ${JSON.stringify(f0)}`);
+    out(`fields after recipe ${JSON.stringify(fRecipe)}`);
+    out(`fields final ${JSON.stringify(fFinal)}`);
+    out(`stored image b${img.brightness} c${img.contrast} g${img.gamma} sharpen ${img.sharpenAmount}/${img.sharpenRadius}; override ${JSON.stringify(img.operationOverride)}`);
+    out(`op unchanged: ${JSON.stringify(op) === JSON.stringify(layer)}; undo +${st().undoStack.length - undoBefore}; toasts ${JSON.stringify(toasts)}; dialog closed ${!document.querySelector('form')}`);
+    // ----- oracle -----
+    const auto = oracleAutoTones(luma);
+    if (sc.recipeId) out(`oracle auto tones ${JSON.stringify(auto)}`);
+    const eff = { ...op, ...(img.operationOverride?.byOperation?.[op.id] ?? {}) } as typeof op;
+    const lpm = eff.linesPerMm; const d0 = 1 / lpm;
+    const w = Math.round(box.w * lpm), h = Math.round(box.h * lpm);
+    const b = img.brightness ?? 0, c = img.contrast ?? 0, g = img.gamma ?? 1;
+    const tl = toneLut(b, c, g); const cl = curveLut((eff.photoToneCurve as Curve | undefined) && (eff.photoToneCurve as Curve).points.length > 2 ? eff.photoToneCurve as Curve : undefined);
+    const prepared = luma.map((v) => { const t = tl[v]!; const n = eff.negativeImage ? 255 - t : t; return cl[n]!; });
+    const grid = (sc.W === w && sc.H === h) ? prepared : areaMean(prepared, sc.W, sc.H, w, h);
+    const sharp = unsharp(grid, w, h, img.sharpenAmount ?? 0, img.sharpenRadius ?? 1);
+    const sMax = Math.round((eff.power / 100) * DEV.maxPowerS), sMin = Math.round((Math.min(eff.minPower, eff.power) / 100) * DEV.maxPowerS);
+    const g1 = gcodeOf(st().project);
+    if (g1.startsWith('NOT OK')) { out(g1); await unmount(d); continue; }
+    const dec = decode(g1, box, w, h, d0);
+    let lit = 0; for (const v of dec.s) if (v > 0) lit++;
+    const passSet = new Set<number>(); dec.passes.forEach((p, i) => { if (dec.s[i]! > 0) passSet.add(p); });
+    out(`grid ${w}x${h} at ${lpm} l/mm; dither ${eff.ditherAlgorithm}; neg ${eff.negativeImage}; sMax ${sMax} sMin ${sMin}; lit ${lit}/${w * h}; passes per burned cell ${[...passSet].join(',')}`);
+    if (eff.ditherAlgorithm !== 'blue-noise') {
+      const want = ditherS(sharp, w, h, eff.ditherAlgorithm, sMax, sMin);
+      const dd = diffN(dec.s, want, w);
+      out(`G-code vs oracle: ${dd.n} cells differ, max ${dd.max} ${dd.first}`);
+      if (dd.n > 0) {
+        // localise: which stage? compare without sharpen
+        const want2 = ditherS(grid, w, h, eff.ditherAlgorithm, sMax, sMin);
+        out(`  (oracle without sharpen: ${diffN(dec.s, want2, w).n} differ)`);
+      }
+    }
+    // ----- preview vs burn -----
+    if (lastPreview?.result.kind === 'ok') {
+      const r = lastPreview.result;
+      const pv = new Float64Array(r.width * r.height);
+      // preview rgba is in machine orientation (front-left: row 0 = scene bottom); flip to scene
+      for (let y = 0; y < r.height; y++) for (let x = 0; x < r.width; x++) pv[y * r.width + x] = 255 - r.rgba[((r.height - 1 - y) * r.width + x) * 4]!;
+      const burn = new Float64Array(w * h); for (let i = 0; i < burn.length; i++) burn[i] = Math.round((dec.s[i]! / sMax) * 255);
+      const dims = `${r.width}x${r.height} (decimated ${r.displayDecimated}) passes ${r.scanPasses}`;
+      const dd = r.width === w && r.height === h ? diffN(pv, burn, w) : { n: -1, max: -1, first: 'size differs' };
+      const lastDraftImg = lastPreview.input.image;
+      out(`preview ${dims}; preview image tones b${lastDraftImg.brightness} c${lastDraftImg.contrast} g${lastDraftImg.gamma}; preview darkness vs burn S/sMax*255: ${dd.n} differ, max ${dd.max} ${dd.first}`);
+    } else out(`preview: ${JSON.stringify(lastPreview?.result).slice(0, 200)}`);
+    await unmount(d);
+  }
+});

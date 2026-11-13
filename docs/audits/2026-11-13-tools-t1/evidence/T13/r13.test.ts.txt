@@ -1,0 +1,224 @@
+// T13 refuter: independent repro of T13-P2-1 and neighbours.
+// Own pixel model, own over-white composite, own G-code lit-length parser.
+import { describe, expect, it, vi } from 'vitest';
+import { writeFileSync, appendFileSync } from 'node:fs';
+
+const T = 'C:/Users/stolk/kd-t1/t13-main/src';
+const LOG = 'C:/Users/stolk/kd-t1/zz-t13r/r13.log';
+
+// Loader output handed to the real decode (set per case).
+let loaderOutput: { width: number; height: number; data: Uint8ClampedArray; rgbCompositedOnWhite?: boolean } | null = null;
+
+vi.mock('C:/Users/stolk/kd-t1/t13-main/src/ui/trace/image-loader', async (orig) => {
+  const actual = (await orig()) as Record<string, unknown>;
+  return { ...actual, loadImageAsRawData: async () => loaderOutput };
+});
+vi.mock('C:/Users/stolk/kd-t1/t13-main/src/ui/import/paged-raster-source', async (orig) => {
+  const actual = (await orig()) as Record<string, unknown>;
+  return { ...actual, readRasterSourceFile: async () => new File([new Uint8Array(4)], 'x.png', { type: 'image/png' }) };
+});
+
+const { decodeRasterToBuffer } = await import(`${T}/ui/image-editor/image-editor-decode`);
+const { createSession } = await import(`${T}/ui/image-editor/editor-session`);
+const { commitAdjustment } = await import(`${T}/ui/image-editor/editor-adjust-session`);
+const { compositeSession } = await import(`${T}/ui/image-editor/editor-session-layers`);
+const { adjustmentById } = await import(`${T}/ui/image-editor/editor-adjustments`);
+const { compileJob } = await import(`${T}/core/job`);
+const { grblStrategy } = await import(`${T}/core/output`);
+const scene = await import(`${T}/core/scene`);
+const { runPreflight } = await import(`${T}/core/preflight/preflight`);
+
+function log(s: string): void {
+  appendFileSync(LOG, s + '\n');
+}
+
+const W = 32;
+const H = 12;
+
+// A black logo bar on a transparent PNG; 1-px antialiased rim at alpha 128.
+// Transparent pixels carry RGB 0 (what most exporters write).
+function logoStraight(): Uint8ClampedArray {
+  const d = new Uint8ClampedArray(W * H * 4);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      const inner = x >= 8 && x < 24 && y >= 4 && y < 8;
+      const rim = !inner && x >= 7 && x < 25 && y >= 3 && y < 9;
+      d[i] = 0; d[i + 1] = 0; d[i + 2] = 0;
+      d[i + 3] = inner ? 255 : rim ? 128 : 0;
+    }
+  return d;
+}
+
+// Own W3C over-white composite, alpha kept: what the loader canvas readback returns.
+function overWhiteKeepAlpha(src: Uint8ClampedArray): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(src.length);
+  for (let i = 0; i < src.length; i += 4) {
+    const a = src[i + 3] / 255;
+    for (let c = 0; c < 3; c++) out[i + c] = Math.round(src[i + c] * a + 255 * (1 - a));
+    out[i + 3] = src[i + 3];
+  }
+  return out;
+}
+
+function lumaOf(rgba: Uint8ClampedArray): number[] {
+  const l: number[] = [];
+  for (let i = 0; i < rgba.length; i += 4)
+    l.push(Math.round(0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]));
+  return l;
+}
+function lumaOverWhite(rgba: Uint8ClampedArray): number[] {
+  return lumaOf(overWhiteKeepAlpha(rgba));
+}
+function b64(bytes: number[]): string {
+  return Buffer.from(Uint8Array.from(bytes)).toString('base64');
+}
+
+const BOUNDS = { minX: 10, minY: 10, maxX: 10 + W, maxY: 10 + H };
+
+function project(luma: number[], negative: boolean, withCutOutline: boolean) {
+  const imageLayer = {
+    ...scene.createLayer({ id: 'L-img', color: '#808080', mode: 'image' }),
+    ditherAlgorithm: 'threshold' as const,
+    linesPerMm: 1,
+    negativeImage: negative,
+  };
+  const objects: unknown[] = [
+    {
+      kind: 'raster-image', id: 'R1', source: 'logo.png',
+      dataUrl: 'data:image/png;base64,iVBORw0KGgo=', lumaBase64: b64(luma),
+      pixelWidth: W, pixelHeight: H, bounds: BOUNDS, transform: scene.IDENTITY_TRANSFORM,
+      color: '#808080', dither: 'threshold', linesPerMm: 1,
+    },
+  ];
+  const layers: unknown[] = [imageLayer];
+  if (withCutOutline) {
+    layers.push(scene.createLayer({ id: 'L-cut', color: '#ff0000' }));
+    objects.push({
+      kind: 'imported-svg', id: 'C1', source: 'o.svg', bounds: { minX: 5, minY: 5, maxX: 50, maxY: 30 },
+      transform: scene.IDENTITY_TRANSFORM,
+      paths: [{ color: '#ff0000', polylines: [{ closed: true, points: [ { x: 5, y: 5 }, { x: 50, y: 5 }, { x: 50, y: 30 }, { x: 5, y: 30 } ] }] }],
+    });
+  }
+  return { ...scene.createProject(), scene: { ...scene.EMPTY_SCENE, objects, layers } };
+}
+
+// Own GRBL parser: lit mm = G1 moves with S>0 while M3/M4 is on.
+function litMm(gcode: string): { lit: number; moves: number } {
+  let x = 0, y = 0, s = 0, on = false, g = 0, lit = 0, moves = 0;
+  for (const raw of gcode.split('\n')) {
+    const line = raw.replace(/;.*$/, '').replace(/\(.*?\)/g, '').toUpperCase();
+    const words = [...line.matchAll(/([A-Z])(-?\d*\.?\d+)/g)];
+    let nx = x, ny = y, motion = false;
+    for (const [, l, v] of words) {
+      const n = Number(v);
+      if (l === 'G' && (n === 0 || n === 1)) g = n;
+      if (l === 'M' && (n === 3 || n === 4)) on = true;
+      if (l === 'M' && n === 5) on = false;
+      if (l === 'S') s = n;
+      if (l === 'X') { nx = n; motion = true; }
+      if (l === 'Y') { ny = n; motion = true; }
+    }
+    if (motion) {
+      if (g === 1 && on && s > 0) { lit += Math.hypot(nx - x, ny - y); moves++; }
+      x = nx; y = ny;
+    }
+  }
+  return { lit, moves };
+}
+
+function burn(p: ReturnType<typeof project>) {
+  const gcode = grblStrategy.emit(compileJob(p.scene as never, p.device), p.device);
+  const r = litMm(gcode);
+  const pf = runPreflight(p as never, gcode);
+  return { ...r, issues: pf.issues.map((i: { code: string; message: string }) => `${i.code}: ${i.message}`) };
+}
+
+async function openStudio(straight: Uint8ClampedArray) {
+  loaderOutput = { width: W, height: H, data: overWhiteKeepAlpha(straight), rgbCompositedOnWhite: true };
+  const raster = { kind: 'raster-image', id: 'R1', pixelWidth: W, pixelHeight: H, dataUrl: 'data:,', bounds: BOUNDS } as never;
+  const doc = await decodeRasterToBuffer(raster);
+  return createSession('R1', 'logo.png', doc, BOUNDS);
+}
+
+function defaults(id: string): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const p of adjustmentById(id as never).params) out[p.key] = p.defaultValue;
+  return out;
+}
+
+const row = (l: number[], y: number) => l.slice(y * W, y * W + W).join(',');
+
+describe('T13 refuter', () => {
+  writeFileSync(LOG, `T13 refuter run ${new Date().toISOString()}\n`);
+
+  it('R1 transparent logo: Invert in Studio vs layer Negative image', async () => {
+    const straight = logoStraight();
+    const imported = lumaOverWhite(straight);
+    let session = await openStudio(straight);
+    const bgAlphaRow3 = Array.from({ length: W }, (_, x) => session.doc.data[(3 * W + x) * 4 + 3]).join(',');
+    log(`R1 imported luma row 3: ${row(imported, 3)}`);
+    log(`R1 Background alpha row 3 after real decode: ${bgAlphaRow3}`);
+    session = commitAdjustment(session, 'invert', {});
+    const after = lumaOf(compositeSession(session).data);
+    log(`R1 composite luma row 3 after Invert: ${row(after, 3)}`);
+    log(`R1 composite luma row 5 after Invert: ${row(after, 5)}`);
+    const expected = imported.map((v) => 255 - v);
+    const diff = after.filter((v, i) => Math.abs(v - expected[i]) > 1).length;
+    log(`R1 pixels differing from 255-imported: ${diff}/${W * H}; distinct composite values: ${[...new Set(after)].join(',')}`);
+    const orig = burn(project(imported, false, false));
+    const studioInv = burn(project(after, false, false));
+    const layerNeg = burn(project(imported, true, false));
+    const ownInv = burn(project(expected, false, false));
+    log(`R1 burn original: ${orig.lit.toFixed(1)} mm / ${orig.moves} moves; issues ${JSON.stringify(orig.issues)}`);
+    log(`R1 burn Studio Invert+Apply luma: ${studioInv.lit.toFixed(1)} mm / ${studioInv.moves} moves; issues ${JSON.stringify(studioInv.issues)}`);
+    log(`R1 burn layer Negative image: ${layerNeg.lit.toFixed(1)} mm / ${layerNeg.moves} moves`);
+    log(`R1 burn own 255-imported luma: ${ownInv.lit.toFixed(1)} mm / ${ownInv.moves} moves`);
+    const withCut = burn(project(after, false, true));
+    const cutOnly = burn(project(imported.map(() => 255), false, true));
+    log(`R1 blank image + cut outline: ${withCut.lit.toFixed(1)} mm; issues ${JSON.stringify(withCut.issues)}; cut alone ${cutOnly.lit.toFixed(1)} mm`);
+    expect(true).toBe(true);
+  });
+
+  it('R2 opaque scan: Clean up white paper then Black & white (Threshold) / Invert', async () => {
+    // Opaque JPEG-like scan: paper 245, ink 20, a light smudge 200, an edge 128.
+    const d = new Uint8ClampedArray(W * H * 4);
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4;
+        const v = x >= 8 && x < 24 && y >= 4 && y < 8 ? 20 : x === 7 && y >= 4 && y < 8 ? 128 : x >= 26 && x < 29 && y >= 4 && y < 8 ? 200 : 245;
+        d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255;
+      }
+    const imported = lumaOf(d);
+    let s = await openStudio(d);
+    log(`R2 imported row 5: ${row(imported, 5)}`);
+    s = commitAdjustment(s, 'remove-white-background', defaults('remove-white-background'));
+    const afterClean = lumaOf(compositeSession(s).data);
+    log(`R2 after Clean up white paper (cleanup ${defaults('remove-white-background').cleanup}%) row 5: ${row(afterClean, 5)}`);
+    const alphaRow = Array.from({ length: W }, (_, x) => s.doc.data[(5 * W + x) * 4 + 3]).join(',');
+    log(`R2 Background alpha row 5 after clean-up: ${alphaRow}`);
+    const sT = commitAdjustment(s, 'threshold', defaults('threshold'));
+    const afterT = lumaOf(compositeSession(sT).data);
+    log(`R2 then Black & white (threshold ${defaults('threshold').level ?? JSON.stringify(defaults('threshold'))}) row 5: ${row(afterT, 5)}`);
+    log(`R2 distinct values after B&W: ${[...new Set(afterT)].sort((a, b) => a - b).join(',')}`);
+    // Same Threshold without the clean-up, for comparison.
+    const s0 = commitAdjustment(await openStudio(d), 'threshold', defaults('threshold'));
+    log(`R2 B&W without clean-up row 5: ${row(lumaOf(compositeSession(s0).data), 5)}`);
+    const sI = commitAdjustment(s, 'invert', {});
+    const afterI = lumaOf(compositeSession(sI).data);
+    log(`R2 clean-up then Invert distinct values: ${[...new Set(afterI)].sort((a, b) => a - b).join(',')}`);
+    const b = burn(project(afterI, false, false));
+    log(`R2 clean-up then Invert burn: ${b.lit.toFixed(1)} mm; issues ${JSON.stringify(b.issues)}`);
+    expect(true).toBe(true);
+  });
+
+  it('R3 Photoshop-parity oracle: invert straight RGB keep alpha, flatten on white', () => {
+    // What Photoshop/GIMP + export PNG + re-import would give.
+    const straight = logoStraight();
+    const inv = new Uint8ClampedArray(straight);
+    for (let i = 0; i < inv.length; i += 4) for (let c = 0; c < 3; c++) inv[i + c] = 255 - inv[i + c];
+    const flat = lumaOverWhite(inv);
+    log(`R3 Photoshop-style invert, flattened on white: distinct ${[...new Set(flat)].join(',')}`);
+    expect(true).toBe(true);
+  });
+});

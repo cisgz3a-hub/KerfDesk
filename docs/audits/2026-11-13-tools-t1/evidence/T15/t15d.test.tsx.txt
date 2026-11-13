@@ -1,0 +1,142 @@
+// T15 D: field boundaries, extreme sizes, auto-tones clip promise, sub-pass polarity.
+import { it } from 'vitest';
+import { act } from 'react';
+import type { RasterImage } from '../t13-main/src/core/scene';
+import { portraitAutoTones } from '../t13-main/src/core/raster/portrait-auto-tones';
+import { lumaAdjustmentLut } from '../t13-main/src/core/raster/luma-adjust';
+import { prepareOutput } from '../t13-main/src/io/gcode/prepare-output';
+import { computePhotoEngravingPreview } from '../t13-main/src/ui/raster/photo-engraving-preview';
+import { useStore } from '../t13-main/src/ui/state/store';
+import {
+  applyBtn, decode, DEV, dialogState, gcodeOf, load, logger, marking, mkImage, mkLayer, mountHost, open, oracleAutoTones, photoLuma, readFields,
+  st, type, unmount, wait, workerLog,
+} from './t15-common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t15/t15d.log');
+const img = (id = 'A') => st().project.scene.objects.find((o) => o.id === id) as RasterImage;
+
+it('D1 typed boundaries', async () => {
+  const entries: [string, string][] = [
+    ['Photo engraving DPI', '5000'], ['Photo engraving DPI', '0'], ['Photo engraving DPI', '-5'], ['Photo engraving DPI', 'abc'], ['Photo engraving DPI', '1e9'], ['Photo engraving DPI', '3'],
+    ['Photo brightness', '1e9'], ['Photo brightness', '-150'], ['Photo contrast', 'NaN'], ['Photo midtones (gamma)', '0'], ['Photo midtones (gamma)', '9'],
+    ['Photo sharpen amount (%)', '9999'], ['Photo sharpen radius (lines)', '0'], ['Photo sharpen radius (lines)', 'Infinity'],
+  ];
+  for (const [label, value] of entries) {
+    load([mkImage('A', photoLuma(48, 32), 48, 32, { x: 20, y: 30, w: 4.8, h: 3.2 })], [mkLayer()]);
+    const d = await mountHost(); await open();
+    await type(label, value); await wait(250);
+    const shown = readFields()[label];
+    const invalid = (document.querySelector(`input[aria-label="${label}"]`) as HTMLInputElement).validationMessage;
+    await applyBtn(); await wait(50);
+    const a = img();
+    const ov = a.operationOverride?.byOperation?.img;
+    out(`D1 ${label} <- ${value}: field shows ${shown} (native msg "${invalid}"); after Apply: closed ${!dialogState().open} alert "${dialogState().alert}"; stored b${a.brightness} c${a.contrast} g${a.gamma} sharpen ${a.sharpenAmount}/${a.sharpenRadius} lpm ${ov?.linesPerMm}`);
+    await unmount(d);
+  }
+});
+
+it('D2 extreme sizes', async () => {
+  // a) source over the read ceiling: no hydration, plain message
+  load([mkImage('A', new Uint8Array(4), 2, 2, { x: 0, y: 0, w: 100, h: 100 }, 'img', { pixelWidth: 100000, pixelHeight: 100000, lumaBase64: '' } as never)], [mkLayer()]);
+  let d = await mountHost(); await open(); await wait(400);
+  out(`D2a 100000x100000 source: preview text "${document.querySelector('.lf-photo-engraving__layout')?.textContent?.slice(0, 300)}"; Apply disabled ${dialogState().applyDisabled}`);
+  await unmount(d);
+  // b) burn grid too big: 2000x1500 px photo at 400x300 mm, DPI 635 (25 l/mm) => 10000x7500 cells
+  const big = photoLuma(2000, 1500);
+  load([mkImage('A', big, 2000, 1500, { x: 0, y: 0, w: 400, h: 300 })], [mkLayer({ linesPerMm: 5 })]);
+  workerLog.length = 0;
+  d = await mountHost(); await open(); await wait(1500);
+  const t0 = Date.now();
+  await type('Photo engraving DPI', '635'); await wait(3000);
+  out(`D2b 400x300 mm at 635 DPI: preview text "${document.querySelector('.lf-photo-engraving__layout')?.textContent?.slice(0, 260)}"; worker results ${JSON.stringify(workerLog.map((w) => w.result.kind === 'ok' ? `ok ${w.result.width}x${w.result.height} src ${w.result.sourceWidth}x${w.result.sourceHeight}` : w.result.message.slice(0, 120)))}; ${Date.now() - t0} ms`);
+  await applyBtn(); await wait(50);
+  out(`D2b Apply: closed ${!dialogState().open}; lpm ${img().operationOverride?.byOperation?.img?.linesPerMm}`);
+  await unmount(d);
+  const t1 = Date.now();
+  const prep = prepareOutput(st().project);
+  out(`D2b prepareOutput ok ${prep.ok} in ${Date.now() - t1} ms; ${prep.ok ? `groups ${prep.job.groups?.length ?? '?'}` : JSON.stringify(prep).slice(0, 400)}`);
+  // c) a billion passes on the operation
+  load([mkImage('A', photoLuma(48, 32), 48, 32, { x: 20, y: 30, w: 4.8, h: 3.2 })], [mkLayer({ passes: 1e9 })]);
+  workerLog.length = 0;
+  d = await mountHost(); await open(); await wait(600);
+  out(`D2c passes 1e9: worker ${JSON.stringify(workerLog.map((w) => w.result.kind === 'ok' ? `ok passes ${w.result.scanPasses}` : w.result.message.slice(0, 160)))}; preview text "${document.querySelector('.lf-photo-engraving__layout')?.textContent?.slice(0, 200)}"`);
+  await unmount(d);
+  void computePhotoEngravingPreview; void DEV;
+});
+
+it('D3 auto tones clip promise on the shipping tone curve', () => {
+  let s = 12345 >>> 0; const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  let n = 0, mismatchOracle = 0, loNotSolid = 0, hiNot255 = 0, hiBelow254 = 0, worstHi = 255, worstCase = '';
+  const hiHist = new Map<number, number>();
+  for (let t = 0; t < 20000; t++) {
+    // random portrait-like histogram: 1-3 gaussian lumps, optional white background
+    const N = 2000; const luma = new Uint8Array(N);
+    const lumps = 1 + Math.floor(rnd() * 3); const centres = Array.from({ length: lumps }, () => 20 + rnd() * 215); const widths = centres.map(() => 3 + rnd() * 50);
+    for (let i = 0; i < N; i++) { const k = Math.floor(rnd() * lumps); const u = rnd() + rnd() + rnd() - 1.5; luma[i] = Math.max(0, Math.min(255, Math.round(centres[k]! + u * widths[k]!))); }
+    if (rnd() < 0.3) for (let i = 0; i < N * 0.3; i++) luma[i] = 255;
+    const hist = new Uint32Array(256); for (const v of luma) hist[v]++;
+    const real = portraitAutoTones(hist); const mine = oracleAutoTones(luma);
+    if (real === null || mine === null) continue;
+    n++;
+    if (real.brightness !== mine.b || real.contrast !== mine.c || real.gamma !== mine.g) mismatchOracle++;
+    const lut = lumaAdjustmentLut(real) ?? Uint8Array.from({ length: 256 }, (_, i) => i);
+    const capped = 255 / (mine.hi - mine.lo) > 2;
+    if (lut[mine.lo]! !== 0) loNotSolid++;
+    if (!capped) {
+      const v = lut[mine.hi]!; hiHist.set(v, (hiHist.get(v) ?? 0) + 1);
+      if (v !== 255) hiNot255++;
+      if (v < 254) hiBelow254++;
+      if (v < worstHi) { worstHi = v; worstCase = `lo ${mine.lo} hi ${mine.hi} median ${mine.median} -> b${real.brightness} c${real.contrast} g${real.gamma}; lut[hi]=${v}, lut[hi-1]=${lut[mine.hi - 1]}`; }
+    }
+  }
+  out(`D3 ${n} histograms: oracle (ADR text) vs portraitAutoTones mismatches ${mismatchOracle}; darkest-0.5% level not solid (lut!=0) ${loNotSolid}; uncapped cases: lightest-0.5% level not 255 ${hiNot255}, below 254 ${hiBelow254}; lut[hi] distribution ${JSON.stringify([...hiHist.entries()].sort((a, b) => a[0] - b[0]))}; worst ${worstCase}`);
+});
+
+it('D4 an image sub-pass after Light marks', async () => {
+  const W = 48, H = 32, box = { x: 20, y: 30, w: 4.8, h: 3.2 };
+  load([mkImage('A', photoLuma(W, H), W, H, box)], [mkLayer({ ditherAlgorithm: 'floyd-steinberg' })]);
+  await act(async () => { st().addLayerSubLayer('img'); });
+  const sub = st().project.scene.layers[0]!.subLayers[0]!;
+  out(`D4 sub-pass added: ${JSON.stringify({ id: sub.id, mode: sub.settings.mode, dither: sub.settings.ditherAlgorithm, neg: sub.settings.negativeImage, enabled: sub.enabled }).slice(0, 300)}`);
+  const g0 = gcodeOf(st().project);
+  const d0 = decode(g0, box, W, H, 0.1);
+  let both0 = 0; d0.passes.forEach((p) => { if (p >= 2) both0++; });
+  const d = await mountHost(); await open();
+  await marking(true); await wait(400);
+  const prev = workerLog[workerLog.length - 1]?.result;
+  out(`D4 dialog op hint "${document.querySelector('.lf-photo-engraving__operation')?.textContent}"; preview scanPasses ${prev?.kind === 'ok' ? prev.scanPasses : '-'} scanCount ${prev?.kind === 'ok' ? prev.scanCount : '-'}; dialog text mentions sub/second pass: ${/sub-|second pass|other pass/i.test(document.body.textContent ?? '')}`);
+  await applyBtn(); await wait(50);
+  await unmount(d);
+  const a = img();
+  out(`D4 override ${JSON.stringify(a.operationOverride)}`);
+  const g1 = gcodeOf(st().project);
+  const d1 = decode(g1, box, W, H, 0.1);
+  let lit = 0, twice = 0; d1.passes.forEach((p, i) => { if (d1.s[i]! > 0) lit++; if (p >= 2) twice++; });
+  // light marks alone would burn the inverse; count cells burned by at least one pass
+  out(`D4 before Apply: cells burned in both passes ${both0}; after Light marks Apply: cells burned by some pass ${lit}/${W * H}, burned twice ${twice}`);
+  void useStore;
+});
+
+it('D5 passes vs preview limit', async () => {
+  for (const passes of [1, 5, 16, 17, 20]) {
+    load([mkImage('A', photoLuma(1000, 750), 1000, 750, { x: 0, y: 0, w: 200, h: 150 })], [mkLayer({ passes, linesPerMm: 10 })]);
+    workerLog.length = 0;
+    const d = await mountHost(); await open(); await wait(2500);
+    const r = workerLog[workerLog.length - 1]?.result;
+    const t1 = Date.now();
+    const prep = prepareOutput(st().project);
+    out(`D5 200x150 mm at 10 l/mm (2000x1500 cells), passes ${passes}: preview ${r?.kind === 'ok' ? `ok ${r.width}x${r.height}` : r?.message.slice(0, 90)}; prepareOutput ok ${prep.ok} (${Date.now() - t1} ms) ${prep.ok ? '' : JSON.stringify(prep).slice(0, 300)}`);
+    await unmount(d);
+  }
+});
+
+it('D6 large photo, few passes', async () => {
+  for (const passes of [1, 2, 3]) {
+    load([mkImage('A', photoLuma(1000, 750), 1000, 750, { x: 0, y: 0, w: 300, h: 225 })], [mkLayer({ passes, linesPerMm: 12.5 })]);
+    workerLog.length = 0;
+    const d = await mountHost(); await open(); await wait(9000);
+    const r = workerLog[workerLog.length - 1]?.result;
+    out(`D6 300x225 mm at 12.5 l/mm (3750x2813 cells), passes ${passes}: preview ${r?.kind === 'ok' ? `ok ${r.width}x${r.height} passes ${r.scanPasses}` : r?.message.slice(0, 90)}`);
+    await unmount(d);
+  }
+});

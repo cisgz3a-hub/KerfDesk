@@ -1,0 +1,243 @@
+// T13 auditor, part A: Image Studio adjustments against independent reference
+// code, and the dialog preview (1:1 and display-resolution) against the commit.
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import type { RgbaBuffer } from '../t13-main/src/core/image-edit';
+import { createRgbaBuffer } from '../t13-main/src/core/image-edit/rgba-buffer';
+import type { SelectionMask } from '../t13-main/src/core/image-select';
+import { commitAdjustment, computeAdjustPreview } from '../t13-main/src/ui/image-editor/editor-adjust-session';
+import { computeWindowPreview, type PreviewWindow } from '../t13-main/src/ui/image-editor/adjust-preview-window';
+import { ADJUSTMENTS, type AdjustmentId } from '../t13-main/src/ui/image-editor/editor-adjustments';
+import { createSession, withSelection, type EditorSession } from '../t13-main/src/ui/image-editor/editor-session';
+import { addLayerAboveActive, compositeSession, setActiveLayerProps, undoScoped, redoScoped } from '../t13-main/src/ui/image-editor/editor-session-layers';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t13/t13a.log';
+const log: string[] = [];
+const out = (s: string) => { log.push(s); writeFileSync(LOG, log.join('\n')); };
+
+const W = 48, H = 36;
+const BOUNDS = { minX: 0, minY: 0, maxX: 48, maxY: 36 };
+function photo(w = W, h = H, alpha: (x: number, y: number) => number = () => 255): RgbaBuffer {
+  const b = createRgbaBuffer(w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4;
+    const sp = (x * 73 + y * 151 + ((x * y) % 17) * 29) % 61;
+    b.data[i] = (x * 5 + sp) % 256; b.data[i + 1] = (y * 7 + sp * 2) % 256; b.data[i + 2] = ((x + y) * 3 + sp * 3) % 256;
+    // a hard step for the filters
+    if (x >= 20 && x < 28 && y >= 10 && y < 26) { b.data[i] = 10; b.data[i + 1] = 12; b.data[i + 2] = 8; }
+    b.data[i + 3] = alpha(x, y);
+  }
+  return b;
+}
+const sess = (doc = photo()) => createSession('obj', 'src.png', doc, BOUNDS);
+const clone = (b: RgbaBuffer): RgbaBuffer => ({ width: b.width, height: b.height, data: new Uint8ClampedArray(b.data) });
+const luma = (r: number, g: number, b: number) => Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+const clampB = (v: number) => Math.max(0, Math.min(255, v));
+
+// ---- independent references (on an opaque single layer, whole doc) ----
+function refPoint(src: RgbaBuffer, f: (v: number, r: number, g: number, b: number, c: number) => number): RgbaBuffer {
+  const o = clone(src);
+  for (let i = 0; i < o.data.length; i += 4) {
+    const r = src.data[i]!, g = src.data[i + 1]!, b = src.data[i + 2]!;
+    for (let c = 0; c < 3; c++) o.data[i + c] = clampB(Math.round(f(src.data[i + c]!, r, g, b, c)));
+  }
+  return o;
+}
+// GIMP levels: pow(t, 1/gamma)
+const levels = (v: number, ib: number, iw: number, g: number, ob: number, ow: number) => {
+  const t = Math.max(0, Math.min(1, (v - ib) / (iw - ib)));
+  return ob + Math.pow(t, 1 / g) * (ow - ob);
+};
+// exact (unclamped-tail) Gaussian kernel, edge clamp
+function refBlurF(src: RgbaBuffer, sigma: number): Float64Array {
+  const R = Math.ceil(sigma * 6);
+  const k: number[] = []; let s = 0;
+  for (let i = -R; i <= R; i++) { const w = Math.exp(-(i * i) / (2 * sigma * sigma)); k.push(w); s += w; }
+  for (let i = 0; i < k.length; i++) k[i]! /= s;
+  const { width: w, height: h } = src;
+  const tmp = new Float64Array(w * h * 3), outF = new Float64Array(w * h * 3);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) for (let c = 0; c < 3; c++) {
+    let a = 0; for (let j = -R; j <= R; j++) { const sx = Math.min(w - 1, Math.max(0, x + j)); a += src.data[(y * w + sx) * 4 + c]! * k[j + R]!; }
+    tmp[(y * w + x) * 3 + c] = a;
+  }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) for (let c = 0; c < 3; c++) {
+    let a = 0; for (let j = -R; j <= R; j++) { const sy = Math.min(h - 1, Math.max(0, y + j)); a += tmp[(sy * w + x) * 3 + c]! * k[j + R]!; }
+    outF[(y * w + x) * 3 + c] = a;
+  }
+  return outF;
+}
+function fromF(src: RgbaBuffer, f: (i: number, c: number, v: number) => number): RgbaBuffer {
+  const o = clone(src);
+  for (let p = 0; p < src.width * src.height; p++) for (let c = 0; c < 3; c++) o.data[p * 4 + c] = clampB(Math.round(f(p, c, src.data[p * 4 + c]!)));
+  return o;
+}
+function refMedian(src: RgbaBuffer, r: number): RgbaBuffer {
+  const { width: w, height: h } = src; const o = clone(src);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) for (let c = 0; c < 3; c++) {
+    const v: number[] = [];
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      const sx = Math.min(w - 1, Math.max(0, x + dx)), sy = Math.min(h - 1, Math.max(0, y + dy));
+      v.push(src.data[(sy * w + sx) * 4 + c]!);
+    }
+    v.sort((a, b) => a - b); o.data[(y * w + x) * 4 + c] = v[(v.length - 1) / 2]!;
+  }
+  return o;
+}
+function diff(a: RgbaBuffer, b: RgbaBuffer) {
+  let max = 0, n = 0, sum = 0;
+  for (let i = 0; i < a.data.length; i++) { const d = Math.abs(a.data[i]! - b.data[i]!); if (d > 0) n++; sum += d; max = Math.max(max, d); }
+  return { max, n, mean: sum / a.data.length };
+}
+const fmt = (d: { max: number; n: number; mean: number }) => `max ${d.max} differing bytes ${d.n} mean ${d.mean.toFixed(3)}`;
+function committed(id: AdjustmentId, params: Record<string, number>, s0 = sess(), curve?: { x: number; y: number }[]) {
+  const s = commitAdjustment(s0, id, params, curve);
+  return { s, comp: compositeSession(s) };
+}
+
+it('A1 operations vs independent references', () => {
+  out('== A1 operations vs reference (48x36 opaque synthetic photo, whole document) ==');
+  const src = photo();
+  const cases: Array<[string, AdjustmentId, Record<string, number>, RgbaBuffer]> = [
+    ['invert', 'invert', {}, refPoint(src, (v) => 255 - v)],
+    ['desaturate (BT.601 luma)', 'desaturate', {}, refPoint(src, (_v, r, g, b) => luma(r, g, b))],
+    ['threshold 128', 'threshold', { level: 128 }, refPoint(src, (_v, r, g, b) => (luma(r, g, b) >= 128 ? 255 : 0))],
+    ['threshold 1', 'threshold', { level: 1 }, refPoint(src, (_v, r, g, b) => (luma(r, g, b) >= 1 ? 255 : 0))],
+    ['levels identity', 'levels', { inBlack: 0, inWhite: 255, gamma: 1, outBlack: 0, outWhite: 255 }, clone(src)],
+    ['levels 20/230 g1.8 10/245', 'levels', { inBlack: 20, inWhite: 230, gamma: 1.8, outBlack: 10, outWhite: 245 }, refPoint(src, (v) => levels(v, 20, 230, 1.8, 10, 245))],
+    ['levels gamma 0.5', 'levels', { gamma: 0.5 }, refPoint(src, (v) => levels(v, 0, 255, 0.5, 0, 255))],
+    ['brightness/contrast 0/0 (identity)', 'brightness-contrast', { brightness: 0, contrast: 0 }, clone(src)],
+    ['curves identity', 'curves', {}, clone(src)],
+  ];
+  for (const [label, id, params, ref] of cases) out(`${label}: ${fmt(diff(committed(id, params, sess(clone(src))).comp, ref))}`);
+  // Gamma direction: mid-grey 128 with Levels gamma 2.0
+  const grey = createRgbaBuffer(1, 1); grey.data.set([128, 128, 128, 255]);
+  const g2 = compositeSession(commitAdjustment(createSession('g', 'g', grey, { minX: 0, minY: 0, maxX: 1, maxY: 1 }), 'levels', { gamma: 2 }));
+  out(`levels gamma 2.0 on grey 128 -> ${g2.data[0]} (GIMP pow(t,1/g): ${Math.round(255 * Math.pow(128 / 255, 0.5))}; lighter = higher gamma lightens, like Photoshop/GIMP; LightBurn's Gamma goes the other way, ADR-671 Amd 1)`);
+  // Blur vs exact Gaussian
+  for (const sigma of [0.5, 1, 1.5, 2, 3, 5, 12, 50]) {
+    const ref = refBlurF(src, sigma);
+    const got = committed('gaussian-blur', { sigma }, sess(clone(src))).comp;
+    out(`gaussian sigma ${sigma}: vs exact edge-clamped Gaussian ${fmt(diff(got, fromF(src, (p, c) => ref[p * 3 + c]!)))}`);
+  }
+  for (const [amount, sigma, thr] of [[100, 1, 0], [150, 2, 4], [500, 3, 0]] as const) {
+    const ref = refBlurF(src, sigma);
+    const r = fromF(src, (p, c, v) => { const d = v - ref[p * 3 + c]!; return Math.abs(d) < thr ? v : v + (amount / 100) * d; });
+    out(`unsharp ${amount}% sigma ${sigma} thr ${thr}: ${fmt(diff(committed('unsharp-mask', { amount, sigma, threshold: thr }, sess(clone(src))).comp, r))}`);
+  }
+  for (const sigma of [1, 4]) {
+    const ref = refBlurF(src, sigma);
+    out(`high pass sigma ${sigma} (v - blur + 128): ${fmt(diff(committed('high-pass', { sigma }, sess(clone(src))).comp, fromF(src, (p, c, v) => v - ref[p * 3 + c]! + 128)))}`);
+  }
+  for (const r of [1, 2, 4]) out(`median r${r}: ${fmt(diff(committed('median', { radius: r }, sess(clone(src))).comp, refMedian(src, r)))}`);
+});
+
+it('A2 screens: tone, pitch on pixel grid, solid black/white', () => {
+  out('\n== A2 halftone / line screen on flat patches 96x96 ==');
+  for (const [id, label] of [['halftone', 'dots'], ['line-screen', 'lines']] as const) {
+    for (const angle of [0, 15, 45, 90]) {
+      for (const spacing of [4, 8, 7.6]) {
+        let worst = 0; const rows: string[] = [];
+        for (const g of [0, 32, 64, 96, 128, 160, 192, 224, 255]) {
+          const b = createRgbaBuffer(96, 96);
+          for (let i = 0; i < b.data.length; i += 4) b.data.set([g, g, g, 255], i);
+          const c = committed(id, { spacing, angle }, createSession('h', 'h', b, { minX: 0, minY: 0, maxX: 96, maxY: 96 })).comp;
+          let black = 0, other = 0;
+          for (let i = 0; i < c.data.length; i += 4) { if (c.data[i] === 0) black++; else if (c.data[i] !== 255) other++; }
+          const cov = black / (96 * 96); const ink = 1 - g / 255;
+          worst = Math.max(worst, Math.abs(cov - ink));
+          if (other > 0) rows.push(`non-binary ${other}`);
+          if (g === 0 || g === 255) rows.push(`g${g} cov ${cov.toFixed(4)}`);
+        }
+        out(`${label} angle ${angle} pitch ${spacing}: worst |coverage-ink| ${worst.toFixed(4)}; ${rows.join(', ')}`);
+      }
+    }
+  }
+  // pitch on the pixel grid: at 0 deg pattern period must equal round(pitch)
+  const b = createRgbaBuffer(64, 64);
+  for (let i = 0; i < b.data.length; i += 4) b.data.set([128, 128, 128, 255], i);
+  for (const spacing of [8, 7.6, 7.4]) {
+    const c = committed('line-screen', { spacing, angle: 0 }, createSession('h', 'h', clone(b), { minX: 0, minY: 0, maxX: 64, maxY: 64 })).comp;
+    const col = Array.from({ length: 64 }, (_, y) => (c.data[(y * 64 + 3) * 4] === 0 ? 1 : 0));
+    let period = 0; for (let p = 1; p < 32; p++) { if (col.every((v, i) => i + p >= 64 || v === col[i + p])) { period = p; break; } }
+    out(`line screen typed pitch ${spacing} at 0 deg: vertical period ${period} px (whole-pixel pitch ADR-242 Amd 2 => ${Math.max(2, Math.round(spacing))})`);
+  }
+});
+
+it('A3 preview at 1:1 equals the commit (2 layers, feathered selection, alpha)', () => {
+  out('\n== A3 1:1 preview vs commit, every adjustment ==');
+  const P: Record<AdjustmentId, Record<string, number>> = {
+    'brightness-contrast': { brightness: 23, contrast: -17 }, levels: { inBlack: 12, inWhite: 230, gamma: 1.4, outBlack: 5, outWhite: 250 },
+    curves: {}, threshold: { level: 100 }, posterize: { levels: 5 }, invert: {}, desaturate: {}, 'remove-white-background': { cleanup: 30 },
+    'gaussian-blur': { sigma: 2.5 }, 'unsharp-mask': { amount: 150, sigma: 1.5, threshold: 4 }, 'high-pass': { sigma: 2 }, median: { radius: 2 },
+    halftone: { spacing: 6, angle: 30 }, 'line-screen': { spacing: 5, angle: 0 },
+  };
+  const curve = [{ x: 0, y: 10 }, { x: 90, y: 140 }, { x: 255, y: 240 }];
+  const sel = (): SelectionMask => {
+    const alpha = new Uint8Array(W * H);
+    for (let y = 5; y < 30; y++) for (let x = 8; x < 40; x++) alpha[y * W + x] = Math.min(255, 30 + Math.min(x - 8, 39 - x, y - 5, 29 - y) * 50);
+    return { width: W, height: H, alpha };
+  };
+  const variants: Array<[string, () => EditorSession]> = [
+    ['single layer', () => sess()],
+    ['single layer + feathered selection', () => withSelection(sess(), sel())],
+    ['alpha background + upper multiply layer active + selection', () => {
+      let s = sess(photo(W, H, (x, y) => ((x + y) % 7 === 0 ? 0 : x < 10 ? 120 : 255)));
+      s = addLayerAboveActive(s, 'up');
+      const d = s.doc.data; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; d[i] = (x * 9) % 256; d[i + 1] = 200; d[i + 2] = (y * 13) % 256; d[i + 3] = x > 24 ? 255 : x * 9; }
+      s = setActiveLayerProps(s, { opacity: 0.7, blend: 'multiply' } as never);
+      return withSelection(s, sel());
+    }],
+  ];
+  for (const [vn, mk] of variants) {
+    const bad: string[] = [];
+    for (const spec of ADJUSTMENTS) {
+      const s0 = mk();
+      const before = clone(s0.doc);
+      const prev = computeAdjustPreview(s0, spec.id, P[spec.id], spec.id === 'curves' ? curve : undefined);
+      const untouched = diff(before, s0.doc).n === 0;
+      const prevCopy = clone(prev);
+      const after = compositeSession(commitAdjustment(s0, spec.id, P[spec.id], spec.id === 'curves' ? curve : undefined));
+      const d = diff(prevCopy, after);
+      if (d.n > 0 || !untouched) bad.push(`${spec.id}: ${fmt(d)} previewTouchedDoc ${!untouched}`);
+    }
+    out(`${vn}: ${bad.length === 0 ? 'all 14 adjustments preview == commit byte for byte' : bad.join(' | ')}`);
+  }
+});
+
+it('A4 display-resolution preview vs downsampled commit (fit view)', () => {
+  out('\n== A4 preview at view scale 0.25 vs area-average of the committed composite ==');
+  // 1-px checkerboard 64/192: a fine texture (scan/dither-like)
+  const N = 128;
+  const tex = createRgbaBuffer(N, N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const v = (x + y) % 2 === 0 ? 64 : 192; tex.data.set([v, v, v, 255], (y * N + x) * 4); }
+  const win: PreviewWindow = { rect: { x: 0, y: 0, width: N, height: N }, width: N / 4, height: N / 4 };
+  for (const [id, params] of [['threshold', { level: 128 }], ['threshold', { level: 100 }], ['levels', { gamma: 2 }], ['invert', {}]] as const) {
+    const s = createSession('t', 't', clone(tex), { minX: 0, minY: 0, maxX: N, maxY: N });
+    const pv = clone(computeWindowPreview({ current: null }, s, { id, params }, win));
+    const comp = compositeSession(commitAdjustment(createSession('t', 't', clone(tex), { minX: 0, minY: 0, maxX: N, maxY: N }), id, params));
+    // area average 4x4 of committed composite = what the canvas shows after OK at 25%
+    let max = 0;
+    for (let j = 0; j < N / 4; j++) for (let i = 0; i < N / 4; i++) {
+      let a = 0; for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) a += comp.data[((j * 4 + y) * N + i * 4 + x) * 4]!;
+      max = Math.max(max, Math.abs(Math.round(a / 16) - pv.data[(j * (N / 4) + i) * 4]!));
+    }
+    out(`${id} ${JSON.stringify(params)}: preview grey ${pv.data[0]} vs after-OK displayed ${Math.round([...Array(16)].reduce((a, _, k) => a + comp.data[((Math.floor(k / 4)) * N + (k % 4)) * 4]!, 0) / 16)}; max display difference ${max}`);
+  }
+});
+
+it('A5 Studio undo/redo exactness after adjustments', () => {
+  out('\n== A5 Studio undo/redo ==');
+  let s = sess();
+  const orig = clone(s.doc);
+  s = commitAdjustment(s, 'levels', { gamma: 1.6 });
+  s = commitAdjustment(s, 'gaussian-blur', { sigma: 3 });
+  const two = clone(s.doc);
+  s = commitAdjustment(s, 'threshold', { level: 128 });
+  const three = clone(s.doc);
+  s = undoScoped(s);
+  out(`undo threshold -> equals after-blur: ${diff(s.doc, two).n === 0}`);
+  s = undoScoped(undoScoped(s));
+  out(`undo x3 -> equals original: ${diff(s.doc, orig).n === 0}`);
+  s = redoScoped(redoScoped(redoScoped(s)));
+  out(`redo x3 -> equals after-threshold: ${diff(s.doc, three).n === 0}`);
+});

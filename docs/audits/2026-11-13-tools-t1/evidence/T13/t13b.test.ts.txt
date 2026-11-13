@@ -1,0 +1,297 @@
+// T13 auditor, part B: the real Image Studio store path (open -> adjust ->
+// Apply), other images sharing a source, project Undo/Redo, Cancel, save/reopen
+// and the compiled G-code against an independent luma oracle.
+import { it, vi } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { deflateSync, crc32 } from 'node:zlib';
+import type { RgbaBuffer } from '../t13-main/src/core/image-edit';
+import { createRgbaBuffer } from '../t13-main/src/core/image-edit/rgba-buffer';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type Project, type RasterImage } from '../t13-main/src/core/scene';
+import { prepareOutput } from '../t13-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t13-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t13-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t13-main/src/io/project/deserialize-project';
+import { useStore } from '../t13-main/src/ui/state/store';
+import { resetStore } from '../t13-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t13-main/src/ui/state/toast-store';
+import { useImageEditorStore } from '../t13-main/src/ui/image-editor/image-editor-store';
+import { useAdjustDialogStore } from '../t13-main/src/ui/image-editor/adjust-dialog-store';
+import { addLayerAboveActive, compositeSession } from '../t13-main/src/ui/image-editor/editor-session-layers';
+import { decodeRasterToBuffer } from '../t13-main/src/ui/image-editor/image-editor-decode';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t13/t13b.log';
+const log: string[] = [];
+const out = (s: string) => { log.push(s); writeFileSync(LOG, log.join('\n')); };
+
+// ---- own PNG encoder + own luma (independent of the app's) ----
+function png(buf: RgbaBuffer): string {
+  const { width: w, height: h, data } = buf;
+  const raw = Buffer.alloc((w * 4 + 1) * h);
+  for (let y = 0; y < h; y++) { raw[y * (w * 4 + 1)] = 0; Buffer.from(data.buffer, data.byteOffset + y * w * 4, w * 4).copy(raw, y * (w * 4 + 1) + 1); }
+  const chunk = (type: string, body: Buffer) => { const len = Buffer.alloc(4); len.writeUInt32BE(body.length); const tb = Buffer.concat([Buffer.from(type, 'ascii'), body]); const c = Buffer.alloc(4); c.writeUInt32BE(crc32(tb) >>> 0); return Buffer.concat([len, tb, c]); };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 6; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
+  const bytes = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+  return `data:image/png;base64,${bytes.toString('base64')}`;
+}
+function ownLumaOverWhite(buf: RgbaBuffer): Uint8Array {
+  const n = buf.width * buf.height; const l = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    const a = buf.data[i * 4 + 3]! / 255;
+    const ch = (c: number) => Math.round(255 - a * (255 - buf.data[i * 4 + c]!));
+    l[i] = Math.round(0.299 * ch(0) + 0.587 * ch(1) + 0.114 * ch(2));
+  }
+  return l;
+}
+const b64 = (u: Uint8Array) => Buffer.from(u).toString('base64');
+const unb64 = (s: string) => new Uint8Array(Buffer.from(s, 'base64'));
+
+vi.mock('../t13-main/src/ui/image-editor/image-editor-decode', async () => {
+  const { lumaBytesFromCompositedRgba } = await import('../t13-main/src/ui/import/rgba-luma');
+  return {
+    decodeRasterToBuffer: vi.fn(),
+    // Same contract as the real bake: luma of the composite the session hands it;
+    // dataUrl from our own PNG encoder (jsdom has no canvas encoder).
+    bakeBufferToBitmapFields: vi.fn(async (doc: RgbaBuffer) => ({
+      dataUrl: png(doc),
+      lumaBase64: Buffer.from(lumaBytesFromCompositedRgba(doc.data, doc.width * doc.height)).toString('base64'),
+    })),
+  };
+});
+
+const W = 48, H = 36;
+function photo(): RgbaBuffer {
+  const b = createRgbaBuffer(W, H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4;
+    const sp = (x * 73 + y * 151 + ((x * y) % 17) * 29) % 61;
+    b.data[i] = (x * 5 + sp) % 256; b.data[i + 1] = (y * 7 + sp * 2) % 256; b.data[i + 2] = ((x + y) * 3 + sp * 3) % 256;
+    b.data[i + 3] = 255;
+  }
+  return b;
+}
+const SRC = photo();
+const st = () => useStore.getState();
+const ed = () => useImageEditorStore.getState();
+const toasts = () => (useToastStore.getState().toasts as Array<{ message: string; variant?: string }>).map((t) => `${t.variant ?? ''}:${t.message}`);
+const obj = (id: string) => st().project.scene.objects.find((o) => o.id === id) as RasterImage;
+function rasterOf(id: string, minX: number): RasterImage {
+  return { kind: 'raster-image', id, source: 'shared.png', dataUrl: png(SRC), pixelWidth: W, pixelHeight: H,
+    bounds: { minX, minY: 10, maxX: minX + W, maxY: 10 + H }, transform: IDENTITY_TRANSFORM, color: '#808080', dither: 'grayscale', linesPerMm: 1,
+    lumaBase64: b64(ownLumaOverWhite(SRC)) } as RasterImage;
+}
+function load(objects: RasterImage[]) {
+  resetStore();
+  useImageEditorStore.setState({ session: null, sessionOwner: null, stash: {}, loadState: { kind: 'idle' }, isApplying: false, applyRequest: null, pendingCrop: null, transform: null });
+  useToastStore.setState({ toasts: [] } as never);
+  const base = createProject();
+  const layer = { ...createLayer({ id: 'img', color: '#808080', name: 'Image', mode: 'image' }), power: 80, minPower: 10, speed: 3000, ditherAlgorithm: 'grayscale', linesPerMm: 1 };
+  const project: Project = { ...base, scene: { ...base.scene, objects, layers: [layer], groups: [] } };
+  useStore.setState({ project, undoStack: [], redoStack: [], selectedObjectId: objects[0]!.id } as never);
+}
+async function open(id: string) {
+  ed().openEditor(obj(id));
+  await vi.waitFor(() => { if (ed().session?.objectId !== id || ed().loadState.kind !== 'idle') throw new Error('not open'); });
+}
+async function apply() {
+  ed().apply();
+  await vi.waitFor(() => { if (ed().isApplying) throw new Error('applying'); });
+}
+function adjust(id: Parameters<ReturnType<typeof useAdjustDialogStore.getState>['open']>[0], params: Record<string, number> = {}) {
+  useAdjustDialogStore.getState().open(id);
+  if (useAdjustDialogStore.getState().dialog !== null) { useAdjustDialogStore.getState().setParams(params); useAdjustDialogStore.getState().commit(); }
+}
+function gcodeOf(p: Project): string {
+  const r = prepareOutput(p);
+  if (!r.ok) return `NOT OK ${JSON.stringify((r as never as { preflight: unknown }).preflight).slice(0, 300)}`;
+  return emitPreparedGcode(r).gcode;
+}
+// Decode lit moves: returns per machine-Y list of [x0,x1,S]
+function decode(g: string) {
+  let x = 0, y = 0, s = 0, mode = 0; const rows = new Map<number, Array<[number, number, number]>>();
+  for (const raw of g.split('\n')) {
+    const line = raw.replace(/;.*$/, '').trim(); if (line === '') continue;
+    const m = line.match(/^G0?([0-3])(?![0-9])/); if (m) mode = Number(m[1]);
+    const nx = line.match(/X(-?[\d.]+)/), ny = line.match(/Y(-?[\d.]+)/), ns = line.match(/S([\d.]+)/);
+    if (ns) s = Number(ns[1]);
+    const x1 = nx ? Number(nx[1]) : x, y1 = ny ? Number(ny[1]) : y;
+    if (mode === 1 && s > 0 && (nx || ny) && Math.abs(y1 - y) < 1e-9) {
+      const k = Math.round(y1 * 1000) / 1000; if (!rows.has(k)) rows.set(k, []);
+      rows.get(k)!.push([Math.min(x, x1), Math.max(x, x1), s]);
+    }
+    x = x1; y = y1;
+  }
+  return rows;
+}
+
+it('B1 apply equals oracle; shared source untouched; undo/redo; save/reopen; burn', async () => {
+  load([rasterOf('A', 0), rasterOf('B', 100)]);
+  vi.mocked(decodeRasterToBuffer).mockImplementation(async () => ({ width: W, height: H, data: new Uint8ClampedArray(SRC.data) }));
+  const p0 = JSON.stringify(st().project);
+  const B0 = JSON.stringify(obj('B'));
+  await open('A');
+  adjust('levels', { inBlack: 20, inWhite: 230, gamma: 1.8, outBlack: 10, outWhite: 245 });
+  adjust('invert');
+  adjust('threshold', { level: 140 });
+  out(`session revision ${ed().session!.revision} dirty ${ed().session!.dirtySinceApply}`);
+  await apply();
+  out(`toasts after apply: ${toasts().join(' | ')}`);
+  // independent oracle: levels(GIMP) -> 255-v -> BT.601 luma >= 140 ? 255 : 0
+  const exp = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) {
+    const ch = (c: number) => { const v = SRC.data[i * 4 + c]!; const t = Math.max(0, Math.min(1, (v - 20) / 210)); return 255 - Math.max(0, Math.min(255, Math.round(10 + Math.pow(t, 1 / 1.8) * 235))); };
+    exp[i] = Math.round(0.299 * ch(0) + 0.587 * ch(1) + 0.114 * ch(2)) >= 140 ? 255 : 0;
+  }
+  const A1 = obj('A');
+  const gotLuma = unb64(A1.lumaBase64!);
+  let lumaDiff = 0; for (let i = 0; i < exp.length; i++) if (gotLuma[i] !== exp[i]) lumaDiff++;
+  out(`applied luma vs oracle: ${lumaDiff} of ${exp.length} pixels differ; black pixels ${exp.filter((v) => v === 0).length}`);
+  out(`applied dims ${A1.pixelWidth}x${A1.pixelHeight} bounds ${JSON.stringify(A1.bounds)} editorDocument layers ${A1.editorDocument?.layers.length}`);
+  const layerBytes = unb64(A1.editorDocument!.layers[0]!.rgbaBase64);
+  let docDiff = 0; for (let i = 0; i < W * H; i++) if (layerBytes[i * 4] !== exp[i] || layerBytes[i * 4 + 3] !== 255) docDiff++;
+  out(`editorDocument layer pixels vs oracle: ${docDiff} differ`);
+  out(`B (shares source) unchanged: ${JSON.stringify(obj('B')) === B0}`);
+  out(`undo stack ${st().undoStack.length}`);
+  const pApplied = JSON.stringify(st().project);
+  // burn of applied project vs a hand-built project with the oracle luma
+  const gA = gcodeOf(st().project);
+  const oracleProject = { ...st().project, scene: { ...st().project.scene, objects: [{ ...rasterOf('A', 0), lumaBase64: b64(exp) }, obj('B')] } } as Project;
+  const gO = gcodeOf(oracleProject);
+  out(`G-code applied == G-code with oracle luma: ${gA === gO} (lengths ${gA.length} / ${gO.length})`);
+  // decode S per pixel for A (x in [0,48))
+  const rows = decode(gA);
+  const ys = [...rows.keys()].sort((a, b) => a - b);
+  const aRows = ys.map((y) => ({ y, segs: rows.get(y)!.filter(([x0]) => x0 < 60) })).filter((r) => r.segs.length > 0);
+  let litMismatch = 0, sVals = new Set<number>();
+  // machine Y: find mapping from row index by order (rows top->bottom vs bottom->top), pick the better
+  const tryMap = (flip: boolean) => {
+    let mm = 0;
+    for (let r = 0; r < H; r++) {
+      const yRow = aRows.find((q) => Math.abs(q.y - (flip ? ys.length > 0 ? 0 : 0 : 0) - q.y) < 0); void yRow; // placeholder
+    }
+    return mm;
+  };
+  void tryMap;
+  // Robust mapping: centre of row r in machine Y is either (bedH - (10 + r + 0.5)) or (10 + r + 0.5)
+  const bedH = st().project.workspace?.height ?? 400;
+  const litAt = (col: number, row: number, flip: boolean): number => {
+    const yM = flip ? bedH - (10 + row + 0.5) : 10 + row + 0.5;
+    const segs = rows.get(Math.round(yM * 1000) / 1000) ?? [];
+    for (const [x0, x1, s] of segs) if (col + 0.5 > x0 && col + 0.5 < x1) return s;
+    return 0;
+  };
+  let bestFlip = true, bestMis = Infinity;
+  for (const flip of [true, false]) {
+    let mis = 0; for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if ((litAt(c, r, flip) > 0) !== (exp[r * W + c] === 0)) mis++;
+    if (mis < bestMis) { bestMis = mis; bestFlip = flip; }
+  }
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) { const s = litAt(c, r, bestFlip); if (s > 0) sVals.add(s); if ((s > 0) !== (exp[r * W + c] === 0)) litMismatch++; }
+  out(`decoded burn (grayscale dither, 1 line/mm, machine Y ${bestFlip ? 'flipped' : 'direct'}): ${litMismatch} of ${W * H} pixel centres disagree with oracle black; distinct lit S ${[...sVals].join(',')}; lit rows ${aRows.length}`);
+  // project undo / redo
+  st().undo();
+  out(`project undo -> exact original: ${JSON.stringify(st().project) === p0}`);
+  st().redo();
+  out(`project redo -> exact applied: ${JSON.stringify(st().project) === pApplied}`);
+  // save / reopen
+  const text = serializeProject(st().project);
+  const re = deserializeProject(text) as { kind: string; project?: Project; reason?: string };
+  if (re.kind !== 'ok') { out(`reopen failed ${re.kind} ${re.reason}`); return; }
+  const rA = re.project!.scene.objects.find((o) => o.id === 'A') as RasterImage;
+  out(`reopen: luma same ${rA.lumaBase64 === A1.lumaBase64}; editorDocument same ${JSON.stringify(rA.editorDocument) === JSON.stringify(A1.editorDocument)}; G-code same ${gcodeOf(re.project!) === gA}`);
+  // reopen in Studio from the saved editorDocument
+  ed().closeEditor();
+  useImageEditorStore.setState({ stash: {} });
+  useStore.setState({ project: re.project!, projectDocumentEpoch: st().projectDocumentEpoch + 1 } as never);
+  await open('A');
+  const comp = compositeSession(ed().session!);
+  let reDiff = 0; for (let i = 0; i < W * H; i++) if (comp.data[i * 4] !== exp[i]) reDiff++;
+  out(`Studio reopen from saved file: composite vs oracle ${reDiff} differ; Revert target is the saved layers: ${ed().session!.baseLayers !== undefined}`);
+});
+
+it('B2 two sessions on images sharing a source; duplicate of an applied image', async () => {
+  load([rasterOf('A', 0), rasterOf('B', 100)]);
+  vi.mocked(decodeRasterToBuffer).mockImplementation(async () => ({ width: W, height: H, data: new Uint8ClampedArray(SRC.data) }));
+  await open('A');
+  adjust('invert');
+  ed().closeEditor();
+  await open('B');
+  adjust('threshold', { level: 128 });
+  await apply();
+  const lumaAafterB = obj('A').lumaBase64;
+  await open('A');
+  out(`A resumed its own stashed session (dirty ${ed().session!.dirtySinceApply}, objectId ${ed().session!.objectId})`);
+  await apply();
+  const la = unb64(obj('A').lumaBase64!), lb = unb64(obj('B').lumaBase64!);
+  const src = ownLumaOverWhite(SRC);
+  let aOk = 0, bOk = 0;
+  for (let i = 0; i < W * H; i++) {
+    const inv = Math.round(0.299 * (255 - SRC.data[i * 4]!) + 0.587 * (255 - SRC.data[i * 4 + 1]!) + 0.114 * (255 - SRC.data[i * 4 + 2]!));
+    if (la[i] === inv) aOk++;
+    if (lb[i] === (src[i]! >= 128 ? 255 : 0)) bOk++;
+  }
+  out(`A before its own Apply untouched by B's Apply: ${lumaAafterB === rasterOf('A', 0).lumaBase64}; A = inverted ${aOk}/${W * H}; B = thresholded ${bOk}/${W * H}`);
+  // duplicate of applied A (shares editorDocument and dataUrl), edit the duplicate
+  const A1 = obj('A');
+  const dup = { ...A1, id: 'A2', bounds: { ...A1.bounds, minX: 200, maxX: 248 } };
+  useStore.setState({ project: { ...st().project, scene: { ...st().project.scene, objects: [...st().project.scene.objects, dup] } } } as never);
+  const A1json = JSON.stringify(obj('A'));
+  ed().closeEditor();
+  await open('A2');
+  adjust('gaussian-blur', { sigma: 3 });
+  await apply();
+  out(`duplicate A2 applied; A unchanged ${JSON.stringify(obj('A')) === A1json}; A2 changed ${obj('A2').lumaBase64 !== A1.lumaBase64}`);
+});
+
+it('B3 cancel and close leave the project unchanged', async () => {
+  load([rasterOf('A', 0)]);
+  vi.mocked(decodeRasterToBuffer).mockImplementation(async () => ({ width: W, height: H, data: new Uint8ClampedArray(SRC.data) }));
+  const p0 = JSON.stringify(st().project);
+  await open('A');
+  const before = new Uint8ClampedArray(ed().session!.doc.data); const rev = ed().session!.revision;
+  useAdjustDialogStore.getState().open('threshold');
+  useAdjustDialogStore.getState().setParams({ level: 200 });
+  useAdjustDialogStore.getState().cancel();
+  const same = ed().session!.doc.data.every((v, i) => v === before[i]);
+  out(`adjust Cancel: doc unchanged ${same}, revision ${rev} -> ${ed().session!.revision}`);
+  adjust('invert');
+  ed().closeEditor();
+  out(`close with unapplied edits: project unchanged ${JSON.stringify(st().project) === p0}; undo stack ${st().undoStack.length}; toasts ${toasts().join(' | ') || 'none'}`);
+});
+
+it('B4 transparency: straight-colour round trip (copy of the decode formula) and alpha through threshold/invert', async () => {
+  // Round trip of image-editor-decode straightColourForEditor then the editor's over-white composite.
+  let worst = 0, worstAt = '';
+  for (let a = 1; a <= 255; a++) for (let s = 0; s <= 255; s++) {
+    const comp = Math.round(255 - (a * (255 - s)) / 255);
+    const straight = Math.min(255, Math.max(0, Math.round(255 - ((255 - comp) * 255) / a)));
+    const again = Math.round(255 - (a * (255 - straight)) / 255);
+    const d = Math.abs(again - comp); if (d > worst) { worst = d; worstAt = `a${a} s${s}`; }
+  }
+  out(`\nB4 decode round trip: worst re-composite error ${worst} level(s) at ${worstAt}`);
+  // A logo with antialiased transparent edge: black ink, alpha ramp; outside alpha 0 (decode makes RGB white)
+  const N = 16; const logo = createRgbaBuffer(N, 1);
+  for (let x = 0; x < N; x++) { const a = Math.round((x / (N - 1)) * 255); logo.data.set(a === 0 ? [255, 255, 255, 0] : [0, 0, 0, a], x * 4); }
+  load([{ ...rasterOf('L', 0), pixelWidth: N, pixelHeight: 1, bounds: { minX: 0, minY: 0, maxX: N, maxY: 1 }, dataUrl: png(logo), lumaBase64: b64(ownLumaOverWhite(logo)) } as RasterImage]);
+  vi.mocked(decodeRasterToBuffer).mockImplementation(async () => ({ width: N, height: 1, data: new Uint8ClampedArray(logo.data) }));
+  await open('L');
+  adjust('threshold', { level: 128 });
+  await apply();
+  out(`threshold 128 on an alpha-ramp black logo edge -> applied luma: ${[...unb64(obj('L').lumaBase64!)].join(',')} (input displayed luma ${[...ownLumaOverWhite(logo)].join(',')})`);
+  await open('L');
+  adjust('invert');
+  await apply();
+  out(`then invert -> applied luma: ${[...unb64(obj('L').lumaBase64!)].join(',')} (transparent pixel x0 stays paper white? ${unb64(obj('L').lumaBase64!)[0] === 255})`);
+});
+
+it('B5 large: 12 MP photo with three layers cannot be applied (known v2 23-P3-5 re-check)', async () => {
+  const LW = 4032, LH = 3024;
+  const big = createRgbaBuffer(LW, LH); big.data.fill(200);
+  load([{ ...rasterOf('Z', 0), pixelWidth: LW, pixelHeight: LH, bounds: { minX: 0, minY: 0, maxX: 403.2, maxY: 302.4 }, dataUrl: 'data:image/png;base64,AA==', lumaBase64: undefined } as unknown as RasterImage]);
+  vi.mocked(decodeRasterToBuffer).mockImplementation(async () => big);
+  const p0 = JSON.stringify(st().project.scene.objects.map((o) => ({ ...o, dataUrl: undefined })));
+  await open('Z');
+  let s = ed().session!;
+  s = addLayerAboveActive(s, 'l2'); s = addLayerAboveActive(s, 'l3');
+  useImageEditorStore.setState({ session: { ...s, dirtySinceApply: true } });
+  await apply();
+  out(`\nB5 12 MP x 3 layers Apply: toasts ${toasts().join(' | ')}; project unchanged ${JSON.stringify(st().project.scene.objects.map((o) => ({ ...o, dataUrl: undefined }))) === p0}; session kept ${ed().session !== null}`);
+});

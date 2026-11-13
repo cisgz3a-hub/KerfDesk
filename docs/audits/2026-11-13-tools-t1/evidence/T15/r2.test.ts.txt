@@ -1,0 +1,89 @@
+// T15 refuter R2: preview pass budget. Own method: threshold table from the
+// real plan at common photo sizes, and a direct compile at passes N vs 1 to
+// show what the preview would draw.
+import { writeFileSync } from 'node:fs';
+import { expect, test } from 'vitest';
+import { DEFAULT_DEVICE_PROFILE } from '../t13-main/src/core/devices';
+import { createLayer, IDENTITY_TRANSFORM, type Layer, type RasterImage } from '../t13-main/src/core/scene';
+import { compileRasterGroupsForLayer } from '../t13-main/src/core/job/compile-job-raster';
+import { compiledRasterPreview } from '../t13-main/src/ui/workspace/compiled-raster-preview';
+import { photoEngravingPreviewPlan } from '../t13-main/src/ui/raster/photo-engraving-preview-budget';
+import { computePhotoEngravingPreview } from '../t13-main/src/ui/raster/photo-engraving-preview';
+
+const out: string[] = [];
+const log = (s: string): void => { out.push(s); writeFileSync('C:/Users/stolk/kd-t1/zz-t15r/r2.log', out.join('\n')); };
+const device = { ...DEFAULT_DEVICE_PROFILE, bedWidth: 1000, bedHeight: 1000 };
+
+function image(wMm: number, hMm: number, pw: number, ph: number, luma?: Uint8Array): RasterImage {
+  return {
+    kind: 'raster-image', id: 'A', source: 'A.jpg', dataUrl: 'data:image/png;base64,iVBORw0KGgo=', pixelWidth: pw, pixelHeight: ph,
+    bounds: { minX: 5, minY: 5, maxX: 5 + wMm, maxY: 5 + hMm }, transform: IDENTITY_TRANSFORM, color: '#808080',
+    dither: 'threshold', linesPerMm: 1, lumaBase64: luma ? Buffer.from(luma).toString('base64') : 'AAAA', operationIds: ['img'],
+  } as RasterImage;
+}
+function op(linesPerMm: number, passes: number, extra: Partial<Layer> = {}): Layer {
+  return { ...createLayer({ id: 'img', color: '#808080', name: 'Photo', mode: 'image' }), power: 80, minPower: 0, speed: 3000,
+    linesPerMm, passes, ditherAlgorithm: 'jarvis', dotWidthCorrectionMm: 0, ...extra } as Layer;
+}
+function firstRefused(wMm: number, hMm: number, lpm: number, materialView: boolean): { first: number | null; msg: string } {
+  for (let p = 1; p <= 200; p++) {
+    const plan = photoEngravingPreviewPlan({ image: image(wMm, hMm, 4000, 3000), layer: op(lpm, p), device, sceneObjects: [], materialView });
+    if (plan.kind === 'limit') return { first: p, msg: plan.message };
+  }
+  return { first: null, msg: '' };
+}
+
+test('R2a: refusal threshold at common photo sizes and resolutions', () => {
+  const cases: [string, number, number, number][] = [
+    ['100x100 mm @ 254 DPI (10 l/mm)', 100, 100, 10],
+    ['150x100 mm @ 254 DPI', 150, 100, 10],
+    ['200x150 mm @ 254 DPI (auditor case)', 200, 150, 10],
+    ['A4 210x297 @ 254 DPI', 210, 297, 10],
+    ['A4 210x297 @ 318 DPI (12.5 l/mm)', 210, 297, 12.5],
+    ['A4 210x297 @ 381 DPI (15 l/mm)', 210, 297, 15],
+    ['A4 210x297 @ 508 DPI (20 l/mm)', 210, 297, 20],
+    ['300x225 mm @ 318 DPI', 300, 225, 12.5],
+    ['A3 297x420 @ 318 DPI', 297, 420, 12.5],
+    ['100x100 mm @ 635 DPI (25 l/mm)', 100, 100, 25],
+    ['150x150 mm @ 635 DPI', 150, 150, 25],
+  ];
+  for (const [name, w, h, lpm] of cases) {
+    const cells = Math.round(w * lpm) * Math.round(h * lpm);
+    const a = firstRefused(w, h, lpm, false);
+    const b = firstRefused(w, h, lpm, true);
+    log(`${name}: grid ~${(cells / 1e6).toFixed(2)} Mcells; preview refused from passes ${a.first} (material view: ${b.first}); ok at 2/3/4 passes: ${[2, 3, 4].map((p) => (a.first === null || p < a.first ? 'ok' : 'REFUSED')).join('/')}`);
+  }
+  log(`message: ${firstRefused(200, 150, 10, false).msg}`);
+});
+
+test('R2b: what the preview would draw at passes 17 equals passes 16 and 1 (one grid per angle)', () => {
+  const pw = 1000, ph = 750;
+  const luma = new Uint8Array(pw * ph);
+  let s = 12345;
+  for (let i = 0; i < luma.length; i++) { s = (s * 1103515245 + 12345) >>> 0; luma[i] = ((i % pw) * 255) / pw * 0.8 + (s >>> 24) * 0.2; }
+  const img = image(200, 150, pw, ph, luma);
+  const results: Record<number, { groups: number; groupPasses: number[]; rgba: Uint8ClampedArray; ms: number }> = {};
+  for (const passes of [1, 16, 17, 40]) {
+    const layer = op(10, passes);
+    const t0 = performance.now();
+    const c = compileRasterGroupsForLayer([img], layer, device, { sceneObjects: [img] });
+    const g = c.groups[0]!;
+    const prev = compiledRasterPreview(g, device, 1000);
+    const ms = performance.now() - t0;
+    results[passes] = { groups: c.groups.length, groupPasses: c.groups.map((x) => x.passes), rgba: prev.rgba, ms };
+    const plan = photoEngravingPreviewPlan({ image: img, layer, device, sceneObjects: [] });
+    const real = computePhotoEngravingPreview({ image: img, layer, device, sceneObjects: [] });
+    log(`passes ${passes}: compiled groups ${c.groups.length} (passes field ${results[passes]!.groupPasses.join(',')}), grid ${g.pixelWidth}x${g.pixelHeight}, compile+display ${ms.toFixed(0)} ms; plan ${plan.kind}; computePhotoEngravingPreview ${real.kind}${real.kind === 'error' ? ` "${real.message.slice(0, 60)}..."` : ` scanPasses ${real.scanPasses}`}`);
+  }
+  const same = (a: Uint8ClampedArray, b: Uint8ClampedArray) => a.length === b.length && a.every((v, i) => v === b[i]);
+  log(`display rgba identical: 1 vs 17 ${same(results[1]!.rgba, results[17]!.rgba)}, 16 vs 17 ${same(results[16]!.rgba, results[17]!.rgba)}, 1 vs 40 ${same(results[1]!.rgba, results[40]!.rgba)}`);
+  expect(results[17]!.groups).toBe(1);
+});
+
+test('R2c: cross-hatch / angle step (cost really grows with passes) and 3D Sliced are not what the dialog previews', () => {
+  const img = image(200, 150, 1000, 750);
+  const hatch = photoEngravingPreviewPlan({ image: img, layer: op(10, 8, { imageCrossHatch: true }), device, sceneObjects: [] });
+  log(`cross-hatch 8 passes 200x150@10: plan ${hatch.kind}`);
+  const sliced = photoEngravingPreviewPlan({ image: img, layer: op(10, 30, { ditherAlgorithm: '3d-sliced' }), device, sceneObjects: [] });
+  log(`3d-sliced op (unpatched) 30 passes 200x150@10: plan ${sliced.kind}${sliced.kind === 'limit' ? ` ${sliced.message.slice(0, 50)}` : ''}`);
+});

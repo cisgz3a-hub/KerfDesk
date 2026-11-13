@@ -1,0 +1,21 @@
+[R-A] PNG, no pHYs (ADR-048 default 254) | import 100.00 x 50.00 mm | save bmp -> dog.bmp (1500054 B, header 1000x500 px, 96.01 x 96.01 DPI) | re-import 264.58 x 132.29 mm ratio x2.646 | toast: Added image: dog.bmp (1000x500 px · embedded density 96 DPI)
+[R-A] PNG, no pHYs (ADR-048 default 254) | import 100.00 x 50.00 mm | save png -> dog.png (2018 B) | re-import 100.00 x 50.00 mm ratio x1.000 | toast: Added image: dog.png (1000x500 px · default 254 DPI — no usable embedded density)
+[R-A] PNG, pHYs 300 DPI | import 84.67 x 42.33 mm | save bmp -> scan.bmp (1500054 B, header 1000x500 px, 96.01 x 96.01 DPI) | re-import 264.58 x 132.29 mm ratio x3.125 | toast: Added image: scan.bmp (1000x500 px · embedded density 96 DPI)
+[R-A] PNG, pHYs 300 DPI | import 84.67 x 42.33 mm | save png -> scan.png (2039 B) | re-import 84.67 x 42.33 mm ratio x1.000 | toast: Added image: scan.png (1000x500 px · embedded density 300 DPI)
+[R-A] JPEG, JFIF 72 DPI (typical phone/web) | import 352.78 x 176.39 mm | save bmp -> phone.bmp (1500054 B, header 1000x500 px, 96.01 x 96.01 DPI) | re-import 264.58 x 132.29 mm ratio x0.750 | toast: Added image: phone.bmp (1000x500 px · embedded density 96 DPI)
+[R-A] JPEG, JFIF 72 DPI (typical phone/web) | import 352.78 x 176.39 mm | save png -> phone.png (2018 B) | re-import 100.00 x 50.00 mm ratio x0.283 | toast: Added image: phone.png (1000x500 px · default 254 DPI — no usable embedded density)
+[R-A] JPEG, JFIF 96 DPI (control) | import 264.58 x 132.29 mm | save bmp -> web96.bmp (1500054 B, header 1000x500 px, 96.01 x 96.01 DPI) | re-import 264.58 x 132.29 mm ratio x1.000 | toast: Added image: web96.bmp (1000x500 px · embedded density 96 DPI)
+[R-A] JPEG, JFIF 96 DPI (control) | import 264.58 x 132.29 mm | save png -> web96.png (2018 B) | re-import 100.00 x 50.00 mm ratio x0.378 | toast: Added image: web96.png (1000x500 px · default 254 DPI — no usable embedded density)
+[R-B png] dialog BEFORE flatten: format=png | "Saves dog.png as it is in the project, before any operation's dithering, adjustments or mask. Use Save Processed Bitmap for what the laser engraves."
+[R-B png] flatten toasts: Flattened the mask into dog.png and deleted the mask shape.
+[R-B png] after flatten: source=dog.png dataUrl=data:image/png;base64,... 20x10 px, imageClip=yes, editorDocument=no, imageAsset=no; undo depth=1
+[R-B png] dialog AFTER flatten: format=png | "Saves dog.png as it is in the project, before any operation's dithering, adjustments or mask. Use Save Processed Bitmap for what the laser engraves."
+[R-B png] toast: Saved the original image to dog.png
+[R-B png] Save Original -> suggested "dog.png", 20x10 px, centre RGBA (94,94,94,255), identical to original bytes: false; original 40x20 RGBA (220,40,40,255), BT.601 luma 94
+[R-B jpg] dialog BEFORE flatten: format=jpeg
+[R-B jpg] dialog AFTER flatten: format=png | "Saves dog.jpg as it is in the project, before any operation's dithering, adjustments or mask. Use Save Processed Bitmap for what the laser engraves."
+[R-B jpg] after flatten, format png: suggested "dog.png"
+[R-B jpg] after flatten, format jpeg: suggested "undefined" (re-encode path, needs createImageBitmap)
+[R-C] after Studio Apply: source=dog.png; saved == edited bytes: true; saved == original bytes: false; suggested "dog.png"; any field still holding the original bytes: false
+[R-D] page object 84.67 x 42.33 mm (1000x500 px, 300 DPI) | Save Original png (default, byte-identical pass-through) -> brochure.png | re-import 100.00 x 50.00 mm ratio x1.181 | Added image: brochure.png (1000x500 px · default 254 DPI — no usable embedded density)
+[R-D] page object 84.67 x 42.33 mm (1000x500 px, 300 DPI) | Save Original bmp -> brochure.bmp | re-import 264.58 x 132.29 mm ratio x3.125 | Added image: brochure.bmp (1000x500 px · embedded density 96 DPI)

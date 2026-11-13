@@ -1,0 +1,71 @@
+import { it } from 'vitest';
+import { IDENTITY_TRANSFORM, type RasterImage, type Transform } from '../t13-main/src/core/scene';
+import { burnedSegments, circle, compare, gcodeOf, imageLayer, logger, maskLayer, mkImage, mkMask, project, rect, type P } from './t16-common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t16/t16b.log');
+const T = (t: Partial<Transform>): Transform => ({ ...IDENTITY_TRANSFORM, ...t });
+const REGION = { x0: 0, y0: 0, x1: 50, y1: 50 };
+const quad = (img: RasterImage): P[] => [{ x: 10, y: 10 }, { x: 30, y: 10 }, { x: 30, y: 30 }, { x: 10, y: 30 }].map((p) => ({ x: p.x + (img.transform.x - 20), y: p.y + (img.transform.y - 20) }));
+
+it('B1: 45 degree scan, unmasked baseline and gap location', () => {
+  for (const masked of [false, true]) {
+    const img = mkImage('R', 40, 40, { x: -10, y: -10, w: 20, h: 20 }, T({ x: 20, y: 20 }));
+    const c0 = circle(20.05, 19.95, 7.3);
+    const m = mkMask('M', [c0]);
+    const image = masked ? ({ ...img, imageMaskId: 'M' } as RasterImage) : img;
+    const g = gcodeOf(project([image, m], [imageLayer({ imageScanAngleDeg: 45 } as never), maskLayer(false)]));
+    const segs = burnedSegments(g);
+    const r = compare(segs, 0.2, quad(img), masked ? [c0] : [], masked ? 'evenodd' : 'none', REGION);
+    out(`B1 masked=${masked}: ${JSON.stringify(r)}`);
+    // segments near (16.625,16.425)
+    const near = segs.filter((s) => {
+      const t = Math.max(0, Math.min(1, ((16.625 - s.a.x) * (s.b.x - s.a.x) + (16.425 - s.a.y) * (s.b.y - s.a.y)) / ((s.b.x - s.a.x) ** 2 + (s.b.y - s.a.y) ** 2 || 1)));
+      return Math.hypot(s.a.x + t * (s.b.x - s.a.x) - 16.625, s.a.y + t * (s.b.y - s.a.y) - 16.425) < 0.4;
+    });
+    out(`   near gap: ${near.map((s) => `(${s.a.x.toFixed(3)},${s.a.y.toFixed(3)})->(${s.b.x.toFixed(3)},${s.b.y.toFixed(3)}) S${s.s}`).join(' | ')}`);
+    const lines = g.split('\n');
+    const idx = lines.findIndex((l) => /X1[56]\.\d+ Y38[34]\./.test(l));
+    out(`   gcode sample around idx ${idx}: ${lines.slice(Math.max(0, idx - 3), idx + 4).join(' / ')}`);
+  }
+});
+
+it('B2: Fill of the same nonzero object vs its mask', () => {
+  const star: P[] = Array.from({ length: 5 }, (_, i) => { const a = -Math.PI / 2 + (i * 4 * Math.PI) / 5; return { x: 20 + 9 * Math.cos(a), y: 20.1 + 9 * Math.sin(a) }; });
+  const glyphs = [rect(12.1, 13.1, 21.3, 26.9), rect(18.7, 13.1, 27.9, 26.9)];
+  const objs = [
+    { name: 'pentagram imported-svg nonzero', o: mkMask('M', [star], IDENTITY_TRANSFORM, 'imported-svg', 'nonzero'), c: [star] },
+    { name: 'pentagram shape (no rule)', o: mkMask('M', [star]), c: [star] },
+    { name: 'text overlapping glyphs', o: mkMask('M', glyphs, IDENTITY_TRANSFORM, 'text'), c: glyphs },
+  ];
+  for (const { name, o, c } of objs) {
+    const g = gcodeOf(project([o], [maskLayer(true, 'fill', { hatchSpacingMm: 0.2, hatchAngleDeg: 0, fillOverscanMm: 0 } as never)]));
+    const segs = burnedSegments(g);
+    const eo = compare(segs, 0.2, rect(0, 0, 50, 50), c, 'evenodd', REGION);
+    const nz = compare(segs, 0.2, rect(0, 0, 50, 50), c, 'nonzero', REGION);
+    out(`B2 Fill of ${name}: segs ${segs.length} burn ${eo.burnMm2} mm2; vs even-odd oracle ${eo.oracleMm2} (missFar ${eo.missFarMm2}, leakFar ${eo.leakFarMm2}); vs non-zero oracle ${nz.oracleMm2} (missFar ${nz.missFarMm2}, leakFar ${nz.leakFarMm2})`);
+  }
+});
+
+it('B3: the mask object keeps its own operation', () => {
+  const img = mkImage('R', 40, 40, { x: 10, y: 10, w: 20, h: 20 });
+  const c0 = circle(20.05, 19.95, 7.3);
+  const m = mkMask('M', [c0]);
+  const image = { ...img, imageMaskId: 'M' } as RasterImage;
+  for (const mode of ['line', 'fill'] as const) {
+    const g = gcodeOf(project([image, m], [imageLayer(), maskLayer(true, mode, { power: 60, speed: 600 } as never)]));
+    const segs = burnedSegments(g);
+    const maskBurn = segs.filter((s) => s.s !== segs[0]?.s || true);
+    const onCircle = segs.filter((s) => Math.abs(Math.hypot(s.a.x - 20.05, s.a.y - 19.95) - 7.3) < 0.05 && Math.abs(Math.hypot(s.b.x - 20.05, s.b.y - 19.95) - 7.3) < 0.05);
+    out(`B3 mask on ${mode} layer, output on: total burned segs ${maskBurn.length}; segments lying on the mask circle ${onCircle.length}; S values ${[...new Set(segs.map((s) => s.s))].join(',')}`);
+  }
+});
+
+it('B4: one mask shared by two images', () => {
+  const a = { ...mkImage('A', 40, 40, { x: 10, y: 10, w: 20, h: 20 }), imageMaskId: 'M' } as RasterImage;
+  const b = { ...mkImage('B', 40, 40, { x: 20, y: 10, w: 20, h: 20 }), imageMaskId: 'M' } as RasterImage;
+  const c0 = rect(15.1, 12.1, 35.3, 27.9);
+  const g = gcodeOf(project([a, b, mkMask('M', [c0])], [imageLayer(), maskLayer(false)]));
+  const segs = burnedSegments(g);
+  const r = compare(segs, 0.2, rect(10, 10, 40, 30), [c0], 'evenodd', REGION);
+  out(`B4 two images share one mask (union oracle): ${JSON.stringify(r)}`);
+});

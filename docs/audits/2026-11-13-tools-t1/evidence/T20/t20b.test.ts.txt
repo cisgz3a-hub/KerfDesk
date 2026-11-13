@@ -1,0 +1,118 @@
+// T20b: rotation/mask/clip parity, failure paths, file names, odd inputs, latency.
+import { it } from 'vitest';
+import { IDENTITY_TRANSFORM, type Layer, type RasterImage, type SceneObject, type Transform } from '../t13-main/src/core/scene';
+import { buildProcessedRasterBitmap } from '../t13-main/src/ui/raster/processed-bitmap';
+import { DEV, burnedSegments, cellsFromSegments, diff, exportOf, gcodeOf, greys, imageLayer, logger, mkImage, project, xf } from './t20-common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t20/t20b.log');
+const T = (t: Partial<Transform>): Transform => ({ ...IDENTITY_TRANSFORM, ...t });
+const W = 40, H = 20, BOX = { x: 10, y: 10, w: 8, h: 4 };
+const thr = { ditherAlgorithm: 'threshold' } as Partial<Layer>;
+
+function sceneBox(tr: Transform) {
+  const c = [{ x: BOX.x, y: BOX.y }, { x: BOX.x + BOX.w, y: BOX.y }, { x: BOX.x + BOX.w, y: BOX.y + BOX.h }, { x: BOX.x, y: BOX.y + BOX.h }].map((q) => xf(q, tr));
+  return { minX: Math.min(...c.map((q) => q.x)), minY: Math.min(...c.map((q) => q.y)), maxX: Math.max(...c.map((q) => q.x)), maxY: Math.max(...c.map((q) => q.y)) };
+}
+function maskRect(id: string, x0: number, y0: number, x1: number, y1: number, layer = 'mask'): SceneObject {
+  const pts = [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
+  return { kind: 'shape', id, spec: { kind: 'polyline', points: pts, closed: true }, color: '#000000', layerId: layer, bounds: { minX: x0, minY: y0, maxX: x1, maxY: y1 }, transform: IDENTITY_TRANSFORM, paths: [{ color: '#000000', polylines: [{ points: pts, closed: true }] }] } as unknown as SceneObject;
+}
+
+it('rotation: image-space export vs placed burn', async () => {
+  for (const deg of [90, 180, 270]) {
+    const tr = T({ rotationDeg: deg, x: deg === 180 ? 36 : 30, y: deg === 90 ? 0 : 30 });
+    const p = project([mkImage('R', W, H, BOX, tr)], [imageLayer(thr)]);
+    const e = await exportOf(p);
+    const box = sceneBox(tr);
+    const rw = deg === 180 ? W : H, rh = deg === 180 ? H : W;
+    const { s } = cellsFromSegments(burnedSegments(gcodeOf(p)), box, rw, rh);
+    // rotate the burned scene grid back into image space by sampling: image pixel (i,j) centre -> scene -> cell
+    const back: number[] = [];
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+      const q = xf({ x: BOX.x + (i + 0.5) * BOX.w / W, y: BOX.y + (j + 0.5) * BOX.h / H }, tr);
+      const ci = Math.floor((q.x - box.minX) / ((box.maxX - box.minX) / rw)), cj = Math.floor((q.y - box.minY) / ((box.maxY - box.minY) / rh));
+      back.push(s[cj * rw + ci] ?? -1);
+    }
+    out(`rot${deg}: export ${e.width}x${e.height}; burn grid ${rw}x${rh}; export vs burn mapped back to image space ${JSON.stringify(diff(greys(e.rgba), back, 800))}`);
+  }
+});
+
+it('mask, owned clip and negative', async () => {
+  const cases: Array<[string, Partial<RasterImage>, Partial<Layer>, SceneObject[]]> = [
+    ['live mask threshold', { imageMaskId: 'M' }, thr, [maskRect('M', 12, 11, 16, 13)]],
+    ['live mask negative floyd', { imageMaskId: 'M' }, { negativeImage: true, ditherAlgorithm: 'threshold' }, [maskRect('M', 12, 11, 16, 13)]],
+    ['owned clip negative', { imageClip: [{ color: '#000', polylines: [{ closed: true, points: [{ x: 12, y: 11 }, { x: 16, y: 11 }, { x: 16, y: 13 }, { x: 12, y: 13 }] }] }] } as never, { negativeImage: true, ditherAlgorithm: 'threshold' }, []],
+    ['grayscale min30 masked', { imageMaskId: 'M' }, { ditherAlgorithm: 'grayscale', minPower: 30 }, [maskRect('M', 12, 11, 16, 13)]],
+  ];
+  for (const [name, imgExtra, layerExtra, extra] of cases) {
+    const maskLayer = { ...imageLayer(), id: 'mask', mode: 'line', output: false } as Layer;
+    const p = project([mkImage('R', W, H, BOX, IDENTITY_TRANSFORM, imgExtra), ...extra], [imageLayer(layerExtra), maskLayer]);
+    const e = await exportOf(p);
+    const { s } = cellsFromSegments(burnedSegments(gcodeOf(p)), sceneBox(IDENTITY_TRANSFORM), W, H);
+    const g = greys(e.rgba);
+    // outside-mask pixels: rows 0-4 (y 10..11) -> must be white(255) and alpha 255
+    const outside = g.slice(0, 5 * W);
+    const alphas = new Set(Array.from({ length: e.rgba.length / 4 }, (_, i) => e.rgba[i * 4 + 3]));
+    out(`${name}: ${JSON.stringify(diff(g, Array.from(s), 800))} outside-mask greys ${[...new Set(outside)].join(',')} alphas ${[...alphas].join(',')} toasts ${JSON.stringify(e.toasts)}`);
+  }
+});
+
+it('failure paths and messages', async () => {
+  const base = () => project([mkImage('R', W, H, BOX)], [imageLayer()]);
+  let e = await exportOf(base(), 'R', null);
+  out(`cancel picker: toasts ${JSON.stringify(e.toasts)}`);
+  e = await exportOf(base(), 'R', { write: async () => { throw new Error('Disk full'); } });
+  out(`write failure: toasts ${JSON.stringify(e.toasts)}`);
+  e = await exportOf(base(), 'R', undefined, Object.assign(new Error('Must be handling a user gesture to show a file picker.'), { name: 'SecurityError' }));
+  out(`picker throws SecurityError: toasts ${JSON.stringify(e.toasts)}`);
+  e = await exportOf(base(), 'X');
+  out(`no such selection: ${JSON.stringify(e.toasts)}`);
+  e = await exportOf(project([mkImage('R', W, H, BOX)], [imageLayer({ output: false })]));
+  out(`layer output off: ${JSON.stringify(e.toasts)}`);
+  e = await exportOf(project([mkImage('R', W, H, BOX)], [imageLayer({ mode: 'fill' } as never)]));
+  out(`layer mode fill: ${JSON.stringify(e.toasts)}`);
+  e = await exportOf(project([mkImage('R', W, H, BOX, IDENTITY_TRANSFORM, { hidden: true } as never)], [imageLayer()]));
+  out(`hidden image: ${JSON.stringify(e.toasts)} size ${e.width}x${e.height}; gcode burns: ${burnedSegments(gcodeOf(project([mkImage('R', W, H, BOX, IDENTITY_TRANSFORM, { hidden: true } as never)], [imageLayer()]))).length} segs`);
+  e = await exportOf(project([mkImage('R', W, H, BOX, IDENTITY_TRANSFORM, {}, new Uint8Array(W * H).fill(255))], [imageLayer()]));
+  out(`all-white image: ${JSON.stringify(e.toasts)} distinct greys ${[...new Set(greys(e.rgba))].join(',')}`);
+  e = await exportOf(project([mkImage('R', W, H, { x: 0, y: 0, w: 400, h: 400 })], [imageLayer({ linesPerMm: 10, ditherAlgorithm: 'floyd-steinberg' })]));
+  out(`400mm @10 l/mm floyd (4000x4000): ${JSON.stringify(e.toasts)} size ${e.width}x${e.height} request ${JSON.stringify(e.request ?? null)}`);
+  e = await exportOf(project([mkImage('R', 8000, 7000, BOX, IDENTITY_TRANSFORM, { lumaBase64: undefined } as never)], [imageLayer()]));
+  out(`56MP source: ${JSON.stringify(e.toasts)}`);
+  for (const lpm of [0, -5, Number.NaN, Number.POSITIVE_INFINITY, 1000]) {
+    e = await exportOf(project([mkImage('R', W, H, BOX)], [imageLayer({ linesPerMm: lpm })]));
+    const g = gcodeOf(project([mkImage('R', W, H, BOX)], [imageLayer({ linesPerMm: lpm })]));
+    const segs = g.startsWith('NOT OK') ? g.slice(0, 160) : `${burnedSegments(g).length} segs`;
+    out(`linesPerMm ${lpm}: export ${e.width}x${e.height} toasts ${JSON.stringify(e.toasts)} | gcode ${segs}`);
+  }
+  for (const sc of [0, -1, 1e-9]) {
+    e = await exportOf(project([mkImage('R', W, H, BOX, T({ scaleX: sc }))], [imageLayer()]));
+    out(`scaleX ${sc}: export ${e.width}x${e.height} toasts ${JSON.stringify(e.toasts)}`);
+  }
+});
+
+it('suggested file names', async () => {
+  for (const src of ['C:\\photos\\dog.jpg', '/home/u/My Photo.final.png', 'scan', '', 'a:b*c?.png', '..', '.png', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg/AAAA+BBB', 'https://x.test/img.webp?w=200', 'CON.png', 'name.   .png', 'kat\u0000.png']) {
+    const e = await exportOf(project([mkImage('R', W, H, BOX, IDENTITY_TRANSFORM, { source: src })], [imageLayer()]));
+    out(`source ${JSON.stringify(src)} -> ${JSON.stringify(e.request?.suggestedName)} ext ${JSON.stringify(e.request?.extensions)}`);
+  }
+});
+
+it('rotary and multi-pass angle', async () => {
+  const rot = { ...DEV, rotary: { ...(DEV as never as { rotary?: object }).rotary, enabled: true, kind: 'roller', objectDiameterMm: 50, rollerDiameterMm: 25, stepsPerRotation: 360, axis: 'y' } } as typeof DEV;
+  const p = project([mkImage('R', W, H, BOX)], [imageLayer(thr)], rot);
+  const e = await exportOf(p);
+  const g = gcodeOf(p);
+  out(`rotary: export ${e.width}x${e.height}; gcode ${g.startsWith('NOT OK') ? g.slice(0, 200) : burnedSegments(g).length + ' segs'}`);
+});
+
+it('latency at the largest accepted size', async () => {
+  for (const [algo, w, h] of [['floyd-steinberg', 2660, 2660], ['threshold', 2840, 2840]] as const) {
+    const img = mkImage('R', w, h, { x: 0, y: 0, w: w / 10, h: h / 10 }, IDENTITY_TRANSFORM, {}, new Uint8Array(w * h).map((_, i) => (i * 7) & 255));
+    const layer = imageLayer({ linesPerMm: 10, ditherAlgorithm: algo });
+    const t0 = performance.now();
+    const r = buildProcessedRasterBitmap(img, layer, DEV);
+    const t1 = performance.now();
+    out(`latency ${algo} ${w}x${h}: ${r.kind} ${r.kind === 'too-large' ? r.reason : ''} build ${(t1 - t0).toFixed(0)} ms (Node, main thread)`);
+  }
+});
