@@ -29,7 +29,11 @@ describe('stable desktop release action references', () => {
       true,
     );
     expect([...new Set(external)].sort()).toEqual([...EXPECTED_ACTION_REFERENCES].sort());
-    // The recursive policy gate checks the composite's pinned external actions.
-    expect(local).toEqual(['./.github/actions/setup-remote-control']);
+    // The recursive policy gate checks the composites' pinned external actions
+    // (electron-downloads: actions/cache, ADR-712).
+    expect(local).toEqual([
+      './.github/actions/electron-downloads',
+      './.github/actions/setup-remote-control',
+    ]);
   });
 });
