@@ -18,6 +18,17 @@
 // Pure: no clock, no randomness, no I/O.
 
 import type { Vec2 } from '../scene';
+import { narrowestBridgeMm } from './cnc-tab-bridge';
+import {
+  circularGap,
+  mergedWindows,
+  modulo,
+  pointAtDistance,
+  tabLoop,
+  type TabLoop,
+} from './cnc-tab-loop';
+
+export { modulo, pointAtDistance, tabLoop, type TabLoop };
 
 const EPS = 1e-9;
 /** Through cut each automatic window leaves before the next one. */
@@ -26,13 +37,6 @@ const PHASE_SAMPLES = 48;
 const NUDGE_STEPS = 24;
 // Chord lost to a flattened curve's facets, not to a corner.
 const SCORE_TOLERANCE_MM = 0.01;
-
-export type TabLoop = {
-  readonly points: ReadonlyArray<Vec2>;
-  /** Arc length to each vertex; the last entry is the perimeter. */
-  readonly cumulative: ReadonlyArray<number>;
-  readonly perimeter: number;
-};
 
 export type TabPlan = {
   /** Window centres as arc length from the loop start. Empty when `coversLoop`. */
@@ -45,41 +49,6 @@ export type TabPlan = {
   /** The narrowest bridge left: window chord less the cut width (null: none). */
   readonly narrowestBridgeMm: number | null;
 };
-
-/** The closed loop `points` describe, or null when it has no length. */
-export function tabLoop(rawPoints: ReadonlyArray<Vec2>): TabLoop | null {
-  const points = closedLoopPoints(rawPoints);
-  if (points.length < 3) return null;
-  const cumulative: number[] = [0];
-  for (let index = 1; index <= points.length; index += 1) {
-    const previous = points[index - 1] as Vec2;
-    const current = points[index % points.length] as Vec2;
-    cumulative.push(
-      (cumulative[index - 1] as number) +
-        Math.hypot(current.x - previous.x, current.y - previous.y),
-    );
-  }
-  const perimeter = cumulative[cumulative.length - 1] ?? 0;
-  return perimeter > EPS ? { points, cumulative, perimeter } : null;
-}
-
-export function pointAtDistance(loop: TabLoop, distance: number): Vec2 {
-  const { points, cumulative, perimeter } = loop;
-  const target = modulo(distance, perimeter);
-  let low = 1;
-  let high = cumulative.length - 1;
-  while (low < high) {
-    const middle = (low + high) >> 1;
-    if ((cumulative[middle] as number) < target) low = middle + 1;
-    else high = middle;
-  }
-  const from = cumulative[low - 1] as number;
-  const span = (cumulative[low] as number) - from;
-  const ratio = span <= EPS ? 0 : (target - from) / span;
-  const a = points[low - 1] as Vec2;
-  const b = points[low % points.length] as Vec2;
-  return { x: a.x + (b.x - a.x) * ratio, y: a.y + (b.y - a.y) * ratio };
-}
 
 /** Evenly spaced automatic tabs, kept off corners, as many as the loop holds. */
 export function automaticTabPlan(
@@ -106,7 +75,7 @@ export function automaticTabPlan(
     windowMm,
     coversLoop: false,
     requested,
-    narrowestBridgeMm: narrowestBridge(loop, centers, windowMm, cutWidthMm),
+    narrowestBridgeMm: windowsBridgeMm(loop, centers, windowMm, cutWidthMm),
   };
 }
 
@@ -160,10 +129,7 @@ export function manualTabPlan(
     windowMm,
     coversLoop: false,
     requested: centers.length,
-    narrowestBridgeMm: merged.reduce<number | null>((narrowest, window) => {
-      const bridge = bridgeAcross(loop, window.start, window.end, cutWidthMm);
-      return narrowest === null || bridge < narrowest ? bridge : narrowest;
-    }, null),
+    narrowestBridgeMm: narrowestBridgeMm(loop, merged, cutWidthMm),
   };
 }
 
@@ -269,94 +235,13 @@ function chordBetween(loop: TabLoop, from: number, to: number): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
-function narrowestBridge(
+/** The narrowest bridge evenly placed windows leave (cnc-tab-bridge.ts). */
+export function windowsBridgeMm(
   loop: TabLoop,
   centers: ReadonlyArray<number>,
   windowMm: number,
   cutWidthMm: number,
 ): number | null {
-  let narrowest: number | null = null;
-  for (const center of centers) {
-    const bridge = bridgeAcross(loop, center - windowMm / 2, center + windowMm / 2, cutWidthMm);
-    if (narrowest === null || bridge < narrowest) narrowest = bridge;
-  }
-  return narrowest;
-}
-
-const BRIDGE_SAMPLES = 24;
-
-// The material left between the cuts either side of a window: the distance
-// from each kerf end to the cut running on from the other end, less the cut
-// width. On a straight span that is the chord; where the outline closes in on
-// itself, as round an acute tip, the far leg's cut comes nearer than its end.
-function bridgeAcross(loop: TabLoop, start: number, end: number, cutWidthMm: number): number {
-  const span = Math.max(cutWidthMm, end - start);
-  const reach = Math.min(span, (loop.perimeter - (end - start)) / 2);
-  const a = pointAtDistance(loop, start);
-  const b = pointAtDistance(loop, end);
-  let nearest = Math.hypot(b.x - a.x, b.y - a.y);
-  for (let step = 1; step <= BRIDGE_SAMPLES; step += 1) {
-    const along = (reach * step) / BRIDGE_SAMPLES;
-    const beyondEnd = pointAtDistance(loop, end + along);
-    const beforeStart = pointAtDistance(loop, start - along);
-    nearest = Math.min(
-      nearest,
-      Math.hypot(beyondEnd.x - a.x, beyondEnd.y - a.y),
-      Math.hypot(beforeStart.x - b.x, beforeStart.y - b.y),
-    );
-  }
-  return nearest - cutWidthMm;
-}
-
-type Interval = { readonly start: number; readonly end: number };
-
-// The windows as unwrapped arc-length intervals with overlaps merged, or
-// 'whole' when together they cover the loop.
-function mergedWindows(
-  centers: ReadonlyArray<number>,
-  windowMm: number,
-  perimeter: number,
-): ReadonlyArray<Interval> | 'whole' {
-  if (centers.length === 0) return [];
-  if (windowMm >= perimeter - EPS) return 'whole';
-  const sorted = centers
-    .map((center) => ({ start: center - windowMm / 2, end: center + windowMm / 2 }))
-    .sort((a, b) => a.start - b.start);
-  const merged: Interval[] = [];
-  for (const window of sorted) {
-    const last = merged[merged.length - 1];
-    if (last !== undefined && window.start <= last.end + EPS) {
-      merged[merged.length - 1] = { start: last.start, end: Math.max(last.end, window.end) };
-    } else {
-      merged.push(window);
-    }
-  }
-  const first = merged[0] as Interval;
-  const last = merged[merged.length - 1] as Interval;
-  if (merged.length > 1 && last.end + EPS >= first.start + perimeter) {
-    merged[0] = { start: last.start, end: first.end + perimeter };
-    merged.pop();
-  }
-  const only = merged[0] as Interval;
-  return merged.length === 1 && only.end - only.start >= perimeter - EPS ? 'whole' : merged;
-}
-
-function circularGap(a: number, b: number, period: number): number {
-  const gap = modulo(a - b, period);
-  return Math.min(gap, period - gap);
-}
-
-// Drop a trailing vertex that repeats the first: callers hand us rings both with
-// and without the explicit closing point.
-function closedLoopPoints(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
-  if (points.length < 2) return points;
-  const first = points[0] as Vec2;
-  const last = points[points.length - 1] as Vec2;
-  const repeatsFirst = Math.abs(first.x - last.x) <= EPS && Math.abs(first.y - last.y) <= EPS;
-  return repeatsFirst ? points.slice(0, -1) : points;
-}
-
-export function modulo(value: number, divisor: number): number {
-  if (!(divisor > 0)) return 0;
-  return ((value % divisor) + divisor) % divisor;
+  const windows = mergedWindows(centers, windowMm, loop.perimeter);
+  return windows === 'whole' ? null : narrowestBridgeMm(loop, windows, cutWidthMm);
 }

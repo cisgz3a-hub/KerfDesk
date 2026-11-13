@@ -51,7 +51,7 @@ describe('cncTabHoldWarnings', () => {
       job([shape({ kind: 'closed-gap', role: 'part', widthMm: 80, heightMm: 60, tabsCut: 4 })]),
     );
 
-    expect(warning).toContain('1 open outline (80 × 60 mm) ends closer to its start');
+    expect(warning).toContain('1 open outline (80 × 60 mm) ends so close to its start that the');
     expect(warning).toContain('Join paths');
   });
 
