@@ -46,4 +46,4 @@ Finding IDs are `N<area>-P<n>-<k>`. Severity follows [METHOD.md §3](../2026-10-
 
 J1's G-code oracle can be reused as a second reader: `../2026-11-11-cnc-v2/evidence/oracle.ts.txt`. An auditor and its refuter must not both rely on it.
 
-**Status:** started 2026-11-13. N1–N3 ledgered ([LEDGER.md](LEDGER.md)); N4 next.
+**Status:** started 2026-11-13. N1–N4 ledgered ([LEDGER.md](LEDGER.md)); N5 next.
