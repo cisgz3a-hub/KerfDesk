@@ -14,6 +14,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { settingsWithStockTabGate } from '../../core/cnc/cnc-tabs';
+import { setStockThicknessMm } from '../../core/scene/machine';
 import { detectCncThroughCutTabWarnings } from './cnc-through-cut-tab-warnings';
 
 function cncProjectWithLayerCnc(cnc: CncLayerSettings | undefined): Project {
@@ -239,9 +240,17 @@ describe('detectCncThroughCutTabWarnings', () => {
 });
 
 describe('tabs skipped because of the stock thickness (ADR-258 amendment 2)', () => {
-  function projectWith(stockThicknessMm: number, cnc: CncLayerSettings): Project {
+  function projectWith(
+    stockThicknessMm: number,
+    cnc: CncLayerSettings,
+    thicknessSet = false,
+  ): Project {
     const project = cncProjectWithLayerCnc(cnc);
-    const stock = { ...DEFAULT_CNC_MACHINE_CONFIG.stock, thicknessMm: stockThicknessMm };
+    const stock = {
+      ...DEFAULT_CNC_MACHINE_CONFIG.stock,
+      thicknessMm: stockThicknessMm,
+      ...(thicknessSet ? { thicknessSet: true as const } : {}),
+    };
     return { ...project, machine: { ...DEFAULT_CNC_MACHINE_CONFIG, stock } };
   }
 
@@ -263,7 +272,8 @@ describe('tabs skipped because of the stock thickness (ADR-258 amendment 2)', ()
     expect(detectCncThroughCutTabWarnings(projectWith(12.7, { ...tabs, depthMm: 11.5 }))).toEqual(
       [],
     );
-    // The shipped thickness counts as "not set", so any cut keeps its tabs.
+    // The shipped thickness, never marked set, counts as unset (Amendment 6), so
+    // any cut keeps its tabs.
     expect(detectCncThroughCutTabWarnings(projectWith(shipped, { ...tabs, depthMm: 3 }))).toEqual(
       [],
     );
@@ -283,21 +293,34 @@ describe('tabs skipped because of the stock thickness (ADR-258 amendment 2)', ()
   });
 
   it('fires exactly where the compiler drops tabs a profile asked for', () => {
+    // ADR-258 Amendment 6: each thickness both unmarked and marked set, so a
+    // set 6.35 mm (the shipped value) is judged like any other thickness.
     for (const stockThicknessMm of [3, 6.35, 9, 12.7, 18]) {
-      for (const depthMm of [0.5, 1, 2, 2.5, 4, 6.8, 9, 12, 18, 19]) {
-        const cnc = { ...DEFAULT_CNC_LAYER_SETTINGS, depthMm, tabsEnabled: true };
-        const gated = settingsWithStockTabGate(cnc, stockThicknessMm);
-        const dropped = depthMm > cnc.tabHeightMm && !gated.tabsEnabled;
-        const warned = detectCncThroughCutTabWarnings(projectWith(stockThicknessMm, cnc)).some(
-          (warning) => warning.includes('skips its holding tabs'),
-        );
-        expect({ stockThicknessMm, depthMm, warned }).toEqual({
-          stockThicknessMm,
-          depthMm,
-          warned: dropped,
-        });
+      for (const thicknessSet of [false, true]) {
+        for (const depthMm of [0.5, 1, 2, 2.5, 4, 6.8, 9, 12, 18, 19]) {
+          const cnc = { ...DEFAULT_CNC_LAYER_SETTINGS, depthMm, tabsEnabled: true };
+          const project = projectWith(stockThicknessMm, cnc, thicknessSet);
+          if (project.machine?.kind !== 'cnc') throw new Error('expected a CNC machine');
+          const gated = settingsWithStockTabGate(cnc, setStockThicknessMm(project.machine.stock));
+          const dropped = depthMm > cnc.tabHeightMm && !gated.tabsEnabled;
+          const warned = detectCncThroughCutTabWarnings(project).some((warning) =>
+            warning.includes('skips its holding tabs'),
+          );
+          expect({ stockThicknessMm, thicknessSet, depthMm, warned }).toEqual({
+            stockThicknessMm,
+            thicknessSet,
+            depthMm,
+            warned: dropped,
+          });
+        }
       }
     }
+    // A 3 mm groove in a set 6.35 mm sheet leaves a 3.35 mm floor: no tabs.
+    expect(
+      detectCncThroughCutTabWarnings(
+        projectWith(6.35, { ...DEFAULT_CNC_LAYER_SETTINGS, depthMm: 3, tabsEnabled: true }, true),
+      ).some((warning) => warning.includes('skips its holding tabs')),
+    ).toBe(true);
   });
 });
 

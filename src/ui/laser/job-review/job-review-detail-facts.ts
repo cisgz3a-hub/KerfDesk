@@ -19,7 +19,6 @@ import { passAngleStepApplies } from '../../../core/job/scan-pass-angles';
 import { fillRampParts, slicedImagePart } from './job-review-depth-parts';
 import { normalizedScanAngleDeg } from '../../../core/raster/raster-scan-frame';
 import {
-  DEFAULT_CNC_STOCK,
   type CncLayerSettings,
   type Layer,
   type LayerOperationSettings,
@@ -388,7 +387,6 @@ function cncTabsPart(
   if (!cutCanFreePart(settings.depthMm, settings.tabHeightMm, stockThicknessMm)) {
     return `${configured}, skipped: the ${formatMm(stockThicknessMm - settings.depthMm)} mm floor holds the part`;
   }
-  if (stockThicknessMm === DEFAULT_CNC_STOCK.thicknessMm) return `${configured}${keptNote}`;
   // Amendment 3: a set stock thickness measures a kept tab from the stock bottom,
   // and amendment 4 cuts a tab no thinner than the stock half the stock thick.
   const keptMm = stockLimitedTabHeightMm(settings.tabHeightMm, stockThicknessMm);

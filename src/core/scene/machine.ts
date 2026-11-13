@@ -33,6 +33,11 @@ export type CncStock = {
   // project material picker that seeds/auto-fills every layer's feeds. Absent =
   // no project material ("Custom"); display/seed only, never compiled directly.
   readonly materialKey?: string;
+  // ADR-258 Amendment 6 (CNC audit J1-P3-3): the operator committed Stock
+  // thickness, whatever its value. Without it a thickness equal to the shipped
+  // default reads as never set (setStockThicknessMm), so a real 6.35 mm sheet
+  // needs this mark to have its tabs measured from the stock bottom.
+  readonly thicknessSet?: true;
 };
 
 // How a layer's geometry is machined (Easel's "cut type"):
@@ -305,6 +310,20 @@ export const DEFAULT_CNC_STOCK: CncStock = {
   heightMm: 400,
   originOffset: { x: 0, y: 0 },
 };
+
+/**
+ * The stock thickness the operator has set, or undefined while it is still
+ * the shipped default (ADR-258 Amendment 6). The holding-tab rules measure a
+ * tab from the stock bottom only on a set thickness; unset, they keep the
+ * cut-floor rule. A stock marked thicknessSet counts as set at any value,
+ * 6.35 mm included. Unmarked (every project saved before the mark), any value
+ * other than the default counts as set and the default itself does not, as
+ * before: a stored 6.35 mm cannot say whether the operator chose it.
+ */
+export function setStockThicknessMm(stock: CncStock): number | undefined {
+  if (stock.thicknessSet === true) return stock.thicknessMm;
+  return stock.thicknessMm === DEFAULT_CNC_STOCK.thicknessMm ? undefined : stock.thicknessMm;
+}
 
 // Starter tiling block for the 4040 bed: near-full-bed tiles with a 20 mm
 // registration overlap.

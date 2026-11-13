@@ -9,6 +9,7 @@ import {
 import type { CncPass } from '../job';
 import type { CncStrategyFallback } from '../job/cnc-compilation-sidecar-types';
 import { settingsWithStockTabGate } from './cnc-tabs';
+import { setStockThicknessMm } from '../scene/machine';
 import { contourMajorPasses, type CncTabHoldFinding } from './cnc-tabbed-contour-passes';
 import { cncLayoutCutWidths } from './layout-cut-widths';
 import { isProfileCutType, sourceRegionMajorDepthPasses } from './compile-cnc-helpers';
@@ -69,7 +70,7 @@ export function passesForCncLayerWithEvidence(
   vcarveLadder?: VCarveLadder,
 ): CncLayerPassesResult {
   // ADR-258 amendment 1: no tabs where the floor under the cut holds the part.
-  const settings = settingsWithStockTabGate(layerSettings, config.stock.thicknessMm);
+  const settings = settingsWithStockTabGate(layerSettings, setStockThicknessMm(config.stock));
   const specialized = resolvedSpecializedPasses(
     polylines,
     settings,

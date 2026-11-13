@@ -35,6 +35,8 @@ import {
   type Layer,
   type Project,
 } from '../../core/scene';
+// Deep import: core/scene's barrel is a ratcheted over-cap legacy barrel.
+import { setStockThicknessMm } from '../../core/scene/machine';
 import { formatMm } from './job-review/job-review-format';
 import { cncTabHoldWarnings, layersWithNeverThroughLoops } from './cnc-tab-hold-warnings';
 
@@ -49,7 +51,7 @@ export function detectCncFullTabCoverageWarnings(
 
   // The compiler's own tab settings: skipped where the floor holds the part, and
   // measured from the stock bottom when the stock is set (ADR-258 amendment 3).
-  const stockThicknessMm = machine.stock.thicknessMm;
+  const stockThicknessMm = setStockThicknessMm(machine.stock);
   const tabSettings = (layer: Layer) =>
     settingsWithStockTabGate(layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS, stockThicknessMm);
   const candidates = project.scene.layers.filter(
