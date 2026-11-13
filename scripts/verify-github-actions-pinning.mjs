@@ -9,6 +9,9 @@ export const REVIEWED_ACTIONS = new Map([
   ['actions/upload-artifact', '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'],
   ['actions/download-artifact', '37930b1c2abaa49bbe596cd826c3c89aef350131'],
   ['actions/attest', '36051bcae73b7c2a8a6945a48cbf80953c6baa35'],
+  // v6.1.0. Electron download cache only (ADR-712).
+  ['actions/cache', '55cc8345863c7cc4c66a329aec7e433d2d1c52a9'],
+  ['actions/cache/restore', '55cc8345863c7cc4c66a329aec7e433d2d1c52a9'],
   ['pnpm/action-setup', '0ebf47130e4866e96fce0953f49152a61190b271'],
   ['cloudflare/wrangler-action', 'ebbaa1584979971c8614a24965b4405ff95890e0'],
 ]);

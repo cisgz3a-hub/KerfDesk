@@ -86,6 +86,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Cannot plan an authenticated release.' }
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
         if: steps.plan.outputs.publish == 'true'
+      - name: Fetch the Electron zip with retries
+        if: steps.plan.outputs.publish == 'true' && hashFiles('.github/actions/electron-downloads/action.yml') != ''
+        uses: ./.github/actions/electron-downloads
+        with:
+          packaging: 'true'
+          cache: 'false'
       - name: Install the locked dependency graph
         if: steps.plan.outputs.publish == 'true'
         run: pnpm install --frozen-lockfile
@@ -369,6 +375,13 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
+      - name: Fetch the Electron zip with retries
+        # A pinned older commit may predate this action (ADR-712).
+        if: hashFiles('.github/actions/electron-downloads/action.yml') != ''
+        uses: ./.github/actions/electron-downloads
+        with:
+          packaging: 'true'
+          cache: 'false'
       - name: Install the locked dependency graph
         run: pnpm install --frozen-lockfile
       - name: Build the desktop source the Windows release was built from
