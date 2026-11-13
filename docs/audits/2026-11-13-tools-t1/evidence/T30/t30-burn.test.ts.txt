@@ -1,0 +1,333 @@
+// @vitest-environment jsdom
+// T30 Join Paths: store mutation, inheritance, dependencies, burn decode.
+import { beforeEach, it } from 'vitest';
+import {
+  createLayer,
+  createRegistrationLayer,
+  DEFAULT_PROJECT_VARIABLE_DATA,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type RasterImage,
+  type SceneObject,
+  type TextObject,
+} from '../t29-main/src/core/scene';
+import { createRegistrationBox } from '../t29-main/src/core/shapes';
+import {
+  registrationJigCopyId,
+  registrationJigObjectIdentity,
+  withRegistrationJigChild,
+} from '../t29-main/src/core/scene/registration-jig-artwork';
+import { registrationJigCompilationRuns } from '../t29-main/src/core/job/registration-jig-compilation-runs';
+import { compileJob } from '../t29-main/src/core/job';
+import { textToPolylines } from '../t29-main/src/core/text';
+import { prepareOutputSnapshot, type VariableTextRenderer } from '../t29-main/src/io/gcode/prepare-output-snapshot';
+import { emitPreparedGcode } from '../t29-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t29-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t29-main/src/io/project/deserialize-project';
+import { lumaToBase64 } from '../t29-main/src/ui/raster/luma-bitmap';
+import { resetStore } from '../t29-main/src/ui/state/test-helpers';
+import { selectionCanJoinPaths } from '../t29-main/src/ui/commands/selection-command-state';
+import { joinOpenVectorPaths } from '../t29-main/src/core/geometry/vector-path-join';
+import { cncTabAnchorPosition } from '../t29-main/src/core/cnc/cnc-tab-anchors';
+import { litMoves, totalLen, bbox, type LitMove } from './decode';
+import { burn, byFS, clearToasts, f3, layer, logger, proj, rect, setProject, st, toasts } from './common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t30/t30-burn.log');
+beforeEach(() => {
+  resetStore();
+  clearToasts();
+});
+type V = { x: number; y: number };
+const line = (id: string, pts: V[][], extra: Record<string, unknown> = {}): ImportedSvg =>
+  ({
+    kind: 'imported-svg', id, source: `${id}.dxf`, operationIds: ['L'],
+    bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 }, transform: IDENTITY_TRANSFORM,
+    paths: [{ color: '#000000', polylines: pts.map((points) => ({ points, closed: false })) }],
+    ...extra,
+  }) as ImportedSvg;
+const ids = (p: Project) => p.scene.objects.map((o) => o.id).join(',');
+/** pierces = lit runs; travel = G0 distance (scene mm). */
+function stats(gcode: string, moves: LitMove[]) {
+  let pierces = 0;
+  let prev: V | null = null;
+  for (const m of moves) {
+    if (prev === null || Math.hypot(prev.x - m.from.x, prev.y - m.from.y) > 1e-6) pierces += 1;
+    prev = m.to;
+  }
+  let x = 0, y = 0, g = 0, travel = 0;
+  for (const raw of gcode.split('\n')) {
+    const l = raw.replace(/;.*$/, '').toUpperCase();
+    const gm = /G0*([0-3])\b/.exec(l);
+    if (gm) g = Number(gm[1]);
+    const xm = /X(-?\d*\.?\d+)/.exec(l);
+    const ym = /Y(-?\d*\.?\d+)/.exec(l);
+    const nx = xm ? Number(xm[1]) : x;
+    const ny = ym ? Number(ym[1]) : y;
+    if ((xm || ym) && g === 0) travel += Math.hypot(nx - x, ny - y);
+    x = nx;
+    y = ny;
+  }
+  return `lit ${f3(totalLen(moves))} pierces ${pierces} travel ${f3(travel)}`;
+}
+const burnStats = (p: Project) => {
+  const b = burn(p);
+  return b.ok ? stats(b.gcode, b.moves) : `NOT OK ${b.why}`;
+};
+
+it('B1 burn before/after: two lines, an open square, undo/redo/save', () => {
+  const L = layer('L', 'line', 1000, 50);
+  const A = line('A', [[{ x: 10, y: 10 }, { x: 40, y: 10 }]], { name: 'Alpha' });
+  const B = line('B', [[{ x: 70, y: 10 }, { x: 40.04, y: 10 }]]); // reversed, gap 0.04
+  const S = line('S', [[{ x: 10, y: 30 }, { x: 30, y: 30 }, { x: 30, y: 50 }, { x: 10, y: 50 }, { x: 10, y: 30.03 }]]);
+  const p0 = proj([A, B, S], [L]);
+  setProject(p0, ['A', 'B', 'S']);
+  out(`B1 menu enabled ${selectionCanJoinPaths(p0, ['A', 'B', 'S'])}`);
+  out(`B1 before: ${burnStats(p0)} (oracle lit 30+29.96+79.97=139.930, pierces 3)`);
+  const ok = st().joinSelectedPaths(0.05);
+  const p1 = st().project;
+  out(`B1 applied ${ok}; objects ${ids(p1)}; selected ${st().selectedObjectId},${[...st().additionalSelectedIds]}; undo ${st().undoStack.length}; dirty ${st().dirty}; toasts ${JSON.stringify(toasts())}`);
+  out(`B1 after: ${burnStats(p1)} (oracle lit 139.930+0.04+0.03=140.000, pierces 2)`);
+  const a1 = p1.scene.objects.find((o) => o.id === 'A') as ImportedSvg;
+  out(`B1 A name ${a1.name}; source ${a1.source}; transform identity ${JSON.stringify(a1.transform) === JSON.stringify(IDENTITY_TRANSFORM)}`);
+  st().undo();
+  out(`B1 undo exact: ${JSON.stringify(st().project) === JSON.stringify(p0)}`);
+  st().redo();
+  out(`B1 redo exact: ${JSON.stringify(st().project) === JSON.stringify(p1)}`);
+  const re = deserializeProject(serializeProject(p1));
+  out(`B1 save/reopen: ${re.kind}; burn same ${re.kind === 'ok' ? burnStats((re as { project: Project }).project) === burnStats(p1) : '-'}`);
+});
+
+it('B2 what does not join: different operations, colours, power scale, override, locked, mixed', () => {
+  const L = layer('L', 'line', 1000, 50);
+  const L2 = layer('L2', 'line', 1000, 50);
+  const A = line('A', [[{ x: 0, y: 0 }, { x: 10, y: 0 }]]);
+  const variants: Array<[string, ImportedSvg]> = [
+    ['other op', line('B', [[{ x: 10, y: 0 }, { x: 20, y: 0 }]], { operationIds: ['L2'] })],
+    ['powerScale 50', line('B', [[{ x: 10, y: 0 }, { x: 20, y: 0 }]], { powerScale: 50 })],
+    ['override speed', line('B', [[{ x: 10, y: 0 }, { x: 20, y: 0 }]], { operationOverride: { speed: 500 } })],
+    ['path colour red, same op ids', { ...line('B', [[{ x: 10, y: 0 }, { x: 20, y: 0 }]]), paths: [{ color: '#ff0000', polylines: [{ points: [{ x: 10, y: 0 }, { x: 20, y: 0 }], closed: false }] }] } as ImportedSvg],
+    ['locked', line('B', [[{ x: 10, y: 0 }, { x: 20, y: 0 }]], { locked: true })],
+  ];
+  for (const [name, B] of variants) {
+    const p0 = proj([A, B], [L, L2]);
+    setProject(p0, ['A', 'B']);
+    clearToasts();
+    const ok = st().joinSelectedPaths(0.05);
+    out(`B2 ${name}: menu ${selectionCanJoinPaths(p0, ['A', 'B'])}; applied ${ok}; objects ${ids(st().project)}; toasts ${JSON.stringify(toasts())}`);
+  }
+});
+
+it('B3 what the result inherits', () => {
+  const L = layer('L', 'line', 1000, 50);
+  const meta = {
+    name: 'Leader', powerScale: 70, operationOverride: { speed: 321 },
+    svgImport: { mode: 'line', id: 'frag-1', source: 'logo.svg', transform: IDENTITY_TRANSFORM },
+    libraryProvenance: { schemaVersion: 1, assetId: 'x', title: 'X', sourceName: 's', licenseId: 'CC0-1.0' },
+  };
+  const A = line('A', [[{ x: 0, y: 0 }, { x: 10, y: 0 }]], { ...meta, transform: { ...IDENTITY_TRANSFORM, x: 5, rotationDeg: 90, scaleX: 2 } });
+  const B = line('B', [[{ x: 5, y: 20.01 }, { x: 5, y: 40 }]], { ...meta, name: 'Member' });
+  const p0 = proj([A, B], [L]);
+  out(`B3 before: ${burnStats(p0)}`);
+  setProject(p0, ['A', 'B']);
+  st().joinSelectedPaths(0.05);
+  const p1 = st().project;
+  const r = p1.scene.objects[0] as ImportedSvg;
+  out(`B3 after: ${burnStats(p1)}; objects ${ids(p1)}; toasts ${JSON.stringify(toasts())}`);
+  out(`B3 kept: ${Object.keys(r).sort().join(',')}`);
+  out(`B3 lost vs source A: ${Object.keys(A).filter((k) => !(k in r)).join(',')}`);
+  out(`B3 'Member' name gone: ${!p1.scene.objects.some((o) => o.name === 'Member')}`);
+});
+
+it('B4 variable text in a single-line font', async () => {
+  const L = layer('L', 'line', 1234, 37);
+  const renderer: VariableTextRenderer = ({ text, content }) =>
+    textToPolylines({ content, sizeMm: text.sizeMm, alignment: text.alignment, lineHeight: text.lineHeight, letterSpacing: text.letterSpacing, color: text.color, geometry: 'single-line', fontKey: text.fontKey });
+  for (const [template, tokens] of [
+    ['SN {{serial:4}}', [{ kind: 'literal', value: 'SN ' }, { kind: 'serial', prefix: '', width: 4 }]],
+    ['{{serial:4}}', [{ kind: 'serial', prefix: '', width: 4 }]],
+  ] as const) {
+    for (const fontKey of ['relief-single-line', 'ems-nixish', 'ems-casual-hand']) {
+      const base = {
+        kind: 'text', id: 'VT', content: template, variableTemplate: { tokens },
+        fontKey, sizeMm: 10, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000',
+        bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 }, transform: { ...IDENTITY_TRANSFORM, x: 50, y: 50 }, paths: [], operationIds: ['L'],
+      } as unknown as TextObject;
+      let src;
+      try {
+        src = await renderer({ text: base, content: template, project: proj([], []) } as never);
+      } catch (e) {
+        out(`B4 ${fontKey}: render failed ${String(e).slice(0, 120)}`);
+        continue;
+      }
+      const text = { ...base, bounds: src.bounds, paths: src.paths } as TextObject;
+      const p0 = proj([text], [L], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 42 } });
+      const snap = async (p: Project, serial: number) => {
+        const prepared = await prepareOutputSnapshot({ ...p, variables: { ...p.variables, serialValue: serial } }, { clock: () => new Date(0), renderVariableText: renderer });
+        if (!prepared.ok) return { len: NaN, w: NaN };
+        const moves = litMoves(emitPreparedGcode(prepared).gcode, p.device);
+        const b = bbox(moves);
+        return { len: totalLen(moves), w: b.maxX - b.minX };
+      };
+      const plan = joinOpenVectorPaths([text], [L], 0.05);
+      setProject(p0, ['VT']);
+      clearToasts();
+      const menu = selectionCanJoinPaths(p0, ['VT']);
+      const applied = st().joinSelectedPaths(0.05);
+      const p1 = st().project;
+      const o = p1.scene.objects[0]!;
+      const b42 = await snap(p0, 42);
+      const b43 = await snap(p0, 43);
+      const a42 = await snap(p1, 42);
+      const a43 = await snap(p1, 43);
+      const value = await renderer({ text: base, content: template.replace('{{serial:4}}', '0042'), project: p0 } as never);
+      out(`B4 "${template}" ${fontKey}: menu ${menu}; plan ${plan.kind === 'ok' ? `joins ${plan.value.joins} closures ${plan.value.closures}` : plan.error.message}; applied ${applied}; kind after ${o.kind}; variableTemplate kept ${'variableTemplate' in o}; toasts ${JSON.stringify(toasts())}`);
+      out(`   before: serial 42 lit ${f3(b42.len)} w ${f3(b42.w)}; serial 43 lit ${f3(b43.len)}`);
+      out(`   after : serial 42 lit ${f3(a42.len)} w ${f3(a42.w)}; serial 43 lit ${f3(a43.len)} (changes with serial: ${Math.abs(a43.len - a42.len) > 1e-6})`);
+      out(`   oracle "0042" value width ${f3(value.bounds.maxX - value.bounds.minX)}; template width ${f3(src.bounds.maxX - src.bounds.minX)}`);
+    }
+  }
+});
+
+it('B5 registration jig copies', () => {
+  const BOX_A = '379754e4-b1f1-45b1-853d-75a769147a71';
+  const BOX_B = '389754e4-b1f1-45b1-853d-75a769147a72';
+  const boxes = [BOX_A, BOX_B].map((id, i) => createRegistrationBox({ id, widthMm: 60, heightMm: 60, x: 10 + i * 80, y: 10 }));
+  const layers = [{ ...createRegistrationLayer(), output: false }, layer('L', 'line', 2222, 90), layer('E', 'line', 1111, 10)];
+  // an "L" drawn as two strokes meeting with a 0.02 gap
+  const S = line('SRC', [[{ x: 20, y: 20 }, { x: 20, y: 40 }], [{ x: 20.02, y: 40 }, { x: 40, y: 40 }]]);
+  const E = rect('ENG', 6, 6, { x: 30, y: 50 }, { operationIds: ['E'] });
+  for (const style of ['legacy id', 'v2 uuid id'] as const) {
+    const copyId = style === 'legacy id' ? registrationJigCopyId('SRC', BOX_B) : 'registration-jig-copy-v2:0b0e6f8e-8f1c-4c55-9b33-0a3a8c4a1d01';
+    const copy = withRegistrationJigChild(S, { ...S, id: copyId, transform: { ...IDENTITY_TRANSFORM, x: 80 } }, BOX_B, 'copy');
+    const engId = style === 'legacy id' ? registrationJigCopyId('ENG', BOX_B) : 'registration-jig-copy-v2:1b0e6f8e-8f1c-4c55-9b33-0a3a8c4a1d02';
+    const engC = withRegistrationJigChild(E, { ...E, id: engId, transform: { ...E.transform, x: 110 } } as SceneObject, BOX_B, 'copy');
+    const p0 = proj([...boxes, S, E, copy, engC], layers);
+    const order = (p: Project) =>
+      burn(p).moves.reduce<string[]>((acc, m) => {
+        const tag = `F${m.f}@${m.from.x < 85 ? 'A' : 'B'}`;
+        if (acc.at(-1) !== tag) acc.push(tag);
+        return acc;
+      }, []);
+    for (const sel of [[copyId], ['SRC', copyId]]) {
+      setProject(p0, sel);
+      clearToasts();
+      const menu = selectionCanJoinPaths(p0, sel);
+      st().joinSelectedPaths(0.05);
+      const p1 = st().project;
+      const c1 = p1.scene.objects.find((o) => o.id === copyId)!;
+      out(`B5 ${style} select [${sel.map((s) => s.slice(0, 26))}]: menu ${menu}; copy jig field before ${JSON.stringify(copy.registrationJig?.boxId?.slice(0, 4))} after ${JSON.stringify(c1.registrationJig?.boxId?.slice(0, 4))}; identity after ${registrationJigObjectIdentity(c1) === null ? 'NONE' : 'kept'}; runs ${registrationJigCompilationRuns(p0.scene)?.length ?? 0} -> ${registrationJigCompilationRuns(p1.scene)?.length ?? 0}`);
+      out(`   order before ${order(p0).join(' > ')}; after ${order(p1).join(' > ')}; toasts ${JSON.stringify(toasts())}`);
+    }
+  }
+});
+
+it('B6 tabs: placed tabs on another contour of a transformed object; tabbed contour itself', () => {
+  const L = layer('L', 'line', 1000, 50, { tabsEnabled: true, tabSizeMm: 1 } as Partial<Layer>);
+  const anchor = { layerColor: '#000000', pathIndex: 0, polylineIndex: 1, pathT: 0.3 };
+  const A: ImportedSvg = {
+    ...line('A', [[{ x: 0, y: 0 }, { x: 10, y: 0 }]]),
+    transform: { ...IDENTITY_TRANSFORM, x: 20, y: 20, scaleX: 3, scaleY: 0.5, rotationDeg: 30, mirrorX: true },
+    paths: [{ color: '#000000', polylines: [
+      { points: [{ x: 0, y: 0 }, { x: 10, y: 0 }], closed: false },
+      { points: [{ x: 0, y: 10 }, { x: 10, y: 10 }, { x: 10, y: 20 }, { x: 0, y: 20 }, { x: 0, y: 10 }], closed: true },
+    ] }],
+    laserTabAnchors: [anchor],
+    cncTabAnchors: [anchor],
+  } as ImportedSvg;
+  const aEnd = { x: 20 + -30 * Math.cos(Math.PI / 6), y: 20 + -30 * Math.sin(Math.PI / 6) };
+  const B = line('B', [[{ x: aEnd.x - 0.03, y: aEnd.y }, { x: aEnd.x - 20, y: aEnd.y }]]);
+  const p0 = proj([A, B], [L]);
+  const before = cncTabAnchorPosition(A, anchor);
+  out(`B6 before: ${burnStats(p0)}`);
+  setProject(p0, ['A', 'B']);
+  st().joinSelectedPaths(0.05);
+  const p1 = st().project;
+  const a1 = p1.scene.objects.find((o) => o.id === 'A') as ImportedSvg;
+  const after = a1.laserTabAnchors?.[0] ? cncTabAnchorPosition(a1, a1.laserTabAnchors[0]) : null;
+  out(`B6 after: ${burnStats(p1)}; objects ${ids(p1)}; toasts ${JSON.stringify(toasts())}`);
+  out(`B6 tab before ${JSON.stringify(before)} after ${JSON.stringify(after)} anchors ${JSON.stringify(a1.laserTabAnchors)}`);
+  // tabbed open contour itself
+  const T = { ...line('T', [[{ x: 0, y: 0 }, { x: 10, y: 0 }]]), laserTabAnchors: [{ layerColor: '#000000', pathIndex: 0, polylineIndex: 0, pathT: 0.5 }] } as ImportedSvg;
+  const U = line('U', [[{ x: 10.01, y: 0 }, { x: 20, y: 0 }]]);
+  setProject(proj([T, U], [L]), ['T', 'U']);
+  clearToasts();
+  const ok = st().joinSelectedPaths(0.05);
+  out(`B6b tabbed open contour: applied ${ok}; toasts ${JSON.stringify(toasts())}`);
+});
+
+it('B7 image mask and text guide references, groups', () => {
+  const N = 40;
+  const photo = {
+    kind: 'raster-image', id: 'photo', source: 'p.png', dataUrl: 'data:image/png;base64,x', pixelWidth: N, pixelHeight: N,
+    bounds: { minX: 0, minY: 0, maxX: 40, maxY: 40 }, transform: { ...IDENTITY_TRANSFORM, x: 100, y: 100 }, color: '#808080',
+    operationIds: ['img'], dither: 'threshold', linesPerMm: 1, lumaBase64: lumaToBase64(new Uint8Array(N * N).fill(40)),
+  } as RasterImage;
+  const layers = [{ ...createLayer({ id: 'img', color: '#808080', mode: 'image' }), linesPerMm: 1 } as Layer, layer('L', 'line', 500, 90)];
+  const cells = (p: Project) => {
+    const g = compileJob(p.scene, p.device).groups.find((c) => c.kind === 'raster' && c.sourceObjectId === 'photo');
+    return g?.kind === 'raster' ? g.sValues.filter((s) => s > 0).length : -1;
+  };
+  // mask: closed-enough open-flagged box (end returns to start), plus a separate open stroke in the mask object
+  const M = line('M', [[{ x: 105, y: 105 }, { x: 125, y: 105 }, { x: 125, y: 125 }, { x: 105, y: 125 }, { x: 105, y: 105 }], [{ x: 130, y: 105 }, { x: 130, y: 125 }]]);
+  const A = line('A', [[{ x: 130.01, y: 125 }, { x: 130, y: 140 }]]);
+  const p0 = proj([A, photo, M], layers);
+  setProject(p0, []);
+  st().applyImageMask('photo', 'M');
+  const pm = st().project;
+  out(`B7 masked cells ${cells(pm)} (unmasked ${cells(p0)})`);
+  setProject(pm, ['A', 'M']);
+  clearToasts();
+  st().joinSelectedPaths(0.05);
+  const p1 = st().project;
+  const ph = p1.scene.objects.find((o) => o.id === 'photo') as RasterImage;
+  out(`B7a mask M with an extra stroke joined into earlier A: objects ${ids(p1)}; imageMaskId ${ph.imageMaskId}; cells ${cells(p1)}; toasts ${JSON.stringify(toasts())}`);
+  // groups: A in group G1 with X, B in group G2 with Y; joining A+B
+  const X = rect('X', 5, 5, { x: 0, y: 50 }, { operationIds: ['L'] });
+  const Y = rect('Y', 5, 5, { x: 20, y: 50 }, { operationIds: ['L'] });
+  const GA = line('GA', [[{ x: 0, y: 0 }, { x: 10, y: 0 }]]);
+  const GB = line('GB', [[{ x: 10, y: 0 }, { x: 20, y: 0 }]]);
+  const pg = { ...proj([GA, GB, X, Y], [layer('L', 'line', 500, 90)]) };
+  const pg2 = { ...pg, scene: { ...pg.scene, groups: [{ id: 'G1', objectIds: ['GA', 'X'] }, { id: 'G2', objectIds: ['GB', 'Y'] }] } } as Project;
+  setProject(pg2, ['GA', 'GB']);
+  st().joinSelectedPaths(0.05);
+  out(`B7b groups after: ${JSON.stringify(st().project.scene.groups)}; objects ${ids(st().project)}`);
+});
+
+it('B8 doubled DXF line becomes a closed sliver: burn effect', () => {
+  for (const extra of [{}, { kerfOffsetMm: 0.1 }, { leadInEnabled: true, leadLengthMm: 2 }, { tabsEnabled: true, tabSizeMm: 1 }] as Array<Partial<Layer>>) {
+    const L = layer('L', 'line', 1000, 50, extra);
+    const d1 = line('d1', [[{ x: 10, y: 10 }, { x: 40, y: 10 }]]);
+    const d2 = line('d2', [[{ x: 10, y: 10 }, { x: 40, y: 10 }]]);
+    const p0 = proj([d1, d2], [L]);
+    setProject(p0, ['d1', 'd2']);
+    clearToasts();
+    st().joinSelectedPaths(0.05);
+    const p1 = st().project;
+    const b0 = burn(p0);
+    const b1 = burn(p1);
+    out(`B8 layer ${JSON.stringify(extra)}: before ${burnStats(p0)} bbox ${JSON.stringify(bbox(b0.moves))}; after ${burnStats(p1)} bbox ${JSON.stringify(bbox(b1.moves))}; toasts ${JSON.stringify(toasts())}`);
+  }
+});
+
+it('B9 dialog/store mismatch: boolean compound in selection', () => {
+  const L = layer('L', 'line', 1000, 50);
+  const A = line('A', [[{ x: 0, y: 0 }, { x: 10, y: 0 }]]);
+  const B = line('B', [[{ x: 10, y: 0 }, { x: 20, y: 0 }]], { booleanCompound: { schemaVersion: 1, operation: 'union', sourceIds: [] } });
+  const p0 = proj([A, B], [L]);
+  setProject(p0, ['A', 'B']);
+  const plan = joinOpenVectorPaths([A, B], [L], 0.05);
+  const ok = st().joinSelectedPaths(0.05);
+  out(`B9 menu ${selectionCanJoinPaths(p0, ['A', 'B'])}; dialog plan joins ${plan.kind === 'ok' ? plan.value.joins : plan.error.message}; store applied ${ok}; toasts ${JSON.stringify(toasts())}`);
+});
+
+it('B10 power scale and override survive into the burn', () => {
+  const L = layer('L', 'line', 1000, 80);
+  const A = line('A', [[{ x: 0, y: 0 }, { x: 10, y: 0 }]], { powerScale: 50, operationOverride: { speed: 321 } });
+  const B = line('B', [[{ x: 10.02, y: 0 }, { x: 20, y: 0 }]], { powerScale: 50, operationOverride: { speed: 321 } });
+  const p0 = proj([A, B], [L]);
+  setProject(p0, ['A', 'B']);
+  st().joinSelectedPaths(0.05);
+  out(`B10 before ${byFS(burn(p0).moves)}; after ${byFS(burn(st().project).moves)}`);
+});

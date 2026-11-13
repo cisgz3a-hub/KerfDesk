@@ -1,0 +1,97 @@
+// @vitest-environment jsdom
+// Refuter R3: jig built by the real "centre artwork in jig set" action, then Join on the box-A source.
+import { writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { createLayer, createProject, createRegistrationLayer, DEFAULT_PROJECT_OPTIMIZATION, IDENTITY_TRANSFORM, type ImportedSvg, type Layer, type Project, type SceneObject } from '../t29-main/src/core/scene';
+import { createRegistrationBox } from '../t29-main/src/core/shapes';
+import { createRectangle } from '../t29-main/src/core/shapes/primitives/create-rectangle';
+import { registrationJigObjectIdentity } from '../t29-main/src/core/scene/registration-jig-artwork';
+import { registrationJigCompilationRuns } from '../t29-main/src/core/job/registration-jig-compilation-runs';
+import { applyCenterArtworkInRegistrationJigSet } from '../t29-main/src/ui/state/registration-jig-artwork-actions';
+import { prepareOutput } from '../t29-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t29-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t29-main/src/ui/state/store';
+import { useToastStore } from '../t29-main/src/ui/state/toast-store';
+import { resetStore } from '../t29-main/src/ui/state/test-helpers';
+import { selectionCanJoinPaths, selectionCanWeld } from '../t29-main/src/ui/commands/selection-command-state';
+import { decode } from './gdecode';
+
+const lines: string[] = [];
+const log = (s: string) => {
+  lines.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t30r/r3-jig.log', lines.join('\n'));
+};
+const BOX_A = '4f1d2a90-1111-4c3b-9a55-000000000001';
+const BOX_B = '4f1d2a90-2222-4c3b-9a55-000000000002';
+const SRC = '9b8a7c6d-0000-4000-8000-00000000aaaa';
+const ENG = '9b8a7c6d-0000-4000-8000-00000000bbbb';
+
+function baseProject(): Project {
+  const base = createProject();
+  const boxes = [createRegistrationBox({ id: BOX_A, widthMm: 60, heightMm: 60, x: 10, y: 10 }), createRegistrationBox({ id: BOX_B, widthMm: 60, heightMm: 60, x: 100, y: 10 })];
+  const L = { ...createLayer({ id: 'L', color: '#ff0000', name: 'Cut', mode: 'line' }), speed: 2222, power: 90 } as Layer;
+  const E = { ...createLayer({ id: 'E', color: '#0000ff', name: 'Mark', mode: 'line' }), speed: 1111, power: 10 } as Layer;
+  const src = {
+    kind: 'imported-svg', id: SRC, source: 'L.svg', operationIds: ['E'], bounds: { minX: 0, minY: 0, maxX: 20, maxY: 20 }, transform: { ...IDENTITY_TRANSFORM, x: 200, y: 100 },
+    paths: [{ color: '#0000ff', polylines: [{ points: [{ x: 0, y: 0 }, { x: 0, y: 20 }], closed: false }, { points: [{ x: 0.01, y: 20 }, { x: 20, y: 20 }], closed: false }] }],
+  } as unknown as ImportedSvg;
+  const eng = { ...createRectangle({ id: ENG, color: '#ff0000', spec: { widthMm: 6, heightMm: 6, cornerRadiusMm: 0 }, transform: { ...IDENTITY_TRANSFORM, x: 210, y: 105 } }), operationIds: ['L'] } as SceneObject;
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects: [...boxes, src, eng], layers: [{ ...createRegistrationLayer(), output: false } as Layer, L, E], groups: [] } } as Project;
+}
+
+function order(p: Project): string {
+  const prepared = prepareOutput(p);
+  if (!prepared.ok) return `REFUSED ${JSON.stringify(prepared).slice(0, 160)}`;
+  const { lit } = decode(emitPreparedGcode(prepared).gcode);
+  const tags: string[] = [];
+  for (const m of lit) {
+    const tag = `F${m.f}@${m.x0 < 95 ? 'A' : 'B'}`;
+    if (tags.at(-1) !== tag) tags.push(tag);
+  }
+  return tags.join(' > ');
+}
+const ident = (p: Project, id: string) => {
+  const o = p.scene.objects.find((x) => x.id === id);
+  if (!o) return 'gone';
+  const i = registrationJigObjectIdentity(o);
+  return i === null ? 'NONE' : `box ${i.boxId.slice(9, 13)}`;
+};
+
+it('R3 real jig apply, then Join on jig artwork', () => {
+  resetStore();
+  const p0 = baseProject();
+  const applied = applyCenterArtworkInRegistrationJigSet({ project: p0, undoStack: [], selectedObjectId: SRC, additionalSelectedIds: new Set([ENG]) } as never) as { project: Project };
+  const pj = applied.project;
+  const ids = pj.scene.objects.map((o) => o.id);
+  log(`R3 after jig apply: objects ${ids.map((i) => i.slice(0, 40)).join(' | ')}`);
+  log(`   identities: SRC ${ident(pj, SRC)}, ENG ${ident(pj, ENG)}; SRC has explicit registrationJig field ${pj.scene.objects.find((o) => o.id === SRC)!.registrationJig !== undefined}; runs ${registrationJigCompilationRuns(pj.scene)?.length ?? 0}; order ${order(pj)}`);
+  const copyId = ids.find((i) => i.startsWith('registration-jig-copy') && i.includes(encodeURIComponent(SRC)))!;
+  const boxesLocked = pj.scene.objects.filter((o) => o.id === BOX_A || o.id === BOX_B).map((o) => o.locked === true);
+  log(`   copy id of SRC: ${copyId}; boxes locked ${JSON.stringify(boxesLocked)}`);
+  const selections: Array<[string, string[]]> = [
+    ['box-A source only', [SRC]],
+    ['box-B copy only', [copyId]],
+    ['source + copy', [SRC, copyId]],
+  ];
+  for (const [name, sel] of selections) {
+    resetStore();
+    useToastStore.setState({ toasts: [] } as never);
+    useStore.setState({ project: pj, selectedObjectId: sel[0]!, additionalSelectedIds: new Set(sel.slice(1)), undoStack: [], redoStack: [] });
+    const menu = selectionCanJoinPaths(pj, sel);
+    const weld = selectionCanWeld(pj, sel);
+    const ok = useStore.getState().joinSelectedPaths(0.05);
+    const p1 = useStore.getState().project;
+    const toast = useToastStore.getState().toasts.map((t) => t.message).join(' | ');
+    log(`R3 ${name}: Join menu ${menu} (Weld menu ${weld}); applied ${ok}; toast "${toast}"`);
+    log(`   SRC ${ident(pj, SRC)} -> ${ident(p1, SRC)}; copy ${ident(pj, copyId)} -> ${ident(p1, copyId)}; runs ${registrationJigCompilationRuns(pj.scene)?.length ?? 0} -> ${registrationJigCompilationRuns(p1.scene)?.length ?? 0}`);
+    log(`   order before ${order(pj)}`);
+    log(`   order after  ${order(p1)}`);
+  }
+  // Select All in the real flow: are the outlines locked, and is Join enabled?
+  resetStore();
+  useStore.setState({ project: pj, selectedObjectId: null, additionalSelectedIds: new Set(), undoStack: [], redoStack: [] });
+  useStore.getState().selectAllObjects();
+  const s = useStore.getState();
+  const sel = [s.selectedObjectId, ...s.additionalSelectedIds].filter(Boolean) as string[];
+  log(`R3 Select All -> ${sel.length} objects; Join menu ${selectionCanJoinPaths(s.project, sel)}`);
+});

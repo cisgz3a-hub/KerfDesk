@@ -1,0 +1,66 @@
+// @vitest-environment jsdom
+// T30: Join turns doubled / out-and-back open lines into closed zero-area loops. What burns?
+import { beforeEach, it } from 'vitest';
+import { IDENTITY_TRANSFORM, type ImportedSvg, type Layer, type Project } from '../t29-main/src/core/scene';
+import { runPreflight } from '../t29-main/src/core/preflight';
+import { resetStore } from '../t29-main/src/ui/state/test-helpers';
+import { bbox, totalLen } from './decode';
+import { burn, clearToasts, f3, layer, logger, proj, setProject, st, toasts } from './common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t30/t30-sliver.log');
+beforeEach(() => {
+  resetStore();
+  clearToasts();
+});
+type V = { x: number; y: number };
+const art = (id: string, pts: V[][], closed = false): ImportedSvg =>
+  ({
+    kind: 'imported-svg', id, source: `${id}.dxf`, operationIds: ['L'],
+    bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 }, transform: IDENTITY_TRANSFORM,
+    paths: [{ color: '#000000', polylines: pts.map((points) => ({ points, closed })) }],
+  }) as ImportedSvg;
+const desc = (p: Project) => {
+  const b = burn(p);
+  if (!b.ok) return `NOT OK ${b.why.slice(0, 160)}`;
+  const pre = runPreflight(p, b.gcode).issues.map((i) => `${i.severity}:${i.code}`);
+  return `lit ${f3(totalLen(b.moves))} bbox ${JSON.stringify(bbox(b.moves))} preflight [${pre}]`;
+};
+
+const fixtures: Array<[string, () => ImportedSvg[], string[]]> = [
+  ['doubled line (two objects)', () => [art('d1', [[{ x: 10, y: 10 }, { x: 40, y: 10 }]]), art('d2', [[{ x: 10, y: 10 }, { x: 40, y: 10 }]])], ['d1', 'd2']],
+  ['doubled line, one reversed (same object, two subpaths)', () => [art('d', [[{ x: 10, y: 10 }, { x: 40, y: 10 }], [{ x: 40, y: 10 }, { x: 10, y: 10 }]])], ['d']],
+  ['out-and-back single path, 0.01 apart', () => [art('r', [[{ x: 10, y: 10 }, { x: 40, y: 10 }, { x: 10, y: 10.01 }]])], ['r']],
+  ['control: same doubled line drawn closed by hand (closed flag)', () => [art('c', [[{ x: 10, y: 10 }, { x: 40, y: 10 }]], true)], ['c']],
+];
+const layerVariants: Array<[string, Partial<Layer>]> = [
+  ['plain line', {}],
+  ['kerf +0.1', { kerfOffsetMm: 0.1 }],
+  ['kerf -0.1', { kerfOffsetMm: -0.1 }],
+  ['kerf +0.01', { kerfOffsetMm: 0.01 }],
+  ['fill', { mode: 'fill', hatchSpacingMm: 0.1 } as Partial<Layer>],
+];
+
+it('S1 sliver burn', () => {
+  for (const [fname, make, sel] of fixtures) {
+    for (const [lname, extra] of layerVariants) {
+      const L = layer('L', (extra.mode as 'line' | 'fill') ?? 'line', 1000, 50, extra);
+      const p0 = proj(make(), [L]);
+      setProject(p0, sel);
+      clearToasts();
+      const applied = st().joinSelectedPaths(0.05);
+      out(`S1 ${fname} / ${lname}: before ${desc(p0)} || join applied ${applied} ${JSON.stringify(toasts())} || after ${applied ? desc(st().project) : '-'}`);
+    }
+  }
+});
+
+it('S2 doubled line next to other artwork, kerf 0.1', () => {
+  const L = layer('L', 'line', 1000, 50, { kerfOffsetMm: 0.1 });
+  const frame = art('frame', [[{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 60, y: 30 }, { x: 0, y: 30 }]], true);
+  const p0 = proj([frame, art('d1', [[{ x: 10, y: 10 }, { x: 40, y: 10 }]]), art('d2', [[{ x: 10, y: 10 }, { x: 40, y: 10 }]])], [L]);
+  setProject(p0, ['frame', 'd1', 'd2']);
+  clearToasts();
+  const applied = st().joinSelectedPaths(0.05);
+  const b = burn(st().project);
+  const onLine = b.moves.filter((m) => Math.abs(m.from.y - 10) < 0.5 && Math.abs(m.to.y - 10) < 0.5 && m.from.x > 5 && m.from.x < 45);
+  out(`S2 before ${desc(p0)} || applied ${applied} ${JSON.stringify(toasts())} || after ${desc(st().project)}; lit moves near the line y=10: ${onLine.length}`);
+});

@@ -1,0 +1,158 @@
+// @vitest-environment jsdom
+// Refuter R2: doubled line / out-and-back path closed by Join; what burns, per setting.
+import { writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { createLayer, createProject, DEFAULT_PROJECT_OPTIMIZATION, IDENTITY_TRANSFORM, type ImportedSvg, type Layer, type Project, type SceneObject } from '../t29-main/src/core/scene';
+import { prepareOutput } from '../t29-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t29-main/src/io/gcode/emit-gcode';
+import { runPreflight } from '../t29-main/src/core/preflight';
+import { parseDxf } from '../t29-main/src/io/dxf';
+import { useStore } from '../t29-main/src/ui/state/store';
+import { useToastStore } from '../t29-main/src/ui/state/toast-store';
+import { resetStore } from '../t29-main/src/ui/state/test-helpers';
+import { selectionCanJoinPaths } from '../t29-main/src/ui/commands/selection-command-state';
+import { decode, litBox, litLen, type Seg } from './gdecode';
+
+const lines: string[] = [];
+const log = (s: string) => {
+  lines.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t30r/r2-sliver.log', lines.join('\n'));
+};
+const n3 = (v: number) => v.toFixed(3);
+type V = { x: number; y: number };
+const obj = (id: string, polys: Array<{ pts: V[]; closed: boolean }>, src = `${id}.svg`): ImportedSvg =>
+  ({
+    kind: 'imported-svg', id, source: src,
+    bounds: { minX: 0, minY: 0, maxX: 60, maxY: 30 }, transform: { ...IDENTITY_TRANSFORM, x: 20, y: 20 },
+    paths: [{ color: '#ff0000', polylines: polys.map((p) => ({ points: p.pts, closed: p.closed })) }],
+  }) as unknown as ImportedSvg;
+const frame = () => obj('frame', [{ pts: [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 60, y: 30 }, { x: 0, y: 30 }], closed: true }]);
+const slit = (id: string, rev = false) => obj(id, [{ pts: rev ? [{ x: 40, y: 12 }, { x: 10, y: 12 }] : [{ x: 10, y: 12 }, { x: 40, y: 12 }], closed: false }]);
+
+function project(objects: SceneObject[], extra: Partial<Layer>): Project {
+  const base = createProject();
+  const L = { ...createLayer({ id: 'L', color: '#ff0000', name: 'Cut', mode: 'line' }), speed: 600, power: 80, ...extra } as Layer;
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers: [L], groups: [] } };
+}
+
+function burnInfo(p: Project) {
+  const prepared = prepareOutput(p);
+  if (!prepared.ok) return { text: `REFUSED ${JSON.stringify(prepared).slice(0, 200)}`, interior: NaN };
+  const gcode = emitPreparedGcode(prepared).gcode;
+  const { lit, arcs } = decode(gcode);
+  // Interior = lit moves more than 1.5 mm inside the frame's lit box (flip-proof).
+  const box = litBox(lit);
+  const inside = (x: number, y: number) => x > box.minX + 1.5 && x < box.maxX - 1.5 && y > box.minY + 1.5 && y < box.maxY - 1.5;
+  const interior: Seg[] = lit.filter((m) => inside(m.x0, m.y0) || inside(m.x1, m.y1));
+  const adv = [...(prepared.advisories ?? []).map((a) => a.code), ...(((prepared.job as any).diagnostics ?? []) as any[]).map((d) => `diag:${d.kind}`)];
+  const pre = runPreflight(p, gcode).issues.map((i) => `${i.severity}:${i.code}`);
+  return { text: `lit ${n3(litLen(lit))} interior ${n3(litLen(interior))} (${interior.length} moves, arcs ${arcs}) advisories [${adv}] preflight [${pre}]`, interior: litLen(interior) };
+}
+
+const variants: Array<[string, Partial<Layer>]> = [
+  ['no kerf', {}],
+  ['kerf +0.1', { kerfOffsetMm: 0.1 }],
+  ['kerf -0.1', { kerfOffsetMm: -0.1 }],
+  ['kerf +0.001', { kerfOffsetMm: 0.001 }],
+  ['leads in/out 2mm line, no kerf', { leadInEnabled: true, leadOutEnabled: true, leadStyle: 'line', leadLengthMm: 2, leadSide: 'auto' } as Partial<Layer>],
+  ['tabs 4 x 0.5mm, no kerf', { tabsEnabled: true, tabSizeMm: 0.5, tabsPerShape: 4 } as Partial<Layer>],
+  ['passes 2, no kerf', { passes: 2 }],
+];
+
+const fixtures: Array<[string, () => SceneObject[], string[]]> = [
+  ['doubled slit (2 objects, same direction)', () => [frame(), slit('a'), slit('b')], ['frame', 'a', 'b']],
+  ['doubled slit (2 objects, one reversed)', () => [frame(), slit('a'), slit('b', true)], ['frame', 'a', 'b']],
+  ['out-and-back single path (exact)', () => [frame(), obj('r', [{ pts: [{ x: 10, y: 12 }, { x: 40, y: 12 }, { x: 10, y: 12 }], closed: false }])], ['frame', 'r']],
+  ['single slit (control)', () => [frame(), slit('a')], ['frame', 'a']],
+  ['control: closed slot 0.05 wide drawn closed', () => [frame(), obj('s', [{ pts: [{ x: 10, y: 12 }, { x: 40, y: 12 }, { x: 40, y: 12.05 }, { x: 10, y: 12.05 }], closed: true }])], ['frame', 's']],
+];
+
+it('R2a doubled / out-and-back: burn before and after Join per setting', () => {
+  for (const [fname, make, sel] of fixtures) {
+    for (const [vname, extra] of variants) {
+      resetStore();
+      useToastStore.setState({ toasts: [] } as never);
+      const p0 = project(make(), extra);
+      useStore.setState({ project: p0, selectedObjectId: sel[0]!, additionalSelectedIds: new Set(sel.slice(1)), undoStack: [], redoStack: [] });
+      const menu = selectionCanJoinPaths(p0, sel);
+      const before = burnInfo(p0);
+      const applied = useStore.getState().joinSelectedPaths(0.05);
+      const p1 = useStore.getState().project;
+      const after = burnInfo(p1);
+      const closedCount = p1.scene.objects.flatMap((o) => ('paths' in o ? o.paths : [])).flatMap((p) => p.polylines).filter((pl) => pl.closed).length;
+      const toast = useToastStore.getState().toasts.map((t) => t.message).join(' | ');
+      log(`${fname} / ${vname}: menu ${menu}; BEFORE ${before.text}`);
+      log(`   applied ${applied}; closed polylines after ${closedCount}; toast "${toast}"`);
+      log(`   AFTER  ${after.text}  ${Math.abs(after.interior - before.interior) > 1e-6 ? '<<< interior changed' : ''}`);
+    }
+  }
+});
+
+it('R2b DXF import with a doubled LINE: what does import itself produce?', () => {
+  const ent = (x0: number, y0: number, x1: number, y1: number) => ['0', 'LINE', '8', '0', '62', '1', '10', `${x0}`, '20', `${y0}`, '30', '0', '11', `${x1}`, '21', `${y1}`, '31', '0'];
+  const rectLines = [ent(0, 0, 60, 0), ent(60, 0, 60, 30), ent(60, 30, 0, 30), ent(0, 30, 0, 0)];
+  const cases: Array<[string, string[][]]> = [
+    ['frame of 4 LINEs + doubled slit', [...rectLines, ent(10, 12, 40, 12), ent(10, 12, 40, 12)]],
+    ['frame + doubled slit, one reversed', [...rectLines, ent(10, 12, 40, 12), ent(40, 12, 10, 12)]],
+    ['frame with one edge doubled', [...rectLines, ent(0, 0, 60, 0)]],
+    ['frame + single slit (control)', [...rectLines, ent(10, 12, 40, 12)]],
+  ];
+  for (const [name, ents] of cases) {
+    const text = ['0', 'SECTION', '2', 'HEADER', '9', '$INSUNITS', '70', '4', '0', 'ENDSEC', '0', 'SECTION', '2', 'ENTITIES', ...ents.flat(), '0', 'ENDSEC', '0', 'EOF'].join('\n');
+    const res = parseDxf({ dxfText: text, id: 'dxf', source: 'doubled.dxf' }) as unknown as { kind: string; value?: { objects?: SceneObject[] } } & Record<string, unknown>;
+    const objs: SceneObject[] = (res as any).object ? [(res as any).object] : [];
+    const polys = objs.flatMap((o: any) => (o.paths ?? []).flatMap((p: any) => p.polylines.map((pl: any) => ({ closed: pl.closed, n: pl.points.length, pts: pl.points.slice(0, 4).map((q: V) => `${n3(q.x)},${n3(q.y)}`).join(' ') }))));
+    log(`R2b ${name}: kind ${res.kind}; notes ${JSON.stringify((res as any).notes)}; ${objs.length} object(s); polylines ${JSON.stringify(polys)}`);
+    if (objs.length > 0) {
+      for (const [vname, extra] of [variants[0]!, variants[1]!, variants[2]!]) {
+        const p = project(objs, extra);
+        // DXF objects carry their own colour: bind to L explicitly.
+        const bound = { ...p, scene: { ...p.scene, objects: p.scene.objects.map((o) => ({ ...o, operationIds: ['L'] })) } } as Project;
+        log(`   import ${vname}: ${burnInfo(bound).text}`);
+      }
+    }
+  }
+});
+
+it('R2c other close routes on the same out-and-back path, kerf +0.1', () => {
+  const routes: Array<[string, () => void]> = [
+    ['Join paths 0.05', () => useStore.getState().joinSelectedPaths(0.05)],
+    ['Close Path', () => useStore.getState().closeSelectedPaths()],
+    ['Close Paths with Tolerance 0.05 bridge', () => useStore.getState().closeSelectedPathsWithTolerance(0.05, 'bridge' as never)],
+  ];
+  for (const [rname, run] of routes) {
+    for (const shape of ['exact out-and-back', 'doubled 2 subpaths one object']) {
+      resetStore();
+      useToastStore.setState({ toasts: [] } as never);
+      const art = shape === 'exact out-and-back'
+        ? obj('r', [{ pts: [{ x: 10, y: 12 }, { x: 40, y: 12 }, { x: 10, y: 12 }], closed: false }])
+        : obj('r', [{ pts: [{ x: 10, y: 12 }, { x: 40, y: 12 }], closed: false }, { pts: [{ x: 40, y: 12 }, { x: 10, y: 12 }], closed: false }]);
+      const p0 = project([frame(), art], { kerfOffsetMm: 0.1 });
+      useStore.setState({ project: p0, selectedObjectId: 'r', additionalSelectedIds: new Set(), undoStack: [], redoStack: [] });
+      run();
+      const p1 = useStore.getState().project;
+      const r = p1.scene.objects.find((o) => o.id === 'r') as any;
+      const toast = useToastStore.getState().toasts.map((t) => t.message).join(' | ');
+      log(`R2c ${rname} / ${shape}: closed flags ${JSON.stringify(r?.paths?.flatMap((p: any) => p.polylines.map((pl: any) => pl.closed)))} toast "${toast}" AFTER ${burnInfo(p1).text}`);
+    }
+  }
+});
+
+it('R2d Job Review strings: sliver inside a part vs standalone, kerf +/-0.1', async () => {
+  const { compileDiagnosticWarnings } = await import('../t29-main/src/ui/laser/compile-diagnostic-warnings');
+  for (const where of ['inside frame', 'standalone']) {
+    for (const k of [0.1, -0.1]) {
+      resetStore();
+      const objs = where === 'inside frame' ? [frame(), slit('a'), slit('b')] : [slit('a'), slit('b')];
+      const ids = objs.map((o) => o.id);
+      const p0 = project(objs, { kerfOffsetMm: k });
+      useStore.setState({ project: p0, selectedObjectId: ids[0]!, additionalSelectedIds: new Set(ids.slice(1)), undoStack: [], redoStack: [] });
+      useStore.getState().joinSelectedPaths(0.05);
+      const p1 = useStore.getState().project;
+      const prepared = prepareOutput(p1);
+      const lit = prepared.ok ? litLen(decode(emitPreparedGcode(prepared).gcode).lit) : NaN;
+      const warns = prepared.ok ? compileDiagnosticWarnings(prepared.job as never) : ['REFUSED'];
+      log(`R2d ${where} kerf ${k}: lit after ${n3(lit)}; Job Review compile warnings ${JSON.stringify(warns)}`);
+    }
+  }
+});

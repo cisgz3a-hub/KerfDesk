@@ -1,0 +1,44 @@
+// Refuter's own G-code decoder (independent of zz-t30/decode.ts).
+export type Seg = { x0: number; y0: number; x1: number; y1: number; s: number; f: number; len: number; arc: boolean };
+
+export function decode(gcode: string): { lit: Seg[]; arcs: number; relative: boolean } {
+  let x = 0, y = 0, s = 0, f = 0, mode = 0, on = false, relative = false, arcs = 0;
+  const lit: Seg[] = [];
+  for (const raw of gcode.split(/\r?\n/)) {
+    const line = raw.replace(/\(.*?\)/g, '').replace(/;.*/, '').trim().toUpperCase();
+    if (line === '') continue;
+    const words = line.match(/[A-Z][-+]?[0-9]*\.?[0-9]+/g) ?? [];
+    let nx = x, ny = y, motion = false;
+    for (const w of words) {
+      const k = w[0]!;
+      const v = Number(w.slice(1));
+      if (k === 'G') {
+        if (v === 0 || v === 1 || v === 2 || v === 3) { mode = v; motion = true; }
+        if (v === 91) relative = true;
+        if (v === 90) relative = false;
+      } else if (k === 'M') {
+        if (v === 3 || v === 4) on = true;
+        if (v === 5) on = false;
+      } else if (k === 'S') s = v;
+      else if (k === 'F') f = v;
+      else if (k === 'X') { nx = relative ? x + v : v; motion = true; }
+      else if (k === 'Y') { ny = relative ? y + v : v; motion = true; }
+    }
+    if (motion && (nx !== x || ny !== y)) {
+      if (mode !== 0 && on && s > 0) {
+        if (mode !== 1) arcs += 1;
+        lit.push({ x0: x, y0: y, x1: nx, y1: ny, s, f, len: Math.hypot(nx - x, ny - y), arc: mode !== 1 });
+      }
+      x = nx;
+      y = ny;
+    }
+  }
+  return { lit, arcs, relative };
+}
+
+export const litLen = (segs: Seg[]) => segs.reduce((a, b) => a + b.len, 0);
+export function litBox(segs: Seg[]) {
+  const xs = segs.flatMap((m) => [m.x0, m.x1]);
+  const ys = segs.flatMap((m) => [m.y0, m.y1]);
+  return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+}

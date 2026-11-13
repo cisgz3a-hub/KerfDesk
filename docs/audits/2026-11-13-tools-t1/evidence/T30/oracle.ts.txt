@@ -1,0 +1,104 @@
+// T30 independent oracle: sample lines, cubics and SVG elliptical arcs (SVG 1.1 F.6.5)
+// without any app geometry code, and apply the scene transform by hand.
+export type V = { x: number; y: number };
+type Seg =
+  | { kind: 'line'; to: V }
+  | { kind: 'cubic'; control1: V; control2: V; to: V }
+  | { kind: 'elliptical-arc'; radiusX: number; radiusY: number; rotationDeg: number; largeArc: boolean; sweep: boolean; to: V };
+export type Curve = { start: V; segments: ReadonlyArray<Seg>; closed: boolean };
+export type T = { x: number; y: number; scaleX: number; scaleY: number; rotationDeg: number; mirrorX: boolean; mirrorY: boolean };
+
+export function xf(p: V, t: T): V {
+  let x = p.x * t.scaleX * (t.mirrorX ? -1 : 1);
+  let y = p.y * t.scaleY * (t.mirrorY ? -1 : 1);
+  const r = (t.rotationDeg * Math.PI) / 180;
+  return { x: x * Math.cos(r) - y * Math.sin(r) + t.x, y: x * Math.sin(r) + y * Math.cos(r) + t.y };
+}
+
+function arcPoints(from: V, s: Extract<Seg, { kind: 'elliptical-arc' }>, n: number): V[] {
+  let rx = Math.abs(s.radiusX);
+  let ry = Math.abs(s.radiusY);
+  const phi = (s.rotationDeg * Math.PI) / 180;
+  const cp = Math.cos(phi);
+  const sp = Math.sin(phi);
+  const dx = (from.x - s.to.x) / 2;
+  const dy = (from.y - s.to.y) / 2;
+  const x1 = cp * dx + sp * dy;
+  const y1 = -sp * dx + cp * dy;
+  const lam = (x1 * x1) / (rx * rx) + (y1 * y1) / (ry * ry);
+  if (lam > 1) {
+    rx *= Math.sqrt(lam);
+    ry *= Math.sqrt(lam);
+  }
+  const num = rx * rx * ry * ry - rx * rx * y1 * y1 - ry * ry * x1 * x1;
+  const den = rx * rx * y1 * y1 + ry * ry * x1 * x1;
+  let co = Math.sqrt(Math.max(0, num / den));
+  if (s.largeArc === s.sweep) co = -co;
+  const cx1 = (co * rx * y1) / ry;
+  const cy1 = (-co * ry * x1) / rx;
+  const cx = cp * cx1 - sp * cy1 + (from.x + s.to.x) / 2;
+  const cy = sp * cx1 + cp * cy1 + (from.y + s.to.y) / 2;
+  const ang = (ux: number, uy: number, vx: number, vy: number) => {
+    const a = Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+    return a;
+  };
+  const t1 = ang(1, 0, (x1 - cx1) / rx, (y1 - cy1) / ry);
+  let dt = ang((x1 - cx1) / rx, (y1 - cy1) / ry, (-x1 - cx1) / rx, (-y1 - cy1) / ry);
+  if (!s.sweep && dt > 0) dt -= 2 * Math.PI;
+  if (s.sweep && dt < 0) dt += 2 * Math.PI;
+  const pts: V[] = [];
+  for (let i = 1; i <= n; i++) {
+    const t = t1 + (dt * i) / n;
+    const ex = rx * Math.cos(t);
+    const ey = ry * Math.sin(t);
+    pts.push({ x: cp * ex - sp * ey + cx, y: sp * ex + cp * ey + cy });
+  }
+  return pts;
+}
+
+/** Dense sample of a curve in its own frame. */
+export function sample(c: Curve, n = 400): V[] {
+  const pts: V[] = [c.start];
+  let cur = c.start;
+  for (const s of c.segments) {
+    if (s.kind === 'line') pts.push(s.to);
+    else if (s.kind === 'cubic') {
+      for (let i = 1; i <= n; i++) {
+        const t = i / n;
+        const u = 1 - t;
+        pts.push({
+          x: u * u * u * cur.x + 3 * u * u * t * s.control1.x + 3 * u * t * t * s.control2.x + t * t * t * s.to.x,
+          y: u * u * u * cur.y + 3 * u * u * t * s.control1.y + 3 * u * t * t * s.control2.y + t * t * t * s.to.y,
+        });
+      }
+    } else pts.push(...arcPoints(cur, s, n));
+    cur = s.to;
+  }
+  return pts;
+}
+
+export function len(pts: ReadonlyArray<V>, closed = false): number {
+  let l = 0;
+  for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i]!.x - pts[i - 1]!.x, pts[i]!.y - pts[i - 1]!.y);
+  if (closed && pts.length > 1) l += Math.hypot(pts[0]!.x - pts.at(-1)!.x, pts[0]!.y - pts.at(-1)!.y);
+  return l;
+}
+
+/** Max distance from each point of a to the polyline b (Hausdorff one way). */
+export function hausdorff(a: ReadonlyArray<V>, b: ReadonlyArray<V>): number {
+  let worst = 0;
+  for (const p of a) {
+    let best = Infinity;
+    for (let i = 1; i < b.length; i++) {
+      const s = b[i - 1]!;
+      const e = b[i]!;
+      const dx = e.x - s.x;
+      const dy = e.y - s.y;
+      const l2 = dx * dx + dy * dy;
+      const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - s.x) * dx + (p.y - s.y) * dy) / l2));
+      best = Math.min(best, Math.hypot(p.x - (s.x + t * dx), p.y - (s.y + t * dy)));
+    }
+    worst = Math.max(worst, best);
+  }
+  return worst;
+}

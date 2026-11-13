@@ -1,0 +1,64 @@
+// @vitest-environment jsdom
+// T30 Join paths dialog: summary text, validation, Enter, Cancel, Apply.
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, it, vi } from 'vitest';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type ImportedSvg, type Project } from '../t29-main/src/core/scene';
+import { JoinPathsDialog } from '../t29-main/src/ui/commands/JoinPathsDialog';
+import { logger } from './common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t30/t30-dialog.log');
+let host: HTMLDivElement, root: Root;
+beforeEach(() => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  host = document.createElement('div');
+  document.body.appendChild(host);
+  root = createRoot(host);
+});
+afterEach(async () => {
+  await act(async () => root.unmount());
+  host.remove();
+  vi.unstubAllGlobals();
+});
+const line = (id: string, a: number, b: number, extra: Partial<ImportedSvg> = {}): ImportedSvg =>
+  ({
+    kind: 'imported-svg', id, source: id, operationIds: ['L'], bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 }, transform: IDENTITY_TRANSFORM,
+    paths: [{ color: '#000000', polylines: [{ points: [{ x: a, y: 0 }, { x: b, y: 0 }], closed: false }] }], ...extra,
+  }) as ImportedSvg;
+
+it('D1 dialog', async () => {
+  const base = createProject();
+  const p: Project = { ...base, scene: { ...base.scene, layers: [createLayer({ id: 'L', color: '#000000' })], objects: [line('A', 0, 10), line('B', 10.03, 20), line('C', 10.02, 10.02 + 0.001), line('Z', 50, 60)] } };
+  const applied: number[] = [];
+  let cancelled = 0;
+  const render = async (ids: string[]) =>
+    act(async () =>
+      root.render(<JoinPathsDialog scene={p.scene} selectedIds={ids} onCancel={() => (cancelled += 1)} onApply={(t) => applied.push(t)} />),
+    );
+  await render(['A', 'B', 'Z']);
+  const input = () => host.ownerDocument.querySelector('input') as HTMLInputElement;
+  const status = () => host.ownerDocument.querySelector('[role=status]')?.textContent;
+  const button = () => [...host.ownerDocument.querySelectorAll('button')].find((b) => b.textContent === 'Join paths') as HTMLButtonElement;
+  out(`D1 default value ${input().value}; status "${status()}"; apply disabled ${button().disabled}`);
+  const setVal = async (v: string) =>
+    act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+      setter.call(input(), v);
+      input().dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  for (const v of ['0.02', '', '-1', 'abc', '1e-1', '100']) {
+    await setVal(v);
+    out(`D1 value "${v}": status "${status()}"; apply disabled ${button().disabled}`);
+  }
+  await setVal('0.05');
+  const form = host.ownerDocument.querySelector('form')!;
+  await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  out(`D1 Enter/submit -> applied ${JSON.stringify(applied)}`);
+  const cancelBtn = [...host.ownerDocument.querySelectorAll('button')].find((b) => b.textContent === 'Cancel')!;
+  await act(async () => cancelBtn.click());
+  out(`D1 Cancel -> cancelled ${cancelled}`);
+  await act(async () => host.ownerDocument.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  out(`D1 Escape -> cancelled ${cancelled}`);
+  await render(['A', 'B', 'C']);
+  out(`D1 T-junction A,B,C: status "${status()}"`);
+});

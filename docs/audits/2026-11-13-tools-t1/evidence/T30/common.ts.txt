@@ -1,0 +1,117 @@
+// T29 shared helpers: fixtures, store driver, burn decode.
+import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type Transform,
+} from '../t29-main/src/core/scene';
+import { createRectangle } from '../t29-main/src/core/shapes/primitives/create-rectangle';
+import { createEllipse } from '../t29-main/src/core/shapes/primitives/create-ellipse';
+import { textToPolylines } from '../t29-main/src/core/text';
+import { prepareOutput } from '../t29-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t29-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t29-main/src/ui/state/store';
+import { useToastStore } from '../t29-main/src/ui/state/toast-store';
+import { litMoves, type LitMove } from './decode';
+
+export function logger(path: string): (s: string) => void {
+  const lines: string[] = [];
+  return (s: string) => {
+    lines.push(s);
+    writeFileSync(path, lines.join('\n'));
+  };
+}
+export const st = () => useStore.getState();
+export const f3 = (n: number) => n.toFixed(3);
+export const toasts = () => useToastStore.getState().toasts.map((t) => `${t.variant ?? ''}:${t.message}`);
+export const clearToasts = () => useToastStore.setState({ toasts: [] } as never);
+
+export const roboto = (() => {
+  const b = readFileSync('C:/Users/stolk/kd-t1/t29-main/src/ui/text/fonts/Roboto-Regular.ttf');
+  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+})();
+
+export const layer = (id: string, mode: 'line' | 'fill', speed: number, power: number, extra: Partial<Layer> = {}) =>
+  ({ ...createLayer({ id, color: '#000000', name: id, mode }), speed, power, ...extra }) as Layer;
+
+export function proj(objects: SceneObject[], layers: Layer[], extra: Partial<Project> = {}): Project {
+  const base = createProject();
+  return {
+    ...base,
+    optimization: { ...DEFAULT_PROJECT_OPTIMIZATION },
+    scene: { ...base.scene, objects, layers, groups: [] },
+    ...extra,
+  };
+}
+export function setProject(project: Project, selected: string[]): void {
+  useStore.setState({
+    project,
+    selectedObjectId: selected[0] ?? null,
+    additionalSelectedIds: new Set(selected.slice(1)),
+    undoStack: [],
+    redoStack: [],
+    dirty: false,
+  });
+}
+export function burn(project: Project) {
+  const prepared = prepareOutput(project);
+  if (!prepared.ok)
+    return { ok: false, gcode: '', moves: [] as LitMove[], why: JSON.stringify(prepared).slice(0, 400) };
+  const g = emitPreparedGcode(prepared).gcode;
+  return { ok: true, gcode: g, moves: litMoves(g, project.device), why: '' };
+}
+export const rect = (id: string, w: number, h: number, t: Partial<Transform>, extra: Record<string, unknown> = {}) =>
+  ({
+    ...createRectangle({ id, color: '#000000', spec: { widthMm: w, heightMm: h, cornerRadiusMm: 0 }, transform: { ...IDENTITY_TRANSFORM, ...t } }),
+    ...extra,
+  }) as SceneObject;
+export const circ = (id: string, d: number, t: Partial<Transform>, extra: Record<string, unknown> = {}) =>
+  ({
+    ...createEllipse({ id, color: '#000000', spec: { widthMm: d, heightMm: d }, transform: { ...IDENTITY_TRANSFORM, ...t } }),
+    ...extra,
+  }) as SceneObject;
+export type P = { x: number; y: number };
+/** imported-svg with exact local contours. */
+export const svg = (id: string, contours: P[][], extra: Record<string, unknown> = {}, closed = true, fillRule?: 'evenodd' | 'nonzero') => {
+  const all = contours.flat();
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: {
+      minX: Math.min(...all.map((p) => p.x)),
+      minY: Math.min(...all.map((p) => p.y)),
+      maxX: Math.max(...all.map((p) => p.x)),
+      maxY: Math.max(...all.map((p) => p.y)),
+    },
+    transform: IDENTITY_TRANSFORM,
+    paths: [{ color: '#000000', ...(fillRule ? { fillRule } : {}), polylines: contours.map((points) => ({ points, closed })) }],
+    ...extra,
+  } as unknown as SceneObject;
+};
+export const box = (x: number, y: number, w: number, h: number): P[] => [
+  { x, y },
+  { x: x + w, y },
+  { x: x + w, y: y + h },
+  { x, y: y + h },
+];
+export const ring = (cx: number, cy: number, r: number, n = 720): P[] =>
+  Array.from({ length: n }, (_, i) => ({ x: cx + r * Math.cos((2 * Math.PI * i) / n), y: cy + r * Math.sin((2 * Math.PI * i) / n) }));
+
+export async function textObj(id: string, content: string, at: P, ops: string[]): Promise<SceneObject> {
+  const r = await textToPolylines({ content, sizeMm: 20, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000', fontBuffer: roboto });
+  return {
+    kind: 'text', id, content, fontKey: 'roboto-regular', sizeMm: 20, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000',
+    bounds: r.bounds, transform: { ...IDENTITY_TRANSFORM, x: at.x, y: at.y }, paths: r.paths, operationIds: ops,
+  } as unknown as SceneObject;
+}
+export const byFS = (moves: LitMove[]) => {
+  const m = new Map<string, number>();
+  for (const mv of moves) m.set(`F${mv.f} S${mv.s}`, (m.get(`F${mv.f} S${mv.s}`) ?? 0) + mv.len);
+  return [...m].map(([k, v]) => `${k}: ${f3(v)}`).join(' | ');
+};
