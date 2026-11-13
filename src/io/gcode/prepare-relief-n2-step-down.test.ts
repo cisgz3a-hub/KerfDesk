@@ -5,7 +5,7 @@
 // depth per pass (1.5 mm) under its centre, plus the grid's own slack.
 import { describe, expect, it } from 'vitest';
 import type { CncTool, Project } from '../../core/scene';
-import { emitGcode } from './emit-gcode';
+import { emitPreparedGcode } from './emit-gcode';
 import { prepareOutput } from './prepare-output';
 import { detectMachineJobWarnings } from '../../ui/laser/machine-job-warnings';
 import {
@@ -41,13 +41,14 @@ const BALL_1MM: CncTool = { id: 'bn-1000', name: '1 mm ball', kind: 'ball-nose',
 function run(project: Project) {
   const prepared = prepareOutput(project);
   if (!prepared.ok) throw new Error(JSON.stringify(prepared.preflight).slice(0, 300));
-  const gcode = emitGcode(project).gcode;
+  // Emit the job already prepared: emitGcode would compile it a second time.
+  const gcode = emitPreparedGcode(prepared).gcode;
   return { prepared, gcode, warnings: detectMachineJobWarnings(project, null, null, prepared) };
 }
 
 // The most stock any lateral move of `toolId` left under its centre.
-function worstUnderCentre(project: Project, gcode: string, toolId: string): number {
-  const moves = simulateStock(project, gcode, 0.05).moves.filter(
+function worstUnderCentre(project: Project, gcode: string, toolId: string, G = 0.05): number {
+  const moves = simulateStock(project, gcode, G).moves.filter(
     (move) => move.tool === toolId && !move.rapid && move.len > 0.05,
   );
   return Math.max(0, ...moves.map((move) => move.centreRem));
@@ -167,7 +168,11 @@ describe('rest finishing after a 1/4" ball steps a 1/16" ball down (N2-P2-2)', (
       const project = dome(rest);
       const { prepared, gcode } = run(project);
       // Main: bn-1588 8.7 mm at Z−4 with 3.76 mm under its centre; bn-3175 3.06 mm.
-      expect(worstUnderCentre(project, gcode, rest)).toBeLessThanOrEqual(PER_PASS_MM + SLACK_MM);
+      // A 0.1 mm grid: the rest bits are 1.6 and 3.2 mm across, and the
+      // measure matched the 0.05 mm grid within 0.01 mm on this dome.
+      expect(worstUnderCentre(project, gcode, rest, 0.1)).toBeLessThanOrEqual(
+        PER_PASS_MM + SLACK_MM,
+      );
       const plan = prepared.job.cncCompilation?.reliefPlans?.find(
         (p) => p.stage === 'rest-finishing',
       );

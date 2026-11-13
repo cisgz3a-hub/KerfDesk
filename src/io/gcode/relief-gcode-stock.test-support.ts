@@ -273,10 +273,14 @@ function cutMove(
     for (let gx = gx0; gx <= gx1; gx += 1) {
       const qx = X0 + gx * G - a.x;
       const qy = Y0 + gy * G - a.y;
-      const bottom = cellBottom(tool, a, b, qx, qy);
-      if (bottom === null) continue;
       const i = gy * NX + gx;
       const current = top[i] ?? 0;
+      // The cutter's bottom over this cell is at least its lower tip plus its
+      // rise at the cell's nearest distance to the path: a cell already at or
+      // below that cannot be cut, so it needs no search (exact, not a guess).
+      if (current <= Math.min(a.z, b.z) + lowestRise(tool, qx, qy, b.x - a.x, b.y - a.y)) continue;
+      const bottom = cellBottom(tool, a, b, qx, qy);
+      if (bottom === null) continue;
       if (current <= bottom) continue;
       const rem = current - bottom;
       vol += rem * G * G;
@@ -301,6 +305,15 @@ function cellSpan(
     Math.max(0, Math.floor((Math.min(from, to) - R - origin) / G)),
     Math.min(cells - 1, Math.ceil((Math.max(from, to) + R - origin) / G)),
   ];
+}
+
+// The cutter's rise at the cell's nearest XY distance to the move.
+function lowestRise(tool: CncTool, qx: number, qy: number, ex: number, ey: number): number {
+  const ee = ex * ex + ey * ey;
+  const t = ee < 1e-12 ? 0 : Math.max(0, Math.min(1, (qx * ex + qy * ey) / ee));
+  const d = Math.hypot(qx - t * ex, qy - t * ey);
+  if (d > tool.diameterMm / 2) return Number.POSITIVE_INFINITY;
+  return tool.kind === 'end-mill' ? 0 : cutterRise(tool)(d);
 }
 
 // The cutter's lowest point over one cell during a move, or null off its path.
@@ -369,7 +382,8 @@ function ballBottom(
     let c2 = lo + PHI * (hi - lo);
     let f1 = fz(c1);
     let f2 = fz(c2);
-    for (let k = 0; k < 40; k += 1) {
+    // 24 golden steps leave 0.618^24 ≈ 1e-5 of the move: far below the grid.
+    for (let k = 0; k < 24; k += 1) {
       if (f1 < f2) {
         hi = c2;
         c2 = c1;
