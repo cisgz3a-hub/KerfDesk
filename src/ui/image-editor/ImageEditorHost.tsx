@@ -9,7 +9,7 @@ import { lazy, Suspense } from 'react';
 import { rejectAsLoadFailure } from '../common/lazy-load-failure';
 import { LazyOverlayBoundary } from '../common/LazyOverlayBoundary';
 import { useImageEditorStore } from './image-editor-store';
-import { useDesignStudioStore } from '../design-studio/design-studio-store';
+import { useDesignStudioShell } from '../design-studio/design-studio-shell';
 
 const LazyOverlay = lazy(() =>
   import('./ImageEditorOverlay')
@@ -21,7 +21,7 @@ export function ImageEditorHost(props: { readonly embedded?: boolean } = {}): JS
   const hasSession = useImageEditorStore((s) => s.session !== null);
   const loadState = useImageEditorStore((s) => s.loadState);
   const closeEditor = useImageEditorStore((s) => s.closeEditor);
-  const designIsOpen = useDesignStudioStore((s) => s.session !== null);
+  const designIsOpen = useDesignStudioShell((s) => s.sessionOpen);
   if (designIsOpen && !props.embedded) return null;
   if (!hasSession && loadState.kind !== 'loading') return null;
   return (

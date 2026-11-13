@@ -27,7 +27,7 @@ import { handleEditorKeyDown, handleEditorKeyUp } from './editor-shortcuts';
 import { useImageEditorStore } from './image-editor-store';
 import { useCompositeDoc } from './use-composite-doc';
 import { useQuickMaskStore } from './quick-mask-store';
-import { useDesignStudioStore } from '../design-studio/design-studio-store';
+import { closeDesignStudio } from '../design-studio/design-studio-shell';
 import { PhotoQuickActions } from './PhotoQuickActions';
 
 export function ImageEditorOverlay(
@@ -78,7 +78,7 @@ export function ImageEditorOverlay(
           // trace dialog (V2 plan F) via the toolbar's openImageDialog seam.
           applyAndTrace: () =>
             applyAndTrace((id) => {
-              if (props.embedded) useDesignStudioStore.getState().closeStudio();
+              if (props.embedded) closeDesignStudio();
               traceUpdatedImage(id, openImageDialog);
             }),
           close: closeEditor,

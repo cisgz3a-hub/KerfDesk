@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { useDesignStudioStore } from '../design-studio';
+import { useDesignStudioStore } from '../design-studio/design-studio-store';
 import { EditionContext, setActiveEdition, UNRESTRICTED_EDITION } from '../licensing/edition';
 import { ToolStrip } from '../workspace/ToolStrip';
 import { Toolbar } from './Toolbar';

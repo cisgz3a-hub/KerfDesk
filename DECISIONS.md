@@ -15009,6 +15009,51 @@ construction lines could be extended to a boundary but never cut back to one.
    geometry changed kind (a circle's diameter once it is an arc) is dropped.
    `.lf2`, compile and G-code are untouched.
 
+### Amendment 9 (2026-11-13) - The Studio's session code loads on the first Open, not at boot
+
+The overlay was lazy from the start, but `design-studio-store.ts` was not: the
+always-mounted host, the toolbar button, the Image Studio host and the
+unsaved-changes guard all imported it, so the store and everything it imports
+(sessions, history, recovery drafts, typed entry, dimensions, trim, extend,
+corner and arrange operations) were part of every first download. Amendments
+5-8 grew that code, and the boot byte guard (performance audit S9-P3-2) had to
+be raised for it.
+
+1. **A boot shell.** `design-studio-shell.ts` is all the workspace imports: a
+   small store with "is a session open", "is the Studio code loading" and "why
+   it could not load"; Close; and the unapplied-drawing check for the
+   unsaved-changes prompt. It imports neither the session store nor
+   `core/design`. Open lives beside it in `design-studio-open.ts`, the only
+   boot module that fetches the Studio's session code.
+2. **The runtime chunk.** `design-studio-runtime.ts` is fetched on the first
+   Open. Loading it loads the session store, which registers its open, close
+   and unapplied-drawing check with the shell and mirrors `session !== null`
+   into it, and it starts saving the drawing for recovery
+   (`startDesignSessionPersistence`, the body of the host's former hook). That
+   starts before any session opens, so the first drawing is saved exactly as
+   before, and it runs for the page's life, as the always-mounted host did.
+3. **Nothing changes once loaded.** Open is synchronous again after the first
+   one, as the store's own `openStudio` is. Before the first Open there is no
+   drawing, so Close is a no-op and the unsaved-changes prompt counts none,
+   which is what the store reported then too. A store that loads later starts
+   from the same state a document switch leaves it in, so reopening still
+   prefers the stash, then the last page's drawing, then a kept drawing, then
+   the project's own (Amendment 3, ADR-590 Amendment 1).
+4. **While it loads.** The host shows the same "Opening Design Studio..." card
+   the overlay chunk shows. If the code cannot be fetched (a window left on the
+   previous build), the host's LazyOverlayBoundary shows its "Design Studio
+   could not load" notice; Close dismisses it and a later Open asks again.
+5. **Studio-only core leaves the `core` chunk.** `vite.config.ts` forces all of
+   `src/core/` into the eager `core` chunk, so `core/design/{entry,dimensions,
+   snap,ops}` are left to Rollup instead. The pieces the workspace itself uses
+   (two snap helpers for its own snap markers, and the dimension check the
+   project validator runs) still land in boot chunks; the rest loads with the
+   Studio.
+6. Measured on the browser web build (`check-boot-bundle.mjs`'s closure, gzip
+   level 6): boot JavaScript 2,383,200 -> 2,365,869 bytes (-17,331 bytes,
+   0.7 %), raw 7,533,844 -> 7,477,321 bytes. `.lf2`, compile and G-code are
+   untouched.
+
 ## ADR-273 - CNC exports record incident-grade tool, settings, and profile provenance (2026-08-01)
 
 **Date:** 2026-08-01
