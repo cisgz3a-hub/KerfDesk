@@ -3,6 +3,7 @@ import { isVectorPathObject } from '../../core/geometry';
 import { joinOpenVectorPaths, type VectorPathJoinPlan } from '../../core/geometry/vector-path-join';
 import type { Scene } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
+import { retracedPathsNote } from '../state/retraced-paths-note';
 
 export function JoinPathsDialog(props: {
   readonly scene: Scene;
@@ -88,7 +89,8 @@ function JoinSummary(props: {
       {summary.tabbedPaths > 0 ? (
         <p>{summary.tabbedPaths} paths have manual holding tabs.</p>
       ) : null}
-      {summary.joins + summary.closures === 0 ? (
+      {summary.retraced > 0 ? <p>{retracedPathsNote(summary.retraced)}</p> : null}
+      {summary.joins + summary.closures === 0 && summary.retraced === 0 ? (
         <p>
           No matching endpoints within this gap. Assign paths to the same operation in the artwork
           settings, or increase the gap.

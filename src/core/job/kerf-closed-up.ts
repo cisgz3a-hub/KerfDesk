@@ -18,6 +18,25 @@ import { pointInPolygon } from '../geometry';
 import type { Polyline, Vec2 } from '../scene';
 import { polylineBounds, type SegmentBounds } from './segment-bounds';
 
+/** ADR-486 Amendment 1: the kerf offset succeeded but closed up `count` holes or
+ * slots narrower than twice the offset (parts, when the offset is negative), so
+ * they are missing from the cut. */
+export type KerfClosedUpDiagnostic = {
+  readonly kind: 'kerf-offset-closed-up';
+  readonly layerName: string;
+  readonly count: number;
+  readonly kerfOffsetMm: number;
+};
+
+/** ADR-486 Amendment 4: `count` closed contours enclose no area (a line drawn
+ * twice, a path out and back over itself), so the offset dropped them,
+ * whichever way it went. */
+export type KerfNoAreaDiagnostic = {
+  readonly kind: 'kerf-offset-no-area';
+  readonly layerName: string;
+  readonly count: number;
+};
+
 // Below the offset engine's 1 µm grid an offset contour can land on its source
 // contour, where a probe cannot tell inside from outside.
 const MIN_CHECKED_OFFSET_MM = 0.001;

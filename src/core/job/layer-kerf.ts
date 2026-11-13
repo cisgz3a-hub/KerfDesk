@@ -29,6 +29,7 @@
 import { toMachineCoords, type DeviceProfile } from '../devices';
 import { laserArcMovesEnabled } from '../devices/laser-arc-moves';
 import { offsetClosedPolylinesForKerfChecked } from '../geometry/kerf-offset';
+import { closedContourEnclosesNoArea } from '../geometry/zero-area-contour';
 import {
   applyTransform,
   type ColoredPath,
@@ -81,6 +82,9 @@ export type LayerKerfResult = LineSegmentsWithTabs & {
   /** Holes or slots (parts, when the offset is negative) the offset closed up
    * entirely, so they are missing although the engine succeeded. */
   readonly closedUp: number;
+  /** Closed contours that enclose no area (a line drawn twice, a path out and
+   * back), which the offset drops on either side (ADR-486 Amendment 4). */
+  readonly noArea: number;
 };
 
 // For each ring of a path: how many rings of other paths enclose it, and how
@@ -90,7 +94,11 @@ type RingDepths = {
   readonly total: ReadonlyArray<number>;
 };
 
-type GroupOffset = { readonly rings: ReadonlyArray<Polyline>; readonly closedUp: number };
+type GroupOffset = {
+  readonly rings: ReadonlyArray<Polyline>;
+  readonly closedUp: number;
+  readonly noArea: number;
+};
 
 const NO_DEPTHS: RingDepths = { outside: [], total: [] };
 
@@ -133,7 +141,7 @@ export function withLayerKerf(
   contextDepths?: ReadonlyMap<Polyline, KerfContextDepth>,
 ): LayerKerfResult {
   const pending = collected.kerf;
-  if (pending.length === 0) return { ...collected, failed: false, closedUp: 0 };
+  if (pending.length === 0) return { ...collected, failed: false, closedUp: 0, noArea: 0 };
   const rings = pending.map((group) => group.sources.map((source) => source.polyline));
   const depths =
     contextDepths === undefined
@@ -147,11 +155,13 @@ export function withLayerKerf(
     : (segment: CutSegment) => segment;
   let failed = false;
   let closedUp = 0;
+  let noArea = 0;
   const offsets = pending.map((group, index): OffsetContours => {
     const sources = rings[index] ?? [];
     const offset = offsetGroup(sources, depths[index] ?? NO_DEPTHS, layer.kerfOffsetMm);
     if (offset === null) failed = true;
     closedUp += offset?.closedUp ?? 0;
+    noArea += offset?.noArea ?? 0;
     const started = startKerfRingsAtSources(offset?.rings ?? [], sources, layer.kerfOffsetMm);
     const leadSources = kerfLeadSources(started, group.sources, layer.kerfOffsetMm);
     return {
@@ -163,7 +173,7 @@ export function withLayerKerf(
       tabs: placedTabPointsForKerfContours(started, group.sources),
     };
   });
-  return { ...interleave(collected, pending, offsets), failed, closedUp };
+  return { ...interleave(collected, pending, offsets), failed, closedUp, noArea };
 }
 
 // Each offset contour carries the scene contour it was offset from, when its
@@ -197,6 +207,9 @@ export function layerKerfDiagnostics(
       kerfOffsetMm: layer.kerfOffsetMm,
     });
   }
+  if (result.noArea > 0) {
+    diagnostics.push({ kind: 'kerf-offset-no-area', layerName: layer.name, count: result.noArea });
+  }
   return diagnostics;
 }
 
@@ -227,7 +240,20 @@ function offsetGroup(
   depths: RingDepths,
   kerfOffsetMm: number,
 ): GroupOffset | null {
-  const shrinking = depths.total.map((depth) => kerfShrinksContour(depth, kerfOffsetMm));
+  // The offset reads its contours by the even-odd rule first, which leaves no
+  // region for a contour that encloses none: it is dropped whichever way the
+  // offset goes, and named for what it is rather than as a hole that closed up
+  // (ADR-486 Amendment 4).
+  const empty = rings.map(
+    (ring) =>
+      Number.isFinite(kerfOffsetMm) &&
+      kerfOffsetMm !== 0 &&
+      closedContourEnclosesNoArea(ring.points),
+  );
+  const noArea = empty.filter(Boolean).length;
+  const shrinking = depths.total.map(
+    (depth, index) => empty[index] !== true && kerfShrinksContour(depth, kerfOffsetMm),
+  );
   const parity = (depths.outside[0] ?? 0) % 2;
   if (depths.outside.every((depth) => depth % 2 === parity)) {
     const offset = offsetOrNull(rings, parity === 0 ? kerfOffsetMm : -kerfOffsetMm);
@@ -235,6 +261,7 @@ function offsetGroup(
     return {
       rings: offset,
       closedUp: countClosedUpRegions(rings, depths.total, shrinking, offset),
+      noArea,
     };
   }
   const out: Polyline[] = [];
@@ -247,7 +274,7 @@ function offsetGroup(
     if (offset.length === 0 && shrinking[index] === true) closedUp += 1;
     out.push(...offset);
   }
-  return { rings: out, closedUp };
+  return { rings: out, closedUp, noArea };
 }
 
 function offsetOrNull(

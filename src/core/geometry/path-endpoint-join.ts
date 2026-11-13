@@ -1,4 +1,5 @@
 import { curveEndpointJoin, type CurveSubpath, type PathSegment, type Vec2 } from '../scene';
+import { curveEnclosesNoArea } from './zero-area-contour';
 
 export type JoinableCurve = {
   readonly curve: CurveSubpath;
@@ -14,6 +15,9 @@ export type EndpointJoinResult = {
   readonly joins: number;
   readonly closures: number;
   readonly ambiguousEndpoints: number;
+  /** Chains that would close into a loop enclosing no area (a line drawn twice,
+   * or a path out and back over itself). Left as they were (ADR-486 Amd 4). */
+  readonly retraced: number;
 };
 
 type Endpoint = { readonly curve: number; readonly end: 0 | 1; readonly point: Vec2 };
@@ -33,24 +37,44 @@ export function joinCurveEndpointsWithin(
   const members = new Map<number, ReadonlyArray<number>>();
   let joins = 0;
   let closures = 0;
+  let retraced = 0;
   const visited = new Set<number>();
   for (let index = 0; index < curves.length; index += 1) {
     if (visited.has(index) || (!links.has(index * 2) && !links.has(index * 2 + 1))) continue;
     const component = connectedCurves(index, links);
     for (const member of component) visited.add(member);
-    const free = component
-      .flatMap((member) => [member * 2, member * 2 + 1])
-      .find((id) => !links.has(id));
-    const firstEndpoint = free ?? index * 2;
-    const result = assembleChain(curves, links, firstEndpoint, free === undefined);
+    const result = componentChain(curves, links, component, index);
     if (result === null) continue;
+    if (result === 'retraced') {
+      retraced += 1;
+      continue;
+    }
     const leader = component[0] ?? index;
     for (const member of component) replacements.set(member, member === leader ? result : null);
     members.set(leader, component);
     joins += component.length - 1;
-    if (free === undefined) closures += 1;
+    if (result.closed) closures += 1;
   }
-  return { replacements, members, joins, closures, ambiguousEndpoints };
+  return { replacements, members, joins, closures, ambiguousEndpoints, retraced };
+}
+
+// The chain a component makes: open from a free end, or closed when it has
+// none. Closing a line drawn twice, or a path out and back over itself, makes
+// a loop with no area, which Kerf Offset drops (ADR-486 Amendment 4); such a
+// component is left as it was, where it burns as drawn and Delete Duplicates
+// can remove an exact second copy.
+function componentChain(
+  curves: ReadonlyArray<JoinableCurve>,
+  links: ReadonlyMap<number, number>,
+  component: ReadonlyArray<number>,
+  index: number,
+): CurveSubpath | 'retraced' | null {
+  const free = component
+    .flatMap((member) => [member * 2, member * 2 + 1])
+    .find((id) => !links.has(id));
+  const result = assembleChain(curves, links, free ?? index * 2, free === undefined);
+  if (result === null) return null;
+  return result.closed && curveEnclosesNoArea(result) ? 'retraced' : result;
 }
 
 function endpointLinks(
