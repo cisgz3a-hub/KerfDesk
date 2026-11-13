@@ -63,7 +63,7 @@ Run order puts tools that make or change burns first, then new tools, then the r
 | T22 | Bitmap | Convert to Bitmap | `tools.convert-to-bitmap` | ledgered: P3 6 (known 1) |
 | T23 | Trace | Trace Image | `tools.trace-image` | ledgered: P3 2 |
 | T24 | Trace | Re-trace Original | `tools.retrace-original` | ledgered: P1 3 (fix session proposed), P3 2 |
-| T25 | Trace | Multi-File Trace | `tools.multi-file-trace` | |
+| T25 | Trace | Multi-File Trace | `tools.multi-file-trace` | ledgered: P2 2 (fix session proposed), P3 5 |
 | T26 | Vector | Convert to Path | `tools.convert-to-path` | |
 | T27 | Vector | Generate Path From Cut | `tools.generate-path-from-cut` | |
 | T28 | Vector | Weld | `tools.weld` | |

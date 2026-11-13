@@ -1,0 +1,150 @@
+// T25b: batch behaviour on mixed inputs with the real decoders where Node can run them
+// (TIFF, Netpbm: real decodeBatchRasterBytes; PNG/JPEG size + density: real header readers),
+// real tracer and writers, a fake folder that records names. Only the browser's PNG/JPEG pixel
+// decode is injected (jsdom cannot decode); for a file whose header the readers reject, the
+// browser <img> fallback is modelled by its own error text ("Failed to decode image — unsupported format?").
+import { describe, it } from 'vitest';
+import type { RawImageData } from '../t22-main/src/core/trace';
+import { useStore } from '../t22-main/src/ui/state';
+import {
+  buildMultiFileTraceExports,
+  runMultiFileTrace,
+  traceFileWriterForDirectory,
+} from '../t22-main/src/ui/commands/multi-file-trace-action';
+import { readImageNaturalSize } from '../t22-main/src/ui/trace/image-loader';
+import { makePixels, seedRaster, setupProject, W, H } from '../zz-t23/t23-fixture';
+import { jpegBytes, logger, pgmBytes, pngBytes, r3, readSvg, tiffBytes } from './t25-common';
+
+const log = logger('C:/Users/stolk/kd-t1/zz-t25/t25b.log');
+// jsdom's Blob has no arrayBuffer(); browsers do. Same bytes via FileReader.
+if (typeof Blob.prototype.arrayBuffer !== 'function')
+  Blob.prototype.arrayBuffer = function (this: Blob) {
+    return new Promise<ArrayBuffer>((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result as ArrayBuffer);
+      r.onerror = () => rej(r.error);
+      r.readAsArrayBuffer(this);
+    });
+  };
+const PIX = makePixels();
+const GRAY = new Uint8Array(W * H);
+for (let i = 0; i < W * H; i++) GRAY[i] = PIX.data[i * 4]!;
+const BLANK: RawImageData = { width: W, height: H, data: new Uint8ClampedArray(W * H * 4).fill(255) };
+
+const f = (name: string, bytes: Uint8Array | string, type = '') => new File([bytes], name, { type });
+async function naturalOrImgError(file: File) {
+  try {
+    return await Promise.race([
+      readImageNaturalSize(file),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('jsdom <img> fallback')), 200)),
+    ]);
+  } catch (e) {
+    if ((e as Error).message === 'jsdom <img> fallback') throw new Error('Failed to decode image — unsupported format?');
+    throw e;
+  }
+}
+function fakeFolder(existing: string[] = []) {
+  const names = new Set(existing);
+  const writes: string[] = [];
+  const texts = new Map<string, string>();
+  return {
+    names, writes, texts,
+    dir: {
+      exists: async (n: string) => names.has(n),
+      file: (n: string) => ({
+        write: async (data: unknown) => {
+          names.add(n);
+          writes.push(n);
+          texts.set(n, String(data));
+        },
+      }),
+    } as never,
+  };
+}
+
+describe('T25b batch behaviour', () => {
+  it('1 mixed formats, corrupt + empty + blank + unsupported in the middle, duplicate stems', async () => {
+    setupProject([seedRaster()]);
+    const before = useStore.getState();
+    const files = [
+      f('logo.png', pngBytes(W, H, 300), 'image/png'),
+      f('logo.jpg', jpegBytes(W, H, 150), 'image/jpeg'),
+      f('scan.tif', tiffBytes(W, H, GRAY, { value: 100, unit: 3 }), 'image/tiff'), // 100 px/cm
+      f('corrupt.tif', new Uint8Array([0x49, 0x49, 42, 0, 8, 0, 0, 0, 99, 0, 1, 2, 3]), 'image/tiff'),
+      f('empty.png', new Uint8Array(0), 'image/png'),
+      f('blank.png', pngBytes(W, H, 300), 'image/png'),
+      f('drawing.pdf', '%PDF-1.4\n%%EOF', 'application/pdf'),
+      f('scan.pgm', pgmBytes(W, H, GRAY)),
+      f('logo-2.png', pngBytes(W, H, 300), 'image/png'),
+      f('scan.tif', tiffBytes(W, H, GRAY, { value: 600, unit: 2 }), 'image/tiff'), // same name again, 600 DPI
+    ];
+    const folder = fakeFolder(['logo-trace.svg']); // a file from an earlier batch
+    const toasts: string[] = [];
+    const progress: string[] = [];
+    await runMultiFileTrace(files, (m, k) => toasts.push(`${k}: ${m}`), {
+      readNaturalSize: naturalOrImgError,
+      loadImage: async (file) => {
+        if (file.name === 'blank.png') return BLANK;
+        if (file.name.endsWith('.png') || file.name.endsWith('.jpg')) return PIX;
+        throw new Error('Failed to decode image — unsupported format?');
+      },
+      onProgress: (c, t) => progress.push(`${c}/${t}`),
+      write: traceFileWriterForDirectory(folder.dir),
+      settingsLabel: 'the Line Art preset',
+    });
+    log(`== 1 progress ${progress.join(' ')}`);
+    log(`toasts:\n  ${toasts.join('\n  ')}`);
+    log(`written (in order): ${folder.writes.join(', ')}`);
+    for (const n of folder.writes) {
+      const d = readSvg(folder.texts.get(n)!);
+      log(`  ${n}: ${r3(d.widthMm)} x ${r3(d.heightMm)} mm`);
+    }
+    log(`oracle sizes: logo.png 300 DPI -> ${r3((W / 300) * 25.4)} x ${r3((H / 300) * 25.4)}; logo.jpg 150 DPI -> ${r3((W / 150) * 25.4)} x ${r3((H / 150) * 25.4)}; scan.tif 100 px/cm -> ${W / 10} x ${H / 10}; scan.pgm default 254 DPI -> ${W / 10} x ${H / 10}; scan.tif 600 DPI -> ${r3((W / 600) * 25.4)} x ${r3((H / 600) * 25.4)}`);
+    const after = useStore.getState();
+    log(`workspace untouched: project same object ${after.project === before.project}; undo ${before.undoStack.length}->${after.undoStack.length}`);
+  });
+
+  it('2 cancel after the 2nd file is written and cancel while the 3rd traces', async () => {
+    for (const when of ['after-write-2', 'during-3'] as const) {
+      const ctrl = new AbortController();
+      const folder = fakeFolder();
+      const toasts: string[] = [];
+      const files = Array.from({ length: 5 }, (_, i) => f(`p${i + 1}.png`, pngBytes(W, H, 300), 'image/png'));
+      let traces = 0;
+      await runMultiFileTrace(files, (m, k) => toasts.push(`${k}: ${m}`), {
+        loadImage: async () => PIX,
+        signal: ctrl.signal,
+        onProgress: (c) => {
+          if (when === 'during-3' && c === 3) setTimeout(() => ctrl.abort(), 0);
+        },
+        write: async (file, signal) => {
+          const ok = await traceFileWriterForDirectory(folder.dir)(file, signal);
+          if (when === 'after-write-2' && folder.writes.length === 2) ctrl.abort();
+          return ok;
+        },
+        trace: async (image, options, signal) => {
+          traces++;
+          const { traceImageToColoredPaths } = await import('../t22-main/src/core/trace/trace-to-paths');
+          await new Promise((r) => setTimeout(r, 5));
+          signal?.throwIfAborted();
+          return traceImageToColoredPaths(image, options);
+        },
+      });
+      log(`== 2 ${when}: traces started ${traces}; written ${folder.writes.join(', ')}; toasts ${JSON.stringify(toasts)}`);
+    }
+  });
+
+  it('3 size overrides: tiny DPI, width, and a PNG whose pHYs sits after 1.1 MB of text', async () => {
+    const run = async (name: string, bytes: Uint8Array, size?: never) => {
+      const r = await buildMultiFileTraceExports([f(name, bytes, 'image/png')], { loadImage: async () => PIX, ...(size ? { size } : {}) });
+      const d = r.files[0] ? readSvg(r.files[0].text) : null;
+      return d ? `${r3(d.widthMm)} x ${r3(d.heightMm)} mm (${r.files[0]!.densitySource}), svg ${r.files[0]!.text.length} B` : JSON.stringify(r.skipped);
+    };
+    log(`== 3 dpi 0.01: ${await run('t.png', pngBytes(W, H, 300), { kind: 'dpi', dpi: 0.01 } as never)}`);
+    log(`   width 100 mm: ${await run('t.png', pngBytes(W, H, 300), { kind: 'width', widthMm: 100 } as never)}`);
+    const padded = pngBytes(W, H, 300, 1_100_000);
+    log(`   pHYs after 1.1 MB tEXt (${padded.length} B): batch ${await run('big.png', padded)}`);
+    const { readImageDensity } = await import('../t22-main/src/ui/common/image-density');
+    log(`   Import Image density reader on same file: ${JSON.stringify(await readImageDensity(f('big.png', padded)))} -> ${r3((W / 300) * 25.4)} mm wide`);
+  });
+});

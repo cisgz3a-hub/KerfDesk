@@ -1,0 +1,40 @@
+// How long one batch file holds the shared trace worker: real tracer (Line Art), photo-like
+// synthetic grids at the preview edge and at the finer grid the batch planned for a 3000 x 2250
+// px file at the default density (2744 px edge, from t25r.log).
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { TRACE_PRESETS, traceImageToColoredPaths, type TraceOptions } from '../t22-main/src/core/trace';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t25r/t25r-time.log';
+writeFileSync(LOG, '');
+
+function photo(w: number, h: number) {
+  const data = new Uint8ClampedArray(w * h * 4);
+  let seed = 7;
+  const rnd = (): number => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  const blobs = Array.from({ length: 60 }, () => ({ x: rnd() * w, y: rnd() * h, r: (0.02 + rnd() * 0.08) * w }));
+  for (let y = 0; y < h; y += 1)
+    for (let x = 0; x < w; x += 1) {
+      let v = 255 * (0.35 + 0.5 * (x / w)) + (rnd() - 0.5) * 60;
+      for (const b of blobs) if ((x - b.x) ** 2 + (y - b.y) ** 2 < b.r * b.r) v -= 90;
+      const i = (y * w + x) * 4;
+      const c = Math.max(0, Math.min(255, v));
+      data[i] = c;
+      data[i + 1] = c;
+      data[i + 2] = c;
+      data[i + 3] = 255;
+    }
+  return { width: w, height: h, data };
+}
+
+it('times real Line Art traces', async () => {
+  for (const [w, h] of [
+    [1000, 750],
+    [2744, 2058],
+  ] as const) {
+    const img = photo(w, h);
+    const t = performance.now();
+    const paths = await traceImageToColoredPaths(img, TRACE_PRESETS['Line Art'] as TraceOptions);
+    appendFileSync(LOG, `${w}x${h}: ${Math.round(performance.now() - t)} ms, ${paths.length} paths\n`);
+  }
+});

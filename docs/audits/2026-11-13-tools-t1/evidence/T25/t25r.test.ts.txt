@@ -1,0 +1,269 @@
+// T25 refuter: Trace Image commit vs a running Multi-File Trace, on the WORKER path the shipped
+// app uses (the auditor's t25c ran the inline no-Worker path). A fake Worker class stands in for
+// trace-worker.ts at the postMessage level: it acks 'started' after a startup delay and answers
+// 'ok' after a cost that depends on the image, and terminate() kills its timers. Everything above
+// the transport is real: use-trace-worker-client (epochs, supersession, worker retirement),
+// retrySupersededTrace, runMultiFileTrace / traceImagesToVectorFiles (real job planning with
+// finer grid + preview-grid fallback, real SVG writer, real notice text), and the real
+// ImportImageDialog `commit` (its reportTraceCommitError). Only the commit's resolver is replaced
+// by "decode delay, then the real traceImageWithBoundaryMode on a 601 x 450 image", and it returns
+// the result with no paths so a trace that CAME BACK is visible as the commit's own
+// "produced no paths" warning toast, while a superseded commit is visible as nothing at all.
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { describe, expect, it, vi } from 'vitest';
+import type { RawImageData, TraceOptions } from '../t22-main/src/core/trace';
+import { TRACE_PRESETS } from '../t22-main/src/core/trace';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t25r/t25r.log';
+writeFileSync(LOG, '');
+let t0 = Date.now();
+const log = (s: string): void => {
+  appendFileSync(LOG, `${String(Date.now() - t0).padStart(5)}ms ${s}\n`);
+};
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+// ---- timings (ms, scaled ~1:10 from seconds-long real traces) ----
+const STARTUP = 30; // fresh worker module start
+const DIALOG_WIDTH = 601; // tag: the dialog's image
+let DIALOG_COST = 300;
+const BATCH_DECODE = 40;
+const DIALOG_DECODE = 20;
+const costFor = (w: number, h: number): number =>
+  w === DIALOG_WIDTH ? DIALOG_COST : Math.max(60, Math.round((w * h) / 20000));
+
+let workersCreated = 0;
+let workersTerminated = 0;
+class FakeWorker {
+  onmessage: ((e: { data: unknown }) => void) | null = null;
+  onerror: ((e: unknown) => void) | null = null;
+  private timers: ReturnType<typeof setTimeout>[] = [];
+  private warm = false;
+  private busyUntil = 0;
+  constructor() {
+    workersCreated += 1;
+  }
+  postMessage(req: { id: number; image: RawImageData }): void {
+    const now = Date.now();
+    const start = Math.max(now, this.busyUntil) + (this.warm ? 0 : STARTUP) - now;
+    this.warm = true;
+    const cost = costFor(req.image.width, req.image.height);
+    this.busyUntil = now + start + cost;
+    const who = req.image.width === DIALOG_WIDTH ? 'DIALOG' : `batch ${req.image.width}px`;
+    log(`  worker#${workersCreated} got request ${req.id} (${who}), cost ${cost}`);
+    this.timers.push(
+      setTimeout(() => this.onmessage?.({ data: { id: req.id, kind: 'started' } }), start),
+      setTimeout(() => {
+        log(`  worker answers request ${req.id} (${who})`);
+        this.onmessage?.({
+          data: {
+            id: req.id,
+            kind: 'ok',
+            paths: [
+              {
+                color: '#000000',
+                polylines: [
+                  {
+                    closed: true,
+                    points: [
+                      { x: 1, y: 1 },
+                      { x: 9, y: 1 },
+                      { x: 9, y: 9 },
+                      { x: 1, y: 9 },
+                    ],
+                  },
+                ],
+              },
+            ],
+            bounds: { minX: 1, minY: 1, maxX: 9, maxY: 9 },
+            width: req.image.width,
+            height: req.image.height,
+          },
+        });
+      }, start + cost),
+    );
+  }
+  terminate(): void {
+    workersTerminated += 1;
+    for (const t of this.timers) clearTimeout(t);
+    this.timers = [];
+  }
+}
+(globalThis as { Worker?: unknown }).Worker = FakeWorker;
+
+const dialogImage: RawImageData = (() => {
+  const w = DIALOG_WIDTH;
+  const h = 450;
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y += 1)
+    for (let x = 0; x < w; x += 1) {
+      const i = (y * w + x) * 4;
+      const v = x > 150 && x < 450 && y > 100 && y < 350 ? 0 : 255;
+      data[i] = v;
+      data[i + 1] = v;
+      data[i + 2] = v;
+      data[i + 3] = 255;
+    }
+  return { width: w, height: h, data };
+})();
+
+vi.mock('../t22-main/src/ui/trace/trace-commit-grid-note', async (orig) => ({
+  ...(await orig<Record<string, unknown>>()),
+  traceCommitGridForClaim: () => undefined,
+}));
+vi.mock('../t22-main/src/ui/trace/trace-commit-result', async () => {
+  const region = await import('../t22-main/src/ui/trace/region-enhance-trace');
+  return {
+    resolveTraceCommitResult: async (args: { options: TraceOptions; signal?: AbortSignal }) => {
+      await sleep(DIALOG_DECODE);
+      log('DIALOG commit asks the worker client to trace');
+      const r = await region.traceImageWithBoundaryMode(
+        dialogImage,
+        args.options,
+        null,
+        'crop',
+        args.signal,
+      );
+      log('DIALOG commit trace CAME BACK');
+      return { ...r, paths: [] };
+    },
+  };
+});
+
+const { commit } = await import('../t22-main/src/ui/trace/ImportImageDialog');
+const { runMultiFileTrace } = await import('../t22-main/src/ui/commands/multi-file-trace-action');
+const region = await import('../t22-main/src/ui/trace/region-enhance-trace');
+
+const LINE_ART = TRACE_PRESETS['Line Art'] as TraceOptions;
+
+type PressOutcome = { toasts: string[]; closed: boolean };
+async function pressTrace(label: string): Promise<PressOutcome> {
+  const toasts: string[] = [];
+  let closed = false;
+  log(`USER presses Trace (${label})`);
+  await commit(
+    {
+      file: new File([new Uint8Array(4)], 'photo.png', { type: 'image/png' }),
+      options: LINE_ART,
+      seed: { source: 'photo.png', id: 'r1', pixelWidth: DIALOG_WIDTH, pixelHeight: 450 } as never,
+      traceOutput: 'vector',
+    } as never,
+    {
+      traceExistingImage: (() => undefined) as never,
+      commitRasterizedTrace: (() => undefined) as never,
+      pushToast: ((m: string, k: string) => toasts.push(`${k}: ${m}`)) as never,
+      close: () => {
+        closed = true;
+      },
+      setBusy: () => undefined,
+      claimOwner: () => ({ project: { machine: undefined }, source: {} }) as never,
+      signal: new AbortController().signal,
+    },
+  );
+  log(`USER press (${label}) settled: toasts ${JSON.stringify(toasts)} closed ${closed}`);
+  return { toasts, closed };
+}
+
+function startBatch(n: number, natural = { width: 3000, height: 2250 }) {
+  const toasts: string[] = [];
+  const written: string[] = [];
+  const files = Array.from(
+    { length: n },
+    (_, i) => new File([new Uint8Array(4)], `b${i + 1}.png`, { type: 'image/png' }),
+  );
+  const done = runMultiFileTrace(files as never, ((m: string, k: string) => toasts.push(`${k}: ${m}`)) as never, {
+    readNaturalSize: async () => natural,
+    readDensity: async () => null,
+    decodeRaster: async () => null,
+    loadImage: async (file: { name: string }, maxEdge?: number) => {
+      await sleep(BATCH_DECODE);
+      const s = Math.min(1, (maxEdge ?? 1000) / Math.max(natural.width, natural.height));
+      const w = Math.round(natural.width * s);
+      const h = Math.round(natural.height * s);
+      log(`batch decoded ${file.name} at maxEdge ${maxEdge ?? 'preview'} -> ${w}x${h}`);
+      return { width: w, height: h, data: new Uint8ClampedArray(16) };
+    },
+    onProgress: (c: number) => log(`batch file ${c} starts`),
+    write: async (f: { filename: string }) => {
+      written.push(f.filename);
+      log(`batch wrote ${f.filename}`);
+      return true;
+    },
+  }).then(() => log(`batch finished; toasts ${JSON.stringify(toasts)}`));
+  return { done, toasts, written };
+}
+
+describe('T25 refuter: worker path', () => {
+  it('A: one press while batch file 1 traces', async () => {
+    t0 = Date.now();
+    appendFileSync(LOG, '\n== A: one press mid file 1\n');
+    const b = startBatch(3);
+    await sleep(150);
+    const r = await pressTrace('A1');
+    await b.done;
+    appendFileSync(LOG, `RESULT A: press toasts ${r.toasts.length}, closed ${r.closed}; batch wrote ${b.written.join(',')}\n`);
+    expect(r.toasts).toEqual([]);
+  });
+
+  it('B: keep pressing every time the press settles, until the trace comes back', async () => {
+    t0 = Date.now();
+    appendFileSync(LOG, '\n== B: repeated presses during file 1\n');
+    const b = startBatch(3);
+    await sleep(150);
+    const presses: PressOutcome[] = [];
+    for (let i = 1; i <= 8; i += 1) {
+      const r = await pressTrace(`B${i}`);
+      presses.push(r);
+      if (r.toasts.length > 0) break;
+      await sleep(10);
+    }
+    await b.done;
+    appendFileSync(
+      LOG,
+      `RESULT B: presses ${presses.length}, first with any feedback: ${presses.findIndex((p) => p.toasts.length > 0) + 1}; batch wrote ${b.written.join(',')}; batch toast ${JSON.stringify(b.toasts)}\n`,
+    );
+  });
+
+  it('C: a dialog preview at open, then one press (preview + commit share the budget)', async () => {
+    t0 = Date.now();
+    appendFileSync(LOG, '\n== C: dialog opened (preview) then Trace pressed\n');
+    const b = startBatch(3);
+    await sleep(150);
+    log('DIALOG opens: preview trace starts');
+    const preview = region
+      .traceImageWithBoundaryMode(dialogImage, LINE_ART, null, 'crop')
+      .then(() => log('DIALOG preview CAME BACK'))
+      .catch((e: Error) => log(`DIALOG preview dropped: ${e.name}`));
+    await sleep(60);
+    const r1 = await pressTrace('C1');
+    await sleep(10);
+    const r2 = await pressTrace('C2');
+    await preview;
+    await b.done;
+    appendFileSync(
+      LOG,
+      `RESULT C: C1 toasts ${r1.toasts.length}, C2 toasts ${r2.toasts.length}; batch wrote ${b.written.join(',')}; batch toast ${JSON.stringify(b.toasts)}\n`,
+    );
+  });
+
+  it('D: press in the gap after file 1 is written (next file decoding)', async () => {
+    t0 = Date.now();
+    appendFileSync(LOG, '\n== D: press in the gap between files\n');
+    const b = startBatch(3);
+    // wait until file 1 is written
+    while (b.written.length < 1) await sleep(2);
+    const r = await pressTrace('D1');
+    await b.done;
+    appendFileSync(LOG, `RESULT D: toasts ${r.toasts.length}; batch wrote ${b.written.join(',')}\n`);
+  });
+
+  it('E: press after the batch has finished', async () => {
+    t0 = Date.now();
+    appendFileSync(LOG, '\n== E: press after the batch\n');
+    const b = startBatch(2);
+    await b.done;
+    const r = await pressTrace('E1');
+    appendFileSync(LOG, `RESULT E: toasts ${JSON.stringify(r.toasts)}\n`);
+    expect(r.toasts.length).toBe(1);
+    appendFileSync(LOG, `workers created ${workersCreated}, terminated ${workersTerminated}\n`);
+  });
+});

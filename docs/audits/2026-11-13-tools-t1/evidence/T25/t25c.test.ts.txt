@@ -1,0 +1,67 @@
+// T25c: Trace Image used while a Multi-File Trace batch runs (the batch leaves the editor usable).
+// Both share the one trace client (use-trace-worker-client); in Node there is no Worker, so both run
+// on its cooperative inline path, which honours the same request epochs as the worker path.
+// Real batch (real tracer), real Trace dialog commit (T23 harness, decode replaced by the pixels).
+import { describe, it, vi } from 'vitest';
+import type { RawImageData } from '../t22-main/src/core/trace';
+import { useStore } from '../t22-main/src/ui/state';
+import { runMultiFileTrace } from '../t22-main/src/ui/commands/multi-file-trace-action';
+import { makePixels, runTrace, seedRaster, setupProject, W, H } from '../zz-t23/t23-fixture';
+import { logger, pngBytes } from './t25-common';
+
+vi.mock('../t22-main/src/ui/trace/off-thread-trace-decode', async () => {
+  const transp = await import('../t22-main/src/ui/trace/raw-image-transparency');
+  return {
+    decodeTraceSourceImage: async () => {
+      const image = (globalThis as { __T23_PIXELS?: RawImageData }).__T23_PIXELS!;
+      return { image, hasTransparency: transp.rawImageHasTransparency(image) };
+    },
+  };
+});
+
+const log = logger('C:/Users/stolk/kd-t1/zz-t25/t25c.log');
+const PIX = makePixels();
+
+describe('T25c Trace Image during a batch', () => {
+  for (const startAt of [1, 2])
+    it(`commit Trace Image while batch file ${startAt} of 4 traces`, async () => {
+      const seed = seedRaster();
+      setupProject([seed]);
+      const batchToasts: string[] = [];
+      const written: string[] = [];
+      let single: Promise<{ toasts: string[]; closed: boolean }> | null = null;
+      const t0 = Date.now();
+      const events: string[] = [];
+      const batch = runMultiFileTrace(
+        Array.from({ length: 4 }, (_, i) => new File([pngBytes(W, H, 300)], `b${i + 1}.png`, { type: 'image/png' })),
+        (m, k) => batchToasts.push(`${k}: ${m}`),
+        {
+          loadImage: async () => PIX,
+          onProgress: (c) => {
+            events.push(`${Date.now() - t0}ms batch file ${c} starts`);
+            if (c === startAt)
+              setTimeout(() => {
+                events.push(`${Date.now() - t0}ms user presses Trace in the Trace Image dialog`);
+                single = runTrace(seed, 'Line Art').then((r) => {
+                  events.push(`${Date.now() - t0}ms dialog commit settled`);
+                  return r;
+                });
+              }, 5);
+          },
+          write: async (f) => {
+            events.push(`${Date.now() - t0}ms batch wrote ${f.filename}`);
+            written.push(f.filename);
+            return true;
+          },
+          settingsLabel: 'the Line Art preset',
+        },
+      );
+      await batch;
+      const s = single ? await single : null;
+      const traced = useStore.getState().project.scene.objects.filter((o) => o.kind === 'traced-image').length;
+      log(`\n== start at file ${startAt}`);
+      log(events.join('\n'));
+      log(`batch toasts: ${JSON.stringify(batchToasts)}; written ${written.join(', ')}`);
+      log(`dialog commit: toasts ${JSON.stringify(s?.toasts)}, dialog closed ${s?.closed}, traced objects in scene ${traced}, undo entries ${useStore.getState().undoStack.length}`);
+    });
+});
