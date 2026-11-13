@@ -14,7 +14,8 @@ import { selectedObjectIds } from '../state/scene-group-actions';
 import { useStore } from '../state/store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore, type ToolMode } from '../state/ui-store';
-import { warpDeformRequestForSelection } from '../state/warp-deform-plan';
+import { variableTextSkippedNotice } from '../state/geometry-tool-sources';
+import { isVariableText, warpDeformRequestForSelection } from '../state/warp-deform-plan';
 import { useWarpDeformSession, type WarpDeformRequest } from '../state/warp-deform-session';
 import { canvasTheme } from '../theme/canvas-theme';
 import { deriveVariableBarcodeDisplay } from './variable-barcode-display';
@@ -52,10 +53,15 @@ export function startWarpDeformTool(grid: WarpDeformGrid): void {
   const current = deriveVariableBarcodeDisplay(app.project).project;
   const request = warpDeformRequestForSelection(current.scene, selectedObjectIds(app), grid);
   if (request === null) {
+    const ids = new Set(selectedObjectIds(app));
+    const variableText = current.scene.objects.filter(
+      (object) => ids.has(object.id) && isVariableText(object),
+    ).length;
+    const leftOut = variableText === 0 ? '' : ` ${variableTextSkippedNotice(variableText)}`;
     useToastStore
       .getState()
       .pushToast(
-        `Select unlocked vector artwork to ${grid === 'warp' ? 'warp' : 'deform'} first.`,
+        `Select unlocked vector artwork to ${grid === 'warp' ? 'warp' : 'deform'} first.${leftOut}`,
         'info',
       );
     return;

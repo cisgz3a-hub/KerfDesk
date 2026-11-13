@@ -53,7 +53,7 @@ function load(objects: ReadonlyArray<VectorSceneObject> = parityObjects()): void
 
 function targets(): ReadonlyArray<VectorSceneObject> {
   const state = useStore.getState();
-  return offsetShapesTargets(state.project.scene, selectedObjectIds(state));
+  return offsetShapesTargets(state.project.scene, selectedObjectIds(state), false).targets;
 }
 
 // The committed document after an action. Equal documents compile to equal

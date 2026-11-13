@@ -1,14 +1,15 @@
-import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
-import { isVectorPathObject, type VectorSceneObject } from '../../core/geometry';
+import type { VectorSceneObject } from '../../core/geometry';
 import { joinOpenVectorPaths } from '../../core/geometry/vector-path-join';
 import { unionVectorObjects } from '../../core/geometry/vector-path-union';
 import { canonicalArtworkOrder } from '../../core/artwork-order';
 import { pathUsesOperation, type Project, type Scene } from '../../core/scene';
 import type { PathNodeRef } from './path-node-edit-actions';
 import { pruneOrphanLayers, pushUndo } from './scene-mutations';
+import { removedTabsNotice } from './removed-tabs-notice';
+import { repairReplacedSources } from './replaced-sources-repair';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
 import { useToastStore } from './toast-store';
-import { repairRemovedObjectReferences } from './repair-object-dependencies';
+import { vectorRepairSources } from './vector-repair-sources';
 
 export type VectorRepairActions = {
   readonly unionSilhouetteSelection: (operationId: string) => boolean;
@@ -55,16 +56,17 @@ export function vectorRepairActions(set: RepairSet): VectorRepairActions {
 
 function unionSelection(state: RepairState, operationId: string): RepairState | RepairMutation {
   const scene = state.project.scene;
-  const selected = selectedRepairObjects(state);
+  const unionMessage = 'Select closed vector shapes and choose one of their operations.';
+  const selected = selectedRepairObjects(state, unionMessage);
   const operation = scene.layers.find((candidate) => candidate.id === operationId);
+  if (selected === null) return state;
   if (
-    selected.length === 0 ||
     operation === undefined ||
     !selected.some((object) =>
       object.paths.some((path) => pathUsesOperation(object, path, operation)),
     )
   ) {
-    warn('Select closed vector shapes and choose one of their operations.');
+    warn(unionMessage);
     return state;
   }
   const id = `union-${crypto.randomUUID()}`;
@@ -87,32 +89,34 @@ function unionSelection(state: RepairState, operationId: string): RepairState | 
   });
   const order = canonicalArtworkOrder(scene);
   const firstInOrder = order.find((objectId) => selectedIds.has(objectId));
-  const next = pruneOrphanLayers(
-    removeObjectIdsFromGroups(
-      {
-        ...scene,
-        objects,
-        ...(scene.artworkOrder === undefined
-          ? {}
-          : {
-              artworkOrder: order.flatMap((objectId) =>
-                objectId === firstInOrder ? [id] : selectedIds.has(objectId) ? [] : [objectId],
-              ),
-            }),
-      },
-      selectedIds,
+  const next = repairReplacedSources(
+    pruneOrphanLayers(
+      removeObjectIdsFromGroups(
+        {
+          ...scene,
+          objects,
+          ...(scene.artworkOrder === undefined
+            ? {}
+            : {
+                artworkOrder: order.flatMap((objectId) =>
+                  objectId === firstInOrder ? [id] : selectedIds.has(objectId) ? [] : [objectId],
+                ),
+              }),
+        },
+        selectedIds,
+      ),
     ),
   );
   useToastStore.getState().pushToast(`Created one silhouette using ${operation.name}.`, 'success');
-  return commitRepair(state, next, [id]);
+  // The silhouette is a new outline without the sources' placed tabs (ADR-494 Amendment 3).
+  info(removedTabsNotice(selected, 'unioned shapes'));
+  next.report();
+  return commitRepair(state, next.scene, [id]);
 }
 
 function joinSelection(state: RepairState, toleranceMm: number): RepairState | RepairMutation {
-  const selected = selectedRepairObjects(state);
-  if (selected.length === 0) {
-    warn('Select unlocked vector artwork to join paths.');
-    return state;
-  }
+  const selected = selectedRepairObjects(state, 'Select unlocked vector artwork to join paths.');
+  if (selected === null) return state;
   const result = joinOpenVectorPaths(selected, state.project.scene.layers, toleranceMm);
   if (result.kind === 'error') {
     warn(result.error.message);
@@ -149,23 +153,28 @@ function joinSelection(state: RepairState, toleranceMm: number): RepairState | R
       `Joined ${plan.joins} gap(s), closed ${plan.closures} path(s). ${plan.remainingOpenPaths} open path(s) remain.`,
       'success',
     );
+  const repaired = repairReplacedSources(next);
+  repaired.report();
   return commitRepair(
     state,
-    repairRemovedObjectReferences(next).scene,
+    repaired.scene,
     plan.objects.map((object) => object.id),
   );
 }
 
-function selectedRepairObjects(state: RepairState): ReadonlyArray<VectorSceneObject> {
-  const ids = new Set(selectedObjectIds(state));
-  const objects = state.project.scene.objects.filter(
-    (object): object is VectorSceneObject =>
-      ids.has(object.id) &&
-      object.locked !== true &&
-      !isBooleanCompoundObject(object) &&
-      isVectorPathObject(object),
-  );
-  return objects.length === ids.size ? objects : [];
+// The sources Union and Join rebuild (ADR-350 Amendment 2), or null after a
+// warning. What the guard left out is named, as Weld names it.
+function selectedRepairObjects(
+  state: RepairState,
+  message: string,
+): ReadonlyArray<VectorSceneObject> | null {
+  const sources = vectorRepairSources(state.project.scene, selectedObjectIds(state));
+  if (sources === null || sources.kept.length === 0) {
+    warn(sources?.notice || message);
+    return null;
+  }
+  info(sources.notice);
+  return sources.kept;
 }
 
 function commitRepair(
@@ -187,4 +196,8 @@ function commitRepair(
 
 function warn(message: string): void {
   useToastStore.getState().pushToast(message, 'warning');
+}
+
+function info(message: string): void {
+  if (message !== '') useToastStore.getState().pushToast(message, 'info');
 }

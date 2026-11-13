@@ -740,6 +740,13 @@ the linked artwork.
    tab indices are retained. The node toolbar's two-anchor Join keeps its existing workflow.
 4. Both tools support laser and CNC artwork, commit one undo transaction, and leave the project
    unchanged on invalid or empty results. They do not operate a machine.
+5. Both leave variable text, variable barcodes and the registration jig as they are (ADR-350
+   Amendment 2). They edit the rest of the selection, and the dialog and a notice say what was
+   left out ("Variable text was left as text: use Bake Variable Text first to fix its value.").
+   A selection of only those keeps both commands disabled.
+6. Edge: when a source masks an image or guides text on a path, Union (like Weld and the
+   Booleans) and Join clear that reference and warn that the artwork "was merged into a new
+   shape"; the image burns unmasked, as the canvas then shows. Union names placed tabs it drops.
 
 ### F-A6c. Offset Shapes (ADR-410)
 
