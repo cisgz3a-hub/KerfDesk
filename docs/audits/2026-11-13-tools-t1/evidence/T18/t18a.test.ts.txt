@@ -1,0 +1,194 @@
+// T18 Flatten Image Mask: Flatten-specific behaviour through the real store,
+// the real bake (cropMaskedRasterImage) and the real output path.
+import { it, vi } from 'vitest';
+vi.mock('../t13-main/src/ui/raster/luma-bitmap', () => ({ lumaToBitmap: (r: { luma: Uint8Array }) => ({ dataUrl: 'data:image/png;base64,baked', lumaBase64: Buffer.from(r.luma).toString('base64') }) }));
+import type { Layer, Project, RasterImage, SceneObject } from '../t13-main/src/core/scene';
+import { serializeProject } from '../t13-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t13-main/src/io/project/deserialize-project';
+import { useStore } from '../t13-main/src/ui/state/store';
+import { resetStore } from '../t13-main/src/ui/state/test-helpers';
+import { cropMaskedRasterImage } from '../t13-main/src/ui/raster/crop-image';
+import { flattenImageMaskAction, cropImageAction } from '../t13-main/src/ui/commands/image-command-actions';
+import { burnedSegments, circle, encode, gcodeOf, imageLayer, logger, mkImage, mkMask, project, rect, sMap, diffMaps, type Seg } from './t18-common';
+import { createLayer } from '../t13-main/src/core/scene';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t18/t18a.log');
+const st = () => useStore.getState();
+const settle = () => new Promise((r) => setTimeout(r, 50));
+
+// Aligned grid (0.5 mm source pixel = 0.5 mm line at 2 l/mm) so the known
+// T17 edge band is absent and any difference is Flatten's own.
+const LPM = 2;
+const imgLayer = (extra: Partial<Layer> = {}) => imageLayer({ linesPerMm: LPM, ...extra });
+const cutLayer = (output = true, visible = true): Layer =>
+  ({ ...createLayer({ id: 'mask', color: '#000000', name: 'Mask cut', mode: 'line' }), output, visible, power: 50, speed: 1000 }) as Layer;
+const img = (id: string, x = 10, extra: Partial<RasterImage> = {}) =>
+  ({ ...mkImage(id, 40, 40, { x, y: 10, w: 20, h: 20 }, undefined, { linesPerMm: LPM }), imageMaskId: 'M', ...extra }) as RasterImage;
+const c0 = circle(20.05, 19.95, 7.3);
+
+function segsOf(p: Project): Seg[] { return burnedSegments(gcodeOf(p)); }
+function imageOnly(p: Project): Project {
+  // the mask's own cut switched off so the image burn can be compared alone
+  return { ...p, scene: { ...p.scene, layers: p.scene.layers.map((l) => (l.id === 'mask' ? { ...l, output: false } : l)) } };
+}
+function cutSegs(p: Project): number { return segsOf(p).filter((s) => s.s === 500).length; }
+function ids(p: Project) { return p.scene.objects.map((o) => o.id).join(','); }
+function layersOf(p: Project) { return p.scene.layers.map((l) => l.id).join(','); }
+function groupsOf(p: Project) { return JSON.stringify((p.scene.groups ?? []).map((g) => [g.id, g.objectIds])); }
+
+async function flattenViaStore(imageId: string): Promise<string> {
+  const image = st().project.scene.objects.find((o) => o.id === imageId) as RasterImage;
+  const mask = st().project.scene.objects.find((o) => o.id === image.imageMaskId)!;
+  const baked = await cropMaskedRasterImage(image, mask, encode);
+  return st().flattenImageMask(imageId, baked);
+}
+
+it('A1: basic Flatten, mask on an output Line operation; Undo/Redo/reopen; burn of the image', async () => {
+  resetStore();
+  const p0 = project([img('R'), mkMask('M', [c0])], [imgLayer(), cutLayer(true)]);
+  st().setProject(p0);
+  const before = JSON.stringify(st().project);
+  const gBefore = gcodeOf(st().project);
+  const imgBefore = segsOf(imageOnly(st().project));
+  out(`A1 before: objects ${ids(st().project)}; layers ${layersOf(st().project)}; mask cut segments (S500) ${cutSegs(st().project)}; image segments ${imgBefore.length}`);
+  const outcome = await flattenViaStore('R');
+  const after = JSON.stringify(st().project);
+  const gAfter = gcodeOf(st().project);
+  const imgAfter = segsOf(st().project);
+  const r = st().project.scene.objects.find((o) => o.id === 'R') as RasterImage;
+  out(`A1 after: outcome ${outcome}; objects ${ids(st().project)}; layers ${layersOf(st().project)}; mask cut segments ${cutSegs(st().project)}; image ${r.pixelWidth}x${r.pixelHeight} px bounds ${JSON.stringify(r.bounds)}; imageClip ${r.imageClip?.length}; imageMaskId ${r.imageMaskId}; selected ${st().selectedObjectId} + ${[...st().additionalSelectedIds]}; undo depth ${st().undoStack.length}`);
+  const region = { x0: 8, y0: 8, x1: 32, y1: 32 };
+  const d = diffMaps(sMap(imgBefore, 0.5, region), sMap(imgAfter, 0.5, region), [c0], 1, 800);
+  out(`A1 image burn before vs after (aligned grid): ${JSON.stringify(d)}`);
+  st().undo();
+  out(`A1 undo: project JSON-equal ${JSON.stringify(st().project) === before}; gcode equal ${gcodeOf(st().project) === gBefore}; objects ${ids(st().project)}; layers ${layersOf(st().project)}`);
+  st().redo();
+  out(`A1 redo: project JSON-equal ${JSON.stringify(st().project) === after}; gcode equal ${gcodeOf(st().project) === gAfter}`);
+  const back = deserializeProject(serializeProject(st().project));
+  if (back.kind !== 'ok') { out(`A1 reopen failed ${JSON.stringify(back).slice(0, 300)}`); return; }
+  out(`A1 reopen: gcode identical ${gcodeOf(back.project) === gAfter}; objects ${ids(back.project)}; clip kept ${(back.project.scene.objects[0] as RasterImage).imageClip !== undefined}`);
+});
+
+it('A2: two images share one mask', async () => {
+  resetStore();
+  const p0 = project([img('R1', 10), img('R2', 35), mkMask('M', [circle(25, 20, 12)])], [imgLayer(), cutLayer(false)]);
+  st().setProject(p0);
+  const r2Before = segsOf(st().project).filter((s) => Math.min(s.a.x, s.b.x) >= 30);
+  const o1 = await flattenViaStore('R1');
+  const r2After = segsOf(st().project).filter((s) => Math.min(s.a.x, s.b.x) >= 30);
+  const r2 = st().project.scene.objects.find((o) => o.id === 'R2') as RasterImage;
+  out(`A2 flatten R1: outcome ${o1}; objects ${ids(st().project)}; R2 imageMaskId ${r2.imageMaskId}; R2 burn unchanged ${JSON.stringify(r2Before) === JSON.stringify(r2After)} (${r2Before.length} segs)`);
+  const o2 = await flattenViaStore('R2');
+  out(`A2 flatten R2 next: outcome ${o2}; objects ${ids(st().project)}; undo depth ${st().undoStack.length}`);
+});
+
+it('A3: locked mask, hidden mask layer, grouped mask, path-text guide', async () => {
+  // locked
+  resetStore();
+  st().setProject(project([img('R'), { ...mkMask('M', [c0]), locked: true } as SceneObject], [imgLayer(), cutLayer(true)]));
+  out(`A3 locked: outcome ${await flattenViaStore('R')}; objects ${ids(st().project)}; mask cut still burns ${cutSegs(st().project)}`);
+  // hidden layer
+  resetStore();
+  st().setProject(project([img('R'), mkMask('M', [c0])], [imgLayer(), cutLayer(false, false)]));
+  out(`A3 hidden mask layer: outcome ${await flattenViaStore('R')}; objects ${ids(st().project)}; layers ${layersOf(st().project)}`);
+  // grouped with the image only
+  resetStore();
+  let p = project([img('R'), mkMask('M', [c0])], [imgLayer(), cutLayer(false)]);
+  p = { ...p, scene: { ...p.scene, groups: [{ id: 'G', name: 'Group 1', objectIds: ['R', 'M'] }] } };
+  st().setProject(p);
+  out(`A3 group {R,M}: outcome ${await flattenViaStore('R')}; groups ${groupsOf(st().project)}`);
+  // grouped with two other shapes
+  resetStore();
+  p = project([img('R'), mkMask('M', [c0]), mkMask('X', [rect(40, 40, 45, 45)]), mkMask('Y', [rect(50, 40, 55, 45)])], [imgLayer(), cutLayer(false)]);
+  p = { ...p, scene: { ...p.scene, groups: [{ id: 'G', name: 'Group 1', objectIds: ['M', 'X', 'Y'] }] } };
+  st().setProject(p);
+  out(`A3 group {M,X,Y}: outcome ${await flattenViaStore('R')}; groups ${groupsOf(st().project)}`);
+  // path-text guide
+  resetStore();
+  const text = { kind: 'text', id: 'T', content: 'Hi', fontKey: 'sans', sizeMm: 5, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000', bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 }, transform: { x: 0, y: 0, rotationDeg: 0, scaleX: 1, scaleY: 1 }, paths: [], pathText: { guideObjectId: 'M', offsetMm: 0, reverse: false } } as unknown as SceneObject;
+  st().setProject(project([img('R'), mkMask('M', [c0]), text], [imgLayer(), cutLayer(false)]));
+  out(`A3 path-text guide: outcome ${await flattenViaStore('R')}; objects ${ids(st().project)}`);
+});
+
+it('A4: image that already owns a clip (Crop with M1), then a second mask M2, then Flatten', async () => {
+  for (const negative of [false, true]) {
+    resetStore();
+    const m1 = mkMask('M1', [rect(12.3, 12.3, 24.7, 27.7)]);
+    const m2 = mkMask('M2', [circle(24.05, 19.95, 6.3)]);
+    const base = { ...img('R', 10, { imageMaskId: 'M1' }), negative } as RasterImage;
+    st().setProject(project([base, m1, m2], [imgLayer(), cutLayer(false)]));
+    const cropped = await cropMaskedRasterImage(base, m1, encode);
+    st().cropImage('R', cropped);
+    st().applyImageMask('R', 'M2');
+    const live = segsOf(st().project);
+    const o = await flattenViaStore('R');
+    const baked = segsOf(st().project);
+    const region = { x0: 8, y0: 8, x1: 32, y1: 32 };
+    const d = diffMaps(sMap(live, 0.5, region), sMap(baked, 0.5, region), [rect(12.3, 12.3, 24.7, 27.7), circle(24.05, 19.95, 6.3)], 1, 800);
+    const r = st().project.scene.objects.find((x) => x.id === 'R') as RasterImage;
+    out(`A4 negative=${negative}: outcome ${o}; objects ${ids(st().project)}; clip polylines ${r.imageClip?.[0]?.polylines.length}; live ${live.length} segs vs flattened ${baked.length}; diff ${JSON.stringify(d)}`);
+  }
+  // M2 overlaps the image but not the owned clip
+  resetStore();
+  const m1 = mkMask('M1', [rect(11, 11, 15, 15)]);
+  const m2 = mkMask('M2', [rect(22, 22, 28, 28)]);
+  const base = img('R', 10, { imageMaskId: 'M1' });
+  st().setProject(project([base, m1, m2], [imgLayer(), cutLayer(false)]));
+  st().cropImage('R', await cropMaskedRasterImage(base, m1, encode));
+  const rc = st().project.scene.objects.find((x) => x.id === 'R') as RasterImage;
+  out(`A4b after crop to M1 the image bounds ${JSON.stringify(rc.bounds)} (M2 at 22-28 lies outside them)`);
+  // place M2 inside the cropped image's footprint but outside the clip: use a clip that is a ring instead
+  try { st().applyImageMask('R', 'M2'); out(`A4b apply M2: imageMaskId ${(st().project.scene.objects[0] as RasterImage).imageMaskId}; live burn segs ${segsOf(st().project).length}`); await flattenViaStore('R'); out('A4b flatten succeeded'); } catch (e) { out(`A4b flatten threw: ${(e as Error).message}`); }
+  // ring clip: M1 = outer square with a hole; M2 sits in the hole
+  resetStore();
+  const ring = mkMask('M1', [rect(11, 11, 29, 29), rect(16, 16, 24, 24)]);
+  const hole = mkMask('M2', [rect(18, 18, 22, 22)]);
+  const base2 = img('R', 10, { imageMaskId: 'M1' });
+  st().setProject(project([base2, ring, hole], [imgLayer(), cutLayer(false)]));
+  st().cropImage('R', await cropMaskedRasterImage(base2, ring, encode));
+  st().applyImageMask('R', 'M2');
+  out(`A4c M2 inside the ring's hole: live burn segs ${segsOf(st().project).length}`);
+  try { await flattenViaStore('R'); out(`A4c flatten succeeded; objects ${ids(st().project)}`); } catch (e) { out(`A4c flatten threw: ${(e as Error).message}`); }
+});
+
+it('A5: command action: toasts, double invoke, mask as traced trace of the image', async () => {
+  resetStore();
+  const toasts: string[] = [];
+  const push = (m: string, k: string) => { toasts.push(`${k}: ${m}`); };
+  st().setProject(project([img('R'), mkMask('M', [c0])], [imgLayer(), cutLayer(true)]));
+  const app = { get project() { return st().project; }, get projectDocumentEpoch() { return st().projectDocumentEpoch; }, flattenImageMask: (i: string, f: RasterImage) => st().flattenImageMask(i, f) };
+  const sel = st().project.scene.objects[0]!;
+  const action = flattenImageMaskAction({ project: st().project, projectDocumentEpoch: st().projectDocumentEpoch, flattenImageMask: app.flattenImageMask }, sel, push);
+  action(); action();
+  await settle(); await settle();
+  out(`A5 double invoke: toasts ${JSON.stringify(toasts)}; undo depth ${st().undoStack.length}; objects ${ids(st().project)}`);
+  // crop action after flatten on the same (stale) selection
+  toasts.length = 0;
+  cropImageAction({ project: st().project, projectDocumentEpoch: st().projectDocumentEpoch, applyImageMask: () => {}, cropImage: st().cropImage, removeImageMask: () => {} }, sel, push)();
+  await settle();
+  out(`A5 stale crop: toasts ${JSON.stringify(toasts)}`);
+  // dangling mask id
+  resetStore(); toasts.length = 0;
+  st().setProject(project([img('R')], [imgLayer()]));
+  const sel2 = st().project.scene.objects[0]!;
+  flattenImageMaskAction({ project: st().project, projectDocumentEpoch: 0, flattenImageMask: app.flattenImageMask }, sel2, push)();
+  await settle();
+  out(`A5 dangling imageMaskId (mask object missing): toasts ${JSON.stringify(toasts)}; undo depth ${st().undoStack.length}`);
+});
+
+it('A6: selection order: Apply with the pair selected, then Flatten with the same selection', async () => {
+  for (const order of ['image-first', 'mask-first'] as const) {
+    resetStore();
+    const objs = order === 'image-first' ? [img('R', 10, { imageMaskId: undefined }), mkMask('M', [c0])] : [mkMask('M', [c0]), img('R', 10, { imageMaskId: undefined })];
+    st().setProject(project(objs, [imgLayer(), cutLayer(false)]));
+    // user clicks the image, then Shift-clicks the mask
+    st().selectObject('R');
+    st().toggleSelectObject('M');
+    st().applyImageMask('R', 'M');
+    const s = st();
+    const selected = s.project.scene.objects.find((o) => o.id === s.selectedObjectId) ?? null;
+    // verbatim from use-app-commands.ts:125-126
+    const hasMaskedRasterSelection = selected?.kind === 'raster-image' && selected.imageMaskId !== undefined;
+    out(`A6 ${order}: clicked R then shift M; primary ${s.selectedObjectId}, extra ${[...s.additionalSelectedIds]}; R masked ${(s.project.scene.objects.find((o) => o.id === 'R') as RasterImage).imageMaskId}; Flatten/Crop enabled = ${hasMaskedRasterSelection}`);
+  }
+});

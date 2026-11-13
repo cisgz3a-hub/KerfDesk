@@ -56,7 +56,7 @@ Run order puts tools that make or change burns first, then new tools, then the r
 | T15 | Image | Photo Engraving | `tools.photo-engraving` | ledgered: P2 2 (fixed by #1860), P3 3 |
 | T16 | Image | Apply Mask to Image | `tools.apply-image-mask` | ledgered: P2 3 (fix session proposed), P3 3 |
 | T17 | Image | Crop Image | `tools.crop-image` | ledgered: P2 2 (fix session proposed, with T16), P3 2 (known 3) |
-| T18 | Image | Flatten Image Mask | `tools.flatten-image-mask` | |
+| T18 | Image | Flatten Image Mask | `tools.flatten-image-mask` | ledgered: P2 1 (fix #1865), P3 4 (known 9) |
 | T19 | Image | Remove Image Mask | `tools.remove-image-mask` | |
 | T20 | Image | Save Processed Bitmap | `tools.save-processed-bitmap` | |
 | T21 | Image | Save Original Image | `tools.save-original-image` | |

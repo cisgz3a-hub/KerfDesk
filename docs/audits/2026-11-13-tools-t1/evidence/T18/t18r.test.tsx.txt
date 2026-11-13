@@ -1,0 +1,245 @@
+// T18 refuter: drive the REAL useAppCommands hook (the menu, the context menu and
+// the shortcut all read these AppCommand objects), the real store actions for
+// draw / import / click / shift-click / marquee / Bring to Front, and the real
+// canvas hit test. No helper code from the auditor's scratch dir.
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { writeFileSync } from 'node:fs';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { mockPlatform } from '../t13-main/src/__fixtures__/file-actions';
+import { IDENTITY_TRANSFORM, type RasterImage } from '../t13-main/src/core/scene';
+import { hitTestDetailed } from '../t13-main/src/core/scene/hit-test';
+import { createEllipse } from '../t13-main/src/core/shapes/primitives/create-ellipse';
+import { PlatformProvider } from '../t13-main/src/ui/app/platform-context';
+import { useStore } from '../t13-main/src/ui/state';
+import { useToastStore } from '../t13-main/src/ui/state/toast-store';
+import type { AppCommand } from '../t13-main/src/ui/commands/command-registry';
+import { useAppCommands } from '../t13-main/src/ui/commands/use-app-commands';
+import {
+  moreWorkspaceContextCommands,
+  primaryWorkspaceContextCommands,
+} from '../t13-main/src/ui/commands/workspace-context-commands';
+import { selectObjectsInMarquee } from '../t13-main/src/ui/workspace/selection-marquee';
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
+  true;
+
+const LOG: string[] = [];
+const log = (s: string): void => {
+  LOG.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t18r/t18r.log', LOG.join('\n'));
+};
+
+let root: Root | null = null;
+let host: HTMLDivElement | null = null;
+let latest: ReadonlyArray<AppCommand> = [];
+
+function Probe(): null {
+  latest = useAppCommands({} as never);
+  return null;
+}
+function render(): void {
+  host = document.createElement('div');
+  document.body.appendChild(host);
+  root = createRoot(host);
+  act(() => {
+    root?.render(
+      <PlatformProvider adapter={mockPlatform()}>
+        <Probe />
+      </PlatformProvider>,
+    );
+  });
+}
+const cmd = (id: string): AppCommand => {
+  const c = latest.find((command) => command.id === id);
+  if (c === undefined) throw new Error(`no command ${id}`);
+  return c;
+};
+const state = (id: string): string => {
+  const c = cmd(id);
+  return `${c.enabled ? 'ENABLED ' : 'disabled'} "${c.title ?? ''}"`;
+};
+
+beforeEach(() => {
+  useStore.getState().newProject();
+  useToastStore.setState({ toasts: [] } as never);
+  latest = [];
+});
+afterEach(() => {
+  act(() => root?.unmount());
+  host?.remove();
+  root = null;
+  host = null;
+  useStore.getState().newProject();
+});
+
+function photo(id = 'photo'): RasterImage {
+  return {
+    kind: 'raster-image',
+    id,
+    source: 'portrait.png',
+    bounds: { minX: 0, minY: 0, maxX: 60, maxY: 60 },
+    transform: IDENTITY_TRANSFORM,
+    color: '#000000',
+    pixelWidth: 4,
+    pixelHeight: 4,
+    linesPerMm: 10,
+    dither: 'jarvis',
+    dataUrl: 'data:image/png;base64,AQID',
+  };
+}
+
+/** "Coaster" order: draw the circle, then import the photo (real store actions). */
+function drawThenImport(): { circle: string; image: string } {
+  const s = useStore.getState();
+  s.drawShape(createEllipse({ id: 'circle', color: '#ff0000', spec: { widthMm: 40, heightMm: 40 } }));
+  s.importRasterImage(photo());
+  const objs = useStore.getState().project.scene.objects;
+  const img = objs.find((o) => o.kind === 'raster-image')!;
+  const circle = objs.find((o) => o.id === 'circle')!;
+  // Put the circle over the middle of wherever import placed the photo
+  // (moving does not change stacking order).
+  const ib = img.bounds;
+  const cx = img.transform.x + (ib.minX + ib.maxX) / 2 - 20;
+  const cy = img.transform.y + (ib.minY + ib.maxY) / 2 - 20;
+  useStore.getState().applyObjectTransform(circle.id, { ...circle.transform, x: cx, y: cy });
+  return { circle: circle.id, image: img.id };
+}
+
+/** "Natural" order: import the photo, then draw the circle on top. */
+function importThenDraw(): { circle: string; image: string } {
+  const s = useStore.getState();
+  s.importRasterImage(photo());
+  s.drawShape(createEllipse({ id: 'circle', color: '#ff0000', spec: { widthMm: 40, heightMm: 40 } }));
+  const objs = useStore.getState().project.scene.objects;
+  const img = objs.find((o) => o.kind === 'raster-image')!;
+  const circle = objs.find((o) => o.id === 'circle')!;
+  const ib = img.bounds;
+  useStore.getState().applyObjectTransform(circle.id, {
+    ...circle.transform,
+    x: img.transform.x + (ib.minX + ib.maxX) / 2 - 20,
+    y: img.transform.y + (ib.minY + ib.maxY) / 2 - 20,
+  });
+  return { circle: circle.id, image: img.id };
+}
+
+const order = (): string => useStore.getState().project.scene.objects.map((o) => o.id).join(',');
+const sel = (): string => {
+  const s = useStore.getState();
+  return `primary=${s.selectedObjectId} extra=[${[...s.additionalSelectedIds].join(',')}]`;
+};
+function applyMaskViaCommand(): void {
+  const apply = cmd('tools.apply-image-mask');
+  log(`  Apply Mask: ${state('tools.apply-image-mask')}`);
+  act(() => apply.invoke());
+}
+function report(label: string): Record<string, boolean> {
+  const img = useStore.getState().project.scene.objects.find((o) => o.kind === 'raster-image') as
+    | RasterImage
+    | undefined;
+  log(`  after Apply: order=${order()} ${sel()} imageMaskId=${img?.imageMaskId}`);
+  for (const id of ['tools.flatten-image-mask', 'tools.crop-image', 'tools.remove-image-mask'])
+    log(`  ${label} ${id}: ${state(id)}`);
+  return {
+    flatten: cmd('tools.flatten-image-mask').enabled,
+    crop: cmd('tools.crop-image').enabled,
+    remove: cmd('tools.remove-image-mask').enabled,
+  };
+}
+
+describe('T18 refuter', () => {
+  it('R1 natural order (import photo, draw circle on top), click + shift-click', () => {
+    log('R1 import then draw; click photo, shift-click circle');
+    const { circle, image } = importThenDraw();
+    render();
+    act(() => useStore.getState().selectObject(image));
+    act(() => useStore.getState().toggleSelectObject(circle));
+    log(`  order=${order()} ${sel()}`);
+    applyMaskViaCommand();
+    const r = report('R1');
+    expect(r.flatten).toBe(true);
+  });
+
+  it('R2 coaster order (draw circle, import photo): hit test, marquee, Ctrl+A, Objects-panel shift-click', () => {
+    log('R2 draw then import');
+    const { circle, image } = drawThenImport();
+    render();
+    log(`  order=${order()}`);
+    const scene = useStore.getState().project.scene;
+    const c = scene.objects.find((o) => o.id === circle)!;
+    // a point on the circle's stroke (left-most point), inside the photo
+    const onStroke = { x: c.transform.x + 0, y: c.transform.y + 20 };
+    const hit = hitTestDetailed(scene, onStroke, { strokeToleranceMm: 0.5 });
+    log(`  click on circle stroke at (${onStroke.x.toFixed(1)},${onStroke.y.toFixed(1)}) picks: ${JSON.stringify(hit)}`);
+    // marquee (crossing, right->left) over both
+    const ids = selectObjectsInMarquee(scene, { x: 1e4, y: 1e4 }, { x: -1e4, y: -1e4 });
+    act(() => useStore.getState().selectObjects(ids));
+    log(`  marquee ids (scene order)=${ids.join(',')} -> ${sel()}`);
+    applyMaskViaCommand();
+    const r = report('R2-marquee');
+    expect(r.flatten).toBe(false);
+    // Invoke the disabled Flatten anyway (what a stale shortcut would do): nothing happens.
+    const before = useStore.getState().project;
+    act(() => cmd('tools.flatten-image-mask').invoke());
+    log(`  invoking Flatten anyway: project unchanged=${useStore.getState().project === before}, toasts=${useToastStore.getState().toasts.length}`);
+    // Workaround: click the photo alone.
+    act(() => useStore.getState().selectObject(image));
+    log(`  click photo alone -> ${sel()}; Flatten: ${state('tools.flatten-image-mask')}`);
+    expect(cmd('tools.flatten-image-mask').enabled).toBe(true);
+  });
+
+  it('R3 coaster order, click photo FIRST then shift-click circle (Objects panel): primary follows scene order', () => {
+    log('R3 draw then import; click photo then shift-click circle');
+    const { circle, image } = drawThenImport();
+    render();
+    act(() => useStore.getState().selectObject(image));
+    log(`  after click photo: ${sel()}`);
+    act(() => useStore.getState().toggleSelectObject(circle));
+    log(`  after shift-click circle: ${sel()}  (store comment: "Shift+click toggle; never clears the primary.")`);
+    applyMaskViaCommand();
+    report('R3');
+  });
+
+  it('R4 Ctrl+A path in coaster order', () => {
+    log('R4 draw then import; Select All');
+    drawThenImport();
+    render();
+    act(() => useStore.getState().selectAllObjects());
+    log(`  ${sel()}`);
+    applyMaskViaCommand();
+    report('R4');
+  });
+
+  it('R5 natural order, then Bring photo to Front / Send circle to Back', () => {
+    log('R5 import then draw; mask applied; then Bring photo to Front');
+    const { circle, image } = importThenDraw();
+    render();
+    act(() => useStore.getState().selectObject(image));
+    act(() => useStore.getState().toggleSelectObject(circle));
+    applyMaskViaCommand();
+    report('R5-before');
+    act(() => useStore.getState().selectObject(image));
+    act(() => cmd('arrange.bring-to-front').invoke());
+    log(`  after Bring photo to Front: order=${order()}`);
+    act(() => useStore.getState().selectObject(image));
+    act(() => useStore.getState().toggleSelectObject(circle));
+    log(`  reselect both: ${sel()}`);
+    report('R5-after');
+  });
+
+  it('X1 context menu lists', () => {
+    const all = [
+      ...primaryWorkspaceContextCommands('workspace-selection'),
+      ...moreWorkspaceContextCommands('workspace-selection'),
+    ];
+    log('X1 right-click (workspace-selection) lists:');
+    for (const id of [
+      'tools.apply-image-mask',
+      'tools.crop-image',
+      'tools.flatten-image-mask',
+      'tools.remove-image-mask',
+    ])
+      log(`  ${id}: ${all.includes(id as never) ? 'present' : 'ABSENT'}`);
+    expect(all.includes('tools.flatten-image-mask' as never)).toBe(false);
+  });
+});
