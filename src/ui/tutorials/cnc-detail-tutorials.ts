@@ -79,7 +79,7 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Set the bridge shape',
         instruction:
-          'Set Tab height, Tab width and Tabs per shape. Height is measured up from the cut floor; width is the length along the contour.',
+          'Set Tab height, Tab width and Tabs per shape. Height is measured up from the stock bottom when Stock thickness is set (from the cut floor until it is set); width is the length along the contour.',
         focus: 'Height · Width · Count',
         result: 'The operation has an explicit bridge height, length and requested count.',
       },

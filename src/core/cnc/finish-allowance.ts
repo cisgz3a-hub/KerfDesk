@@ -68,7 +68,11 @@ export function profilePassesWithFinishAllowance(
     ? roughingTabCentersBesideFinishTabs(
         finishToolpaths,
         roughingToolpaths,
-        settings.tabsPerShape,
+        {
+          tabWidthMm: settings.tabWidthMm,
+          tabsPerShape: settings.tabsPerShape,
+          toolDiameterMm,
+        },
         manualTabCenters,
         manualTabCentersForToolpaths(roughingToolpaths, tabSources),
         toolDiameterMm,

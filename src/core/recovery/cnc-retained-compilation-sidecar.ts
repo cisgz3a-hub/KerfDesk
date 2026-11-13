@@ -79,6 +79,7 @@ export function retainedCncCompilationSidecar(
             retainedLayerIds.has(entry.layerId),
           ),
         }),
+    ...retainedTabHoldShapes(sidecar, retainedLayerIds),
     // A cut that still runs is still close to the part, wherever that part is cut.
     ...(sidecar.keptPartCuts === undefined
       ? {}
@@ -86,4 +87,15 @@ export function retainedCncCompilationSidecar(
           keptPartCuts: sidecar.keptPartCuts.filter((entry) => retainedLayerIds.has(entry.layerId)),
         }),
   };
+}
+
+function retainedTabHoldShapes(
+  sidecar: CncCompilationSidecar,
+  retainedLayerIds: ReadonlySet<string>,
+): Pick<CncCompilationSidecar, 'tabHoldShapes'> {
+  return sidecar.tabHoldShapes === undefined
+    ? {}
+    : {
+        tabHoldShapes: sidecar.tabHoldShapes.filter((entry) => retainedLayerIds.has(entry.layerId)),
+      };
 }

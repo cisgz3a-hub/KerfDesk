@@ -1,6 +1,41 @@
 import type { CncMachineConfig, CncStock } from '../../../core/scene';
+// Deep import: core/scene's barrel is a ratcheted over-cap legacy barrel.
+import { setStockThicknessMm } from '../../../core/scene/machine';
 import { NumberField } from '../../common/NumberField';
+import { Button } from '../../kit';
 import { Row, unitStyle } from '../device-settings-shared';
+
+/**
+ * ADR-258 Amendment 6 (CNC audit J1-P3-3): the field shows the shipped
+ * thickness until a value is committed, and entering the value it already
+ * shows commits nothing, so a real sheet of that thickness is confirmed here.
+ * Until then the holding tabs are measured from the cut floor.
+ */
+function UnsetThicknessNote(props: {
+  readonly thicknessMm: number;
+  readonly onConfirm: () => void;
+}): JSX.Element {
+  return (
+    <div style={noteStyle} role="note">
+      <span>Stock thickness not set yet: holding tabs are measured from the cut floor.</span>
+      <Button
+        onClick={props.onConfirm}
+        title="My stock really is this thick: measure holding tabs from the stock bottom"
+      >
+        Use {props.thicknessMm} mm
+      </Button>
+    </div>
+  );
+}
+
+const noteStyle: React.CSSProperties = {
+  gridColumn: '1 / -1',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  fontSize: 11,
+  color: 'var(--lf-text-muted)',
+};
 
 export function DeviceSetupCncStockFields(props: {
   readonly machine: CncMachineConfig;
@@ -16,8 +51,15 @@ export function DeviceSetupCncStockFields(props: {
         min={0.1}
         max={200}
         step={0.05}
-        onCommit={(thicknessMm) => edit({ thicknessMm })}
+        // ADR-258 Amendment 6: a committed thickness is set, even 6.35 mm.
+        onCommit={(thicknessMm) => edit({ thicknessMm, thicknessSet: true })}
       />
+      {setStockThicknessMm(stock) === undefined ? (
+        <UnsetThicknessNote
+          thicknessMm={stock.thicknessMm}
+          onConfirm={() => edit({ thicknessSet: true })}
+        />
+      ) : null}
       <StockNumberRow
         label="Stock width"
         value={stock.widthMm}

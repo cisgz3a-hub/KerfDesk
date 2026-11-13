@@ -39,10 +39,14 @@ const OBJECT: ImportedSvg = {
   ],
 };
 
+// The tab-top run spans the window, and since ADR-258 Amendment 5 the loop also
+// starts (and ends) in the middle of a tab, so the run's extent is centred on it.
 function expectTabCenter(points: ReadonlyArray<Vec2>, expected: Vec2): void {
-  expect(points).toHaveLength(2);
-  expect((points[0]!.x + points[1]!.x) / 2).toBeCloseTo(expected.x, 3);
-  expect((points[0]!.y + points[1]!.y) / 2).toBeCloseTo(expected.y, 3);
+  expect(points.length).toBeGreaterThanOrEqual(2);
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo(expected.x, 3);
+  expect((Math.min(...ys) + Math.max(...ys)) / 2).toBeCloseTo(expected.y, 3);
 }
 
 describe('transformed manual CNC tabs', () => {

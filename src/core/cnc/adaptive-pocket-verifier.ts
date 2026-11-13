@@ -1,6 +1,7 @@
 import type { Polyline, Vec2 } from '../scene';
 import type { AdaptivePocketPlan } from './adaptive-pocket';
 import { AdaptiveCutterContact } from './adaptive-pocket-contact';
+import { ADAPTIVE_SLOT_REFUSAL } from './cnc-strategy-fallback-notice';
 import {
   createAdaptivePocketStockGrid,
   type AdaptivePocketGrid as Grid,
@@ -30,6 +31,15 @@ const COVERAGE_TARGET = 0.985;
 // a grid speck out of the verdict (ADR-154 Amendment 4).
 const STRANDED_STOCK_RADIUS_SQUARED_SHARE = 0.1;
 
+// A roughing move whose leading rim is in stock over this arc or more is a
+// full-width slot at the cutting feed. The maintainer decided adaptive refuses
+// it whatever the Radial engagement setting (ADR-154 Amendment 7): at 50 % the
+// limit equalled a slot's reading, r (1 - cos 90°), so the verifier certified
+// 92.5 mm of slot on an L and 22.4 mm on a 44 × 30 rectangle (CNC audit v3
+// AC-6). A side cut wide enough to reach this arc removes over 0.99 D.
+export const ADAPTIVE_SLOT_CONTACT_ARC_DEG = 170;
+const SLOT_ENGAGEMENT_RADIUS_SHARE = 1 - Math.cos((ADAPTIVE_SLOT_CONTACT_ARC_DEG * Math.PI) / 360);
+
 // The cutter path run since the contact was last evaluated. Every move at
 // least a quarter cell long is evaluated at each of its half-cell samples;
 // along a run of shorter moves, such as a dense curve's fillet slivers, it is
@@ -56,7 +66,8 @@ export function verifyAdaptivePocket(
     earlyCells: 0,
   };
   let maxSimulatedEngagementMm = 0;
-  const ceilingMm = engagementCeilingMm(grid, plan.optimalLoadMm);
+  const limitMm = engagementCeilingMm(grid, plan.optimalLoadMm);
+  const ceilingMm = Math.min(limitMm, SLOT_ENGAGEMENT_RADIUS_SHARE * (toolDiameterMm / 2));
   // The plan's sequences are in the order the program cuts them, each one's
   // finishing rings straight after its roughing, at every depth. Within one
   // depth that is this order, so the simulation follows it.
@@ -77,7 +88,7 @@ export function verifyAdaptivePocket(
     // limit settles it: simulating the rest only delayed the same refusal, by
     // up to a minute and a half on a large recess (S8-P3-2).
     if (maxSimulatedEngagementMm > ceilingMm)
-      return engagementRefusal(grid, maxSimulatedEngagementMm);
+      return engagementRefusal(grid, maxSimulatedEngagementMm, limitMm);
     clearFinishRings(grid, order, sequence.finishRings, toolDiameterMm / 2);
   }
   return verificationResult(
@@ -88,6 +99,17 @@ export function verifyAdaptivePocket(
     order.earlyCells,
     toolDiameterMm / 2,
   );
+}
+
+// A move the configured limit refuses is refused for that, as before; one the
+// limit admits was stopped by the slot rule alone.
+function engagementRefusal(grid: Grid, maxSimulatedEngagementMm: number, limitMm: number) {
+  return {
+    ok: false as const,
+    reason: maxSimulatedEngagementMm > limitMm ? ENGAGEMENT_REFUSAL : ADAPTIVE_SLOT_REFUSAL,
+    gridMm: grid.cellMm,
+    maxSimulatedEngagementMm,
+  };
 }
 
 // Finishing rings run unmeasured (ADR-154 Amendment 3), so one must not run
@@ -160,15 +182,6 @@ function engagementCeilingMm(grid: Grid, engagementLimitMm: number): number {
 // stopped there: nothing reads a refusal's numbers but its reason.
 const ENGAGEMENT_REFUSAL =
   'Adaptive verification simulated radial engagement above the configured limit.';
-
-function engagementRefusal(grid: Grid, maxSimulatedEngagementMm: number) {
-  return {
-    ok: false as const,
-    reason: ENGAGEMENT_REFUSAL,
-    gridMm: grid.cellMm,
-    maxSimulatedEngagementMm,
-  };
-}
 
 type RoughingCut = {
   readonly grid: Grid;

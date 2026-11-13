@@ -18,7 +18,6 @@ import { inverseReliefPoint } from '../relief/relief-vector-boundary';
 import {
   applyTransform,
   DEFAULT_CNC_LAYER_SETTINGS,
-  DEFAULT_CNC_STOCK,
   layerCncTool,
   sceneObjectUsesOperation,
   type CncLayerSettings,
@@ -31,6 +30,7 @@ import { reliefMachineSpaceGeometry } from './relief-machine-space';
 import { reliefGroup } from './cnc-relief-group';
 import { isProfileCutType } from './compile-cnc-helpers';
 import { cutCanFreePart, stockLimitedTabHeightMm } from './cnc-tabs';
+import { setStockThicknessMm } from '../scene/machine';
 
 export type ReliefProjectionCompilation =
   | {
@@ -182,13 +182,14 @@ function projectionOptions(
   };
   if (!isProfileCutType(settings.cutType) || !settings.tabsEnabled) return base;
   const tabHeightMm = Math.max(0, settings.tabHeightMm);
+  const setStockMm = setStockThicknessMm(config.stock);
   const tabTopZ = (deepestZ: number): number | null => {
     const depthMm = -deepestZ;
-    if (!cutCanFreePart(depthMm, tabHeightMm, stockMm)) return null;
+    if (!cutCanFreePart(depthMm, tabHeightMm, setStockMm)) return null;
     const top =
-      stockMm === DEFAULT_CNC_STOCK.thicknessMm
+      setStockMm === undefined
         ? deepestZ + Math.min(tabHeightMm, Math.max(0, depthMm))
-        : -stockMm + stockLimitedTabHeightMm(tabHeightMm, stockMm);
+        : -setStockMm + stockLimitedTabHeightMm(tabHeightMm, setStockMm);
     return top > deepestZ + TAB_EPS && top < 0 ? top : null;
   };
   return {

@@ -11,6 +11,12 @@ import type { CncStrategyFallback } from '../job/cnc-compilation-sidecar-types';
 export const ADAPTIVE_ENGAGEMENT_REFUSAL =
   'Adaptive verification simulated radial engagement above the configured limit.';
 
+/** The verifier's refusal of a full-width slot at the cutting feed, whatever
+ * the Radial engagement setting (adaptive-pocket-verifier.ts, ADR-154
+ * Amendment 7). */
+export const ADAPTIVE_SLOT_REFUSAL =
+  'Adaptive verification simulated a full-width slot at the cutting feed.';
+
 export function cncStrategyFallbackNotice(
   fallback: Pick<CncStrategyFallback, 'kind' | 'reason'>,
 ): string {
@@ -24,7 +30,12 @@ export function cncStrategyFallbackNotice(
   // is wide, its first ring past the helix being a full slot, and no Radial
   // engagement below the 50% cap changes that. That is what this refusal
   // almost always is, so the notice names it and offers no Radial advice.
-  if (fallback.reason === ADAPTIVE_ENGAGEMENT_REFUSAL) {
+  // ADR-154 Amendment 7: the same pocket at a Radial engagement wide enough to
+  // admit a slot is refused for the slot itself, so it reads the same.
+  if (
+    fallback.reason === ADAPTIVE_ENGAGEMENT_REFUSAL ||
+    fallback.reason === ADAPTIVE_SLOT_REFUSAL
+  ) {
     return (
       "Adaptive can't open this pocket from one entry, so it will cut offset rings instead " +
       '(full-width first pass). Pockets longer than they are wide do this. Choose Offset ' +
