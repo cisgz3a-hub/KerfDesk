@@ -1,3 +1,4 @@
+import { DEFAULT_RELIEF_SCALLOP_MM } from '../relief';
 import { reliefCutterBudgetError } from '../relief/relief-cutter-budget';
 import { toMachineCoords, type DeviceProfile } from '../devices';
 import type { CncGroup, CncPass } from '../job';
@@ -102,7 +103,10 @@ function restForRelief(
     }
   | ReliefMaterializationFailure {
   const { settings, device, tool, predecessor } = context;
-  const scallopMm = settings.reliefRestScallopMm ?? settings.reliefScallopMm ?? 0.05;
+  const scallopMm =
+    // CNC audit v3 N2-P3-1: rest refines the finish, so by default it takes the
+    // finish's own scallop, never a coarser one.
+    settings.reliefRestScallopMm ?? settings.reliefScallopMm ?? DEFAULT_RELIEF_SCALLOP_MM;
   const thresholdMm = settings.reliefRestResidualMm ?? 0.05;
   if (!validRestParameters(scallopMm, thresholdMm))
     return reliefMaterializationFailure(

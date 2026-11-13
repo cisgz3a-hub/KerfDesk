@@ -68,7 +68,10 @@ describe('compiled V-carve depth warnings', () => {
   it('classifies stock thresholds by emitted coordinate text, not binary float drift', () => {
     const exact = compiledVCarveLayerDepths(jobAtDepth(3.798));
 
-    expect(detectCompiledVCarveDepthWarnings(exact, 3.798)).toEqual([]);
+    // CNC audit v2 J1-P2-1: V-carve warns at the stock bottom as relief does.
+    expect(detectCompiledVCarveDepthWarnings(exact, 3.798)).toEqual([
+      expect.stringContaining('reaches the configured stock bottom'),
+    ]);
     expect(
       detectCompiledReliefDepthWarnings(
         exact.map((entry) => ({ ...entry })),
@@ -98,10 +101,41 @@ describe('compiled V-carve depth warnings', () => {
     expect(controllerDepthMm).toBe(parseGrblCncCoordinate('9999.010'));
     const depths = [{ layerId: 'script', depthMm: controllerDepthMm, depthText: '9999.011' }];
 
-    expect(detectCompiledVCarveDepthWarnings(depths, stockThicknessMm)).toEqual([]);
-    expect(detectCompiledReliefDepthWarnings(depths, stockThicknessMm)).toEqual([
-      expect.stringContaining('reaches the configured stock bottom'),
+    for (const detect of [detectCompiledVCarveDepthWarnings, detectCompiledReliefDepthWarnings])
+      expect(detect(depths, stockThicknessMm)).toEqual([
+        expect.stringContaining('reaches the configured stock bottom'),
+      ]);
+  });
+});
+
+describe('a floor left thinner than 0.2 mm warns like the stock bottom (CNC v3 N2-P2-3)', () => {
+  const depth = (mm: number) => [{ layerId: 'relief', depthMm: mm, depthText: mm.toFixed(3) }];
+
+  it.each([
+    [6.349, '0.001'],
+    [6.3, '0.05'],
+    [6.2, '0.15'],
+  ])('relief at %s mm in 6.35 mm stock leaves only %s mm and warns', (mm, left) => {
+    expect(detectCompiledReliefDepthWarnings(depth(mm), 6.35)).toEqual([
+      expect.stringContaining(`leaves only ${left} mm of stock under its floor`),
     ]);
+    expect(detectCompiledReliefDepthWarnings(depth(mm), 6.35)[0]).toContain(
+      'Relief paths have no holding tabs',
+    );
+  });
+
+  it('a 0.2 mm floor or thicker stays quiet', () => {
+    expect(detectCompiledReliefDepthWarnings(depth(6.15), 6.35)).toEqual([]);
+    expect(detectCompiledReliefDepthWarnings(depth(5.8), 6.35)).toEqual([]);
+  });
+
+  it('a V-carve leaving 0.15 mm (the 1/2" 90° bit in 6.5 mm stock) warns too (J1-P2-1)', () => {
+    expect(detectCompiledVCarveDepthWarnings(depth(6.35), 6.5)).toEqual([
+      expect.stringContaining('leaves only 0.15 mm of stock under its floor'),
+    ]);
+    expect(detectCompiledVCarveDepthWarnings(depth(6.35), 6.5)[0]).toContain(
+      'V-carve paths have no holding tabs',
+    );
   });
 });
 
