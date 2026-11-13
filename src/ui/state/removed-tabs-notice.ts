@@ -6,6 +6,7 @@
 // Extend's does.
 
 import type { SceneObject } from '../../core/scene';
+import { repairReplacedSources } from './replaced-sources-repair';
 import { selectedObjectIds } from './scene-group-actions';
 import { useToastStore } from './toast-store';
 import type {
@@ -33,7 +34,9 @@ export function droppedTextTabsNotice(dropped: number): string {
 
 /** Weld or a Boolean through `set`. The combined outline has none of the
  *  selection's tabs placed by hand, so when it replaces the selection the note
- *  says so once the edit commits; kept originals keep theirs. */
+ *  says so once the edit commits; kept originals keep theirs. Masks and text
+ *  guides that pointed at a replaced source are repaired with their own notice
+ *  (ADR-350 Amendment 2). */
 export function combineSelectionNotingTabs(
   set: VectorPathSet,
   options: VectorCombineOptions,
@@ -41,26 +44,26 @@ export function combineSelectionNotingTabs(
   combine: (state: VectorPathState) => VectorPathMutation | VectorPathState,
 ): void {
   let notice = '';
+  let reportRepairs = (): void => undefined;
   set(
     (state) => {
       if (!expectedSelection(state, options)) return state;
       const next = combine(state);
-      notice =
-        next === state || options.keepOperands === true
-          ? ''
-          : removedTabsNotice(
-              selectedVectorObjects(
-                state.project.scene,
-                selectedObjectIds(state),
-                'replace',
-                false,
-              ),
-              what,
-            );
-      return next;
+      if (next === state || options.keepOperands === true) {
+        notice = '';
+        return next;
+      }
+      notice = removedTabsNotice(
+        selectedVectorObjects(state.project.scene, selectedObjectIds(state), 'replace', false),
+        what,
+      );
+      const repaired = repairReplacedSources(next.project.scene);
+      reportRepairs = repaired.report;
+      return { ...next, project: { ...next.project, scene: repaired.scene } };
     },
     () => {
       if (notice !== '') useToastStore.getState().pushToast(notice, 'info');
+      reportRepairs();
     },
     options.isCurrent,
   );

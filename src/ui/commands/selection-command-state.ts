@@ -12,6 +12,7 @@ import { subpathCount } from '../../core/geometry/outer-shape-groups';
 import { isConvertibleVector, type ConvertibleVector } from '../raster/vector-to-bitmap';
 import { groupsWithinFocus } from '../state/design-hierarchy-store';
 import { geometryToolSkipReasons, type GeometryToolGuard } from '../state/geometry-tool-sources';
+import { vectorRepairSources } from '../state/vector-repair-sources';
 
 export function selectedObject(project: Project, selectedObjectId: string | null) {
   if (selectedObjectId === null) return null;
@@ -126,22 +127,17 @@ function geometryToolCandidates(
   );
 }
 
-/** Available result operations only when the entire selection qualifies for silhouette union. */
+/**
+ * The operations Union Silhouette offers. Variable data and the registration
+ * jig are left out of its sources (ADR-350 Amendment 2); everything else
+ * selected must be an unlocked plain vector object with closed contours only.
+ */
 export function unionSilhouetteOperations(
   scene: Scene,
   selectedIds: ReadonlyArray<string>,
 ): ReadonlyArray<Layer> {
-  const selected = new Set(selectedIds);
-  const objects = scene.objects.filter(
-    (object): object is VectorSceneObject =>
-      selected.has(object.id) && object.locked !== true && isVectorPathObject(object),
-  );
-  if (
-    objects.length === 0 ||
-    objects.length !== selectedIds.length ||
-    !objects.every(objectHasOnlyClosedContours)
-  )
-    return [];
+  const objects = vectorRepairSources(scene, selectedIds)?.kept ?? [];
+  if (objects.length === 0 || !objects.every(objectHasOnlyClosedContours)) return [];
   return scene.layers.filter((operation) =>
     objects.some((object) =>
       object.paths.some((path) => pathUsesOperation(object, path, operation)),
@@ -149,21 +145,18 @@ export function unionSilhouetteOperations(
   );
 }
 
+/** Join Paths: Union Silhouette's sources, at least one of them with an open path. */
 export function selectionCanJoinPaths(
   project: Project,
   selectedIds: ReadonlyArray<string>,
 ): boolean {
-  const objects = selectedConvertibleVectors(project, selectedIds);
-  return (
-    objects.length > 0 &&
-    objects.every((object) => object.locked !== true) &&
-    objects.some((object) =>
-      object.paths.some((path) =>
-        path.curves === undefined
-          ? path.polylines.some((polyline) => !polyline.closed && polyline.points.length > 1)
-          : path.curves.some((curve) => !curve.closed && curve.segments.length > 0),
-      ),
-    )
+  const objects = vectorRepairSources(project.scene, selectedIds)?.kept ?? [];
+  return objects.some((object) =>
+    object.paths.some((path) =>
+      path.curves === undefined
+        ? path.polylines.some((polyline) => !polyline.closed && polyline.points.length > 1)
+        : path.curves.some((curve) => !curve.closed && curve.segments.length > 0),
+    ),
   );
 }
 

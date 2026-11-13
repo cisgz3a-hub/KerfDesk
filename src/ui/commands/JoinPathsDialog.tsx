@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { isVectorPathObject } from '../../core/geometry';
 import { joinOpenVectorPaths, type VectorPathJoinPlan } from '../../core/geometry/vector-path-join';
 import type { Scene } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
 import { retracedPathsNote } from '../state/retraced-paths-note';
+import { vectorRepairSources } from '../state/vector-repair-sources';
 
 export function JoinPathsDialog(props: {
   readonly scene: Scene;
@@ -13,18 +13,18 @@ export function JoinPathsDialog(props: {
 }): JSX.Element {
   const [toleranceText, setToleranceText] = useState('0.05');
   const tolerance = toleranceText.trim() === '' ? NaN : Number(toleranceText);
-  const plan = useMemo(() => {
-    const selected = props.scene.objects.filter((object) => props.selectedIds.includes(object.id));
-    const vectors = selected.filter(isVectorPathObject);
-    if (
-      selected.length === 0 ||
-      selected.length !== props.selectedIds.length ||
-      vectors.length !== selected.length ||
-      selected.some((object) => object.locked === true)
-    )
-      return null;
-    return joinOpenVectorPaths(vectors, props.scene.layers, tolerance);
-  }, [props.scene, props.selectedIds, tolerance]);
+  // The same sources as the Join store action (ADR-350 Amendment 2).
+  const sources = useMemo(
+    () => vectorRepairSources(props.scene, props.selectedIds),
+    [props.scene, props.selectedIds],
+  );
+  const plan = useMemo(
+    () =>
+      sources === null || sources.kept.length === 0
+        ? null
+        : joinOpenVectorPaths(sources.kept, props.scene.layers, tolerance),
+    [sources, props.scene.layers, tolerance],
+  );
   const summary = plan?.kind === 'ok' ? plan.value : null;
   const canApply = summary !== null && summary.joins + summary.closures > 0;
   return (
@@ -55,6 +55,7 @@ export function JoinPathsDialog(props: {
         Paths must share the same operations, colour and artwork settings. Ambiguous junctions and
         paths with manual holding tabs stay unchanged.
       </p>
+      {sources === null || sources.notice === '' ? null : <p role="note">{sources.notice}</p>}
       <div role="status" aria-live="polite">
         <JoinSummary
           summary={summary}

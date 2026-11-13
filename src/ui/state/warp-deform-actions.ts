@@ -6,12 +6,13 @@ import { warpDeformHandlesUnmoved, type WarpDeformGrid } from '../../core/geomet
 import { WARP_DEFORM_TOLERANCE_MM } from '../../core/geometry/warp-deform-paths';
 import { isVectorPathObject } from '../../core/geometry/vector-path-tools';
 import type { Project, Scene } from '../../core/scene';
+import { variableTextSkippedNotice } from './geometry-tool-sources';
 import { movedTabsNotice } from './path-node-edit-actions';
 import { selectedObjectIds } from './scene-group-actions';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
 import { useToastStore } from './toast-store';
-import { planWarpDeform, type WarpDeformPlan } from './warp-deform-plan';
+import { isVariableText, planWarpDeform, type WarpDeformPlan } from './warp-deform-plan';
 import type { WarpDeformRequest } from './warp-deform-session';
 
 export type WarpDeformActions = {
@@ -24,7 +25,11 @@ export type WarpDeformActions = {
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
-type LeftAlone = { readonly imagesAndReliefs: number; readonly locked: number };
+type LeftAlone = {
+  readonly imagesAndReliefs: number;
+  readonly locked: number;
+  readonly variableText?: number;
+};
 
 export function warpDeformActions(set: Setter): WarpDeformActions {
   return {
@@ -84,17 +89,20 @@ function applyWarpDeformMutation(
   };
 }
 
-// Images and reliefs cannot bend; locked artwork is never edited.
+// Images and reliefs cannot bend; locked artwork is never edited; variable
+// text keeps its template (ADR-350 Amendment 2).
 function leftAlone(scene: Scene, selectedIds: ReadonlyArray<string>): LeftAlone {
   const ids = new Set(selectedIds);
   let imagesAndReliefs = 0;
   let locked = 0;
+  let variableText = 0;
   for (const object of scene.objects) {
     if (!ids.has(object.id)) continue;
     if (object.kind === 'raster-image' || object.kind === 'relief') imagesAndReliefs += 1;
     else if (object.locked === true && isVectorPathObject(object)) locked += 1;
+    else if (isVariableText(object)) variableText += 1;
   }
-  return { imagesAndReliefs, locked };
+  return { imagesAndReliefs, locked, variableText };
 }
 
 export function warpDeformNotice(
@@ -134,7 +142,11 @@ function leftAloneNote(skipped: LeftAlone): string {
     skipped.locked === 0
       ? ''
       : ` ${skipped.locked === 1 ? '1 locked object was left as it is' : `${skipped.locked} locked objects were left as they are`}.`;
-  return `${images}${locked}`;
+  const variable =
+    (skipped.variableText ?? 0) === 0
+      ? ''
+      : ` ${variableTextSkippedNotice(skipped.variableText ?? 0)}`;
+  return `${images}${locked}${variable}`;
 }
 
 function count(value: number, one: string, many: string): string {
