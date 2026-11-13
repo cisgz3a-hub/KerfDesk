@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { isVectorPathObject } from '../../core/geometry';
-import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 import { joinOpenVectorPaths } from '../../core/geometry/vector-path-join';
 import type { Project } from '../../core/scene';
 import { useStore } from '../state';
+import { vectorRepairSources } from '../state/vector-repair-sources';
 
 /** Repairs use the established geometry engine and its undo action after a separate preview. */
 export function useTemplateVectorRepair() {
@@ -23,22 +22,14 @@ export function useTemplateVectorRepair() {
   const ids = [...new Set([...(selected === null ? [] : [selected]), ...additional])];
   const key = ids.sort().join('|');
   const review = (): void => {
-    const objects = project.scene.objects.filter((object) => ids.includes(object.id));
-    if (
-      !objects.every(
-        (object) =>
-          object.locked !== true && !isBooleanCompoundObject(object) && isVectorPathObject(object),
-      )
-    ) {
-      setStatus('Select unlocked ordinary vector artwork for the join repair.');
+    // The same sources as the Join store action (ADR-350 Amendment 2).
+    const sources = vectorRepairSources(project.scene, ids);
+    if (sources === null || sources.kept.length === 0) {
+      setStatus(sources?.notice || 'Select unlocked ordinary vector artwork for the join repair.');
       setReviewed(null);
       return;
     }
-    const result = joinOpenVectorPaths(
-      objects.filter(isVectorPathObject),
-      project.scene.layers,
-      Number(tolerance),
-    );
+    const result = joinOpenVectorPaths(sources.kept, project.scene.layers, Number(tolerance));
     if (result.kind === 'error') {
       setStatus(result.error.message);
       setReviewed(null);
@@ -56,7 +47,8 @@ export function useTemplateVectorRepair() {
         result.value.joins +
         ' joins; ' +
         result.value.closures +
-        ' closures. Artwork changes only after Apply path repair.',
+        ' closures. Artwork changes only after Apply path repair.' +
+        (sources.notice === '' ? '' : ` ${sources.notice}`),
     );
   };
   const current =

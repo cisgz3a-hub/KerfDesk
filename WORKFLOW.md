@@ -740,6 +740,13 @@ the linked artwork.
    tab indices are retained. The node toolbar's two-anchor Join keeps its existing workflow.
 4. Both tools support laser and CNC artwork, commit one undo transaction, and leave the project
    unchanged on invalid or empty results. They do not operate a machine.
+5. Both leave variable text, variable barcodes and the registration jig as they are (ADR-350
+   Amendment 2). They edit the rest of the selection, and the dialog and a notice say what was
+   left out ("Variable text was left as text: use Bake Variable Text first to fix its value.").
+   A selection of only those keeps both commands disabled.
+6. Edge: when a source masks an image or guides text on a path, Union (like Weld and the
+   Booleans) and Join clear that reference and warn that the artwork "was merged into a new
+   shape"; the image burns unmasked, as the canvas then shows. Union names placed tabs it drops.
 
 ### F-A6c. Offset Shapes (ADR-410)
 
@@ -7478,8 +7485,10 @@ and lifts the command's CNC-only gate.)*
 4. Matching flat end mills peck to the requested depth; smaller flat end mills
    clear concentric circles at each depth step. Adjacent tiles use identical
    stock-space centers in the overlap strip. Each seam's two bores go where the
-   strip is clear of every part and cut and on the stock (its margin at the
-   seam's ends included), as far apart as fits (ADR-392 Amendment 7). A seam
+   strip is clear of every toolpath, outside every outline a cut goes round
+   (whatever its lead, tabs or ramp), and on the stock (its margin at the
+   seam's ends included), as far apart as fits (ADR-392 Amendments 7 and 8). A
+   part drawn as an open outline is not known as a part. A seam
    with no clear spot gets no bore and the save names it; a seam with one gets
    one bore and a warning that it does not square the stock. Preview draws the
    planned bores in purple and lists them; the save lists them by tile, and

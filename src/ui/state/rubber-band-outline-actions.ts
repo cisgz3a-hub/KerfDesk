@@ -14,6 +14,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { formatDisplayMillimetres } from '../format-display-millimetres';
+import { geometryToolSkippedNotice, geometryToolSources } from './geometry-tool-sources';
 import { selectedObjectIds } from './scene-group-actions';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
@@ -53,7 +54,17 @@ function rubberBandOutlineMutation(
 ): AppState | Partial<AppState> {
   const ids = new Set(selectedObjectIds(state));
   const scene0 = state.project.scene;
-  const selected = scene0.objects.filter((object) => ids.has(object.id));
+  // Variable data's stored outlines are its template, not the burned value, so
+  // the outline leaves it out (ADR-350 Amendment 2).
+  const { kept: selected, skipped } = geometryToolSources(
+    scene0,
+    scene0.objects.filter((object) => ids.has(object.id)),
+    'variable',
+  );
+  const leftOut = geometryToolSkippedNotice(skipped);
+  if (leftOut !== '') {
+    useToastStore.getState().pushToast(leftOut, selected.length === 0 ? 'warning' : 'info');
+  }
   if (selected.length === 0) return state;
   const outline = rubberBandOutline(selected, uniqueObjectId(scene0, 'outline'));
   if (outline === null) {

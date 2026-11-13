@@ -126,6 +126,8 @@ worker plan and Apply see the same objects (ADR-609).
 **Not covered.** Offset Shapes (its own dialog), Duplicate Shapes, Cut Shape Sides, Copy Along
 Path, Warp, the nest outline and the rubber-band outline also read stored outlines and are not
 guarded yet; each is left to its own audit entry. Locked members (T28-P2-3, now P3) are unchanged.
+(Amended by Amendment 2: Union Silhouette, Join Paths, Offset Shapes, Cut Shapes, Trim Shapes,
+Warp / Deform and the rubber-band outline are now guarded.)
 
 **Verification.** `weld-skips-variable-data-and-jig.test.ts` checks the burned value against an
 independent render of "SN 0042", the serial advancing after Weld, a variable Code 128, and a
@@ -134,3 +136,80 @@ two-outline jig's runs and decoded piece order with locked and unlocked outlines
 back lit length from the G-code (80 mm and 110 mm union outlines).
 `vector-path-weld.test.ts` covers the batch key. All fail on main 0163a852b except the legacy
 colour case, which guards the kept behaviour.
+
+### Amendment 2 - Union Silhouette, Join Paths and the other outline tools take the guard; replaced sources repair their dependents (2026-11-14)
+
+**Context.** Tools audit T1 (`docs/audits/2026-11-13-tools-t1/`) confirmed on main f8c17f8c4 that
+Amendment 1's guard missed two tools in `vector-repair-actions.ts`, and that the tools which
+replace their sources leave dependents pointing at deleted ids:
+
+- **T29-P1-1 and T30-P1-1 (P1).** Union Silhouette and Join Paths rebuild variable text from its
+  template glyphs. After Union, serial 7 and serial 8 gave identical G-code burning the braces. Join
+  did the same in all four bundled single-line fonts, because it closes loops inside the template
+  glyphs: "SN {{serial:4}}" burned 142.238 mm, 51.592 mm wide, where the value burns 84.703 mm,
+  30.472 mm wide. Weld refused both selections with a reason.
+- **T29-P2-1.** Union of box A's jig pieces made one silhouette in box A while box B still burned
+  both outlines (162 mm against 216 mm). After Unlock All the outlines were absorbed too.
+- **T29-P1-2 (re-graded P2), T29R-P2-1, T29-P3-3.** Union, Weld and Subtract / Intersect / Exclude
+  removed their sources without dependency repair. An image masked by a source kept a dangling
+  `imageMaskId`, and the job burned the whole photo unmasked (3200 mm, 2656 mm of it outside the
+  mask), with no preflight issue and no notice. Text set on a source as its path kept a dangling
+  guide in the same way. Join and Delete already repaired these; Join gave no notice (T30-P3-4).
+- **T29-P2-2.** Union dropped placed tabs without ADR-494 Amendment 3's notice.
+
+**Decision.**
+
+1. **Union Silhouette and Join Paths use the `replace` guard.** Both replace their sources with new
+   objects built from stored outlines. They leave out variable text, variable barcodes, the
+   registration outlines and every jig piece's artwork. They edit the rest of the selection and
+   show Amendment 1's notice; a selection of only those refuses with the notice. One function,
+   `vectorRepairSources` (`src/ui/state/vector-repair-sources.ts`), feeds the menu gating
+   (`unionSilhouetteOperations`, `selectionCanJoinPaths`), both dialogs (which show the notice
+   before Apply), the material library's join preview and the store actions. Guard-skipped
+   objects never make a selection ineligible, so Select All still works. Anything else that is not
+   an unlocked plain vector object still refuses the whole selection, as before. Join's gating now
+   reads the same objects as its action, so a compound result no longer enables a Join that then
+   refuses (T30-P3-2); Union's gating likewise (T29-P3-1). The jig guard on Join also covers
+   T30-P2-1.
+2. **A tool that replaces its sources repairs their dependents and says so.** Weld, Subtract /
+   Intersect / Exclude, Union Silhouette and Join Paths run Delete's dependency repair on the
+   result (`repairReplacedSources`, `src/ui/state/replaced-sources-repair.ts`; Weld and the Booleans
+   reach it through `combineSelectionNotingTabs`). An image mask or text-on-path guide that
+   pointed at a removed source is cleared, and the warning says the artwork "was merged into a
+   new shape". The image then burns unmasked, which the canvas shows; the text keeps its stored
+   geometry. The dependents are not pointed at the result: the result of a Subtract or Exclude
+   is not the mask the user drew, and a guide's new outline would move the text. Keep originals
+   removes nothing and repairs nothing.
+3. **Union names dropped placed tabs** with ADR-494 Amendment 3's notice ("Placed tabs on the
+   unioned shapes were removed. Undo restores them."). Join already refuses paths with placed
+   tabs.
+4. **The other outline tools take the guard:**
+   - Offset Shapes (its dialog and action): `variable`, or `replace` when Delete original objects
+     is on. The dialog shows the notice.
+   - Cut Shapes (action and background plan, `cutShapesSources`): `replace`, because it replaces
+     its sources with pieces.
+   - Trim Shapes: `variable`. A click on variable data refuses with the notice. The object keeps
+     its id, so jig artwork may still be trimmed, as Dogbone may relieve it.
+   - Rubber-Band Outline: `variable`. The outline goes round the rest of the selection.
+   - Warp / Deform: variable text only. Bending converts text to paths from its template glyphs. A
+     variable barcode is bent at the value the canvas shows, which
+     `warp-deform-variable-barcode.test.ts` already guards, in line with ADR-386 Amendment 2's
+     acceptance for Convert to Path. The finished notice and the start notice name skipped text.
+   - Close Path and Close Paths with Tolerance are not changed: they edit only imported, traced
+     and drawn-polyline artwork (`isPathEditable`), never text or barcodes, and keep the id.
+
+**Not covered.** Duplicate Shapes, Cut Shape Sides, Copy Along Path and the nest outline stay as
+Amendment 1 listed them. The Offset outlines row still sends variable data to its background
+worker and then recomputes in the thread, because the store leaves it out; the result is right
+and only the reuse is lost. Join's zero-area loop (T30-P1-2) has its own fix.
+
+**Verification.** `union-join-skip-variable-data-and-jig.test.ts` checks Union's burned value
+against an independent render of "SN 0042" and the serial advancing. It checks Join in each of
+the four single-line fonts against `renderVariableText`'s own render of the value. It also checks
+the gating and refusals, and a two-outline jig: box A's pieces refused, both boxes burning the same
+lit length, and Select All with locked and unlocked outlines keeping the runs while the free pair
+unions to 50 mm. `replaced-sources-dependencies.test.ts` covers mask and guide repair with its
+warning and Undo for Union, Weld, Subtract, Intersect and Exclude, Weld with Keep originals, Join's
+guide notice, and Union's tab notice. It also checks that Offset Shapes, Cut Shapes, Trim, the
+rubber-band outline and Warp / Deform leave variable text. 27 of the 30 tests fail on main
+951f94712; the other three are controls for kept behaviour.

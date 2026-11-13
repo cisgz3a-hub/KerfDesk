@@ -33,6 +33,7 @@ import {
 import type { Scene } from '../../core/scene/scene';
 import type { Bounds, SceneObject } from '../../core/scene/scene-object';
 import { applyTransform } from '../../core/scene/transform';
+import { objectVariableTemplate } from '../../core/variables/object-variable-template';
 import { synchronizePolylineShapeGeometry } from './path-node-shape-sync';
 import type { WarpDeformRequest } from './warp-deform-session';
 
@@ -54,7 +55,13 @@ type WarpedObject = {
   readonly curvesFlattened: boolean;
 };
 
-/** The artwork Warp and Deform bend: unlocked vector objects in the selection. */
+/**
+ * The artwork Warp and Deform bend: unlocked vector objects in the selection.
+ * Variable text is left out: bending converts text to paths, and its stored
+ * glyphs are the template, so every record would burn the braces (ADR-350
+ * Amendment 2). A variable barcode is bent at the value the canvas shows, as
+ * ADR-386 Amendment 2 accepts for Convert to Path.
+ */
 export function warpDeformTargets(
   scene: Scene,
   selectedIds: ReadonlyArray<string>,
@@ -65,8 +72,14 @@ export function warpDeformTargets(
       ids.has(object.id) &&
       object.locked !== true &&
       !isBooleanCompoundObject(object) &&
+      !isVariableText(object) &&
       isVectorPathObject(object),
   );
+}
+
+/** Text whose stored glyphs are a variable template rather than its burned value. */
+export function isVariableText(object: SceneObject): boolean {
+  return object.kind === 'text' && objectVariableTemplate(object) !== undefined;
 }
 
 /** A fresh session on the selection, with the handles on its box, or null when nothing can bend. */
@@ -114,7 +127,7 @@ function prepareWarpDeform(scene: Scene, request: WarpDeformRequest): WarpDeform
   let curvesFlattened = false;
   let movedTabs = 0;
   const objects = scene.objects.map((object) => {
-    if (isBooleanCompoundObject(object)) return object;
+    if (isBooleanCompoundObject(object) || isVariableText(object)) return object;
     if (!ids.has(object.id) || object.locked === true || !isVectorPathObject(object)) {
       return object;
     }
