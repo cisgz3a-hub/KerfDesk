@@ -1,3 +1,4 @@
+import { clickDialogButtonIfReady } from './dialog-button-now';
 import { expect, type KerfDeskFixture, type Page } from './kerfdesk-test';
 import { toolbarCommand } from './workspace-ui';
 
@@ -20,10 +21,8 @@ export async function saveProjectAs(page: Page, fixture: KerfDeskFixture): Promi
     .poll(
       async () => {
         if ((await pickerCount()) > before) return true;
-        if ((await choose.isVisible()) && (await choose.isEnabled())) {
-          // The dialog may close under the click when the picker opens by itself.
-          await choose.click({ timeout: 2_000 }).catch(() => undefined);
-        }
+        // The dialog may close under the click when the picker opens by itself.
+        await clickDialogButtonIfReady(choose);
         return (await pickerCount()) > before;
       },
       { timeout: 90_000 },

@@ -9,7 +9,9 @@
 // made unnecessary. Advisory only, as detectCncThroughCutTabWarnings is.
 
 import { isProfileCutType } from '../../core/cnc';
-import { DEFAULT_CNC_STOCK, type CncLayerSettings, type Layer } from '../../core/scene';
+import type { CncLayerSettings, CncStock, Layer } from '../../core/scene';
+// Deep import: core/scene's barrel is a ratcheted over-cap legacy barrel.
+import { setStockThicknessMm } from '../../core/scene/machine';
 import {
   projectionSetTabHeightMm,
   projectionTabsThin,
@@ -24,9 +26,13 @@ export function projectionStockWarning(
   layer: Layer,
   settings: CncLayerSettings,
   facts: CompiledProjectionFacts | undefined,
-  stockThicknessMm: number,
+  stock: CncStock,
 ): string | null {
   if (facts === undefined) return null;
+  const stockThicknessMm = stock.thicknessMm;
+  // ADR-258 Amendment 6: the tab rules read the SET thickness, undefined while
+  // the operator has not set one; the stock text reads the thickness shown.
+  const setMm = setStockThicknessMm(stock);
   const cut =
     `Layer ${layer.id} projects ${formatMm(facts.verticalDepthMm)} mm under the relief surface ` +
     `and reaches ${formatMm(facts.deepestMm)} mm into ${stockThicknessMm} mm stock`;
@@ -34,8 +40,10 @@ export function projectionStockWarning(
     const shapes = `${facts.freedShapes} closed ${facts.freedShapes === 1 ? 'shape' : 'shapes'}`;
     const fix = !settings.tabsEnabled
       ? 'Enable Tabs or reduce the Vertical depth.'
-      : stockThicknessMm === DEFAULT_CNC_STOCK.thicknessMm
-        ? 'Stock thickness is still the default, so its tabs are measured from the cut floor and sit below the stock. Set Stock thickness to keep them.'
+      : setMm === undefined
+        ? 'Stock thickness has not been set, so its tabs are measured from the cut floor and sit ' +
+          'below the stock. Set Stock thickness in Machine Setup (press Use 6.35 mm there if ' +
+          'that is the real sheet) to keep them.'
         : // X6-P1-1: tabs on and set, yet nothing holds: the relief floor
           // under the windows is at the stock bottom, so they ride in air.
           'Its tab windows leave no more than 0.1 mm, because the relief floor under them is ' +
@@ -46,12 +54,12 @@ export function projectionStockWarning(
       `the parts come free on the final pass. ${fix}`
     );
   }
-  const thin = projectionTabsThin(settings, facts, stockThicknessMm);
+  const thin = projectionTabsThin(settings, facts, setMm);
   if (thin !== null) {
-    const setMm = projectionSetTabHeightMm(settings, stockThicknessMm);
+    const tabMm = projectionSetTabHeightMm(settings, setMm);
     return (
       `${cut}${pastBottom(facts, stockThicknessMm)}: its holding tabs are only ` +
-      `${formatMm(thin)} mm thick, not the ${formatMm(setMm)} mm ` +
+      `${formatMm(thin)} mm thick, not the ${formatMm(tabMm)} mm ` +
       `set, because the relief floor under them stands only ${formatMm(thin)} mm above the ` +
       'stock bottom and a tab keeps only the material there. ' +
       (thin < THIN_TAB_MM ? 'Tabs this thin can break and free the parts. ' : '') +
@@ -64,8 +72,8 @@ export function projectionStockWarning(
       'spoilboard. Reduce the Vertical depth if that is not intended.'
     );
   }
-  // The shipped thickness reads as never set, and then no floor drops a tab.
-  if (stockThicknessMm !== DEFAULT_CNC_STOCK.thicknessMm && projectionSkipsTabs(settings, facts)) {
+  // An unset thickness drops no tab for a floor (ADR-258 Amendment 6).
+  if (setMm !== undefined && projectionSkipsTabs(settings, facts)) {
     return (
       `${layer.name} skips its holding tabs: Stock thickness is ${formatMm(stockThicknessMm)} mm, ` +
       `so the deepest projected cut at ${formatMm(facts.deepestMm)} mm leaves a ` +

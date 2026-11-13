@@ -10,7 +10,7 @@
 import { isProfileCutType } from '../../../core/cnc';
 import { stockLimitedTabHeightMm } from '../../../core/cnc/cnc-tabs';
 import type { Job } from '../../../core/job';
-import { DEFAULT_CNC_STOCK, type CncLayerSettings } from '../../../core/scene';
+import type { CncLayerSettings } from '../../../core/scene';
 import { formatMm } from './job-review-format';
 
 /** What one operation's compiled projection cut. */
@@ -71,10 +71,7 @@ export function projectionSetTabHeightMm(
   settings: CncLayerSettings,
   stockThicknessMm: number | undefined,
 ): number {
-  const stock = stockThicknessMm ?? DEFAULT_CNC_STOCK.thicknessMm;
-  return stock === DEFAULT_CNC_STOCK.thicknessMm
-    ? settings.tabHeightMm
-    : stockLimitedTabHeightMm(settings.tabHeightMm, stock);
+  return stockLimitedTabHeightMm(settings.tabHeightMm, stockThicknessMm);
 }
 
 /** The tabs are thinner than set: the relief floor under them is lower (X6-P1-1). */
@@ -118,7 +115,6 @@ function projectionTabsPart(
   if (facts.freedShapes > 0) return [`no holding tab on ${shapes(facts.freedShapes)} cut free`];
   if (!settings.tabsEnabled) return ['tabs off'];
   if (facts.tabbedShapes > 0) {
-    const stock = stockThicknessMm ?? DEFAULT_CNC_STOCK.thicknessMm;
     const heightMm = projectionSetTabHeightMm(settings, stockThicknessMm);
     const on = `on ${facts.tabbedShapes} of ${shapes(facts.closedShapes)}`;
     // X6-P1-1: a tab is only as thick as the floor the relief leaves under it.
@@ -130,7 +126,7 @@ function projectionTabsPart(
           `stock bottom (${formatMm(heightMm)} mm set)`,
       ];
     }
-    const from = stock === DEFAULT_CNC_STOCK.thicknessMm ? 'the cut floor' : 'the stock bottom';
+    const from = stockThicknessMm === undefined ? 'the cut floor' : 'the stock bottom';
     return [
       `tabs ${settings.tabsPerShape} per shape (${formatMm(settings.tabWidthMm)} × ` +
         `${formatMm(heightMm)} mm above ${from}) ${on}`,
