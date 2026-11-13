@@ -324,3 +324,26 @@ Verification, on this PC:
 | Guard as committed, GPU | passed; no long task |
 | SwiftShader, 2× throttle, CI rule | passed; first draw 143 ms at 7 % camera script |
 | Same, with the moved check's comparison forced into the window | failed: 444 ms and 290 ms tasks at 94–99 % camera script, naming `checkCameraMovedInWorker` |
+
+### Amendment 8 — A garbage-collection sample counts for the script that ran before it (2026-11-13)
+
+The C2 verification round (E3-P3-2, `docs/audits/2026-11-12-c2-verify/E3-guards-tests-ci.md`)
+found that Amendment 7's share counted `(garbage collector)` samples against the camera. In a
+CPU profile they are root-level nodes with no app frame, so a 120 ms camera task made of 45 %
+camera decode and 55 % collecting that decode's garbage scored 0.45 and passed the 0.5 guard. A
+regression that allocates per frame (the per-read base64 decode Amendment 7 removed was one) would
+show exactly that shape.
+
+Decision. In `attributeLongTasks`, a `(garbage collector)` sample takes the attribution of the
+last earlier sample in the profile that had script on its stack. It counts for the camera when
+that sample did. It counts for no area when that sample was another area's, or the overlay
+driver's (the GPU's time, as in Amendment 7), or when there is none. GC samples stay in the
+denominator, so a job render that collects its own garbage still dilutes a little camera work as
+before. `(program)` and other samples with no script on the stack are unchanged: they cannot be
+attributed, and the structural checks still guard them.
+
+`e2e/long-task-attribution.e2e.ts` checks the arithmetic on synthetic profiles with no page.
+The E3 case D (45 % camera, then 55 % GC) now scores 1.0. Garbage collection after React scores
+0, after the driver 0, and after native `(program)` work it follows the last script. On the
+attribution as it was before this amendment, all three tests fail (0.45, 0.1 and 0.3 where
+1.0, 0.2 and 0.8 are expected).

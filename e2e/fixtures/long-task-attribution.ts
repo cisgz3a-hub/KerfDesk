@@ -9,8 +9,12 @@
 // deepest app frame is in a "driver" file (the overlay's thin WebGL wrapper)
 // are left out: Chrome runs fast WebGL calls inside their caller's frame, so
 // that file's time is the GPU's, which a CI runner without one does on the UI
-// thread. Work with no script on the stack at all cannot be attributed and is
-// guarded by structural checks instead.
+// thread. A garbage-collection sample has no script on its stack, but the
+// script that ran just before it made the garbage, so it counts for that
+// script's area (ADR-598 Amendment 8): a camera task spent mostly collecting
+// the camera's own allocations is the camera's. Other work with no script on
+// the stack, such as `(program)`, cannot be attributed and is guarded by
+// structural checks instead.
 
 import type { CDPSession, Page } from '@playwright/test';
 
@@ -51,6 +55,7 @@ export interface AttributedTask extends LongTask {
 }
 
 const MARKER = 'zzLongTaskProfileMarker';
+const GARBAGE_COLLECTOR = '(garbage collector)';
 const SAMPLING_US = 500;
 
 /** Start sampling the page; a 30 ms marker ties the profile's clock to the page's. */
@@ -104,12 +109,12 @@ export function attributeLongTasks(args: {
     return frames;
   };
   const times = sampleTimes(profile, stack, args.markedAt);
-  const owned = (id: number): boolean => ownedSample(stack(id), args.ownedPath, args.driverPath);
+  const owned = ownership(times, stack, args.ownedPath, args.driverPath);
   return args.tasks.map((task) => {
     const inside = times.filter(
       (sample) => sample.at >= task.startMs && sample.at <= task.startMs + task.durationMs,
     );
-    const mine = inside.filter((sample) => owned(sample.id));
+    const mine = inside.filter((sample) => owned.get(sample.index) === true);
     return {
       ...task,
       samples: inside.length,
@@ -139,11 +144,17 @@ function topFrames(stacks: readonly CallFrame[][], ownedPath: string): string[] 
 }
 
 // Page times of the samples: the first sample inside the marker is markedAt.
+interface TimedSample {
+  readonly index: number;
+  readonly id: number;
+  readonly at: number;
+}
+
 function sampleTimes(
   profile: CpuProfile,
   stack: (id: number) => CallFrame[],
   markedAt: number,
-): { readonly id: number; readonly at: number }[] {
+): TimedSample[] {
   let elapsedUs = 0;
   const raw = profile.samples.map((id, index) => {
     elapsedUs += profile.timeDeltas[index] ?? 0;
@@ -153,7 +164,35 @@ function sampleTimes(
     stack(sample.id).some((frame) => frame.functionName === MARKER),
   );
   if (first === undefined) throw new Error('the profile holds no sample of its clock marker');
-  return raw.map((sample) => ({ id: sample.id, at: markedAt + (sample.us - first.us) / 1000 }));
+  return raw.map((sample, index) => ({
+    index,
+    id: sample.id,
+    at: markedAt + (sample.us - first.us) / 1000,
+  }));
+}
+
+// Whether each sample (by index, in time order) is the area's. A garbage
+// collector sample is the area's when the last sample before it that ran
+// script was; one with no script before it is no area's.
+function ownership(
+  samples: readonly TimedSample[],
+  stack: (id: number) => CallFrame[],
+  ownedPath: string,
+  driverPath: string,
+): Map<number, boolean> {
+  const owned = new Map<number, boolean>();
+  let lastScript = false;
+  for (const sample of samples) {
+    const frames = stack(sample.id);
+    if (frames[0]?.functionName === GARBAGE_COLLECTOR) {
+      owned.set(sample.index, lastScript);
+      continue;
+    }
+    const mine = ownedSample(frames, ownedPath, driverPath);
+    if (frames.some((frame) => frame.url !== '')) lastScript = mine;
+    owned.set(sample.index, mine);
+  }
+  return owned;
 }
 
 // The area's own script: an app frame of it on the stack, unless the deepest

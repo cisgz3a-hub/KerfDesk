@@ -19,7 +19,12 @@
 import { createFakeSerialPort, type FakeSerialPort } from './fake-serial-port';
 import { createBackpressureFeeder } from './grbl-sim-backpressure';
 import { createDelayedParseFeeder, flushInputOnJogCancel } from './grbl-sim-jog-cancel-flush';
-import type { SimVec3 } from './grbl-sim-gcode';
+import { hasGWord, leadingGWord, type SimVec3 } from './grbl-sim-gcode';
+import {
+  arcCentreOffset,
+  createKinematicClock,
+  type GrblSimKinematicClock,
+} from './grbl-sim-kinematics';
 import {
   DEFAULT_GRBL_SIM_OPTIONS,
   UNLOCK_MESSAGE,
@@ -96,6 +101,14 @@ export type CreateGrblSimulatorOptions = Partial<GrblSimOptions> & {
    * grbllib.c:358; ADR-375).
    */
   readonly storedOffsets?: { readonly g54?: SimVec3; readonly g92?: SimVec3 };
+  /**
+   * Time each move by its length over its feed, report the position along the
+   * current move, and stop the head where it is at a soft reset or jog cancel
+   * (grbl-sim-kinematics.ts; code quality audit C2, D3-P3-7). Unset: every move
+   * takes `motionMs` and reports its end at once, as before. Not modelled
+   * together with `plannerBlocks`.
+   */
+  readonly kinematic?: boolean;
 };
 
 export type GrblSimulator = {
@@ -200,11 +213,13 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
     lineParseDelayMs,
     storedOffsets,
     fourthAxisA,
+    kinematic,
     ...optionOverrides
   } = options;
   if (jogCancelFlushesInput === true && plannerBlocks !== undefined) {
     throw new Error('jogCancelFlushesInput is not modelled together with plannerBlocks.');
   }
+  const clock = kinematicClockFor(kinematic, plannerBlocks);
   const opts: GrblSimOptions = { ...DEFAULT_GRBL_SIM_OPTIONS, ...optionOverrides };
   const settings = defaultGrblSimSettings();
   for (const [id, value] of settingOverrides ?? []) settings.set(id, value);
@@ -238,9 +253,12 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
 
   const deps: FeederDeps = {
     reduceLine: (line) => {
+      const before = state;
       const reaction = reduceGrblSim(state, { kind: 'rx-line', line }, opts);
       state = reaction.state;
-      return reaction.effects;
+      return clock === null
+        ? reaction.effects
+        : timeMove(clock, before, state, line, reaction.effects);
     },
     runEffect,
     parsesLines: () => grblSimParsesLines(state, opts),
@@ -271,6 +289,19 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
   const onRealtime = (byte: string): void => {
     if (jogCancelFlushesInput === true && byte === JOG_CANCEL_BYTE) {
       state = flushInputOnJogCancel(state, feeder);
+    }
+    if (clock !== null && byte === '?') {
+      // The report reads the head along its move; the queued end stays the target.
+      const target = state.mpos;
+      state = { ...state, mpos: clock.positionAt(Date.now()) ?? target };
+      apply({ kind: 'rx-realtime', byte });
+      state = { ...state, mpos: target };
+      feeder.drain();
+      return;
+    }
+    if (clock !== null && (byte === SOFT_RESET_BYTE || byte === JOG_CANCEL_BYTE)) {
+      // The steppers stop where they are; GRBL keeps that position.
+      state = { ...state, mpos: clock.stopAt(Date.now()) ?? state.mpos };
     }
     apply({ kind: 'rx-realtime', byte });
     // A soft reset flushes the receive buffer and the planner on real hardware.
@@ -332,4 +363,50 @@ function powerUpState(
 /** A four-axis build starts with A at 0 and no offset (ADR-695). */
 function withFourthAxisA(state: GrblSimState, fourthAxisA: boolean | undefined): GrblSimState {
   return fourthAxisA === true ? { ...state, aAxis: { mpos: 0, g92: 0 } } : state;
+}
+
+function kinematicClockFor(
+  kinematic: boolean | undefined,
+  plannerBlocks: number | undefined,
+): GrblSimKinematicClock | null {
+  if (kinematic !== true) return null;
+  if (plannerBlocks !== undefined) {
+    throw new Error('kinematic is not modelled together with plannerBlocks.');
+  }
+  return createKinematicClock();
+}
+
+/** Kinematic mode: time the move a line just queued, and let its
+ *  motion-finished event fire when the clock says it ends. */
+function timeMove(
+  clock: GrblSimKinematicClock,
+  before: GrblSimState,
+  after: GrblSimState,
+  line: string,
+  effects: ReadonlyArray<GrblSimEffect>,
+): ReadonlyArray<GrblSimEffect> {
+  if (after.pendingMotions <= before.pendingMotions) return effects;
+  const g = leadingGWord(line);
+  const has = (value: number): boolean => g === value || hasGWord(line, value);
+  const jogFeed = line.startsWith('$J=') ? Number(/F(\d*\.?\d+)/i.exec(line)?.[1]) : NaN;
+  const rapid = Math.min(
+    Number(after.settings.get(110) ?? 'NaN'),
+    Number(after.settings.get(111) ?? 'NaN'),
+  );
+  const feedMmPerMin = Number.isFinite(jogFeed) ? jogFeed : has(0) ? rapid : after.feed;
+  const centre = has(2) || has(3) ? arcCentreOffset(line) : null;
+  const endsInMs = clock.addMove(
+    {
+      from: before.mpos,
+      to: after.mpos,
+      feedMmPerMin,
+      ...(centre === null ? {} : { arc: { ...centre, clockwise: has(2) } }),
+    },
+    Date.now(),
+  );
+  return effects.map((effect) =>
+    effect.kind === 'schedule' && effect.event.kind === 'motion-finished'
+      ? { ...effect, afterMs: endsInMs }
+      : effect,
+  );
 }

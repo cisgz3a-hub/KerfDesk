@@ -8,6 +8,7 @@ import { lhyBoardSetting } from '../../../core/controllers/lihuiyu/lhy-encoder';
 import type { LhyPoint } from '../../../core/controllers/lihuiyu/lhy-motion-plan';
 import { egvPreparationOptions, type EmitEgvOptions } from '../../../io/egv';
 import { emitPreparedEgvWithJobWarnings } from '../../laser/egv-job-warnings';
+import { linkJobOutcome } from '../link-job-outcome';
 import type { LinkJobRequest } from '../link-job-request';
 import { prepareOutput } from '../../../io/gcode';
 import { withTextGlyphCheck } from '../../../io/gcode/prepare-output-snapshot';
@@ -62,11 +63,11 @@ export async function prepareLihuiyuUsbJob(
       absolute,
       board: lhyBoardSetting(project.device.lihuiyuBoard),
       framingMmPerMin: project.device.framingFeedMmPerMin,
-      // Each line once: the panel and the job bar key their lists by the text.
-      advisories: [
-        ...new Set([...result.advisories.map((issue) => issue.message), ...result.jobWarnings]),
-      ],
-      completed: request.completed,
+      ...linkJobOutcome(
+        request,
+        result.advisories.map((issue) => issue.message),
+        result.jobWarnings,
+      ),
     },
   };
 }

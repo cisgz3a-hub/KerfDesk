@@ -9,10 +9,12 @@
 // is the operator's choice to burn the white: the notice and Job Review stop
 // asking. An import whose white covers every darker shape is left as parsed,
 // as a fresh import leaves it, and the open count leaves it out as well. Copies
-// that lost their import identity are knocked out one by one (Amendment 4).
+// that lost their import identity are grouped by what was copied together
+// (Amendments 4 and 5). Only Fill bindings are knocked out; an operation the
+// knock-out leaves with nothing to burn is removed and named in the toast.
 
 import {
-  isWhiteOutputOff,
+  isBurningPaperWhite,
   savedKnockoutOptions,
   svgImportGroups,
 } from '../../core/geometry/burning-imported-white';
@@ -29,12 +31,14 @@ export type SavedWhiteKnockout = {
   /** White shapes now left unburned. */
   readonly whiteShapes: number;
   readonly removedIds: ReadonlySet<string>;
+  /** Names of the operations only the white used, now removed. */
+  readonly removedOperations: ReadonlyArray<string>;
 };
 
 export function knockOutSavedWhiteFills(project: Project): SavedWhiteKnockout | null {
   const original = project.scene;
   const burns = (object: SceneObject, path: ColoredPath): boolean =>
-    !isWhiteOutputOff(original, object, path);
+    isBurningPaperWhite(original, object, path);
   const options = savedKnockoutOptions(original);
   let scene: Scene = original;
   let whiteShapes = 0;
@@ -51,11 +55,15 @@ export function knockOutSavedWhiteFills(project: Project): SavedWhiteKnockout | 
     whiteShapes += knockout.whiteShapes;
   }
   if (touched.size === 0) return null;
+  const remaining = new Set(scene.layers.map((operation) => operation.id));
   return {
     project: { ...project, scene },
     undoProject: withWhiteKept(project, touched, burns),
     whiteShapes,
     removedIds,
+    removedOperations: original.layers
+      .filter((operation) => !remaining.has(operation.id))
+      .map((operation) => operation.name),
   };
 }
 
@@ -80,10 +88,12 @@ export function savedWhiteKnockoutActions(set: SavedWhiteKnockoutSet): SavedWhit
   return {
     leaveSavedWhiteUnburned: () => {
       let whiteShapes = 0;
+      let removedOperations: ReadonlyArray<string> = [];
       set((state) => {
         const result = knockOutSavedWhiteFills(state.project);
         if (result === null) return {};
         whiteShapes = result.whiteShapes;
+        removedOperations = result.removedOperations;
         const kept = (id: string) => !result.removedIds.has(id);
         return {
           project: result.project,
@@ -98,7 +108,9 @@ export function savedWhiteKnockoutActions(set: SavedWhiteKnockoutSet): SavedWhit
         };
       });
       if (whiteShapes > 0) {
-        useToastStore.getState().pushToast(leftUnburnedMessage(whiteShapes), 'success');
+        useToastStore
+          .getState()
+          .pushToast(leftUnburnedMessage(whiteShapes, removedOperations), 'success');
       }
       return whiteShapes;
     },
@@ -107,10 +119,30 @@ export function savedWhiteKnockoutActions(set: SavedWhiteKnockoutSet): SavedWhit
 
 export const LEAVE_WHITE_UNBURNED = 'Leave white unburned';
 
-export function leftUnburnedMessage(whiteShapes: number): string {
+const NAMED_OPERATIONS = 3;
+
+export function leftUnburnedMessage(
+  whiteShapes: number,
+  removedOperations: ReadonlyArray<string> = [],
+): string {
   const one = whiteShapes === 1;
   return (
     `${one ? '1 white shape is' : `${whiteShapes} white shapes are`} left unburned. ` +
+    removedOperationsSentence(removedOperations) +
     `Undo burns ${one ? 'it' : 'them'} again.`
   );
+}
+
+function removedOperationsSentence(names: ReadonlyArray<string>): string {
+  if (names.length === 0) return '';
+  const shown = names.slice(0, NAMED_OPERATIONS).map((name) => `“${name}”`);
+  const more = names.length - shown.length;
+  const list =
+    more > 0
+      ? `${shown.join(', ')} and ${more} more`
+      : shown.length === 1
+        ? shown[0]
+        : `${shown.slice(0, -1).join(', ')} and ${shown.at(-1)}`;
+  const operations = names.length === 1 ? 'operation' : 'operations';
+  return `Removed the ${operations} ${list}, which only the white used. `;
 }

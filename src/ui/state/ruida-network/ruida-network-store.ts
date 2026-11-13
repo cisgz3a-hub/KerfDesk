@@ -33,11 +33,9 @@ import {
   ruidaStopOutcome,
 } from './ruida-network-messages';
 import { watchRuidaRun, type RuidaMonitor } from './ruida-network-monitor';
-import {
-  reportLinkMachineStatus,
-  reportLinkMachineWork,
-  type LinkMachineWork,
-} from '../link-machine-work';
+import type { LinkJobOutcome } from '../link-job-outcome';
+import type { LinkMachineWork } from '../link-machine-work';
+import { connectLinkStore } from '../link-store-connection';
 
 export type RuidaNetworkPhase =
   | 'disconnected'
@@ -49,12 +47,10 @@ export type RuidaNetworkPhase =
   | 'stopping';
 
 /** A compiled job: the exact .rd bytes Start streams, and where they run. */
-export type RuidaNetworkJob = {
+/** Its warnings and completion come from linkJobOutcome (ADR-705 Amendment 7). */
+export type RuidaNetworkJob = LinkJobOutcome & {
   readonly bytes: Uint8Array;
   readonly footprint: RdFootprint;
-  readonly advisories: ReadonlyArray<string>;
-  /** Runs once the controller reports the job finished (variable advance). */
-  readonly completed?: () => void;
 };
 
 export type RuidaNetworkState = {
@@ -292,7 +288,7 @@ function watchToEnd(
             },
       );
       // "After completed job" variable advance (code quality audit C2 D2-P2-3).
-      if (kind === 'job') job.completed?.();
+      if (kind === 'job') job.completed();
     },
   });
 }
@@ -357,21 +353,7 @@ const ACTIVE_WORK: Partial<Record<RuidaNetworkPhase, LinkMachineWork['activity']
   stopping: 'stopping',
 };
 
-useRuidaNetworkStore.subscribe((state) => {
-  const activity = ACTIVE_WORK[state.phase];
-  reportLinkMachineStatus('ruida-network', {
-    connected: state.phase !== 'disconnected' && state.phase !== 'connecting',
-    framed: state.framed !== null,
-  });
-  reportLinkMachineWork(
-    'ruida-network',
-    activity === undefined
-      ? null
-      : {
-          controller: 'Ruida',
-          activity,
-          advisories: state.advisories,
-          abort: () => useRuidaNetworkStore.getState().abort(),
-        },
-  );
+connectLinkStore('ruida-network', useRuidaNetworkStore, {
+  controller: 'Ruida',
+  activeWork: ACTIVE_WORK,
 });

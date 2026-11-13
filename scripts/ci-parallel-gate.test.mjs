@@ -213,6 +213,21 @@ test('every CI and Browser smoke job, and the web deploy, has a time limit', asy
       assert.equal(workflow.jobs[id]['timeout-minutes'], minutes, `${path} ${id}`);
     }
   }
+  // Each Playwright run on CI ends before its job's limit, so it still reports
+  // (C2 D7). The development config runs the shards and the PR suite.
+  const e2e = await readWorkflow('.github/workflows/e2e.yml');
+  for (const [config, jobs] of [
+    ['playwright.config.ts', ['suite', 'pull-request-suite']],
+    ['playwright-production.config.ts', ['checks']],
+  ]) {
+    const match = /globalTimeout: process\.env(?:\.CI|\['CI'\]) \? (\d+) \* 60_000 : 0,/u.exec(
+      await readFile(config, 'utf8'),
+    );
+    assert.ok(match, `${config} sets a CI-only globalTimeout`);
+    for (const job of jobs) {
+      assert.ok(Number(match[1]) < e2e.jobs[job]['timeout-minutes'], `${config} inside ${job}`);
+    }
+  }
   // A manual deploy runs the whole release gate in one job; a CI-verified
   // one only builds and publishes.
   const deploy = await readWorkflow('.github/workflows/deploy.yml');

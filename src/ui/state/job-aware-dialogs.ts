@@ -21,7 +21,7 @@ import { useToastStore } from './toast-store';
 export const JOB_ACTIVE_CONFIRM_BLOCKED =
   'A job is running — stop it before discarding or replacing work.';
 
-// A streamed laser job, or a Moshi or Ruida link job (ADR-705 Amendment 3).
+// A streamed laser job, or a Moshi, K40 or Ruida link job (ADR-705 Amendment 3).
 function jobActive(): boolean {
   return anyMachineJobActive();
 }

@@ -332,8 +332,17 @@ function reduceMotionOrModalLine(
     spindle: spindleAfterLine(state.spindle, line, words.spindle),
   };
   const effects: GrblSimEffect[] = [emit('ok', opts)];
+  // G2/G3 arcs move the head to their end point too (gcode.c MOTION_MODE_CW_ARC
+  // / CCW_ARC, motion_control.c mc_arc); the kinematic clock times them along
+  // the arc (grbl-sim-kinematics.ts).
   const isMotionLine =
-    words.hasMotion && (g === 0 || g === 1 || g === null || hasGWord(line, 0) || hasGWord(line, 1));
+    words.hasMotion &&
+    (g === 0 ||
+      g === 1 ||
+      g === 2 ||
+      g === 3 ||
+      g === null ||
+      [0, 1, 2, 3].some((value) => hasGWord(line, value)));
   if (isMotionLine) {
     const offset = hasGWord(line, 53) ? SIM_ZERO_VEC3 : totalWco(state);
     next = {

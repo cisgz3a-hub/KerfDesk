@@ -57,6 +57,7 @@ A pull request labelled `fixes-main` gets **success** while main is red, with th
 "main is red, but this pull request is labelled fixes-main." and a link to the red run. Adding or
 removing the label re-syncs at once. When main is green the label changes nothing. Use it only on
 the pull request that repairs main (or reverts the change that broke it). Remove it afterwards.
+Only the maintainer adds it; an agent session asks (Amendment 1).
 
 The label must exist in the repository (`gh label create fixes-main`).
 
@@ -105,3 +106,40 @@ permissions, the concurrency group and the script's verdict, label and write rul
 3. Settings → Rules → Rulesets → "Protect main branch" (ruleset 19573147) → Require status checks
    to pass → Add checks → type `main-is-green` → select it, leaving its source as "Any source"
    → Save changes.
+
+### Amendment 1 — Each red workflow is named with its own commit, the look-back is 100 runs, and `fixes-main` is the owner's (2026-11-13)
+
+The C2 verification round measured the sync on real red episodes (E3-P3-1,
+`docs/audits/2026-11-12-c2-verify/E3-guards-tests-ci.md`). The verdict was right each time, with
+these faults:
+
+1. **One commit named for both workflows.** At 11:08 on 2026-11-12 the status said "CI and Browser
+   smoke failed on ce6b843", but Browser smoke had failed on 1dcce9fa0. The latest completed runs
+   of the two workflows often test different commits, because Browser smoke takes 80–83 minutes
+   and CI 36–57. The description now names each red workflow with the commit its own run tested:
+   "main is red: CI failed on ce6b843, Browser smoke failed on 1dcce9f. Merge the fix first
+   (label fixes-main)." The link is still the first red run's.
+2. **A 30-run look-back.** Browser smoke had 20 cancelled main runs in a row in a 5.6-hour
+   window. More than 30 would have left no verdict run and written `error` on every pull
+   request. The script now reads 100 runs, the most one page of the API returns.
+3. **`fixes-main` is unconditional.** Any session working on this repository uses the owner's
+   GitHub account, so the label's actor cannot tell the owner from an agent, and the workflow
+   cannot enforce who adds it. The rule is procedural: **only the maintainer adds `fixes-main`**,
+   and only to the pull request that repairs main or reverts what broke it. An agent session that
+   believes its pull request fixes main asks the maintainer to label it. Remove the label once main
+   is green.
+
+Not changed: the delay. CI went red at 10:49:15 and the pull requests got `failure` at 11:08:55,
+because the sync job waited 19.7 minutes for an `ubuntu-latest` runner behind the other queued
+jobs. The job's own work is a sparse checkout and one script of a few seconds, so nothing in the
+job is worth trimming. Two remedies were rejected:
+
+- Marking pull requests red when a main run starts (`workflow_run: requested`) would hold every
+  merge for a whole main run, 36–83 minutes, on every push.
+- A separate runner pool needs settings this change does not touch.
+
+A fix still keeps main "red" until its own main run completes. Re-running the red run on main, or
+a `fixes-main` pull request, remains the way through.
+
+`scripts/main-is-green-workflow.test.mjs` pins the per-workflow commits (with the E3 commits), the
+140-character limit for both red, and a 100-run window on both reads.

@@ -32,7 +32,7 @@ export const FIRE_NOT_CONFIRMED_OFF_WARNING =
 export const desktopCloseController = new DesktopCloseController(() => {
   const laser = useLaserStore.getState();
   return {
-    // A Moshi or Ruida link job counts as a job: close stops it, Update waits
+    // A Moshi, K40 or Ruida link job counts as a job: close stops it, Update waits
     // for it (code quality audit C2 D1-P2-3; ADR-705 Amendment 3).
     active: isActiveJob(laser.streamer) || activeLinkMachineWork() !== null,
     fireLatched: laser.fireActive,

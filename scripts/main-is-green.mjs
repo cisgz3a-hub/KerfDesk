@@ -29,6 +29,10 @@ const NO_VERDICT = new Set(['cancelled', 'skipped', 'stale']);
 // status writes so a red main with many open pull requests stays under it.
 const WRITE_SPACING_MS = 800;
 const DESCRIPTION_LIMIT = 140;
+// How many completed main runs to look back through for one with a verdict.
+// Browser smoke has had 20 cancelled main runs in a row; 100 is the most one
+// page of the API returns (ADR-710 Amendment 1).
+export const RUN_WINDOW = 100;
 
 /** The newest completed main run that has a verdict, or null. Runs come newest first. */
 export function pickVerdictRun(runs) {
@@ -51,13 +55,16 @@ export function mainVerdict(picked, { serverUrl, repository }) {
   const missing = picked.filter(({ run }) => run === null).map(({ workflow }) => workflow.name);
   const red = picked.filter(({ run }) => run !== null && run.conclusion !== 'success');
   if (red.length > 0) {
-    const names = red.map(({ workflow }) => workflow.name).join(' and ');
-    const first = red[0].run;
+    // Each red workflow with its own commit: their latest runs often test
+    // different commits of main (ADR-710 Amendment 1).
+    const failures = red
+      .map(({ workflow, run }) => `${workflow.name} failed on ${run.head_sha.slice(0, 7)}`)
+      .join(', ');
     return {
       green: false,
       state: 'failure',
-      description: `main is red: ${names} failed on ${first.head_sha.slice(0, 7)}. Merge the fix first (label ${FIX_LABEL}).`,
-      targetUrl: first.html_url,
+      description: `main is red: ${failures}. Merge the fix first (label ${FIX_LABEL}).`,
+      targetUrl: red[0].run.html_url,
     };
   }
   if (missing.length > 0) {
@@ -148,7 +155,7 @@ export async function syncMainIsGreen({
   const picked = [];
   for (const workflow of WATCHED_WORKFLOWS) {
     const { workflow_runs: runs } = await client.rest(
-      `/repos/${repository}/actions/workflows/${workflow.file}/runs?branch=main&status=completed&exclude_pull_requests=true&per_page=30`,
+      `/repos/${repository}/actions/workflows/${workflow.file}/runs?branch=main&status=completed&exclude_pull_requests=true&per_page=${RUN_WINDOW}`,
     );
     const run = pickVerdictRun(runs);
     log(
