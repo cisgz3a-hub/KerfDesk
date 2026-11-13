@@ -3,6 +3,7 @@ import type {
   CncProfileOpenPaths,
   CncStackedCopyMerge,
   CncStrategyFallback,
+  CncTabHoldShape,
 } from '../job/cnc-compilation-sidecar-types';
 import type {
   CncGroup,
@@ -22,6 +23,7 @@ export type CompiledCncOperation = {
   readonly offsetLadderDiagnostics: ReadonlyArray<CncOffsetLadderCompilationEvidence>;
   readonly stepoverOperation?: CncStepoverCompilationEvidence;
   readonly strategyFallbacks: ReadonlyArray<CncStrategyFallback>;
+  readonly tabHoldShapes: ReadonlyArray<CncTabHoldShape>;
 };
 
 export function tagArtworkGroup(group: CncGroup, sourceObjectId: string): CncGroup {
@@ -34,4 +36,5 @@ export type CncOperationGroups = {
   readonly offsetLadderDiagnostics: ReadonlyArray<CncOffsetLadderCompilationEvidence>;
   readonly stepoverUsed: boolean;
   readonly strategyFallbacks: ReadonlyArray<CncStrategyFallback>;
+  readonly tabHoldShapes: ReadonlyArray<CncTabHoldShape>;
 };

@@ -22,7 +22,8 @@
 // wall of a hole this part is nested in (ADR-250 Amendment 3); those passes are
 // marked so Job Review can say why they plunge. A tabbed pass is represented
 // as one XY-closed path3d ring, so it keeps the same lead without flattening its
-// per-point tab Z moves.
+// per-point tab Z moves; the lead joins it in a tab, at the tab top, so it
+// cannot thin a bridge (ADR-258 Amendment 5).
 
 import type { MachineBounds } from '../devices';
 import { pointInPolygon } from '../geometry';
@@ -33,6 +34,7 @@ import type { CncCutType, CncLayerSettings, Polyline, Vec2 } from '../scene';
 import { computeProfileLead, type ProfileLeadOptions } from './profile-lead';
 import { leadClearsKeptWalls, type ProfileLeadKeptMaterial } from './profile-lead-kept-walls';
 import { segmentsStayOnSide } from './profile-lead-side-crossings';
+import { ringStartingInTab } from './profile-lead-tab-seam';
 import type { ProfileSide } from './profile-paths';
 
 type LeadContext = {
@@ -70,10 +72,15 @@ export function applyProfileLeadPasses(
   if (baseSide === null || options === null) return passes;
   const outerSign = dominantWindingSign(passes);
   const shapes = distinctClosedContours(passes);
-  return passes.map((pass) => {
+  return passes.map((source) => {
+    // ADR-258 Amendment 5: a tabbed ring takes its lead in a tab, at the tab top.
+    const pass =
+      source.kind === 'path3d' && profileLeadPolygon(source) !== null
+        ? { ...source, points: ringStartingInTab(source.points) }
+        : source;
     const polygon = profileLeadPolygon(pass);
-    if (polygon === null) return pass;
-    if (pass.kind !== 'contour' && pass.kind !== 'path3d') return pass;
+    if (polygon === null) return source;
+    if (pass.kind !== 'contour' && pass.kind !== 'path3d') return source;
     const side = windingSide(polygon, outerSign, baseSide);
     const context: LeadContext = {
       side,

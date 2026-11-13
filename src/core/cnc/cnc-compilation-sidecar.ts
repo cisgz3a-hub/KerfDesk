@@ -12,6 +12,7 @@ import type { CncCompilationEvidence } from './cnc-compilation-artifact';
 import type {
   CncStackedCopyMerge,
   CncStrategyFallback,
+  CncTabHoldShape,
 } from '../job/cnc-compilation-sidecar-types';
 import type { CncOpenContourOmissions } from './cnc-open-contour-omissions';
 import type { VCarveLadder } from './vcarve-plan';
@@ -77,6 +78,7 @@ export function buildCncCompilationSidecar(
   mergedStackedCopies: ReadonlyArray<CncStackedCopyMerge> = [],
   profileEvidence: Pick<CncCompilationSidecar, 'profileOpenPaths' | 'keptPartCuts'> = {},
   strategyFallbacks: ReadonlyArray<CncStrategyFallback> = [],
+  tabHoldShapes: ReadonlyArray<CncTabHoldShape> = [],
 ): CncCompilationSidecar {
   const exactOffsetDiagnostics = uniqueOffsetDiagnostics([
     ...offsetLadderDiagnostics,
@@ -107,6 +109,8 @@ export function buildCncCompilationSidecar(
     ...(mergedStackedCopies.length === 0 ? {} : { mergedStackedCopies }),
     // Read only for disclosure, so an absent field means none (S8-P2-1).
     ...(strategyFallbacks.length === 0 ? {} : { strategyFallbacks }),
+    // Read only for disclosure, so an absent field means none (ADR-258 Amendment 5).
+    ...(tabHoldShapes.length === 0 ? {} : { tabHoldShapes }),
   };
 }
 

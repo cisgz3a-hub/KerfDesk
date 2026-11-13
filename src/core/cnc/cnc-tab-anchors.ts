@@ -12,6 +12,10 @@ import {
   type Vec2,
 } from '../scene';
 import { lerpPoint } from '../geometry/point-math';
+import { automaticTabFractions } from './cnc-tab-placement';
+
+/** The tab window and cut width the layer cuts with, so a seed lands where the job's tabs are. */
+export type CncTabSeedPlacement = { readonly tabWidthMm: number; readonly cutWidthMm: number };
 
 const EPS = 1e-9;
 
@@ -37,6 +41,7 @@ export function seedCncTabAnchors(
   object: SceneObject,
   layerColor: string,
   count: number,
+  placement?: CncTabSeedPlacement,
 ): ReadonlyArray<CncTabAnchor> {
   if (!('paths' in object)) return object.cncTabAnchors ?? [];
   const preserved = (object.cncTabAnchors ?? []).filter(
@@ -52,17 +57,34 @@ export function seedCncTabAnchors(
     if (path.color !== layerColor) return;
     resolvedPolylines(path).forEach((polyline, polylineIndex) => {
       if (!polyline.closed || normalizedClosedPoints(polyline).length < 3) return;
-      for (let index = 0; index < perContour; index += 1) {
-        seeded.push({
-          layerColor,
-          pathIndex,
-          polylineIndex,
-          pathT: (index + 0.5) / perContour,
-        });
+      for (const pathT of seedFractions(object, polyline, perContour, placement)) {
+        seeded.push({ layerColor, pathIndex, polylineIndex, pathT });
       }
     });
   });
   return [...preserved, ...seeded];
+}
+
+// ADR-258 Amendment 5: the automatic placement the compiler uses, on the
+// outline as placed; without a placement, even spacing from the first point.
+function seedFractions(
+  object: SceneObject,
+  polyline: Polyline,
+  count: number,
+  placement: CncTabSeedPlacement | undefined,
+): ReadonlyArray<number> {
+  const planned =
+    placement === undefined
+      ? null
+      : automaticTabFractions(
+          polyline.points,
+          polyline.points.map((point) => applyTransform(point, object.transform)),
+          count,
+          placement.tabWidthMm + placement.cutWidthMm,
+          placement.cutWidthMm,
+        );
+  if (planned !== null && planned.length > 0) return planned;
+  return Array.from({ length: count }, (_, index) => (index + 0.5) / count);
 }
 
 export function cncTabAnchorPosition(object: SceneObject, anchor: CncTabAnchor): Vec2 | null {

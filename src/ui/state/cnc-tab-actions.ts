@@ -1,5 +1,7 @@
 import { projectCncTabAnchor, seedCncTabAnchors } from '../../core/cnc';
-import { type Project, type SceneObject, type Vec2 } from '../../core/scene';
+import type { CncTabSeedPlacement } from '../../core/cnc/cnc-tab-anchors';
+import { cncLayoutCutWidths } from '../../core/cnc/layout-cut-widths';
+import { layerCncTool, type Project, type SceneObject, type Vec2 } from '../../core/scene';
 import { pushUndo } from './scene-mutations';
 
 type CncTabState = {
@@ -27,7 +29,9 @@ export function cncTabActions(set: Setter): CncTabActions {
   return {
     seedSelectedCncTabAnchors: (layerColor, count) =>
       set((state) =>
-        mutateSelectedTabs(state, (object) => seedObjectTabs(object, layerColor, count)),
+        mutateSelectedTabs(state, (object) =>
+          seedObjectTabs(object, layerColor, count, tabSeedPlacement(state.project, layerColor)),
+        ),
       ),
     resetSelectedCncTabAnchors: (layerColor) =>
       set((state) => mutateSelectedTabs(state, (object) => resetObjectTabs(object, layerColor))),
@@ -57,8 +61,26 @@ function mutateSelectedTabs(
   };
 }
 
-function seedObjectTabs(object: SceneObject, layerColor: string, count: number): SceneObject {
-  const cncTabAnchors = seedCncTabAnchors(object, layerColor, count);
+// The tab and cut widths the layer of this colour cuts with, so the seeded
+// handles stand where the job already puts its tabs (ADR-258 Amendment 5).
+function tabSeedPlacement(project: Project, layerColor: string): CncTabSeedPlacement | undefined {
+  const machine = project.machine;
+  const settings = project.scene.layers.find(
+    (layer) => layer.color === layerColor && layer.cnc !== undefined,
+  )?.cnc;
+  if (machine?.kind !== 'cnc' || settings === undefined) return undefined;
+  const tool = layerCncTool(machine, settings);
+  const { wallDiameterMm } = cncLayoutCutWidths(tool, settings.depthMm, settings.depthPerPassMm);
+  return { tabWidthMm: settings.tabWidthMm, cutWidthMm: wallDiameterMm };
+}
+
+function seedObjectTabs(
+  object: SceneObject,
+  layerColor: string,
+  count: number,
+  placement: CncTabSeedPlacement | undefined,
+): SceneObject {
+  const cncTabAnchors = seedCncTabAnchors(object, layerColor, count, placement);
   if (JSON.stringify(cncTabAnchors) === JSON.stringify(object.cncTabAnchors ?? [])) return object;
   return { ...object, cncTabAnchors };
 }
