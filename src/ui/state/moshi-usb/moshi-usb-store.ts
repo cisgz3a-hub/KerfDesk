@@ -31,11 +31,8 @@ import {
   moshiDisconnectedMessage,
 } from './moshi-usb-messages';
 import type { MoshiUsbConnection, MoshiUsbJob, MoshiUsbOpener } from './moshi-usb-types';
-import {
-  reportLinkMachineStatus,
-  reportLinkMachineWork,
-  type LinkMachineWork,
-} from '../link-machine-work';
+import type { LinkMachineWork } from '../link-machine-work';
+import { connectLinkStore } from '../link-store-connection';
 
 export type MoshiUsbPhase =
   | 'disconnected'
@@ -223,7 +220,7 @@ async function run(
   if (result.ok) {
     set({ phase: 'idle', sending: null, ...finishedState(kind, job), tone: 'info' });
     // "After completed job" variable advance (code quality audit C2 D2-P2-3).
-    if (kind === 'job') job?.completed?.();
+    if (kind === 'job') job?.completed();
     return;
   }
   set({
@@ -293,21 +290,7 @@ const ACTIVE_WORK: Partial<Record<MoshiUsbPhase, LinkMachineWork['activity']>> =
   stopping: 'stopping',
 };
 
-useMoshiUsbStore.subscribe((state) => {
-  const activity = ACTIVE_WORK[state.phase];
-  reportLinkMachineStatus('moshi-usb', {
-    connected: state.phase !== 'disconnected' && state.phase !== 'connecting',
-    framed: state.framed !== null,
-  });
-  reportLinkMachineWork(
-    'moshi-usb',
-    activity === undefined
-      ? null
-      : {
-          controller: 'Moshiboard',
-          activity,
-          advisories: state.advisories,
-          abort: () => useMoshiUsbStore.getState().abort(),
-        },
-  );
+connectLinkStore('moshi-usb', useMoshiUsbStore, {
+  controller: 'Moshiboard',
+  activeWork: ACTIVE_WORK,
 });

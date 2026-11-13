@@ -95,7 +95,7 @@ export function installDesktopSessionEnd(
   const unsubscribeLaser = useLaserStore.subscribe((laser) =>
     reports.consider(desktopJobReport(laser)),
   );
-  // A Moshi or Ruida link job counts too (ADR-705 Amendment 3).
+  // A Moshi, K40 or Ruida link job counts too (ADR-705 Amendment 3).
   const unsubscribeLinks = useLinkMachineWorkStore.subscribe(() =>
     reports.consider(desktopJobReport(useLaserStore.getState())),
   );

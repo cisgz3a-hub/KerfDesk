@@ -5,6 +5,7 @@
 
 import type { MoshiFootprint } from '../../../core/controllers/moshi/moshi-frame';
 import type { MoshiEppPort } from '../../../core/controllers/moshi/moshi-link-session';
+import type { LinkJobOutcome } from '../link-job-outcome';
 
 export type MoshiUsbConnection = MoshiEppPort & {
   /** What the panel names the device by (e.g. "CH341 chip version 48"). */
@@ -18,12 +19,10 @@ export type MoshiUsbConnection = MoshiEppPort & {
 export type MoshiUsbOpener = () => Promise<MoshiUsbConnection>;
 
 /** A compiled job: the exact programs Start sends, and where they run. */
-export type MoshiUsbJob = {
+/** Its warnings and completion come from linkJobOutcome (ADR-705 Amendment 7). */
+export type MoshiUsbJob = LinkJobOutcome & {
   readonly programs: ReadonlyArray<Uint8Array>;
   readonly footprint: MoshiFootprint;
-  readonly advisories: ReadonlyArray<string>;
   /** The profile's framing feed (mm/min), for the Frame program. */
   readonly framingFeedMmPerMin: number;
-  /** Runs once the board reports the job finished (variable advance). */
-  readonly completed?: () => void;
 };

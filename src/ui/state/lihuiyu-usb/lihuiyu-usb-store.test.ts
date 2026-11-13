@@ -24,6 +24,7 @@ import { LIHUIYU_FRAME_FIRST, LIHUIYU_HOME_FIRST, lihuiyuLinkLost } from './lihu
 import { LIHUIYU_DRIVER_HELP, lihuiyuUsbOpener } from './lihuiyu-usb-opener';
 import { resetLihuiyuUsbStoreForTests, useLihuiyuUsbStore } from './lihuiyu-usb-store';
 import type { LihuiyuUsbJob } from './lihuiyu-usb-types';
+import { testLinkJobOutcome } from '../link-job-outcome-test-helpers';
 
 const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 const store = () => useLihuiyuUsbStore.getState();
@@ -73,7 +74,7 @@ function zigzagJob(rows = 12): LihuiyuUsbJob {
     absolute: true,
     board,
     framingMmPerMin: 3000,
-    advisories: ['M2: power is set on the knob.'],
+    ...testLinkJobOutcome(['M2: power is set on the knob.']),
   };
 }
 

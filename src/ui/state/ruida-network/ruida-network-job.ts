@@ -6,6 +6,7 @@ import { prepareOutput } from '../../../io/gcode';
 import { withTextGlyphCheck } from '../../../io/gcode/prepare-output-snapshot';
 import { rdPreparationOptions, type EmitRdOptions } from '../../../io/rd';
 import { emitPreparedRdWithJobWarnings } from '../../laser/rd-job-warnings';
+import { linkJobOutcome } from '../link-job-outcome';
 import type { LinkJobRequest } from '../link-job-request';
 import { resolveExportJobPlacement } from '../../job-placement';
 import { outputTextRenderer } from '../../text/output-text-renderer';
@@ -47,11 +48,11 @@ export async function prepareRuidaNetworkJob(
     job: {
       bytes: result.bytes,
       footprint: result.footprint,
-      advisories: [
-        ...result.advisories.map((issue) => issue.message),
-        ...(result.jobWarnings ?? []),
-      ],
-      completed: request.completed,
+      ...linkJobOutcome(
+        request,
+        result.advisories.map((issue) => issue.message),
+        result.jobWarnings,
+      ),
     },
   };
 }
