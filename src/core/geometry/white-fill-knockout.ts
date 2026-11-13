@@ -53,9 +53,19 @@ export type WhiteKnockout = {
 export type WhiteFillKnockoutOptions = {
   /** Paths the knock-out leaves alone: neither paper nor a shape to cut into. */
   readonly skip?: (object: ImportedSvg, path: ColoredPath) => boolean;
-  /** Which parts are Fill artwork. By default the import's own mode; a copy that
-   *  lost it is judged by its operations (ADR-686 Amendment 4). */
+  /** Which parts are Fill artwork. By default the import's own mode; a saved
+   *  project judges each path by its operations instead (`skip`, ADR-686
+   *  Amendment 5). */
   readonly isFill?: (object: ImportedSvg) => boolean;
+  /** A path that also feeds other operations: only its Fill bindings are knocked
+   *  out, and an unchanged copy keeps the rest (ADR-686 Amendment 5). */
+  readonly splitBindings?: (object: ImportedSvg, path: ColoredPath) => BindingSplit | null;
+};
+
+/** A path's operation bindings, split into the Fill ones and the rest. */
+export type BindingSplit = {
+  readonly fill: ReadonlyArray<string>;
+  readonly other: ReadonlyArray<string>;
 };
 
 type Box = { minX: number; minY: number; maxX: number; maxY: number };
@@ -78,7 +88,7 @@ export function knockOutWhiteFills(
   objects: ReadonlyArray<SceneObject>,
   options: WhiteFillKnockoutOptions = {},
 ): WhiteFillKnockout | null {
-  const { skip, isFill = isImportFillPart } = options;
+  const { skip, isFill = isImportFillPart, splitBindings } = options;
   const shapes = objects
     .flatMap((object) => fillShapes(object, isFill))
     .filter((shape) => skip === undefined || !skip(shape.object, shape.path));
@@ -96,18 +106,23 @@ export function knockOutWhiteFills(
   });
   if (whites.length === 0 || !hasDark) return null;
 
-  const replaced = new Map<ImportedSvg, (ColoredPath | null)[]>();
-  const pathsOf = (object: ImportedSvg): (ColoredPath | null)[] => {
-    const existing = replaced.get(object);
-    if (existing !== undefined) return existing;
-    const created: (ColoredPath | null)[] = [...object.paths];
-    replaced.set(object, created);
-    return created;
+  // Each path becomes no path, its knocked-out Fill part, and, when it also
+  // feeds another operation, an unchanged copy bound to that operation.
+  const replaced = new Map<ImportedSvg, ReadonlyArray<ColoredPath>[]>();
+  const replace = (shape: FillShape, knocked: ColoredPath | null): void => {
+    let paths = replaced.get(shape.object);
+    if (paths === undefined) {
+      paths = shape.object.paths.map((path) => [path]);
+      replaced.set(shape.object, paths);
+    }
+    const split = splitBindings?.(shape.object, shape.path) ?? null;
+    const fill = knocked === null ? [] : [split === null ? knocked : bound(knocked, split.fill)];
+    paths[shape.pathIndex] = split === null ? fill : [...fill, bound(shape.path, split.other)];
   };
   let knockedShapes = 0;
   shapes.forEach((shape, order) => {
     if (isPaperWhite(shape.path)) {
-      pathsOf(shape.object)[shape.pathIndex] = null;
+      replace(shape, null);
       return;
     }
     const above = whites.filter(
@@ -121,21 +136,21 @@ export function knockOutWhiteFills(
     const knocked = knockOut(shape, above);
     if (knocked === undefined) return;
     knockedShapes += 1;
-    pathsOf(shape.object)[shape.pathIndex] = knocked;
+    replace(shape, knocked);
   });
 
   const changed = new Map<string, ImportedSvg>();
   const removedIds = new Set<string>();
   const keptPaths = new Map<string, number[]>();
   for (const [object, paths] of replaced) {
-    const kept = paths.filter((path): path is ColoredPath => path !== null);
+    const kept = paths.flat();
     if (kept.length === 0) {
       removedIds.add(object.id);
       continue;
     }
     keptPaths.set(
       object.id,
-      paths.flatMap((path, index) => (path === null ? [] : [index])),
+      paths.flatMap((group, index) => group.map(() => index)),
     );
     changed.set(object.id, {
       ...object,
@@ -144,6 +159,10 @@ export function knockOutWhiteFills(
     });
   }
   return { changed, removedIds, keptPaths, whiteShapes: whites.length, knockedShapes };
+}
+
+function bound(path: ColoredPath, operationIds: ReadonlyArray<string>): ColoredPath {
+  return { ...path, operationIds };
 }
 
 function isImportFillPart(object: ImportedSvg): boolean {
