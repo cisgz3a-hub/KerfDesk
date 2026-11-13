@@ -104,6 +104,8 @@ export function machineSetupControllerGuide(
     case 'lihuiyu':
     case 'moshi':
       return linkGuide(kind, common);
+    case 'jcz-lmc':
+      return { ...common, ...GALVO_GUIDE };
   }
 }
 
@@ -149,6 +151,16 @@ function linkGuide(
   }
 }
 
+// ADR-704: a JCZ galvo has no serial console or settings to read or write.
+const GALVO_GUIDE = {
+  identityCommands: [],
+  settingsCommands: [],
+  configurationSurface: 'Machine Setup (galvo lens and source) and EZCad correction files',
+  writePolicy: 'file-only',
+  writeExplanation:
+    'A JCZ galvo runs from the JCZ galvo USB connection in Machine details: red-light Frame, Start, Pause, Resume and Abort. Jogging, console and firmware writes are unavailable. Experimental: simulator-tested only, not qualified on hardware.',
+} as const;
+
 function commonControllerGuide(kind: ControllerKind, driver: ControllerDriver) {
   return {
     kind,
@@ -179,6 +191,7 @@ export function machineSetupControllerGuides(): ReadonlyArray<MachineSetupContro
       'marlin',
       'smoothieware',
       'ruida',
+      'jcz-lmc',
       'lihuiyu',
       'moshi',
     ] as const

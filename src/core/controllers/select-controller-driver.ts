@@ -7,6 +7,7 @@ import type { ControllerDriver } from './controller-driver';
 import { fluidncDriver } from './fluidnc/driver';
 import { grblDriver } from './grbl/driver';
 import { grblHalDriver } from './grblhal/driver';
+import { jczLmcDriver } from './jcz/driver';
 import { lihuiyuDriver } from './lihuiyu/driver';
 import { marlinDriver } from './marlin/driver';
 import { moshiDriver } from './moshi/driver';
@@ -26,6 +27,7 @@ const DRIVERS: Readonly<Record<ControllerKind, ControllerDriver>> = {
   marlin: marlinDriver,
   smoothieware: smoothiewareDriver,
   ruida: ruidaDriver,
+  'jcz-lmc': jczLmcDriver,
   lihuiyu: lihuiyuDriver,
   moshi: moshiDriver,
 };

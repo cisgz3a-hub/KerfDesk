@@ -4,7 +4,8 @@
 // G-code and Start show: compile diagnostics ("will NOT be cut", a kerf side
 // assumed), job intent and cut order. On a Y-port rotary they also carry the
 // row check on the K40's 1/1000 in grid, as the Moshiboard job does (ADR-703
-// Amendment 2, C2 verification E2-P2-2).
+// Amendment 2, C2 verification E2-P2-2), as the branded SharedJobWarnings a
+// link job requires (ADR-705 Amendment 7).
 
 import { LHY_STEPS_PER_MM } from '../../core/controllers/lihuiyu/lhy-motion-plan';
 import type { PreparedOutput } from '../../io/gcode';
@@ -13,7 +14,7 @@ import {
   detectRotaryRowGridWarnings,
   type RotaryRowGrid,
 } from './job-review/rotary-row-step-warnings';
-import { detectMachineJobWarnings } from './machine-job-warnings';
+import { sharedJobWarnings, type SharedJobWarnings } from './shared-job-warnings';
 
 /** A K40 board places every coordinate on a whole 1/1000 inch step. */
 export const K40_ROW_GRID: RotaryRowGrid = {
@@ -23,7 +24,7 @@ export const K40_ROW_GRID: RotaryRowGrid = {
 
 export type EgvWithJobWarnings =
   | (Extract<EmitEgvResult, { readonly ok: true }> & {
-      readonly jobWarnings: ReadonlyArray<string>;
+      readonly jobWarnings: SharedJobWarnings;
     })
   | Extract<EmitEgvResult, { readonly ok: false }>;
 
@@ -33,11 +34,8 @@ export function emitPreparedEgvWithJobWarnings(
 ): EgvWithJobWarnings {
   const result = emitPreparedEgvFile(prepared, options);
   if (!result.ok) return result;
-  const jobWarnings = prepared.ok
-    ? [
-        ...detectMachineJobWarnings(prepared.project, null, null, prepared),
-        ...detectRotaryRowGridWarnings(prepared.project, prepared.job, K40_ROW_GRID),
-      ]
-    : [];
-  return { ...result, jobWarnings };
+  // emitPreparedEgvFile refuses a failed preparation, so `prepared` is ok here.
+  if (!prepared.ok) return { ok: false, messages: [] };
+  const rowChecks = detectRotaryRowGridWarnings(prepared.project, prepared.job, K40_ROW_GRID);
+  return { ...result, jobWarnings: sharedJobWarnings(prepared, rowChecks) };
 }

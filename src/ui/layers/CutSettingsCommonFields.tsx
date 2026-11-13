@@ -7,6 +7,7 @@ import type { Layer, LayerMode } from '../../core/scene';
 import { MAX_OVERCUT_MM, MAX_PERFORATION_MM } from './cut-settings-draft';
 import { useStore } from '../state';
 import { CutPowerModeField } from './CutPowerModeField';
+import { CutSettingsGalvoFields } from './CutSettingsGalvoFields';
 import { Field, NumberInput } from './CutSettingsInputs';
 import { LaserProcessField } from './LaserProcessField';
 import { LineLeadFields } from './LineLeadFields';
@@ -47,6 +48,7 @@ export function CutSettingsCommonFields(props: {
           <NumberInput name="passes" value={props.layer.passes} min={1} step={1} label="passes" />
         </Field>
       </fieldset>
+      <CutSettingsGalvoFields layer={props.layer} />
       {props.mode !== 'image' ? (
         <details className="lf-cut-settings-disclosure">
           <summary title="Show how the controller applies laser power during motion">

@@ -818,7 +818,12 @@ the linked artwork.
 5. **Tools → Image → Flatten Image Mask** bakes the mask into the selected image and crops it, as
    **Crop Image** does, then deletes the mask shape. The shape stays when it is locked or another
    image or path text uses it; the notice says which. Both keep the mask's outline as the image's
-   own clip, so the area outside it never burns, Negative included (ADR-480 Amendment 1).
+   own clip, so the area outside it never burns, Negative included (ADR-480 Amendment 1). The crop
+   keeps the real pixels the mask covers plus a 2 mm margin, and whitens none of them: the clip
+   alone hides what does not burn, so the edge burns as it did through the live mask, sharpening
+   included (ADR-480 Amendment 6). A mask, live or baked, keeps the area **Fill** fills for the
+   same shape: text and `nonzero` paths by winding, and an object's separate paths together. The
+   canvas shows a photo clipped to its live mask, as it does after Crop.
 6. Each tool is one undo step and adds none when nothing changes. None operates a machine.
 
 ### F-A6f. Trim Shapes, Cut Shapes, Warp and Deform, Copy Along Path (ADR-498)
@@ -9123,6 +9128,42 @@ Simulator-tested only; no real Ruida has run this path.
 5. Port 40200 already in use (LightBurn, RDWorks): Connect fails and names them.
 6. A crashed window, a window that stops reading for 15 s, quitting, or
    Windows ending the session: the main process sends Stop Process.
+
+### F-H6. Mark on a JCZ galvo over USB (EXPERIMENTAL — ADR-704)
+
+Simulator-tested only; no real JCZ board has run this path.
+
+#### Success
+1. The user picks a JCZ fiber galvo profile (110, 150 or 200 mm lens) or sets
+   Machine Setup → **Galvo lens and source** (source, flips and swap, timing).
+   The bed is the lens field, with its origin at the centre.
+2. Machine details shows **JCZ galvo USB connection (experimental)** where the
+   platform has a USB link, with the not-qualified warning. The user may choose
+   the lens's EZCad `.cor` file, then clicks **Connect galvo** and picks the
+   board (USB 9588:9899) in the chooser. KerfDesk initialises it as MeerK40t
+   does; nothing moves or fires.
+3. **Frame (red light)** traces the job's outline with the red pointer for
+   about 5 s; the laser source is never fired. It counts as complete once the
+   board reports not busy twice after running it.
+4. **Start** sends the job's LMC lists and lists its warnings. **Pause**,
+   **Resume** and **Abort** send Stop List, Restart List and Stop Execute. The
+   job ends when the board reports idle; the oscillator is closed and the
+   outputs lowered.
+5. Cut Settings → **Galvo** sets an operation's own frequency and, for a MOPA
+   source, pulse width; blank uses the machine's default.
+
+#### Refusals and failures
+1. Start without a completed Frame of the same footprint on this connection:
+   "Frame this job with the red pointer first…"; nothing is sent.
+2. Placement other than Absolute Coordinates, an Image layer, a rotary, a point
+   outside the lens field, or a speed the board cannot take: refused with the
+   reason; nothing is sent.
+3. Save G-code: "A JCZ galvo has no job file to save…".
+4. A board that reports busy, or does not answer, is sent nothing.
+5. A missed reply or a failed transfer mid-send: KerfDesk sends the abort
+   sequence and says whether Stop Execute was acknowledged; if not, use the
+   machine's emergency stop.
+6. The board unplugged: the panel says a held program may keep running.
 
 ## Phase K flows (box generator — ADR-106)
 

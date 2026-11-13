@@ -1,4 +1,8 @@
 import {
+  normalizeClosedPolylinesEvenOddChecked,
+  normalizeClosedPolylinesNonZeroChecked,
+} from '../geometry/polygon-difference';
+import {
   applyTransform,
   assertNever,
   IDENTITY_TRANSFORM,
@@ -116,28 +120,118 @@ function horizontalRowCrossings(
 }
 
 export function hasClosedImageMaskGeometry(object: SceneObject): boolean {
-  return closedMaskContours(object).length > 0;
+  return maskPathGroups(object).length > 0;
 }
 
-export function closedMaskContours(object: SceneObject): ReadonlyArray<ReadonlyArray<Vec2>> {
+type MaskFillRule = NonNullable<ColoredPath['fillRule']>;
+
+type MaskPathGroup = {
+  readonly fillRule: MaskFillRule;
+  readonly contours: MaskContours;
+};
+
+const maskRegionCache = new WeakMap<SceneObject, MaskContours>();
+
+/**
+ * The region an image mask keeps, in scene space, as contours read even-odd:
+ * the area Fill fills for the same object (ADR-480 Amendment 6). Each path is
+ * resolved under its own fill rule (text and a declared `nonzero` path by
+ * winding, everything else even-odd) and the paths are then unioned, the way
+ * layer-fill.ts resolves one object before it pools a layer. Every consumer
+ * (compile, Preview, preflight, Crop/Flatten, Trace, Save Processed Bitmap
+ * and the design canvas) reads this one region.
+ *
+ * Scene objects are immutable, so the region is cached per object. A single
+ * even-odd path, or even-odd paths whose boxes never overlap, already is that
+ * region and keeps its exact contours; the boolean engine resolves the rest.
+ * If the engine fails, the raw even-odd contours stand in, as they do in Fill.
+ */
+export function closedMaskContours(object: SceneObject): MaskContours {
+  const cached = maskRegionCache.get(object);
+  if (cached !== undefined) return cached;
+  const region = maskRegionContours(maskPathGroups(object));
+  maskRegionCache.set(object, region);
+  return region;
+}
+
+function maskRegionContours(groups: ReadonlyArray<MaskPathGroup>): MaskContours {
+  const raw = groups.flatMap((group) => group.contours);
+  if (groups.every((group) => group.fillRule === 'evenodd') && boxesAreDisjoint(groups)) {
+    return raw;
+  }
+  const resolved: Polyline[] = [];
+  for (const group of groups) {
+    const polylines = group.contours.map((points) => ({ points: [...points], closed: true }));
+    const normalized =
+      group.fillRule === 'nonzero'
+        ? normalizeClosedPolylinesNonZeroChecked(polylines)
+        : normalizeClosedPolylinesEvenOddChecked(polylines);
+    if (normalized.kind === 'error') return raw;
+    for (const polyline of normalized.value) resolved.push(polyline);
+  }
+  const union = groups.length === 1 ? null : normalizeClosedPolylinesNonZeroChecked(resolved);
+  const contours = union?.kind === 'ok' ? union.value : resolved;
+  return contours
+    .filter((polyline) => polyline.points.length >= MIN_MASK_POINTS)
+    .map((polyline) => polyline.points);
+}
+
+function maskPathGroups(object: SceneObject): ReadonlyArray<MaskPathGroup> {
   switch (object.kind) {
     case 'imported-svg':
     case 'text':
     case 'traced-image':
     case 'shape':
-      return object.paths.flatMap((path) =>
-        path.polylines
+      return object.paths.flatMap((path): MaskPathGroup[] => {
+        const contours = path.polylines
           .filter((polyline) => isMaskContour(polyline))
           .map((polyline) =>
             polyline.points.map((point) => applyTransform(point, object.transform)),
-          ),
-      );
+          );
+        if (contours.length === 0) return [];
+        // The rule layer-fill.ts resolves the same path with (ADR-286).
+        const fillRule = path.fillRule ?? (object.kind === 'text' ? 'nonzero' : 'evenodd');
+        return [{ fillRule, contours }];
+      });
     case 'raster-image':
     case 'relief':
       return [];
     default:
       return assertNever(object, 'SceneObject');
   }
+}
+
+type ContourBox = { minX: number; minY: number; maxX: number; maxY: number };
+
+// Even-odd paths that share no area XOR and union alike, so they need no
+// boolean pass. Bounding boxes make the check conservative.
+function boxesAreDisjoint(groups: ReadonlyArray<MaskPathGroup>): boolean {
+  if (groups.length < 2) return true;
+  const boxes = groups.map((group) => contourBox(group.contours));
+  for (let i = 0; i < boxes.length; i += 1) {
+    const a = boxes[i];
+    for (let j = i + 1; j < boxes.length; j += 1) {
+      const b = boxes[j];
+      if (a === undefined || b === undefined) continue;
+      if (a.minX <= b.maxX && b.minX <= a.maxX && a.minY <= b.maxY && b.minY <= a.maxY) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function contourBox(contours: MaskContours): ContourBox {
+  const box = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  for (const contour of contours) {
+    for (const point of contour) {
+      box.minX = Math.min(box.minX, point.x);
+      box.minY = Math.min(box.minY, point.y);
+      box.maxX = Math.max(box.maxX, point.x);
+      box.maxY = Math.max(box.maxY, point.y);
+    }
+  }
+  return box;
 }
 
 function isMaskContour(polyline: Polyline): boolean {

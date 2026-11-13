@@ -153,18 +153,22 @@ function scanPlanFits(
   let workingBytes = maxEdge * maxEdge * displayBytesPerPixel + maskBytes;
   const seenAngles = new Set<number>();
   for (const run of runs) {
+    // Runs at one angle share one compiled grid (ADR-492), and the preview
+    // shows that grid once, whatever the pass count (ADR-581 decision 5), so
+    // each angle costs one pass. Charging every pass refused multi-pass photos
+    // as "too big" though the preview's work was flat (T15-P2-2).
+    if (seenAngles.has(run.angleDeg)) continue;
+    seenAngles.add(run.angleDeg);
     const { width, height } = scanDimensions(input, layer, run.angleDeg);
     const pixelCount = width * height;
     const streamedRows = pixelCount > streamedPixelThreshold;
     const verdict = evaluateRasterBudget(width, height, {
       ditherAlgorithm: imageDitherAlgorithm(layer),
-      passes: run.passes,
+      passes: 1,
       streamedRows,
     });
     if (verdict.kind === 'too-large') return false;
     workUnits += verdict.budget.workUnits;
-    if (seenAngles.has(run.angleDeg)) continue;
-    seenAngles.add(run.angleDeg);
     // Account for temporary mask/orientation/diffusion buffers beyond the
     // core budget, plus every retained grid for multi-angle scans.
     workingBytes +=

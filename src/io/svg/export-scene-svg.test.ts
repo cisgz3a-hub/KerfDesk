@@ -222,7 +222,7 @@ describe('artwork SVG export', () => {
   });
 
   it.each(['separate colors', 'nonzero artwork'])(
-    'keeps raster mask holes when its contours use %s',
+    'fills the same-wound hole in raster and SVG, as Fill does, when contours use %s (ADR-480 Amd 6)',
     (variant) => {
       const contours = square.paths[0]?.polylines ?? [];
       const transform = {
@@ -251,7 +251,7 @@ describe('artwork SVG export', () => {
       if (rasterIncludes === null) throw new Error('Expected a valid raster mask.');
       const samples = [
         { x: 1, y: 1, inside: true },
-        { x: 4, y: 4, inside: false },
+        { x: 4, y: 4, inside: true },
         { x: 12, y: 4, inside: false },
       ];
       for (const sample of samples) {

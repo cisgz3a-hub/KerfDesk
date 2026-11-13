@@ -25,6 +25,7 @@ import {
 } from '../../core/image-adjust';
 // Its own module, not the barrel: image-adjust/index.ts is at its export cap.
 import type { FilterProgress } from '../../core/image-adjust/filter-progress';
+import { flattenOverWhiteInPlace } from './background-over-white';
 
 export type AdjustmentId =
   | 'brightness-contrast'
@@ -306,9 +307,22 @@ const RUNNERS: Record<AdjustmentId, (args: RunArgs) => void> = {
     halftoneScreenInPlace(doc, screenFrom(spec, params, 'line'), rect, mask, progress),
 };
 
+// Adjustments that map each pixel's colour through a lookup table.
+const COLOUR_LUT_IDS: ReadonlySet<AdjustmentId> = new Set<AdjustmentId>([
+  'brightness-contrast',
+  'levels',
+  'curves',
+  'threshold',
+  'posterize',
+  'invert',
+  'desaturate',
+]);
+
 /**
  * Run one adjustment against the document (rect/mask = selection clamp).
  * `progress` only reports; the pixels are the same with or without it.
+ * `backgroundOverWhite` marks the Background layer: a colour lookup then acts
+ * on its colour over white, the colour it shows and burns (T13-P2-1).
  */
 export function runAdjustment(
   id: AdjustmentId,
@@ -318,7 +332,9 @@ export function runAdjustment(
   mask: SelectionMask | null,
   curvePoints?: readonly CurvePoint[],
   progress?: FilterProgress,
+  backgroundOverWhite = false,
 ): void {
+  if (backgroundOverWhite && COLOUR_LUT_IDS.has(id)) flattenOverWhiteInPlace(doc, rect, mask);
   RUNNERS[id]({ spec: BY_ID[id], params, doc, rect, mask, curvePoints, progress });
 }
 

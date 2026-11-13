@@ -24,7 +24,7 @@ import { isBidirectionalScanPolicy, kinematicsEntry } from '../../core/devices/d
 import { laserArcMovesEntry } from '../../core/devices/laser-arc-moves';
 import { normalizedPowerScaleStatement } from '../../core/devices/power-scale-statement';
 import { normalizeScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
-import { normalizeCameraProfile, type CameraProfile } from '../../core/camera';
+import { normalizeOptionalDeviceParts } from './normalize-device-optional';
 import {
   DEFAULT_CNC_MACHINE_CONFIG,
   type CncMachineConfig,
@@ -364,9 +364,7 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
       normalizeGcodeDialectSelection(dev['gcodeDialect']).dialectId,
     ),
     noGoZones: Array.isArray(dev['noGoZones']) ? dev['noGoZones'] : [],
-    ...(dev['cameraProfile'] !== undefined
-      ? { cameraProfile: normalizeCameraProfile(dev['cameraProfile'] as CameraProfile) }
-      : {}),
+    ...normalizeOptionalDeviceParts(dev),
     ...normalizeZTravelPatch(dev),
     ...normalizeControllerPatch(dev),
   };

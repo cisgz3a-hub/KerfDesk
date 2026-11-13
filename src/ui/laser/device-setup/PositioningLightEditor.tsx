@@ -310,6 +310,8 @@ function commandHelp(kind: ControllerKind | undefined): string {
       return 'Stock GRBL has no standard pointer command. Use your machine vendor’s documented accessory commands. M7/M8/M9 are coolant controls unless your machine explicitly maps that output to the separate light.';
     case 'ruida':
       return 'Ruida uses file output; operate the light from the machine panel.';
+    case 'jcz-lmc':
+      return 'A galvo’s red pointer is its Frame: use Frame in the Galvo USB panel.';
     case 'lihuiyu':
       return 'Lihuiyu boards have no light output; switch the light at the machine.';
     case 'moshi':

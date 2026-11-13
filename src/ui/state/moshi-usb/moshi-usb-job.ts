@@ -7,8 +7,9 @@ import { withTextGlyphCheck } from '../../../io/gcode/prepare-output-snapshot';
 import { emitPreparedMoshiJob } from '../../../io/moshi';
 import { outputTextRenderer } from '../../text/output-text-renderer';
 import type { MoshiUsbJob } from './moshi-usb-types';
+import { linkJobOutcome } from '../link-job-outcome';
 import type { LinkJobRequest } from '../link-job-request';
-import { detectMachineJobWarnings } from '../../laser/machine-job-warnings';
+import { sharedJobWarnings } from '../../laser/shared-job-warnings';
 import { MM_PER_MIL } from '../../../core/controllers/moshi/moshi-units';
 import {
   detectRotaryRowGridWarnings,
@@ -44,16 +45,17 @@ export async function prepareMoshiUsbJob(request: LinkJobRequest): Promise<Moshi
     job: {
       programs: result.programs.map((program) => program.bytes),
       footprint: result.footprint,
-      advisories: [
-        ...result.advisories,
-        // The job warnings every G-code Save and Start shows (C2 D2-P2-1).
-        ...detectMachineJobWarnings(prepared.project, null, null, prepared),
-        // On a Y-port rotary, Fill and Image rows land on whole mils of machine
-        // Y; the Job Review row check runs on that grid (v14 Z4-P2-1).
-        ...detectRotaryRowGridWarnings(project, prepared.job, MOSHI_ROW_GRID),
-      ],
+      // The job warnings every G-code Save and Start shows (C2 D2-P2-1), and
+      // on a Y-port rotary the Job Review row check on whole mils of machine
+      // Y (v14 Z4-P2-1).
+      ...linkJobOutcome(
+        request,
+        result.advisories,
+        sharedJobWarnings(prepared, [
+          ...detectRotaryRowGridWarnings(project, prepared.job, MOSHI_ROW_GRID),
+        ]),
+      ),
       framingFeedMmPerMin: project.device.framingFeedMmPerMin,
-      completed: request.completed,
     },
   };
 }

@@ -9,6 +9,7 @@ import type { FrameStartPoint } from '../scene/start-points';
 import type {
   ControllerCapabilities,
   DatagramNetworkCapabilities,
+  GalvoUsbCapabilities,
   UsbLinkCapabilities,
 } from './controller-capabilities';
 import type { ControllerEvent } from './controller-event';
@@ -167,6 +168,9 @@ export type ControllerDriver = {
   /** Present when the desktop app can reach this controller over its own
    *  datagram link (ADR-697); absent for every serial driver. */
   readonly datagramNetwork?: DatagramNetworkCapabilities;
+  /** Present when the app can reach this controller as a JCZ galvo over USB
+   *  (ADR-704); absent for every other driver. */
+  readonly galvoUsb?: GalvoUsbCapabilities;
   /** Present when the app can reach this controller over its own USB link
    *  (ADR-703); absent for every serial driver. */
   readonly usbLink?: UsbLinkCapabilities;

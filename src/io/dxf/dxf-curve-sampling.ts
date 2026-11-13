@@ -79,9 +79,16 @@ const TURN_TOLERANCE = 1e-12;
 const INPUT_ULPS = 4 * Number.EPSILON;
 /**
  * How near a whole turn, as a fraction of it, a sweep within one turn closes:
- * 0.036° or 0.00063 rad, a gap of at most R × 6.3e-4.
+ * 0.036° for ARC, a gap of at most R × 6.3e-4.
  */
 export const WHOLE_TURN_SNAP = 1e-4;
+/**
+ * The same for ELLIPSE, sized for radians printed to 2 decimals: a full turn
+ * written as a pair less than a turn apart (−3.14 → 3.14) misses by 0.0032 rad.
+ * 0.005 rad allowed, a gap of at most R × 5.03e-3; 1 decimal (−3.1 → 3.1) stays
+ * open as written (ADR-700 Amd 7).
+ */
+export const ELLIPSE_CLOSE_SNAP = 8e-4;
 /**
  * How near a whole turn angles at least a turn apart still mean one, per unit.
  * Printed ARC degrees are off by at most 0.1° at 1 decimal or 4 significant
@@ -93,12 +100,17 @@ export const WHOLE_TURN_SNAP = 1e-4;
 export const ARC_WRAP_SNAP = 5e-4;
 export const ELLIPSE_WRAP_SNAP = 1.568e-3;
 
+/** A unit's allowances, as fractions of a turn: within one turn, and across one. */
+export type TurnSnaps = { readonly close: number; readonly wrap: number };
+export const ARC_SNAPS: TurnSnaps = { close: WHOLE_TURN_SNAP, wrap: ARC_WRAP_SNAP };
+export const ELLIPSE_SNAPS: TurnSnaps = { close: ELLIPSE_CLOSE_SNAP, wrap: ELLIPSE_WRAP_SNAP };
+
 /**
  * The counter-clockwise sweep from `start` to `end` in (0, turn], the one
  * direction rule DXF ARC (degrees) and ELLIPSE (radians) share. Whole turns
  * between the two are dropped, so 0 → 450° is a quarter. Equal angles mean a
- * full turn, and so does a sweep within WHOLE_TURN_SNAP of one. When the angles
- * are at least a turn apart, a sweep within `wrapSnap` of a whole turn or of
+ * full turn, and so does a sweep within `snaps.close` of one. When the angles
+ * are at least a turn apart, a sweep within `snaps.wrap` of a whole turn or of
  * zero is one too: a circle written as s → s + 360 (or −3.142 → 3.142) stays a
  * circle whichever way its printed angles round. Angles less than a turn apart
  * keep a tiny sweep, so a small arc across 0° (359.99° → 0.01°) stays small.
@@ -108,20 +120,20 @@ export function counterClockwiseSweep(
   start: number,
   end: number,
   turn: number,
-  wrapSnap: number,
+  snaps: TurnSnaps,
 ): number {
   const difference = end - start;
   if (!Number.isFinite(difference)) return turn;
   const tolerance = TURN_TOLERANCE * turn + INPUT_ULPS * (Math.abs(start) + Math.abs(end));
   const remainder = difference % turn;
   const sweep = remainder < 0 ? remainder + turn : remainder;
-  if (sweep <= tolerance || turn - sweep <= WHOLE_TURN_SNAP * turn) return turn;
+  if (sweep <= tolerance || turn - sweep <= snaps.close * turn) return turn;
   if (Math.abs(difference) < turn) return sweep;
-  const snap = wrapSnap * turn;
+  const snap = snaps.wrap * turn;
   return sweep <= snap || turn - sweep <= snap ? turn : sweep;
 }
 
 /** An ELLIPSE's parameter sweep, by the shared rule. */
 export function normalizedSweep(startParam: number, endParam: number): number {
-  return counterClockwiseSweep(startParam, endParam, FULL_TURN, ELLIPSE_WRAP_SNAP);
+  return counterClockwiseSweep(startParam, endParam, FULL_TURN, ELLIPSE_SNAPS);
 }

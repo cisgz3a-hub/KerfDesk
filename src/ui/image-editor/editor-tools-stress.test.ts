@@ -22,8 +22,10 @@ describe('Image Studio bounded working-image stress', () => {
     });
     session = commitAdjustment(session, 'invert', {});
     const inverted = new Uint8ClampedArray(session.doc.data);
-    expect(inverted[0]).toBe(255);
-    expect(inverted[3]).toBe(original[3]);
+    // Pixel 0 is fully transparent: on the Background that is white paper
+    // (ADR-245 §4), so its negative is opaque black (T13-P2-1).
+    expect(inverted[0]).toBe(0);
+    expect(inverted[3]).toBe(255);
     session = undoSession(session);
     expect(Buffer.compare(Buffer.from(session.doc.data), Buffer.from(original))).toBe(0);
     session = redoSession(session);

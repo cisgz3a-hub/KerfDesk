@@ -46,7 +46,10 @@ import type { ProductionNestDefinition } from '../nesting/production-nest';
 // rotary as Y.
 // v23 carries a Fill ramp and the 3D Sliced image mode (ADR-699). An older
 // reader would burn a ramped fill flat; 3D Sliced it already refuses.
-export const PROJECT_SCHEMA_VERSION = 23 as const;
+// v24 carries a JCZ galvo machine (ADR-704): the jcz-lmc controller kind, its
+// galvo setup and per-operation galvo frequency and pulse width. An older
+// reader would drop the unknown kind and treat the galvo as a GRBL machine.
+export const PROJECT_SCHEMA_VERSION = 24 as const;
 
 export type EmbeddedFont = {
   readonly key: string;

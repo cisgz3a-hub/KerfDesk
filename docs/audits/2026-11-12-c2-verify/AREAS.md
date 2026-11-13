@@ -36,4 +36,4 @@ C2's rules apply:
 - security findings stay redacted until fixed;
 - fix PRs use auto-merge with the MERGE method, plus Auto-fix.
 
-**Status:** DONE 2026-11-13. E1–E5 ledgered; see the [round result](LEDGER.md#round-result-2026-11-12).
+**Status:** DONE 2026-11-13. E1–E5 ledgered and every P1, P2 and P3 resolved; see the [round result](LEDGER.md#round-result-2026-11-12) and the [P3 sweep](LEDGER.md#p3-sweep-2026-11-13).

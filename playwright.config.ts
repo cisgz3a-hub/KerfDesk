@@ -13,6 +13,12 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   timeout: 60_000,
+  // On CI, stop the run before its job's time limit kills it, so Playwright
+  // still reports what passed, failed and never ran, and uploads its traces.
+  // 55 minutes is above the slowest Browser smoke shard (44.6 minutes for the
+  // whole job, 2026-11-12) and below the pull-request suite's 60 and a shard's
+  // 75 (C2 D7). Local runs, which take hours on one worker, have no limit.
+  globalTimeout: process.env.CI ? 55 * 60_000 : 0,
   expect: { timeout: 10_000 },
   reporter: process.env.CI ? 'github' : 'list',
   use: {

@@ -14,6 +14,14 @@ export function CutPowerModeField(props: {
       </p>
     );
   }
+  if (props.controllerKind === 'jcz-lmc') {
+    return (
+      <p className="lf-subheading">
+        A galvo marks every move of this layer at this power; set its frequency and pulse width
+        under Galvo.
+      </p>
+    );
+  }
   if (props.controllerKind === 'lihuiyu') {
     return (
       <p className="lf-subheading">

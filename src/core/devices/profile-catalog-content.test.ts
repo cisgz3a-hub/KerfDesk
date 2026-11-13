@@ -32,6 +32,9 @@ const RECORDED: Readonly<Record<string, string>> = {
   'xtool-d1-pro-10w': '2026-09-24 625580b4fe983209',
   'xtool-d1-pro-40w': '2026-09-24 2607ff341d47125b',
   'xtool-d1-pro-5w': '2026-09-24 881dc847f7589ce1',
+  'generic-jcz-fiber-galvo-110': '2026-11-11 18901a3cf050fb59',
+  'generic-jcz-fiber-galvo-150': '2026-11-11 ab7d574bd3baf4c4',
+  'generic-jcz-fiber-galvo-200': '2026-11-11 924202ac301432a4',
 };
 
 describe('preset catalog versions (ADR-322 Amendment 2)', () => {

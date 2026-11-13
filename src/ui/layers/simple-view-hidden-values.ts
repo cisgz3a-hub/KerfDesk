@@ -185,6 +185,9 @@ export const SIMPLE_VIEW_HIDDEN_SPECS: Readonly<Record<HiddenKey, HiddenSpec>> =
   // ADR-699: a Fill ramp changes the burn whenever its length is set.
   fillRampLengthMm: { label: 'Ramp length', modes: FILL, baseline: 0, unit: 'mm' },
   fillRampOuterEdge: { label: 'Ramp outer edge', modes: FILL, baseline: false, when: rampOn },
+  // ADR-704: absent is the galvo machine's own default.
+  galvoFrequencyKhz: { label: 'Galvo frequency', modes: ALL, baseline: undefined, unit: 'kHz' },
+  galvoPulseWidthNs: { label: 'Galvo pulse width', modes: ALL, baseline: undefined, unit: 'ns' },
 };
 
 export type HiddenSettingValue = {

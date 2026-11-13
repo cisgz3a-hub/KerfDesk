@@ -13,6 +13,7 @@ import {
   mainVerdict,
   needsWrite,
   pickVerdictRun,
+  RUN_WINDOW,
   syncMainIsGreen,
 } from './main-is-green.mjs';
 
@@ -154,7 +155,21 @@ test('main is green only when both workflows passed', () => {
     ],
     SITE,
   );
-  assert.match(bothRed.description, /CI and Browser smoke failed/u);
+  assert.match(bothRed.description, /CI failed on abcdef1, Browser smoke failed on abcdef1/u);
+  assert.ok(bothRed.description.length <= 140);
+
+  // E3-P3-1: each red workflow is named with the commit its own run tested.
+  const apart = mainVerdict(
+    [
+      { workflow: ci, run: run({ conclusion: 'failure', head_sha: 'ce6b84357aaaa' }) },
+      { workflow: smoke, run: run({ conclusion: 'failure', head_sha: '1dcce9fa0bbbb' }) },
+    ],
+    SITE,
+  );
+  assert.equal(
+    apart.description,
+    'main is red: CI failed on ce6b843, Browser smoke failed on 1dcce9f. Merge the fix first (label fixes-main).',
+  );
   assert.equal(bothRed.targetUrl, 'ci-run');
 
   const unknown = mainVerdict(
@@ -197,14 +212,17 @@ test('a status is rewritten only when it would change', () => {
 function fakeClient({ ci, smoke, pages }) {
   const writes = [];
   const queries = [];
+  const reads = [];
   return {
     writes,
     queries,
+    reads,
     async rest(path, options) {
       if (options?.method === 'POST') {
         writes.push({ path, body: options.body });
         return {};
       }
+      reads.push(path);
       if (path.includes('/workflows/ci.yml/')) return { workflow_runs: ci };
       if (path.includes('/workflows/e2e.yml/')) return { workflow_runs: smoke };
       throw new Error(`unexpected ${path}`);
@@ -277,6 +295,10 @@ test('a red main fails every open head except the fix, across pages', async () =
 
   assert.equal(result.verdict.state, 'failure');
   assert.deepEqual(result.written, [1, 3, 4]);
+  // A long streak of cancelled main runs must not hide the last verdict.
+  assert.equal(RUN_WINDOW, 100);
+  assert.equal(client.reads.length, 2);
+  for (const path of client.reads) assert.match(path, /status=completed&.*per_page=100$/u);
   assert.equal(client.queries.length, 2);
   assert.deepEqual(
     client.writes.map(({ path, body }) => [path, body.state, body.context]),

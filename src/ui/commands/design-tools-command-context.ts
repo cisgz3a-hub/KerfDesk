@@ -16,6 +16,7 @@ import { openCopyAlongPathDialog } from './copy-along-path-dialog-store';
 import type { DesignToolsCommandContext } from './design-tools-command-types';
 import type { ParityToolsCommandContext } from './parity-tools-command-types';
 import { flattenImageMaskAction } from './image-command-actions';
+import { selectedMaskedImage } from './image-mask-command-state';
 import { openOptimizeShapesDialog } from './optimize-shapes-dialog-store';
 import { vectorCutCommandContext } from './vector-cut-command-context';
 import { warpDeformCommandContext } from './warp-deform-command-context';
@@ -26,6 +27,7 @@ export function designToolsCommandContext(
 ): Omit<DesignToolsCommandContext, keyof ParityToolsCommandContext> {
   const selected =
     app.project.scene.objects.find((object) => object.id === app.selectedObjectId) ?? null;
+  const maskedImage = selectedMaskedImage(app.project, selected, selectedIds);
   return {
     ...vectorCutCommandContext(),
     ...warpDeformCommandContext(app.project, selectedIds),
@@ -38,7 +40,7 @@ export function designToolsCommandContext(
     addRubberBandOutline: () => {
       app.addRubberBandOutline();
     },
-    flattenImageMask: flattenImageMaskAction(app, selected, (message, kind) =>
+    flattenImageMask: flattenImageMaskAction(app, maskedImage, (message, kind) =>
       useToastStore.getState().pushToast(message, kind),
     ),
     copyAlongPath: openCopyAlongPathDialog,

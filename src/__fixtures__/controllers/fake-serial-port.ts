@@ -23,6 +23,16 @@ export type FakeSerialPort = {
   /** Baud rates passed to open(), in order (usually length 1). */
   readonly openRequests: () => ReadonlyArray<SerialOpenRequest>;
   readonly isClosed: () => boolean;
+  /**
+   * Make every later write whose payload matches fail (code quality audit C2,
+   * D3-P3-7): the write rejects and nothing reaches the firmware, with the
+   * port still open, or with it closing first as a cable pull does
+   * (`closePort`). Null clears the rule.
+   */
+  readonly failWrites: (
+    match: ((data: string) => boolean) | null,
+    options?: { readonly closePort?: boolean },
+  ) => void;
 };
 
 export function createFakeSerialPort(): FakeSerialPort {
@@ -33,10 +43,16 @@ export function createFakeSerialPort(): FakeSerialPort {
   const outbound: string[] = [];
   const openRequests: SerialOpenRequest[] = [];
   let closed = false;
+  let failing: { readonly match: (data: string) => boolean; readonly closePort: boolean } | null =
+    null;
 
   const connection: SerialConnection = {
     write: async (data) => {
       if (closed) throw new Error('Fake serial port is closed.');
+      if (failing?.match(data) === true) {
+        if (failing.closePort) closePort();
+        throw new Error('Fake serial write failed.');
+      }
       outbound.push(data);
       for (const handler of [...writeHandlers]) handler(data);
     },
@@ -70,6 +86,12 @@ export function createFakeSerialPort(): FakeSerialPort {
     },
   };
 
+  const closePort = (): void => {
+    if (closed) return;
+    closed = true;
+    for (const handler of [...closeHandlers]) handler();
+  };
+
   return {
     connection,
     adapter,
@@ -77,11 +99,7 @@ export function createFakeSerialPort(): FakeSerialPort {
       if (closed) return;
       for (const handler of [...lineHandlers]) handler(line);
     },
-    emitClose: () => {
-      if (closed) return;
-      closed = true;
-      for (const handler of [...closeHandlers]) handler();
-    },
+    emitClose: closePort,
     onWrite: (handler) => {
       writeHandlers.add(handler);
       return () => writeHandlers.delete(handler);
@@ -93,5 +111,8 @@ export function createFakeSerialPort(): FakeSerialPort {
     outbound: () => [...outbound],
     openRequests: () => [...openRequests],
     isClosed: () => closed,
+    failWrites: (match, options) => {
+      failing = match === null ? null : { match, closePort: options?.closePort === true };
+    },
   };
 }
