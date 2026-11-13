@@ -147,6 +147,25 @@ function rawMissed(
   return raw;
 }
 
+/** Sweep one path of `tool` (relief map frame) into a stock grid on `map`:
+ * an upper bound of the stock after it anywhere in each cell, since a cell is
+ * lowered only to where the cutter stands over its farthest corner (CNC audit
+ * v3 N8-P3-1, for the step-down's measured take). */
+export function sweepPathIntoStock(
+  map: Heightmap,
+  stock: Float32Array,
+  tool: CncTool,
+  points: ReadonlyArray<Vec3>,
+): void {
+  const kernel = kernelForTool(tool, map.mmPerCell);
+  for (let i = 1; i < points.length; i += 1) {
+    const a = points[i - 1];
+    const b = points[i];
+    if (a !== undefined && b !== undefined)
+      stampSegment(map, stock, kernel, { a, b }, map.mmPerCell * Math.SQRT1_2);
+  }
+}
+
 type Segment = { readonly a: Vec3; readonly b: Vec3 };
 
 // Every cutting move as a straight segment. A move that changes height is
@@ -192,6 +211,7 @@ function stampSegment(
   stock: Float32Array,
   kernel: ToolKernel,
   { a, b }: Segment,
+  farCornerMm = 0,
 ): void {
   const z = Math.max(a.z, b.z);
   if (z >= 0) return;
@@ -204,7 +224,7 @@ function stampSegment(
   for (let row = top; row <= bottom; row += 1) {
     const cy = partialCellCenter(map, 'y', row);
     for (let col = left; col <= right; col += 1) {
-      const d = distanceToSegment(partialCellCenter(map, 'x', col), cy, a, b);
+      const d = distanceToSegment(partialCellCenter(map, 'x', col), cy, a, b) + farCornerMm;
       if (d > radius) continue;
       const index = row * map.widthCells + col;
       stock[index] = Math.min(stock[index] ?? 0, z + kernel.surfaceDzAtRadius(d));
