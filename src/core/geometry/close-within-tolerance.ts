@@ -25,7 +25,7 @@ import {
 } from '../scene';
 // Deep import: core/scene's barrel is ratcheted and may only shrink.
 import { endpointArc, pointOnArc, type CenterArc } from '../scene/curve-path';
-import { closeOpenPaths, isCloseablePolyline } from './path-direction-edits';
+import { closeOpenPaths, isCloseablePolyline, retracesItself } from './path-direction-edits';
 import { midpoint, addPoints } from './point-math';
 
 export type CloseToleranceMode = 'bridge' | 'move-ends';
@@ -47,6 +47,8 @@ export function closePathsWithinTolerance(
   let remaining = 0;
   const within = (polyline: Polyline, index: number, path: ColoredPath): boolean => {
     if (!isCloseablePolyline(polyline) || !pairs(path)) return false;
+    // Out and back over itself: closed, it would enclose no area (ADR-486 Amd 4).
+    if (retracesItself(path, index, transform)) return false;
     const ends = pathEnds(path, index);
     if (ends === null) return false;
     const ok = worldGap(ends, transform) <= toleranceMm;

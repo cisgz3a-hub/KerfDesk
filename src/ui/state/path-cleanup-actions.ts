@@ -10,14 +10,16 @@ import { duplicateObjectIds } from '../../core/geometry/duplicate-shapes';
 import {
   closeOpenPaths,
   isCloseablePolyline,
+  retracesItself,
   reversePaths,
 } from '../../core/geometry/path-direction-edits';
+import { retracedPathsNote } from './retraced-paths-note';
 import {
   closePathsWithinTolerance,
   type CloseToleranceMode,
 } from '../../core/geometry/close-within-tolerance';
 import { closingLineFraction } from '../../core/cnc/cnc-tab-anchors';
-import type { CncTabAnchor, ColoredPath, Scene, SceneObject } from '../../core/scene';
+import type { CncTabAnchor, ColoredPath, Scene, SceneObject, Transform } from '../../core/scene';
 import { formatDisplayMillimetres } from '../format-display-millimetres';
 import { removeSceneObjectsFromState } from './object-delete-actions';
 import { synchronizePolylineShapeGeometry } from './path-node-shape-sync';
@@ -47,18 +49,27 @@ export function pathCleanupActions(set: Setter): PathCleanupActions {
     closeSelectedPaths: () =>
       set((state) => {
         let longestGapMm = 0;
+        let retraced = 0;
         const edit = editSelectedPaths(state, 'close', (object) => {
+          retraced += retracedPolylines(object.paths, object.transform);
           const result = closeOpenPaths(object.paths, object.transform);
           longestGapMm = Math.max(longestGapMm, result.longestGapMm);
           return { paths: result.paths, count: result.closed };
         });
-        toast(closeMessage(edit.count, longestGapMm, skippedOpenObjects(state)));
+        const message = closeMessage(edit.count, longestGapMm, skippedOpenObjects(state));
+        toast(
+          edit.count === 0 && retraced > 0
+            ? retracedPathsNote(retraced)
+            : withNote(message, retraced),
+        );
         return edit.state;
       }),
     closeSelectedPathsWithTolerance: (toleranceMm, mode) =>
       set((state) => {
         let remaining = 0;
+        let retraced = 0;
         const edit = editSelectedPaths(state, 'close', (object) => {
+          retraced += retracedPolylines(object.paths, object.transform);
           const result = closePathsWithinTolerance(
             object.paths,
             object.transform,
@@ -73,11 +84,13 @@ export function pathCleanupActions(set: Setter): PathCleanupActions {
             ? ''
             : ` ${remaining === 1 ? '1 path stays' : `${remaining} paths stay`} open: the gap is wider than ${formatDisplayMillimetres(toleranceMm)} mm.`;
         const done = edit.count === 1 ? 'Closed 1 path.' : `Closed ${edit.count} paths.`;
-        toast(
-          edit.count === 0 && remaining === 0
-            ? closeMessage(0, 0, skippedOpenObjects(state))
-            : `${done}${left}`,
-        );
+        if (edit.count === 0 && remaining === 0) {
+          toast(
+            retraced > 0
+              ? retracedPathsNote(retraced)
+              : closeMessage(0, 0, skippedOpenObjects(state)),
+          );
+        } else toast(withNote(`${done}${left}`, retraced));
         return edit.state;
       }),
     reverseSelectedPaths: () =>
@@ -251,6 +264,19 @@ function closeMessage(closed: number, longestGapMm: number, skipped: number): st
       ? ''
       : ` The widest gap closed was ${formatDisplayMillimetres(longestGapMm)} mm.`;
   return `Closed ${paths}.${gap}${skippedNote}`;
+}
+
+// Open paths that run back over themselves stay open (ADR-486 Amendment 4).
+function retracedPolylines(paths: ReadonlyArray<ColoredPath>, transform: Transform): number {
+  return paths.reduce(
+    (sum, path) =>
+      sum + path.polylines.filter((_, index) => retracesItself(path, index, transform)).length,
+    0,
+  );
+}
+
+function withNote(message: string, retraced: number): string {
+  return retraced === 0 ? message : `${message} ${retracedPathsNote(retraced)}`;
 }
 
 function reverseMessage(reversed: number, openMayFlip: boolean): string {

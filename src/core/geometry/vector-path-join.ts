@@ -23,6 +23,8 @@ export type VectorPathJoinPlan = {
   readonly remainingOpenPaths: number;
   readonly ambiguousEndpoints: number;
   readonly tabbedPaths: number;
+  /** Chains left open because closing them would enclose no area (ADR-486 Amd 4). */
+  readonly retraced: number;
 };
 
 type SourceCurve = JoinableCurve & {
@@ -74,6 +76,7 @@ export function joinOpenVectorPaths(
     remainingOpenPaths: sources.length - joined.joins - joined.closures,
     ambiguousEndpoints: joined.ambiguousEndpoints,
     tabbedPaths: sources.filter((source) => source.protected).length,
+    retraced: joined.retraced,
   });
 }
 

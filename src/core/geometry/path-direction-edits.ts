@@ -15,6 +15,7 @@ import {
 } from '../scene';
 // The exact comparison; `samePoint` below allows a tolerance.
 import { samePoint as coincident } from './point-math';
+import { subpathEnclosesNoArea } from './zero-area-contour';
 
 export type ClosePathsResult = {
   readonly paths: ReadonlyArray<ColoredPath>;
@@ -45,10 +46,30 @@ export function isCloseablePolyline(polyline: Polyline): boolean {
   return polyline.points.length >= 3 && !polyline.closed;
 }
 
+/**
+ * A closeable path that closed would enclose no area in world millimetres: a
+ * line drawn out and back over itself. Kerf Offset drops such a loop from the
+ * job, so Close Path leaves it open and says why (ADR-486 Amendment 4).
+ */
+export function retracesItself(path: ColoredPath, index: number, transform: Transform): boolean {
+  const polyline = path.polylines[index];
+  return (
+    polyline !== undefined &&
+    isCloseablePolyline(polyline) &&
+    subpathEnclosesNoArea(path, index, transform)
+  );
+}
+
+/** Close Path's default: every closeable path except one that retraces itself. */
+export function closeableUnlessRetraced(transform: Transform): ClosePathPredicate {
+  return (polyline, index, path) =>
+    isCloseablePolyline(polyline) && !retracesItself(path, index, transform);
+}
+
 export function closeOpenPaths(
   paths: ReadonlyArray<ColoredPath>,
   transform: Transform,
-  shouldClose: ClosePathPredicate = isCloseablePolyline,
+  shouldClose: ClosePathPredicate = closeableUnlessRetraced(transform),
 ): ClosePathsResult {
   let closed = 0;
   let longestGapMm = 0;

@@ -11,6 +11,7 @@ import {
   type Vec2,
 } from '../../core/scene';
 import { CLOSURE_EPS_MM } from '../../core/scene/polyline-closure';
+import { closedContourEnclosesNoArea } from '../../core/geometry/zero-area-contour';
 import { parseDecimalReal } from '../../core/util';
 import type { DxfTag } from './dxf-tags';
 import {
@@ -269,7 +270,14 @@ function withoutRepeatedSeam<T extends Vec2>(
   if (points.length < minimum || first === undefined || last === undefined) return unchanged;
   const endsMeet =
     Math.abs(first.x - last.x) < CLOSURE_EPS_MM && Math.abs(first.y - last.y) < CLOSURE_EPS_MM;
-  return endsMeet ? { points: points.slice(0, -1), closed: true } : unchanged;
+  if (!endsMeet) return unchanged;
+  const ring = points.slice(0, -1);
+  // An unflagged run out and back over itself only looks closed: closed, it
+  // would enclose no area and Kerf Offset would drop it (ADR-486 Amendment 4).
+  // Bulges are arcs these anchors do not show, so a bulged run is kept closed.
+  const straight = ring.every((point) => !('bulge' in point) || point.bulge === 0);
+  if (!flaggedClosed && straight && closedContourEnclosesNoArea(ring)) return unchanged;
+  return { points: ring, closed: true };
 }
 
 // Runs `build` in the entity's OCS and returns its geometry in world XY. The

@@ -13,6 +13,10 @@
 // absorbs float rounding, such as an ARC end computed from its angles against
 // a LINE end written as a number, and leaves every drawn gap open. Wider gaps
 // are for Join paths, and the leads and Job Review read them (Amendment 8).
+//
+// A LINE drawn twice meets itself at both ends, but closed it would be a loop
+// with no area, which Kerf Offset drops. The shared pairing leaves such a chain
+// as it was (ADR-486 Amendment 4), so both LINEs import open and burn as drawn.
 
 import {
   joinCurveEndpointsWithin,

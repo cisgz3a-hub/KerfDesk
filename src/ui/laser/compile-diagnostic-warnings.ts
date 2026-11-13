@@ -37,9 +37,15 @@ export function compileDiagnosticWarnings(job: CompiledJob): ReadonlyArray<strin
     (diagnostic): diagnostic is CompileDiagnostic => !isLaserLeadDiagnostic(diagnostic),
   );
   return [
-    ...mergeClosedUpCounts(others).map(diagnosticWarning),
+    ...mergeClosedUpCounts(others).map(warningFor),
     ...laserLeadWarnings(diagnostics.filter(isLaserLeadDiagnostic)),
   ];
+}
+
+function warningFor(diagnostic: CompileDiagnostic): string {
+  return diagnostic.kind === 'kerf-offset-no-area'
+    ? kerfNoAreaWarning(diagnostic.layerName, diagnostic.count)
+    : diagnosticWarning(diagnostic);
 }
 
 // A layer compiled one object at a time (objects with their own power scale)
@@ -50,10 +56,20 @@ function mergeClosedUpCounts(
   const merged: CompileDiagnostic[] = [];
   for (const diagnostic of diagnostics) {
     const index = merged.findIndex(
-      (earlier) => sameClosedUpLayer(earlier, diagnostic) || sameAssumedSide(earlier, diagnostic),
+      (earlier) =>
+        sameClosedUpLayer(earlier, diagnostic) ||
+        sameAssumedSide(earlier, diagnostic) ||
+        (earlier.kind === 'kerf-offset-no-area' &&
+          diagnostic.kind === 'kerf-offset-no-area' &&
+          earlier.layerName === diagnostic.layerName),
     );
     const earlier = merged[index];
     if (earlier?.kind === 'kerf-offset-closed-up' && diagnostic.kind === 'kerf-offset-closed-up') {
+      merged[index] = { ...earlier, count: earlier.count + diagnostic.count };
+    } else if (
+      earlier?.kind === 'kerf-offset-no-area' &&
+      diagnostic.kind === 'kerf-offset-no-area'
+    ) {
       merged[index] = { ...earlier, count: earlier.count + diagnostic.count };
     } else if (earlier?.kind === 'kerf-side-assumed' && diagnostic.kind === 'kerf-side-assumed') {
       merged[index] = { ...earlier, count: earlier.count + diagnostic.count };
@@ -83,7 +99,9 @@ function sameAssumedSide(a: CompileDiagnostic, b: CompileDiagnostic): boolean {
   );
 }
 
-function diagnosticWarning(diagnostic: CompileDiagnostic): string {
+function diagnosticWarning(
+  diagnostic: Exclude<CompileDiagnostic, { readonly kind: 'kerf-offset-no-area' }>,
+): string {
   switch (diagnostic.kind) {
     case 'offset-fill-failed':
       return offsetFillFailedWarning(diagnostic.layerName);
@@ -135,6 +153,13 @@ function kerfOffsetFailedWarning(layerName: string): string {
 // left once it shrinks by the offset (a part, when the offset is negative).
 // The minimum-feature check may flag the same spot as a narrow gap; this says
 // what actually happened to it.
+// ADR-486 Amendment 4: a closed contour with no inside has no side to offset
+// to, so it is dropped whether the offset grows or shrinks.
+function kerfNoAreaWarning(layerName: string, count: number): string {
+  const one = count === 1;
+  return `Kerf offset on layer "${layerName}" dropped ${count} closed ${one ? 'path that encloses' : 'paths that enclose'} no area, such as a line drawn twice or a path that runs out and back over itself, so ${one ? 'it is' : 'they are'} missing from the job and will NOT be cut. Check the preview before running. Break ${one ? 'it' : 'each'} open at a node in the node editor, remove a second copy with Delete Duplicates, or set Kerf Offset to 0.`;
+}
+
 function kerfClosedUpWarning(layerName: string, count: number, kerfOffsetMm: number): string {
   const one = count === 1;
   const kerf = `the ${formatFeatureMm(2 * Math.abs(kerfOffsetMm))} mm kerf (twice its Kerf Offset)`;
