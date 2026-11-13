@@ -27,9 +27,11 @@ export function selectOutputStrategy(device: DeviceProfile): AnyOutputStrategy {
     // Ruida and Lihuiyu output is NOT G-code — Save routes to the binary .rd
     // encoder (io/rd) or the .egv writer (io/egv, ADR-703) before any strategy
     // runs; a Moshiboard has no file at all and its USB link encodes programs
-    // (io/moshi, ADR-705). The GRBL emitter here only feeds the on-screen
-    // preview/estimate pipeline fallback.
+    // (io/moshi, ADR-705), and a JCZ galvo runs LMC list packets (ADR-704).
+    // The GRBL emitter here only feeds the on-screen preview/estimate pipeline
+    // fallback.
     case 'ruida':
+    case 'jcz-lmc':
     case 'lihuiyu':
     case 'moshi':
       return grblStrategy;

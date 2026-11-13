@@ -81,6 +81,7 @@ function firmwareWhy(
     case 'ruida':
     case 'moshi':
     case 'lihuiyu':
+    case 'jcz-lmc':
       return 'This controller does not report how its coordinates map to the bed.';
   }
 }

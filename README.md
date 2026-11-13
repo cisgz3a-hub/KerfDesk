@@ -28,6 +28,7 @@ that a burn or a cut *looks* right on real material.
 | FluidNC, Marlin, Smoothieware | Tested against simulators only |
 | Ruida (`.rd` export, desktop UDP link) | Simulator and round-trip tests only; never run on a real controller |
 | Stock K40 (Lihuiyu) `.egv` export and USB link, Moshiboard over USB | Experimental; simulator only |
+| JCZ LMC galvo (EZCad2: fiber, MOPA, UV) over USB | Experimental; simulator only |
 | Rotary (Y, A or Z axis) | Code and tests; not qualified on hardware |
 | Desktop installers | Published for Windows; macOS and Linux builds pass CI |
 
@@ -119,7 +120,7 @@ be produced, or the reviewed program is not the one about to be sent. See
 | Ruida | `.rd` file export; experimental UDP link on the desktop |
 | Stock K40 (Lihuiyu M2/M3 Nano) | `.egv` file export; experimental USB link (WebUSB) |
 | Moshiboard | Experimental USB link (WebUSB) |
-| JCZ galvo boards | Driver still in review |
+| JCZ LMC galvo (EZCad2: fiber, MOPA, UV) | Experimental USB link (WebUSB) and red-light Frame; no job file |
 
 **Writes** G-code (`.gcode`, `.nc`, including per-tile files), Ruida `.rd`, K40 `.egv`, KerfDesk projects
 (`.lf2`), SVG and PNG exports, traced vectors (SVG, DXF, PDF, EPS, GeoJSON), material libraries

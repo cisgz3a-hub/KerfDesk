@@ -26,6 +26,7 @@ describe('machineSetupControllerGuide', () => {
       'marlin',
       'smoothieware',
       'ruida',
+      'jcz-lmc',
       'lihuiyu',
       'moshi',
     ]);

@@ -1,6 +1,6 @@
 import { selectControllerDriver, type SettingsCapability } from '../../../core/controllers';
 import { firmwareReportQuery } from '../../../core/controllers/controller-firmware-report';
-import type { DeviceProfile } from '../../../core/devices';
+import type { ControllerKind, DeviceProfile } from '../../../core/devices';
 import type { LaserState } from '../../state/laser-store';
 import { machineNetworkProfileForDevice } from '../machine-network-profile';
 
@@ -9,6 +9,14 @@ const SETTINGS_ADAPTER: Readonly<Record<SettingsCapability, string>> = {
   'grbl-dollar-read': 'Owned $$ read; no setting writes',
   'readonly-dump': 'Owned read-only dump',
   none: 'No generic settings adapter',
+};
+
+// Controllers that run jobs some other way than a saved G-code program.
+const OFFLINE_EXECUTION: Partial<Readonly<Record<ControllerKind, string>>> = {
+  ruida: 'Experimental vector .rd export; run from the machine panel',
+  'jcz-lmc': 'No job file: run over USB from the Galvo USB panel (experimental)',
+  lihuiyu: 'Experimental .egv export; simulator-tested USB link',
+  moshi: 'None: a Moshiboard runs only what its USB link streams (experimental)',
 };
 
 export function machineProtocolInventory(device: DeviceProfile, laser: LaserState) {
@@ -56,13 +64,8 @@ export function machineProtocolInventory(device: DeviceProfile, laser: LaserStat
     {
       name: 'Offline execution',
       value:
-        driver.kind === 'moshi'
-          ? 'None: a Moshiboard runs only what its USB link streams (experimental)'
-          : driver.kind === 'ruida'
-            ? 'Experimental vector .rd export; run from the machine panel'
-            : driver.kind === 'lihuiyu'
-              ? 'Experimental .egv export; simulator-tested USB link'
-              : 'Save executable output and use a separately qualified controller/file workflow',
+        OFFLINE_EXECUTION[driver.kind] ??
+        'Save executable output and use a separately qualified controller/file workflow',
     },
     {
       name: 'Firmware flashing',

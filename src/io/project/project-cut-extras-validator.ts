@@ -1,7 +1,8 @@
-// ADR-415, ADR-494, ADR-492, ADR-495, ADR-626, ADR-670 and ADR-699 operation settings, shared by the operation,
+// ADR-415, ADR-494, ADR-492, ADR-495, ADR-626, ADR-670, ADR-699 and ADR-704 operation settings, shared by the operation,
 // sub-operation and artwork-override validators. All optional: files written
 // before them load as they did.
 
+import { isGalvoFrequencyKhz, isGalvoPulseWidthNs } from '../../core/devices/galvo-setup';
 import { isPhotoToneCurve } from '../../core/raster/photo-tone-curve';
 import {
   optionalBoolean,
@@ -40,7 +41,20 @@ export function cutExtrasFieldErrors(
     optionalPhotoToneCurve(value, `${path}.photoToneCurve`),
     optionalNonNegativeNumber(value, `${path}.fillRampLengthMm`),
     optionalBoolean(value, `${path}.fillRampOuterEdge`),
+    optionalMatching(value, `${path}.galvoFrequencyKhz`, isGalvoFrequencyKhz),
+    optionalMatching(value, `${path}.galvoPulseWidthNs`, isGalvoPulseWidthNs),
   ];
+}
+
+// ADR-704: a galvo frequency or pulse width the board's words cannot carry is
+// refused; a burn at another value would not be the one the file asks for.
+function optionalMatching(
+  value: Record<string, unknown>,
+  path: string,
+  valid: (field: unknown) => boolean,
+): string | null {
+  const field = valueAtPath(value, path);
+  return field === undefined || valid(field) ? null : `missing or invalid \`${path}\``;
 }
 
 // ADR-670: a curve that is not monotonic and pinned at both ends would burn

@@ -39,7 +39,7 @@ function loadAsSchema18(objects: ReadonlyArray<TextObject>): ReadonlyArray<TextO
   const raw = JSON.parse(serializeProject({ ...project, scene: { ...project.scene, objects } }));
   const result = deserializeProject(JSON.stringify({ ...raw, schemaVersion: 18 }));
   if (result.kind !== 'ok') throw new Error(`load failed: ${JSON.stringify(result)}`);
-  expect(result.project.schemaVersion).toBe(23);
+  expect(result.project.schemaVersion).toBe(24);
   return result.project.scene.objects as ReadonlyArray<TextObject>;
 }
 
@@ -140,7 +140,7 @@ describe('schema 19: single-line text Size becomes the em (ADR-682)', () => {
     );
     const result = deserializeProject(JSON.stringify({ ...raw, schemaVersion: 19 }));
 
-    expect(result.kind === 'ok' ? result.project.schemaVersion : null).toBe(23);
+    expect(result.kind === 'ok' ? result.project.schemaVersion : null).toBe(24);
     expect(result.kind === 'ok' ? result.project.scene.objects : []).toEqual([relief]);
   });
 });

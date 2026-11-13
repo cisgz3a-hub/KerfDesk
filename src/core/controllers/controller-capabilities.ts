@@ -60,6 +60,26 @@ export type DatagramNetworkCapabilities = {
   readonly overrides: false;
 };
 
+/** A JCZ LMC galvo board reached over USB (ADR-704), outside the line store
+ *  like the Ruida link. Start sends LMC list packets, Frame traces with the
+ *  red pointer light, Pause/Resume are Stop/Restart List, Abort is Stop
+ *  Execute, status is Get List Status. Every other control stays off. */
+export type GalvoUsbCapabilities = {
+  readonly start: 'lmc-list';
+  readonly frame: 'red-light';
+  readonly pause: boolean;
+  readonly resume: boolean;
+  readonly abort: boolean;
+  readonly status: 'list-status';
+  readonly correctionFile: boolean;
+  readonly jog: false;
+  readonly home: false;
+  readonly console: false;
+  readonly settings: false;
+  readonly origin: false;
+  readonly overrides: false;
+};
+
 /** A live link over USB outside the line-based controller store (ADR-703:
  *  a Lihuiyu board behind its CH341 bridge). Each control it offers is listed;
  *  the UI mounts only those, and every other machine control stays off. */

@@ -29,6 +29,7 @@ import {
 import { DeviceSetupRotaryFields } from './DeviceSetupRotaryFields';
 import { DeviceSetupRasterDiagnostics } from './DeviceSetupRasterDiagnostics';
 import { PositioningLightEditor } from './PositioningLightEditor';
+import { GalvoSetupEditor } from './GalvoSetupEditor';
 import { deviceSetupSupportsMachineKind, type DeviceSetupStepProps } from './device-setup-flow';
 
 export function DeviceSetupOptionsStep({
@@ -48,6 +49,18 @@ export function DeviceSetupOptionsStep({
         <strong>Set up only what you use.</strong>
         <span>Open an item to adjust it. Existing settings are kept when you leave it closed.</span>
       </div>
+      {draft.controllerKind === 'jcz-lmc' ? (
+        <OptionSection
+          title="Galvo lens and source"
+          status={
+            draft.galvo === undefined
+              ? 'Not configured'
+              : `${draft.galvo.source}, ${draft.bedWidth} mm field`
+          }
+        >
+          <GalvoSetupEditor value={draft.galvo} onChange={(galvo) => update({ galvo })} />
+        </OptionSection>
+      ) : null}
       <OptionSection title="No-go zones" status={noGoZoneStatus(draft)}>
         <SafetyZonesPanel zones={draft.noGoZones} onChange={(noGoZones) => update({ noGoZones })} />
       </OptionSection>

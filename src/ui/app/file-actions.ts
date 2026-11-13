@@ -59,6 +59,9 @@ export {
   type PrebuiltGcodeSave,
 } from './transactional-gcode-save';
 export { handleSaveProject, type SaveProjectCtx } from './project-save-action';
+
+export const GALVO_HAS_NO_FILE =
+  'A JCZ galvo has no job file to save. Run the job from Machine details → JCZ galvo USB connection: Frame with the red light, then Start.';
 export {
   SAVE_COMPLETED_WITH_NEWER_EDITS_MESSAGE,
   type SaveProjectOutcome,
@@ -241,6 +244,11 @@ async function savedWithoutGcode(
   placement: Extract<ReturnType<typeof resolveExportJobPlacement>, { readonly ok: true }>,
 ): Promise<boolean> {
   const driver = selectControllerDriver(ctx.project.device.controllerKind);
+  // A JCZ galvo has no job file (ADR-704): it runs over its USB link.
+  if (driver.galvoUsb !== undefined) {
+    ctx.pushToast(GALVO_HAS_NO_FILE, 'error');
+    return true;
+  }
   // A USB-link controller with no file format (ADR-705: Moshiboard) has
   // nothing to save: its programs exist only on the link. A USB-link driver
   // that names a fileFormat (ADR-703: Lihuiyu .egv) saves that file instead.

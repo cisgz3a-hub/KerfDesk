@@ -294,6 +294,14 @@ Verified end-to-end against scripted firmware simulators
   has no software power control (the machine's knob sets power). Fill, Image, output scope, job
   warnings and the Y-port rotary speed match follow the shared planners (ADR-703 Amendment 1).
   Simulator-tested only; NOT qualified on a real board.
+- **I.8 — JCZ LMC galvo** (ADR-704): EXPERIMENTAL fiber, MOPA, UV and CO2 galvo markers on a
+  JCZ LMC (EZCad2-class) board over the ADR-702 USB link, reimplemented from MeerK40t's MIT
+  `balormk`. The bed is the square lens field (origin at its centre; 110/150/200 mm profiles);
+  operations may set their own galvo frequency and MOPA pulse width (schema 24). The line store
+  sees the board as `transport: 'file-only'` and Save has no job file; a separate store sends
+  LMC list packets with a red-pointer Frame (laser never fired), Start gated on it, Pause, Resume,
+  Abort and status. Image rasters, rotary and EZCad3 boards are not built. Simulator-tested only;
+  NOT qualified on a real board.
 - **I.9 — Moshiboard** (ADR-705): EXPERIMENTAL live link over the CH341 USB bridge (ADR-702),
   from MeerK40t's public Moshi module. Frame (a laser-off program), Start, Abort (estop) and Home
   only; frame-first Start unchanged. No file export: no public Moshi file format exists. A

@@ -23,11 +23,12 @@ const PROJECT_ROOT = dirname(fileURLToPath(import.meta.url));
 const WORKER_SIDE_IO =
   /\/src\/io\/(?:tiff\/|raster-decode\/|postscript\/|svg\/parse-svg-worker\.ts$|xml\/read-xml-document-from-blob\.ts$)/;
 // USB controller links that load only when a job is saved or their panel opens
-// (ADR-703: the Lihuiyu encoder, link and .egv writer; ADR-705: the Moshiboard
-// encoder, run loop and output). Only the driver's capability data is boot
-// code, because selectControllerDriver is.
+// (ADR-703: the Lihuiyu encoder, link and .egv writer; ADR-704: the JCZ galvo
+// LMC encoder, link and command sequences; ADR-705: the Moshiboard encoder, run
+// loop and output). Only the driver's capability data is boot code, because
+// selectControllerDriver is.
 const LAZY_CONTROLLER_LINKS =
-  /\/src\/(?:core\/controllers\/(?:lihuiyu|moshi)\/(?!driver\.ts$)|io\/(?:egv|moshi)\/)/;
+  /\/src\/(?:core\/controllers\/(?:jcz|lihuiyu|moshi)\/(?!driver\.ts$)|io\/(?:egv|lmc|moshi)\/)/;
 const DESKTOP_RELEASE_VERSION_ENV = 'KERFDESK_DESKTOP_VERSION';
 const BUILD_APP_VERSION = resolveBuildAppVersion(
   appVersion(),

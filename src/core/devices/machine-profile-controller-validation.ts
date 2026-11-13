@@ -9,6 +9,7 @@ import {
   type DeviceProfile,
 } from './device-profile';
 import { isGcodeDialectSelection } from './gcode-dialects';
+import { galvoProfileIssues } from './galvo-profiles';
 
 export function machineProfileControllerIssues(profile: DeviceProfile): ReadonlyArray<string> {
   return [
@@ -21,6 +22,7 @@ export function machineProfileControllerIssues(profile: DeviceProfile): Readonly
     ...scanPolicyIssues(profile),
     ...streamingIssues(profile),
     ...receiveWindowIssues(profile),
+    ...galvoProfileIssues(profile),
   ];
 }
 

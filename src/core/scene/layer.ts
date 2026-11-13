@@ -96,6 +96,11 @@ export type LayerOperationSettings = {
   // older reader refuse a project rather than burn the fill flat.
   readonly fillRampLengthMm?: number | undefined;
   readonly fillRampOuterEdge?: boolean | undefined;
+  // ADR-704: a JCZ galvo's Q-switch / PWM frequency and MOPA pulse width for
+  // this operation. Absent is the machine's own default (its galvo setup), and
+  // every other controller ignores them, so G-code and .rd stay byte-identical.
+  readonly galvoFrequencyKhz?: number | undefined;
+  readonly galvoPulseWidthNs?: number | undefined;
 };
 
 // ADR-626: an arc meets the cut tangentially; a line meets it at an angle.
@@ -227,6 +232,8 @@ export const LAYER_OPERATION_SETTING_KEYS = [
   'photoToneCurve',
   'fillRampLengthMm',
   'fillRampOuterEdge',
+  'galvoFrequencyKhz',
+  'galvoPulseWidthNs',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 const LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -322,6 +329,8 @@ export const OPTIONAL_CUT_SETTING_KEYS = [
   'photoToneCurve',
   'fillRampLengthMm',
   'fillRampOuterEdge',
+  'galvoFrequencyKhz',
+  'galvoPulseWidthNs',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 // Written only when set, so a capture of an operation that never used them

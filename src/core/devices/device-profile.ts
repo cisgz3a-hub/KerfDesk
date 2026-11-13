@@ -5,6 +5,7 @@
 import type { CameraModelRecord } from '../camera/model/camera-model-record';
 import type { RotarySetup } from './rotary';
 import type { LaserFireControl } from './fire-control';
+import type { GalvoSetup } from './galvo-setup';
 import type { PositioningLight } from './positioning-light';
 import type { ScanOffsetCalibrationStatus, ScanOffsetPoint } from './scan-offset-profile';
 import type { GcodeDialectSelection } from './gcode-dialects';
@@ -25,6 +26,8 @@ export type ControllerKind =
   | 'marlin'
   | 'smoothieware'
   | 'ruida'
+  // ADR-704: a JCZ LMC (EZCad2-class) galvo board, driven over USB.
+  | 'jcz-lmc'
   | 'lihuiyu'
   | 'moshi';
 
@@ -37,6 +40,7 @@ export const KNOWN_CONTROLLER_KINDS: ReadonlyArray<ControllerKind> = [
   'marlin',
   'smoothieware',
   'ruida',
+  'jcz-lmc',
   'lihuiyu',
   'moshi',
 ];
@@ -338,6 +342,9 @@ export type DeviceProfile = {
   readonly rotary?: RotarySetup;
   readonly fireControl?: LaserFireControl;
   readonly positioningLight?: PositioningLight | undefined;
+  // ADR-704: a JCZ galvo's lens mapping, source and timing. Read only for a
+  // 'jcz-lmc' controller, whose bed is the square lens field.
+  readonly galvo?: GalvoSetup | undefined;
   // Feed used by the Frame button (jog around the job bounding box).
   // Separate from `maxFeed` so a user who lowers maxFeed to constrain
   // cut speeds doesn't also slow framing. The firmware still enforces its
