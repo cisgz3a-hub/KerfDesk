@@ -66,6 +66,11 @@ export function reliefRoughingReach(
     // centre in the strip, so there the envelope shrinks to its radius and the
     // map's edge stops eroding the band. Absent: the strip is always side-milled.
     readonly nextToolRadiusMm?: number;
+    // CNC audit v3 N2-P2-2: decide "small" outright. In the rest stage the
+    // band beside a wall is the finishing ball's own fillet, not an allowance
+    // strip, so any rest bit smaller than the finishing bit rides in it.
+    // Absent: small when its radius is under the allowance plus one cell.
+    readonly nextIsSmall?: boolean;
   },
 ): ReliefRoughingReachResult {
   const segments = roughingSegments(passes);
@@ -76,21 +81,7 @@ export function reliefRoughingReach(
   for (const segment of segments) stampSegment(map, stock, kernel, segment);
   const thresholdMm =
     Math.max(0, options.depthPerPassMm) + Math.max(0, options.allowanceMm) + map.mmPerCell;
-  const stripMm = Math.max(0, options.allowanceMm) + map.mmPerCell;
-  const nextRadius = options.nextToolRadiusMm ?? Number.POSITIVE_INFINITY;
-  const smallNext = nextRadius < stripMm;
-  const envelope = allowanceEnvelope(map, smallNext ? nextRadius : stripMm);
-  const raw = new Uint8Array(map.depth.length);
-  for (let index = 0; index < map.depth.length; index += 1) {
-    if (map.inclusion?.[index] === 0) continue;
-    if ((stock[index] ?? 0) - (envelope[index] ?? 0) > thresholdMm) raw[index] = 1;
-  }
-  const missed = opened(
-    map,
-    raw,
-    Math.max(1, Math.round(options.minWidthMm / 2 / map.mmPerCell)),
-    smallNext ? Math.ceil(nextRadius / map.mmPerCell) : 0,
-  );
+  const missed = missedMask(map, stock, thresholdMm, options);
   const missedCells = missed.reduce((sum, value) => sum + value, 0);
   return {
     kind: 'checked',
@@ -103,6 +94,52 @@ export function reliefRoughingReach(
       thresholdMm,
     },
   };
+}
+
+// Cells roughing left more than the threshold above the allowance envelope,
+// opened by half the next bit, with a small next bit's wall strip kept.
+function missedMask(
+  map: Heightmap,
+  stock: Float32Array,
+  thresholdMm: number,
+  options: {
+    readonly allowanceMm: number;
+    readonly minWidthMm: number;
+    readonly nextToolRadiusMm?: number;
+    readonly nextIsSmall?: boolean;
+  },
+): Uint8Array {
+  const stripMm = Math.max(0, options.allowanceMm) + map.mmPerCell;
+  const nextRadius = options.nextToolRadiusMm ?? Number.POSITIVE_INFINITY;
+  const smallNext = options.nextIsSmall ?? nextRadius < stripMm;
+  const envelope = allowanceEnvelope(map, smallNext ? Math.min(nextRadius, stripMm) : stripMm);
+  const raw = rawMissed(map, stock, envelope, thresholdMm);
+  // N2r-P2-1: the opening drops regions narrower than half the next bit. When
+  // that is under one cell (a 1 mm ball on a 1/8" bit's grid), no region on
+  // the grid is that narrow, and a disk of one cell would erase the one-cell
+  // strip such a bit rides in beside a wall.
+  const cells = options.minWidthMm / 2 / map.mmPerCell;
+  if (smallNext && cells < 1) return raw;
+  return opened(
+    map,
+    raw,
+    Math.max(1, Math.round(cells)),
+    smallNext ? wallShadow(map, envelope, thresholdMm) : null,
+  );
+}
+
+function rawMissed(
+  map: Heightmap,
+  stock: Float32Array,
+  envelope: Float32Array,
+  thresholdMm: number,
+): Uint8Array {
+  const raw = new Uint8Array(map.depth.length);
+  for (let index = 0; index < map.depth.length; index += 1) {
+    if (map.inclusion?.[index] === 0) continue;
+    if ((stock[index] ?? 0) - (envelope[index] ?? 0) > thresholdMm) raw[index] = 1;
+  }
+  return raw;
 }
 
 type Segment = { readonly a: Vec3; readonly b: Vec3 };
@@ -173,12 +210,29 @@ function stampSegment(
 // Morphological opening by a disk of `radius` cells: only regions wide enough
 // to hold the disk survive, at their full extent. Past the map edge counts as
 // missed: a channel running off the relief keeps its width to the edge.
-function opened(map: Heightmap, mask: Uint8Array, radius: number, edgeCells: number): Uint8Array {
+// CNC audit v3 N2r-P2-1: under a small next bit, the cells a wall (or the
+// relief's edge, which stands at the stock top) shadows within the envelope:
+// their envelope stands more than a pass above their own target. A small bit
+// rides beside such a wall with its centre in the unroughed strip, so the
+// strip must survive the opening there as it does along the map edge.
+function wallShadow(map: Heightmap, envelope: Float32Array, thresholdMm: number): Uint8Array {
+  const out = new Uint8Array(map.depth.length);
+  for (let index = 0; index < map.depth.length; index += 1)
+    if ((envelope[index] ?? 0) - (map.depth[index] ?? 0) > thresholdMm) out[index] = 1;
+  return out;
+}
+
+function opened(
+  map: Heightmap,
+  mask: Uint8Array,
+  radius: number,
+  neutral: Uint8Array | null,
+): Uint8Array {
   const disk: Array<readonly [number, number]> = [];
   for (let dy = -radius; dy <= radius; dy += 1)
     for (let dx = -radius; dx <= radius; dx += 1)
       if (dx * dx + dy * dy <= radius * radius) disk.push([dx, dy]);
-  return dilated(map, eroded(map, mask, disk, edgeCells), disk, mask);
+  return dilated(map, eroded(map, mask, disk, neutral), disk, mask);
 }
 
 type Disk = ReadonlyArray<readonly [number, number]>;
@@ -187,14 +241,20 @@ function inMap(map: Heightmap, col: number, row: number): boolean {
   return col >= 0 && row >= 0 && col < map.widthCells && row < map.heightCells;
 }
 
-// Cells whose whole disk is in the mask, past the map's edge, or within
-// `edgeCells` of it (the strip a small next bit rides in, X6-P2-3).
-function eroded(map: Heightmap, mask: Uint8Array, disk: Disk, edgeCells: number): Uint8Array {
+// Cells whose whole disk is in the mask, past the map's edge, or in the
+// strip a small next bit rides in beside a wall or the edge (X6-P2-3, N2r-P2-1).
+function eroded(
+  map: Heightmap,
+  mask: Uint8Array,
+  disk: Disk,
+  neutral: Uint8Array | null,
+): Uint8Array {
   const out = new Uint8Array(mask.length);
-  const nearEdge = (col: number, row: number): boolean =>
-    Math.min(col, row, map.widthCells - 1 - col, map.heightCells - 1 - row) < edgeCells;
-  const at = (col: number, row: number): boolean =>
-    !inMap(map, col, row) || nearEdge(col, row) || mask[row * map.widthCells + col] === 1;
+  const at = (col: number, row: number): boolean => {
+    if (!inMap(map, col, row)) return true;
+    const index = row * map.widthCells + col;
+    return mask[index] === 1 || neutral?.[index] === 1;
+  };
   for (let row = 0; row < map.heightCells; row += 1)
     for (let col = 0; col < map.widthCells; col += 1)
       if (disk.every(([dx, dy]) => at(col + dx, row + dy))) out[row * map.widthCells + col] = 1;

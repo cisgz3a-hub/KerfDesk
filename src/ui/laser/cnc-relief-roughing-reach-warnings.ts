@@ -45,12 +45,12 @@ export function reliefRoughingReachWarnings(
     const levels = finishing.finishingStepLevels ?? 0;
     if (levels === 0) {
       return [
-        `${missed} The ${finishing.toolDiameterMm} mm finishing bit does not step down ` +
+        `${missed} The ${bitName(finishing)} finishing bit does not step down ` +
           'there either. Check the 3D preview, or use a smaller roughing bit.',
       ];
     }
     return [
-      `${missed} The ${finishing.toolDiameterMm} mm finishing bit cuts it first in ` +
+      `${missed} The ${bitName(finishing)} finishing bit cuts it first in ` +
         `${levels} step-down ${levels === 1 ? 'level' : 'levels'} of one depth per pass, at the ` +
         'finishing feed, before its finishing pass. A smaller roughing bit clears it faster.',
     ];
@@ -64,7 +64,7 @@ function restReachWarnings(project: Project, plan: CncReliefPlan): ReadonlyArray
   if (plan.predecessorReachUnchecked === true) {
     return [
       `${where}: the check for stock the finishing bit cannot reach exceeded its work budget, ` +
-        `so the ${plan.toolDiameterMm} mm rest bit is not stepped down there. Check the 3D ` +
+        `so the ${bitName(plan)} rest bit is not stepped down there. Check the 3D ` +
         'preview after finishing before rest finishing.',
     ];
   }
@@ -73,14 +73,24 @@ function restReachWarnings(project: Project, plan: CncReliefPlan): ReadonlyArray
   const levels = plan.finishingStepLevels ?? 0;
   const cut =
     levels > 0
-      ? `The ${plan.toolDiameterMm} mm rest bit cuts it first in ${levels} step-down ` +
+      ? `The ${bitName(plan)} rest bit cuts it first in ${levels} step-down ` +
         `${levels === 1 ? 'level' : 'levels'} of one depth per pass, at its own feed, before its ` +
         'rest rows.'
-      : `The ${plan.toolDiameterMm} mm rest bit does not step down there. Check the 3D preview.`;
+      : `The ${bitName(plan)} rest bit does not step down there. Check the 3D preview.`;
   return [
     `${where}: the finishing bit cannot reach about ${Math.max(1, Math.round(areaMm2))} mm² ` +
       `of the relief and leaves it more than one depth per pass above the finished surface. ${cut}`,
   ];
+}
+
+// CNC audit v3 N2-P2-1: a narrowing bit is named by kind and tip, since its
+// nominal diameter (the widest cut) is not what rides in the band.
+function bitName(plan: CncReliefPlan): string {
+  if (plan.toolKind === 'tapered-ball-nose' && plan.toolTipDiameterMm !== undefined)
+    return `${plan.toolTipDiameterMm} mm-tip tapered ball`;
+  if (plan.toolKind === 'v-bit') return `${plan.toolDiameterMm} mm V-bit`;
+  if (plan.toolKind === 'engraving') return `${plan.toolDiameterMm} mm engraving bit`;
+  return `${plan.toolDiameterMm} mm`;
 }
 
 function layerName(project: Project, layerId: string): string {

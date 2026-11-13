@@ -41,6 +41,10 @@ export function detectCompiledVCarveDepthWarnings(
     label: 'V-carve',
     remediation:
       'Change the artwork, bit geometry, or enable a flat depth if that is not intended.',
+    // CNC audit v2 J1-P2-1: a flowing V-carve's depth follows stroke width, so
+    // the default 1/2" 90° bit in default stock lands on the bottom; it warns
+    // there as relief does.
+    warnAtStockBottom: true,
   });
 }
 
@@ -98,6 +102,11 @@ function compiledLayerDepths(
   return [...byLayer.values()];
 }
 
+// CNC audit v3 N2-P2-3: a floor left thinner than this holds nothing, so it
+// warns as the stock bottom itself does (ADR-572 Amd 4 counts 0.1 mm as cut
+// free; the X6 refuter put "effectively free" at 0.2 mm).
+const THIN_FLOOR_MM = 0.2;
+
 type DepthWarningCopy = {
   readonly label: string;
   readonly remediation: string;
@@ -115,17 +124,19 @@ function detectDepthWarnings(
     const representedStockText = formatCncCoordinateMm(stockThicknessMm);
     const emittedDepthMm = parseGrblCncCoordinate(emittedDepthText);
     const representedStockMm = parseGrblCncCoordinate(representedStockText);
-    if (
-      !(emittedDepthMm > representedStockMm) &&
-      !(copy.warnAtStockBottom && emittedDepthMm === representedStockMm)
-    ) {
-      return [];
-    }
-    if (emittedDepthMm === representedStockMm) {
+    // Both are output coordinates (0.001 mm), so compare the floor in microns.
+    const floorMm = Math.round((representedStockMm - emittedDepthMm) * 1000) / 1000;
+    if (floorMm >= 0) {
+      if (copy.warnAtStockBottom !== true || floorMm >= THIN_FLOOR_MM - 1e-9) return [];
+      const where =
+        floorMm === 0
+          ? 'reaches the configured stock bottom'
+          : `leaves only ${formatText(floorMm.toFixed(3))} mm of stock under its floor`;
       return [
-        `Layer ${layerId} reaches the configured stock bottom at an actual compiled ${copy.label} ` +
-          `depth of ${formatText(emittedDepthText)} mm. Relief paths have no holding tabs; if this geometry ` +
-          'separates a part, confirm workholding and spoilboard clearance in Job Review.',
+        `Layer ${layerId} ${where} at an actual compiled ${copy.label} depth of ` +
+          `${formatText(emittedDepthText)} mm in ${formatText(representedStockText)} mm stock. ` +
+          `${capitalised(copy.label)} paths have no holding tabs; if this geometry separates a part, ` +
+          'confirm workholding and spoilboard clearance in Job Review.',
       ];
     }
     const pastMm = emittedDepthMm - representedStockMm;
@@ -135,6 +146,10 @@ function detectDepthWarnings(
         `into the spoilboard. ${copy.remediation}`,
     ];
   });
+}
+
+function capitalised(label: string): string {
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function formatText(text: string): string {

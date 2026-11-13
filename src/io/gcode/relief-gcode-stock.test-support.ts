@@ -7,6 +7,7 @@
 // search. Arcs are refused, so no arc approximation hides anything.
 import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import { toMachineCoords } from '../../core/devices';
+import { kernelForTool } from '../../core/sim';
 import {
   createLayer,
   createProject,
@@ -14,6 +15,7 @@ import {
   DEFAULT_CNC_MACHINE_CONFIG,
   IDENTITY_TRANSFORM,
   type CncLayerSettings,
+  type CncTool,
   type Layer,
   type Polyline,
   type Project,
@@ -111,12 +113,14 @@ export function stockProject(
   objects: ReadonlyArray<SceneObject>,
   layers: ReadonlyArray<Layer>,
   stockMm: number,
+  extraTools: ReadonlyArray<CncTool> = [],
 ): Project {
   const base = createProject();
   return {
     ...base,
     machine: {
       ...DEFAULT_CNC_MACHINE_CONFIG,
+      tools: [...DEFAULT_CNC_MACHINE_CONFIG.tools, ...extraTools],
       stock: { ...DEFAULT_CNC_MACHINE_CONFIG.stock, thicknessMm: stockMm },
     },
     scene: { ...base.scene, objects, artworkOrder: objects.map((o) => o.id), layers },
@@ -252,12 +256,11 @@ type Grid = {
 };
 
 function cutMove(
-  tool: { readonly kind: string; readonly diameterMm: number },
+  tool: CncTool,
   a: Point3,
   b: Point3,
   grid: Grid,
 ): { maxRem: number; centreRem: number; vol: number } {
-  if (tool.kind !== 'ball-nose' && tool.kind !== 'end-mill') throw new Error(tool.kind);
   const { top, X0, Y0, NX, NY, G } = grid;
   const R = tool.diameterMm / 2;
   const ex = b.x - a.x;
@@ -301,22 +304,33 @@ function cellSpan(
 }
 
 // The cutter's lowest point over one cell during a move, or null off its path.
-function cellBottom(
-  tool: { readonly kind: string; readonly diameterMm: number },
-  a: Point3,
-  b: Point3,
-  qx: number,
-  qy: number,
-): number | null {
+function cellBottom(tool: CncTool, a: Point3, b: Point3, qx: number, qy: number): number | null {
   const R = tool.diameterMm / 2;
   const ex = b.x - a.x;
   const ey = b.y - a.y;
   const interval = insideInterval(qx, qy, ex, ey, ex * ex + ey * ey, R);
   if (interval === null) return null;
   const zt = (t: number): number => a.z + (b.z - a.z) * t;
-  return tool.kind === 'ball-nose'
-    ? ballBottom(zt, qx, qy, ex, ey, R, interval)
-    : Math.min(zt(interval[0]), zt(interval[1]));
+  if (tool.kind === 'end-mill') return Math.min(zt(interval[0]), zt(interval[1]));
+  return ballBottom(zt, qx, qy, ex, ey, cutterRise(tool), interval);
+}
+
+// The cutter's rise above its tip at a radius: an exact ball, or for a
+// narrowing bit (tapered ball, V-bit, engraver) the app's own cutter law.
+const rises = new WeakMap<CncTool, (d: number) => number>();
+
+function cutterRise(tool: CncTool): (d: number) => number {
+  const known = rises.get(tool);
+  if (known !== undefined) return known;
+  const R = tool.diameterMm / 2;
+  let rise: (d: number) => number;
+  if (tool.kind === 'ball-nose') rise = (d) => R - Math.sqrt(Math.max(0, R * R - d * d));
+  else {
+    const law = kernelForTool(tool, Math.max(R / 50, 1e-3)).surfaceDzAtRadius;
+    rise = (d) => law(Math.min(d, R));
+  }
+  rises.set(tool, rise);
+  return rise;
 }
 
 function insideInterval(
@@ -344,14 +358,10 @@ function ballBottom(
   qy: number,
   ex: number,
   ey: number,
-  R: number,
+  rise: (d: number) => number,
   [t1, t2]: readonly [number, number],
 ): number {
-  const fz = (t: number): number => {
-    const dx = qx - t * ex;
-    const dy = qy - t * ey;
-    return zt(t) + R - Math.sqrt(Math.max(0, R * R - dx * dx - dy * dy));
-  };
+  const fz = (t: number): number => zt(t) + rise(Math.hypot(qx - t * ex, qy - t * ey));
   let lo = t1;
   let hi = t2;
   if (hi - lo > 1e-9) {
