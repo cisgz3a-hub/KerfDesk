@@ -59,8 +59,14 @@ function collectWeldBatches(
     const pieces = weldBatchPieces(object);
     if (pieces.kind === 'error') return pieces;
     for (const { key, batch } of pieces.value) {
+      // The batch keeps its first source's colour and metadata.
       const existing = grouped.get(key);
-      grouped.set(key, { ...batch, paths: [...(existing?.paths ?? []), ...batch.paths] });
+      grouped.set(
+        key,
+        existing === undefined
+          ? batch
+          : { ...existing, paths: [...existing.paths, ...batch.paths] },
+      );
     }
   }
   return ok(grouped);
@@ -140,14 +146,21 @@ function normalizedOperationIds(
   return [...new Set(operationIds)];
 }
 
+// A path bound to an operation by id keeps its colour for display only: the
+// operation decides its output, and Assign to operation and an operation
+// recolour leave the path colour as it was. Such paths weld by operation, so
+// two shapes in one operation merge whatever their colours (ADR-350
+// Amendment 1, T28-P2-2). A legacy path with no ids, or an explicitly unbound
+// one, is still told apart by its colour, which is what binds or shows it.
 function batchKey(
   color: string,
   operationIds: ReadonlyArray<string> | undefined,
   strokeWidthMm: number | undefined,
   strokeTransform: ColoredPath['strokeTransform'],
 ): string {
+  const boundById = operationIds !== undefined && operationIds.length > 0;
   return JSON.stringify([
-    color.toLowerCase(),
+    boundById ? null : color.toLowerCase(),
     operationIds ?? null,
     strokeWidthMm ?? null,
     strokeTransform ?? null,

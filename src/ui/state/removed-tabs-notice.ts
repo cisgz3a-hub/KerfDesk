@@ -49,7 +49,12 @@ export function combineSelectionNotingTabs(
         next === state || options.keepOperands === true
           ? ''
           : removedTabsNotice(
-              selectedVectorObjects(state.project.scene, selectedObjectIds(state)),
+              selectedVectorObjects(
+                state.project.scene,
+                selectedObjectIds(state),
+                'replace',
+                false,
+              ),
               what,
             );
       return next;

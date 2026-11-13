@@ -24,8 +24,8 @@ export function OffsetPathsRow(): JSX.Element | null {
     ...(selectedObjectId === null ? [] : [selectedObjectId]),
     ...additionalSelectedIds,
   ];
-  // Same eligibility as Weld: unlocked, closed-contour vector selection.
-  if (!selectionCanWeld(project, selectedIds)) return null;
+  // Weld's eligibility, but the registration jig may be offset (a new object).
+  if (!selectionCanWeld(project, selectedIds, 'variable')) return null;
   return (
     <section aria-label="Offset paths" className="lf-artwork-tool">
       <div className="lf-artwork-tool__heading">
