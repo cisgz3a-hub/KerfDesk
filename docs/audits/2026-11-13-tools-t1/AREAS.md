@@ -47,13 +47,13 @@ Run order puts tools that make or change burns first, then new tools, then the r
 | T06 | Fill repair | Fill Selection | `tools.fill-selection` | ledgered: P1 1 and P2 1 (fixed by #1850), P3 9 |
 | T07 | Fill repair | Close Open Fill Contours | `tools.close-open-fill-contours` | ledgered: P3 5 |
 | T08 | Fill repair | Close Fill Contours with Tolerance | `tools.close-fill-contours-with-tolerance` | ledgered: P3 5 (known 3) |
-| T09 | Fill repair | Leave White Unburned | `tools.leave-white-unburned` | ledgered: P1 3, P2 1 (fix #1858), P3 3 |
+| T09 | Fill repair | Leave White Unburned | `tools.leave-white-unburned` | ledgered: P1 3, P2 1 (fixed by #1858), P3 3 |
 | T10 | Fill repair | Close Paths with Tolerance | `tools.close-paths-with-tolerance` | ledgered: P2 2 (fixed by #1851), P3 3 (known 6) |
 | T11 | Fill repair | Radius Fillet | `tools.radius-fillet` | ledgered: P2 3 (fixed by #1852), P3 6 |
 | T12 | Fill repair | Shear | `tools.shear` | ledgered: P2 1 (fixed by #1853), P3 4 |
 | T13 | Image | Image Studio | `tools.edit-image` | ledgered: P2 2 (fixed by #1855), P3 2 (known 3) |
 | T14 | Image | Adjust Image | `tools.adjust-image` | ledgered: P2 2 (fix #1856), P3 2 (known 3) |
-| T15 | Image | Photo Engraving | `tools.photo-engraving` | ledgered: P2 2 (fix #1860), P3 3 |
+| T15 | Image | Photo Engraving | `tools.photo-engraving` | ledgered: P2 2 (fixed by #1860), P3 3 |
 | T16 | Image | Apply Mask to Image | `tools.apply-image-mask` | ledgered: P2 3 (fix session proposed), P3 3 |
 | T17 | Image | Crop Image | `tools.crop-image` | ledgered: P2 2 (fix session proposed, with T16), P3 2 (known 3) |
 | T18 | Image | Flatten Image Mask | `tools.flatten-image-mask` | |
