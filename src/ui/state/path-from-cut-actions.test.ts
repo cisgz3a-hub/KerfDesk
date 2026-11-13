@@ -124,3 +124,60 @@ it('does not append stale paths after the project changes during preparation', a
   expect(useStore.getState().project).toBe(replacement);
   expect(useStore.getState().project.scene.objects).toHaveLength(0);
 });
+
+// Tools audit T1, T27-P2-1: the kerf side is judged among the whole scene, as
+// Start judges it, so a hole selected alone is still cut on its inside.
+function ring(id: string, x: number, size: number): ImportedSvg {
+  return {
+    ...SQUARE,
+    id,
+    source: `${id}.svg`,
+    bounds: { minX: 0, minY: 0, maxX: size, maxY: size },
+    transform: { ...IDENTITY_TRANSFORM, x, y: x },
+    paths: [
+      {
+        color: '#000000',
+        polylines: [
+          {
+            closed: true,
+            points: [
+              { x: 0, y: 0 },
+              { x: size, y: 0 },
+              { x: size, y: size },
+              { x: 0, y: size },
+              { x: 0, y: 0 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+it('keeps the kerf inside a hole that is selected without its plate', async () => {
+  const project = createProject();
+  useStore.setState({
+    project: {
+      ...project,
+      scene: {
+        ...project.scene,
+        objects: [ring('plate', 40, 40), ring('hole', 55, 10)],
+        layers: [{ ...createLayer({ id: 'cut', color: '#000000' }), kerfOffsetMm: 0.5 }],
+      },
+    },
+    selectedObjectId: 'hole',
+    additionalSelectedIds: new Set(),
+  });
+  await useStore.getState().generatePathFromCut();
+  const objects = useStore.getState().project.scene.objects;
+  expect(objects).toHaveLength(3);
+  const generated = objects[2] as ImportedSvg;
+  const points = generated.paths.flatMap((path) => path.polylines.flatMap((p) => p.points));
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  // The hole is 55..65; Start cuts it 0.5 mm inside on every side (9 mm), not 11 mm.
+  expect(Math.min(...xs)).toBeCloseTo(55.5, 3);
+  expect(Math.max(...xs)).toBeCloseTo(64.5, 3);
+  expect(Math.min(...ys)).toBeCloseTo(55.5, 3);
+  expect(Math.max(...ys)).toBeCloseTo(64.5, 3);
+});
