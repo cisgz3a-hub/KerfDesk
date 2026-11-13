@@ -5,6 +5,11 @@ import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 import { pruneDesignTreeOrder } from '../../core/scene/design-hierarchy-order';
 import { useToastStore } from './toast-store';
 import { selectedObjectIds } from './scene-group-actions';
+import {
+  geometryToolSkippedNotice,
+  geometryToolSources,
+  type GeometryToolGuard,
+} from './geometry-tool-sources';
 import type { VectorCombineOptions, VectorPathState } from './vector-path-actions';
 export function replaceSelectedAtEarliest(
   objects: ReadonlyArray<SceneObject>,
@@ -34,9 +39,16 @@ export function replaceIdsAtEarliest(
   });
 }
 
+/**
+ * The selected vector objects a geometry tool works on. With a `guard`, the
+ * objects it must not rebuild are left out and, unless `notify` is false, a
+ * notice says so (ADR-350 Amendment 1).
+ */
 export function selectedVectorObjects(
   scene: Scene,
   selectedIds: ReadonlyArray<string>,
+  guard?: GeometryToolGuard,
+  notify = true,
 ): ReadonlyArray<VectorSceneObject> {
   const selected = new Set(selectedIds);
   const objects = scene.objects.filter(
@@ -51,7 +63,11 @@ export function selectedVectorObjects(
       );
     return [];
   }
-  return objects;
+  if (guard === undefined) return objects;
+  const { kept, skipped } = geometryToolSources(scene, objects, guard);
+  const notice = notify ? geometryToolSkippedNotice(skipped) : '';
+  if (notice !== '') useToastStore.getState().pushToast(notice, 'info');
+  return kept;
 }
 
 export function expectedSelection(state: VectorPathState, options: VectorCombineOptions): boolean {

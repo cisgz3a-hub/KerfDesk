@@ -86,7 +86,9 @@ what it engraves or what a scanner reads.
 - Selecting, dragging and snapping still use the stored code's outline. When the new value
   changes the code's size (a longer serial in a 1D code, a larger QR version), the selection
   box follows the drawn code but a click on the added part does not select it until the code is
-  edited. Convert to Path still converts the stored code.
+  edited. Convert to Path still converts the stored code. *Amended by ADR-350 Amendment 1: that
+  acceptance is for Convert to Path alone; Weld, Subtract / Intersect / Exclude, Offset and
+  Dogbone leave a variable barcode as it is.*
 - A 144 x 144 code saved by an earlier build keeps its stored outlines until it is edited; Edit
   barcode then shows the message. Text that long needs a QR Code or shorter text. Until then it
   engraves as before, with the Job Review warning.

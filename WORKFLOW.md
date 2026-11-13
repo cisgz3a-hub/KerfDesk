@@ -7669,6 +7669,21 @@ and lifts the command's CNC-only gate.)*
    cover. A bar whose ends sit inside two circles is the bridge that joins
    them, so Weld keeps its area and the review does not name it. Of two
    identical shapes, only one is named, because Weld keeps the other.
+3. Within one operation, Weld joins shapes whatever their path colours. A
+   shape moved in with Assign to operation keeps its old colour on the path,
+   but the operation decides what burns, so it welds with the others there
+   (ADR-350 Amendment 1).
+
+#### Edge — variable data and the registration jig (ADR-350 Amendment 1)
+1. Weld, Subtract / Intersect / Exclude, Offset and Dogbone leave variable
+   text and variable barcodes as they are, and the notice says to use Bake
+   Variable Text first. Rebuilding them would burn the template's braces, or
+   one repeated serial, on every record. The rest of the selection is still
+   processed; a selection of only variable data leaves the command disabled.
+2. Weld and Subtract / Intersect / Exclude also leave the registration jig
+   (its outlines, its artwork and the artwork's copies in the other outlines)
+   as it is, so Select All then Weld keeps the jig burning piece by piece.
+   Edit jig artwork in the jig editor.
 
 #### Edge — transforms and z-order
 1. Object transforms are baked to world space before combining, so a

@@ -32,7 +32,7 @@ export function DogboneRow(): JSX.Element | null {
     ...(selectedObjectId === null ? [] : [selectedObjectId]),
     ...additionalSelectedIds,
   ];
-  if (!selectionCanWeld(project, selectedIds)) return null;
+  if (!selectionCanWeld(project, selectedIds, 'variable')) return null;
   return (
     <section aria-label="Dogbone corners" className="lf-artwork-tool">
       <div className="lf-artwork-tool__heading">

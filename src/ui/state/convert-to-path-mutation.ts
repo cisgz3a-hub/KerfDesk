@@ -7,6 +7,7 @@ import { isVectorPathObject } from '../../core/geometry';
 import { isRegistrationBox, replaceObject } from '../../core/scene';
 import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 import { objectVariableTemplate } from '../../core/variables/object-variable-template';
+import { variableTextSkippedNotice } from './geometry-tool-sources';
 import { selectedObjectIds } from './scene-group-actions';
 import { pushUndo } from './scene-mutations';
 import { useToastStore } from './toast-store';
@@ -62,10 +63,7 @@ function convertSkippedNotice(skipped: {
   readonly jigOutline: number;
 }): string {
   const parts: string[] = [];
-  if (skipped.variableText > 0)
-    parts.push(
-      `${skipped.variableText === 1 ? 'Variable text was' : `${skipped.variableText} variable texts were`} left as text: use Bake Variable Text first to fix its value.`,
-    );
+  if (skipped.variableText > 0) parts.push(variableTextSkippedNotice(skipped.variableText));
   if (skipped.jigOutline > 0) parts.push('The registration jig outlines were left as they are.');
   return parts.join(' ');
 }
