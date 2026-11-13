@@ -10,6 +10,7 @@ import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { DitherSwatchPicker } from '../layers/DitherSwatchPicker';
 import { IMAGE_GAMMA_DIRECTION_HINT } from './gamma-direction';
 import { imageDensityBounds } from './image-density-bounds';
+import { PhotoTestedBurnField } from './PhotoTestedBurnField';
 import { PhotoToneCalibrationField } from './PhotoToneCalibrationField';
 import { PHOTO_RECIPES, photoRecipe } from './photo-recipes';
 import {
@@ -35,12 +36,13 @@ type PhotoEngravingFieldsProps = {
   readonly spotSizeMm?: { readonly x: number; readonly y: number } | undefined;
   /** From the photo's stored mode, so Grayscale stays offered after another is picked. */
   readonly processingChoices: ReadonlyArray<PhotoProcessing>;
-  /** The photo's burn power (its multiplier applied) and speed, which a tone
-   * calibration also depends on. */
+  /** The operation's burn power (the photo's multiplier applied) and speed.
+   * A tested power and speed in the draft replace them (ADR-711). */
   readonly power: number;
   readonly speed: number;
   readonly onChange: (patch: Partial<PhotoEngravingDraft>) => void;
   readonly onCalibrateTones: () => void;
+  readonly onBurnTestCard: () => void;
 };
 
 export function PhotoEngravingFields(props: PhotoEngravingFieldsProps): JSX.Element {
@@ -76,10 +78,18 @@ export function PhotoEngravingFields(props: PhotoEngravingFieldsProps): JSX.Elem
           ? 'For surfaces such as slate that mark lighter. Reverses the engraving and shows light marks in the preview.'
           : 'For surfaces such as wood that mark darker. Darker parts of the photo use more laser dots.'}
       </p>
+      <PhotoTestedBurnField
+        draft={draft}
+        operationPower={props.power}
+        operationSpeed={props.speed}
+        onChange={onChange}
+        onBurnTestCard={props.onBurnTestCard}
+      />
+      {/* A tone calibration depends on the power and speed the photo burns with. */}
       <PhotoToneCalibrationField
         draft={draft}
-        power={props.power}
-        speed={props.speed}
+        power={draft.testedBurn?.power ?? props.power}
+        speed={draft.testedBurn?.speed ?? props.speed}
         onChange={onChange}
         onCalibrate={props.onCalibrateTones}
       />
@@ -100,7 +110,7 @@ function PhotoRecipeField(props: PhotoEngravingFieldsProps): JSX.Element {
         <select
           className="lf-select"
           aria-label="Material recipe"
-          title="Prepare the portrait for a kind of material: marking, dot pattern, tones and sharpening. Power, speed and DPI stay as they are."
+          title="Prepare the portrait for a kind of material: marking, dot pattern, tones and sharpening. Power, speed and DPI stay as they are; a test card finds power and speed."
           value={recipe?.id ?? NO_RECIPE}
           onChange={(event) =>
             props.onRecipe(event.target.value === NO_RECIPE ? null : event.target.value)
@@ -116,7 +126,7 @@ function PhotoRecipeField(props: PhotoEngravingFieldsProps): JSX.Element {
       </label>
       <p className="lf-photo-engraving__hint">
         {recipe === null
-          ? 'Sets the marking, Blue Noise dots, auto tones and a light sharpen for a portrait on that material. Power, speed and DPI stay yours to test.'
+          ? 'Sets the marking, Blue Noise dots, auto tones and a light sharpen for a portrait on that material. Power, speed and DPI stay yours to test: Burn a test card below finds power and speed.'
           : `${recipe.note}${recipe.mirror ? ' Flip the photo horizontally on the canvas before burning, because you view it through the material.' : ''}${recipe.lightMarks ? LIGHT_MARKS_BACKGROUND : ''}${props.recipeTonesPending === true ? ' Auto tones apply once the preview has read the photo.' : ''}`}
       </p>
     </>

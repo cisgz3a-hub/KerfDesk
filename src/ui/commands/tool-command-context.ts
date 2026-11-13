@@ -5,6 +5,7 @@
 import { countBurningImportedWhites } from '../../core/geometry/burning-imported-white';
 import type { usePlatform } from '../app/platform-context';
 import { handleSaveProcessedBitmap } from '../app/save-processed-bitmap';
+import { openPhotoTestCard } from '../calibration/photo-test-card-store';
 import { openToneCalibration } from '../calibration/tone-calibration-store';
 import { openPhotoEngraving } from '../raster/photo-engraving-store';
 import type { useStore } from '../state';
@@ -33,6 +34,7 @@ type ToolCommandContext = Pick<
   | 'boxFitTest'
   | 'materialTest'
   | 'intervalTest'
+  | 'photoTestCard'
   | 'toneCalibration'
   | 'scanOffsetTest'
   | 'focusTest'
@@ -81,6 +83,7 @@ export function toolCommandContext(
     boxFitTest: callbacks.requestBoxFitTest,
     materialTest: callbacks.requestMaterialTest,
     intervalTest: callbacks.requestIntervalTest,
+    photoTestCard: () => openPhotoTestCard(),
     toneCalibration: openToneCalibration,
     scanOffsetTest: callbacks.requestScanOffsetTest,
     focusTest: callbacks.requestFocusTest,

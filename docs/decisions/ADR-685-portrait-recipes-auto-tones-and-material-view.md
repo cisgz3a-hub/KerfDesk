@@ -149,3 +149,7 @@ fixes rolling audit v9 R8-P2-3, R8-P3-1 and R8-P3-2.
 
 **Amendment 2 (2026-11-12):** [Auto tones round toward the clip](ADR-685-amendment-2-auto-tones-round-toward-the-clip.md):
 fixes Oracle audit O6-P3-2.
+
+**Amended by [ADR-711](ADR-711-photo-test-card-finds-power-and-speed.md) (2026-11-13):** a recipe
+still sets no power or speed, but the window can now apply the power and speed the operator
+picked from a burned Photo Test Card.

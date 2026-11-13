@@ -108,6 +108,7 @@ async function render(
         onApply={onApply}
         onEditSource={vi.fn()}
         onCalibrateTones={vi.fn()}
+        onBurnTestCard={vi.fn()}
       />,
     );
   });

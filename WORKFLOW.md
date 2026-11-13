@@ -5055,7 +5055,7 @@ Fractional DPI and tone values remain valid within their displayed ranges.
 coated metal, black slate or stone, black anodized aluminium or a painted surface, or clear
 acrylic or glass engraved from the back. It sets the marking, Blue Noise, Auto tones and a
 light sharpen (30% at 0.7 lines). It never changes power, speed, DPI, tone calibration or
-placement. For clear material, flip the photo horizontally on the canvas yourself. **Auto
+placement; the Photo Test Card below finds power and speed. For clear material, flip the photo horizontally on the canvas yourself. **Auto
 tones** turns the photo's darkest and lightest 0.5% solid and blank, then puts its middle tone
 back where it was. Pure white is not counted, so a removed background does not mask the skin.
 This clears stray dots from skin highlights and backgrounds, and works best on a photo cropped
@@ -5064,9 +5064,36 @@ laser spot, in the recipe's colours, so overlapping dots darken before anything 
 a profile spot size it draws one-cell marks and says so. It models spot geometry, not how the
 material chars.
 
-Focus and use Material Test and Interval Test for the actual machine/material.
+**Photo Test Card** (ADR-711) finds the power and speed for a photo on the actual material.
+Choose **Burn a test card…** under Power and speed in Photo engraving, or Tools → Calibrate →
+Photo Test Card... with the photo selected. From Photo engraving, the window's settings are
+applied to the photo first, so nothing chosen there is lost.
+
+1. The dialog shows the photo with a square outlined on it. Click the part every square should
+   burn, such as the eyes, or type its place across and down the photo. Set how many powers run
+   across and how many speeds run down (1 to 8 each), their lowest and highest values, the square
+   size (5 to 50 mm) and the gap. The ranges start around the power and speed the photo burns
+   with. A line under the fields lists the powers and speeds the card will hold.
+2. **Generate card** replaces the project with the card, after the usual save question. Undo
+   brings the photo back. Every square is the same piece of the photo at the photo's placed size,
+   with its tones, sharpening, processing, marking and tone calibration. Only power (low to high
+   across) and speed (fast to slow down) change, and both are burned as labels.
+3. Burn the card on a scrap of the same material with the ordinary Frame and Start workflow.
+4. Open Photo Test Card again and choose **2. Pick the best square**. Click the square where the
+   face looks best and name the material. If that square is on the card's edge, a note says which
+   way to move the range for another card. **Save power and speed** keeps the result on this
+   computer.
+5. Undo back to the photo (or open its project again), open Photo engraving and choose the
+   result under **Tested power and speed**. **Apply photo settings** sets that power and speed for
+   this photo only, and returns its power multiplier to 100%. A note appears when the card was
+   burned with a different photo processing, DPI or marking.
+
+Burn a Tone Calibration wedge after the card, not before: a calibration belongs to the power and
+speed it was measured at, and Photo engraving says when they differ.
+
+Focus and use Interval Test for the actual machine/material.
 Higher DPI can darken a portrait through overlapping marks. The photo tool supplies
-no universal power/speed recipe. Review all passes in the job Preview, then use
+no universal power/speed recipe: the test card measures them on your material. Review all passes in the job Preview, then use
 the ordinary Frame and Start workflow. Software previews are not physical burn
 qualification.
 
