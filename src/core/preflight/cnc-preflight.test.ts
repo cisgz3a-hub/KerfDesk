@@ -9,6 +9,7 @@ import {
   type Project,
   type SceneObject,
 } from '../scene';
+import { COMPILE_INTEGRITY_PREFLIGHT_CODES } from './blocking-codes';
 import { runCncPreflight } from './cnc-preflight';
 
 const config = DEFAULT_CNC_MACHINE_CONFIG;
@@ -325,17 +326,50 @@ describe('runCncPreflight', () => {
   });
 
   // Audit 4.4: requesting more than the configured ceiling is not a compile
-  // failure. capSpindle clamps to Math.min(rpm, ceiling) at every compile site,
-  // so the program is producible and can never emit an out-of-range S word.
-  // Refusing it was policy; Job Review warns that the job runs at the ceiling.
+  // failure. Every compile site caps S and scales the feeds with it (ADR-233
+  // Amd 1), so the program is producible and keeps the planned chip load.
+  // Refusing it was policy; Job Review says what was capped.
   it('does not refuse a spindle speed above the configured ceiling', () => {
     const result = runCncPreflight(projectWithCnc({ spindleRpm: 99999 }), config, GOOD_GCODE);
     expect(result.issues.some((issue) => issue.code === 'cnc-settings-invalid')).toBe(false);
+    expect(result.issues.some((issue) => issue.code === 'cnc-spindle-off')).toBe(false);
   });
 
-  it('still refuses a non-positive spindle speed', () => {
+  // CNC audit v3 N6r-P2-1: this was an advisory, so Save and Start sent M3 S0
+  // and cut. It is compile integrity now (ADR-233 Amd 1).
+  it('refuses a non-positive spindle speed as compile integrity', () => {
     const result = runCncPreflight(projectWithCnc({ spindleRpm: 0 }), config, GOOD_GCODE);
-    expect(result.issues.some((issue) => issue.message.includes('spindle RPM must be'))).toBe(true);
+    const issue = result.issues.find((candidate) => candidate.code === 'cnc-spindle-off');
+    expect(issue?.message).toContain('has a spindle speed of 0 RPM');
+    expect(COMPILE_INTEGRITY_PREFLIGHT_CODES.has('cnc-spindle-off')).toBe(true);
+  });
+
+  // CNC audit v3 N6-P3-1: the compiler caps a recipe's feed as it does the
+  // layer's, so a recipe the job can run gets the same advisory.
+  it('gives a stage recipe feed above CNC Max feed the layer advisory', () => {
+    const toolId = config.tools[0]!.id;
+    const result = runCncPreflight(
+      projectWithCnc({
+        stageRecipes: {
+          'profile-finish': {
+            toolId,
+            depthPerPassMm: 1,
+            feedMmPerMin: 9000,
+            plungeMmPerMin: 8000,
+            spindleRpm: 12000,
+          },
+        },
+      }),
+      config,
+      GOOD_GCODE,
+    );
+    const messages = result.issues.map((issue) => issue.message);
+    expect(messages).toContain(
+      'The Wall finishing recipe on layer "Operation": feed 9000 mm/min is outside (0, 6000].',
+    );
+    expect(messages).toContain(
+      'The Wall finishing recipe on layer "Operation": plunge rate 8000 mm/min is outside (0, 6000].',
+    );
   });
 
   it('flags V-carve when the active bit is not conical (H.3)', () => {

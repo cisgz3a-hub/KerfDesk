@@ -67,7 +67,7 @@ function cncProject(args: {
       ...DEFAULT_CNC_MACHINE_CONFIG,
       stock: { ...DEFAULT_CNC_MACHINE_CONFIG.stock, ...args.stock },
     },
-    scene: { objects: [], layers: [layer] },
+    scene: { objects: [square()], layers: [layer] },
   };
 }
 
@@ -105,12 +105,26 @@ describe('detectCncMachineLimitWarnings (ADR-111)', () => {
   // ceiling, so the operator has to learn it here instead — the job still runs,
   // just clamped, with feeds that assume the higher RPM. Default ceiling is
   // 12000 RPM.
+  // ADR-233 Amd 1: the compiler now scales the feeds with the capped S, so
+  // the warning says the chip load holds and the cut runs slower (N6-P2-1).
   it('warns when a layer requests more spindle than the configured ceiling', () => {
     const [warning, ...rest] = detectCncMachineLimitWarnings(cncProject({ spindleRpm: 24000 }), {});
     expect(rest).toEqual([]);
-    expect(warning).toContain('24000');
-    expect(warning).toContain('12000');
-    expect(warning).toContain('compiled spindle setting is limited to 12000 RPM');
+    expect(warning).toBe(
+      'Layer "Operation" requests spindle 24000 RPM but the machine\'s Spindle maximum is ' +
+        '12000 RPM — the program sends S12000 and lowers its feed from 1000 to 500 mm/min and ' +
+        'plunge from 300 to 150 mm/min by the same ratio, so each tooth keeps the chip load ' +
+        'planned at 24000 RPM and the cut runs slower. To plan at the speed the machine runs, ' +
+        'set the spindle to 12000 RPM or reapply the material.',
+    );
+    expect(warning).not.toContain('Verify the controller-to-spindle scale');
+  });
+
+  // CNC audit v3 N6-P3-2: a layer with no artwork sends nothing.
+  it('ignores a layer with no artwork', () => {
+    const project = cncProject({ spindleRpm: 30000, feedMmPerMin: 5900 });
+    const empty = { ...project, scene: { ...project.scene, objects: [] } };
+    expect(detectCncMachineLimitWarnings(empty, { maxFeed: 3000 })).toEqual([]);
   });
 
   it('stays silent when the layer sits on the configured ceiling', () => {
@@ -170,15 +184,22 @@ describe('detectCncMachineLimitWarnings (ADR-111)', () => {
     const limits: ControllerSettingsSnapshot = {
       maxFeed: 10000,
       maxFeedX: 10000,
-      maxFeedY: 6000,
+      maxFeedY: 5000,
     };
     const [warning, ...rest] = detectCncMachineLimitWarnings(
-      cncProject({ feedMmPerMin: 8000 }),
+      cncProject({ feedMmPerMin: 5500 }),
       limits,
     );
     expect(rest).toEqual([]);
-    expect(warning).toContain('8000 mm/min');
-    expect(warning).toContain('6000 mm/min');
+    expect(warning).toContain('5500 mm/min');
+    expect(warning).toContain('5000 mm/min');
+  });
+
+  // The program never sends more than CNC Max feed (6000 here); the layer's
+  // own 8000 gets the preflight advisory instead.
+  it('compares the feed the program sends, capped at CNC Max feed', () => {
+    const limits: ControllerSettingsSnapshot = { maxFeed: 10000, maxFeedY: 6000 };
+    expect(detectCncMachineLimitWarnings(cncProject({ feedMmPerMin: 8000 }), limits)).toEqual([]);
   });
 
   it('is silent when the feed fits under the slower reported axis rate', () => {
@@ -215,6 +236,10 @@ describe('detectCncMachineLimitWarnings (ADR-111)', () => {
     expect(rest).toEqual([]);
     expect(warning).toContain('12000 RPM');
     expect(warning).toContain('10000 RPM');
+    // N6-P2-1's live sibling: name the chip-load rise and the remedy that fixes it.
+    expect(warning).toContain('each tooth takes 1.2× the planned chip load');
+    expect(warning).toContain('set Spindle maximum to 10000 RPM in Machine Setup');
+    expect(warning).not.toContain('Verify the controller-to-spindle scale');
   });
 
   it('is silent when the spindle RPM equals the reported $30 max', () => {
@@ -270,11 +295,25 @@ describe('detectCncMachineLimitWarnings with stage recipes', () => {
   const WALL_RECIPE = 'The Wall finishing recipe on layer "Operation"';
 
   it('names a recipe whose feed, plunge or RPM exceeds $110/$112/$30', () => {
-    const limits: ControllerSettingsSnapshot = { maxFeed: 2000, zMaxFeed: 500, maxPowerS: 24_000 };
-    const warnings = detectCncMachineLimitWarnings(withWallRecipe(libraryToolId, hot), limits);
+    // At the 12,000 RPM ceiling, so nothing is scaled and the program sends these.
+    const atCeiling = { ...hot, spindleRpm: 12_000 };
+    const limits: ControllerSettingsSnapshot = { maxFeed: 2000, zMaxFeed: 500, maxPowerS: 10_000 };
+    const warnings = detectCncMachineLimitWarnings(withWallRecipe(libraryToolId, atCeiling), limits);
     expect(warnings.some((w) => w.includes(`${WALL_RECIPE} requests feed 4000`))).toBe(true);
     expect(warnings.some((w) => w.includes(`${WALL_RECIPE} requests plunge 1500`))).toBe(true);
-    expect(warnings.some((w) => w.includes(`${WALL_RECIPE} requests spindle 30000`))).toBe(true);
+    expect(warnings.some((w) => w.includes(`${WALL_RECIPE} requests spindle 12000`))).toBe(true);
+  });
+
+  // ADR-233 Amd 1: above the ceiling the program sends S12000 and scales F4000
+  // to 1600 and plunge 1500 to 600, so only the plunge is over $112 and the
+  // ceiling line names the recipe.
+  it('compares the scaled recipe values when its RPM is above the ceiling', () => {
+    const limits: ControllerSettingsSnapshot = { maxFeed: 2000, zMaxFeed: 500, maxPowerS: 24_000 };
+    const warnings = detectCncMachineLimitWarnings(withWallRecipe(libraryToolId, hot), limits);
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain(`${WALL_RECIPE} requests plunge 600 mm/min`);
+    expect(warnings[1]).toContain(`${WALL_RECIPE} requests spindle 30000 RPM`);
+    expect(warnings[1]).toContain('feed from 4000 to 1600 mm/min and plunge from 1500 to 600');
   });
 
   it('compares recipe RPM with the configured spindle ceiling offline', () => {
@@ -328,8 +367,9 @@ describe('detectCncMachineLimitWarnings with a compiled job', () => {
     });
 
     expect(detectCncMachineLimitWarnings(project, limits, compiled(project))).toEqual([]);
-    // Without the compiled job the recipe still counts, as before.
-    expect(detectCncMachineLimitWarnings(project, limits)).toHaveLength(4);
+    // Without the compiled job the recipe still counts. Its 18000 RPM is
+    // capped to 12000, which $30 accepts, so three lines: feed, plunge, ceiling.
+    expect(detectCncMachineLimitWarnings(project, limits)).toHaveLength(3);
   });
 
   it('compares a Wall finishing recipe the job ran and names its layer', () => {
@@ -343,6 +383,14 @@ describe('detectCncMachineLimitWarnings with a compiled job', () => {
         "machine's reported max rate 3000 mm/min — the controller clamps to its limit, so the " +
         'cut runs slower than planned.',
     ]);
+  });
+
+  // CNC audit v3 N6-P3-2: a drill cycle sends no XY cutting feed.
+  it('ignores the feed of a drill layer, which the program never sends', () => {
+    const project = profileProject({ cutType: 'drill', feedMmPerMin: 4500, plungeMmPerMin: 300 });
+
+    expect(detectCncMachineLimitWarnings(project, limits, compiled(project))).toEqual([]);
+    expect(detectCncMachineLimitWarnings(project, limits)).toEqual([]);
   });
 
   it('names the layer whose own feed is above the limit', () => {

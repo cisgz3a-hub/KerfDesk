@@ -6,7 +6,9 @@
 //   1. At least one output layer exists.
 //   2. Spindle spin-up dwell is a non-negative finite duration.
 //   3. Per-layer CNC settings are sane: depth > 0, depth/pass > 0, feeds in
-//      (0, CNC max feed], spindle RPM in (0, spindleMaxRpm].
+//      (0, CNC max feed], and so are the stage recipes the job runs. An RPM
+//      above spindleMaxRpm is capped with its feeds (ADR-233 Amd 1); a group
+//      that would cut with the spindle at S0 is refused (cnc-spindle-off).
 //   4. All motion fits inside the bed (shared bounds scanner).
 //   5. No-go zones are respected (shared scanner — clamps matter on a router).
 //   6. Z is up on every XY rapid; no rapid plunges (findPlungedTravelIssues).
@@ -20,6 +22,7 @@ import {
   findDroppedCncLayers,
 } from '../cnc';
 import { cncMaxFeedMmPerMin } from '../cnc/cnc-head-feeds';
+import { cncStageRecipeRuns } from '../cnc/cnc-stage-recipe-runs';
 import { rampEntryPlungesByLayer, type RampEntryPlunges } from '../cnc/contour-ramp-entry';
 import { reliefRampFieldLabel } from '../cnc/relief-ramp-field';
 import { findCncVCarveEntryIssues } from '../cnc/vcarve-entry-diagnostics';
@@ -41,6 +44,11 @@ import {
 import { findCncMotionBoundsPreflightIssues } from './cnc-motion-bounds-preflight';
 import { hasCuttingMove } from './cutting-move';
 import { cncOpenContourIssues } from './cnc-open-contour-issues';
+import {
+  appendFeedIssue,
+  appendStageRecipeFeedIssues,
+  cncSpindleOffIssues,
+} from './cnc-rate-issues';
 import { cncStackedCopyIssues } from './cnc-stacked-copy-issues';
 import { cncProfileLeadPlungeIssues } from './cnc-profile-lead-plunge-issues';
 import { cncKeptPartCutIssues, cncProfileOpenPathIssues } from './cnc-profile-part-issues';
@@ -80,9 +88,13 @@ export function runCncPreflight(
     });
   }
   appendCncMachineIssues(config, issues);
+  const maxFeed = cncMaxFeedMmPerMin(project.device, config.params);
+  const recipeRuns = cncStageRecipeRuns(config, options.compiledJob);
   for (const layer of outputLayers) {
-    appendCncLayerIssues(layer, cncMaxFeedMmPerMin(project.device, config.params), config, issues);
+    appendCncLayerIssues(layer, maxFeed, config, issues);
+    appendStageRecipeFeedIssues(layer, maxFeed, recipeRuns, issues);
   }
+  issues.push(...cncSpindleOffIssues(project, outputLayers, options.compiledJob));
   appendSourceGeometryIssues(project, config, options, issues);
   appendRampEntryPlungeIssues(project, options.compiledJob, issues);
   issues.push(...cncProfileLeadPlungeIssues(options.compiledJob));
@@ -279,22 +291,15 @@ function appendCncLayerIssues(
       message: `Layer ${layer.id}: cut depth and depth per pass must be greater than 0.`,
     });
   }
-  appendFeedIssue(layer.id, 'feed', settings.feedMmPerMin, maxFeed, issues);
-  appendFeedIssue(layer.id, 'plunge rate', settings.plungeMmPerMin, maxFeed, issues);
-  // Only a non-positive RPM is a compile-integrity failure. Requesting MORE
-  // than the configured ceiling is not: capSpindle already clamps to
-  // Math.min(spindleRpm, spindleMaxRpm) at every compile site, so the program
-  // is producible and can never emit an out-of-range S word. Refusing it was a
-  // policy judgement (rule 7), and a narrow one - the shipped layer default
-  // equals the shipped ceiling, so lowering Spindle maximum put every
-  // hand-tuned layer over it at once. Job Review now warns that the job will
-  // run at the ceiling instead.
-  if (!(settings.spindleRpm > 0)) {
-    issues.push({
-      code: 'cnc-settings-invalid',
-      message: `Layer ${layer.id}: spindle RPM must be greater than 0.`,
-    });
-  }
+  appendFeedIssue(`Layer ${layer.id}`, 'feed', settings.feedMmPerMin, maxFeed, issues);
+  appendFeedIssue(`Layer ${layer.id}`, 'plunge rate', settings.plungeMmPerMin, maxFeed, issues);
+  // Requesting MORE RPM than the configured ceiling is not refused: every
+  // compile site caps S to Spindle maximum and scales the feed and plunge by
+  // the same ratio (ADR-233 Amd 1), so the program is producible, never sends
+  // an out-of-range S word and keeps the planned chip load. Refusing it was a
+  // policy judgement (rule 7), and a narrow one - lowering Spindle maximum put
+  // every hand-tuned layer over it at once. Job Review says what was capped.
+  // Only a non-positive RPM refuses (cncSpindleOffIssues below).
   // H.3: v-carve depth math is driven by the bit's included angle — a flat end
   // mill would gouge full-width trenches at the commanded depths. H.7: the
   // layer's own bit (falling back to the machine bit) is what matters.
@@ -309,20 +314,6 @@ function appendCncLayerIssues(
         'Pick a compatible bit in Startup Setup > Tool Plan.',
     });
   }
-}
-
-function appendFeedIssue(
-  layerId: string,
-  label: string,
-  value: number,
-  maxFeed: number,
-  issues: PreflightIssue[],
-): void {
-  if (value > 0 && value <= maxFeed) return;
-  issues.push({
-    code: 'cnc-settings-invalid',
-    message: `Layer ${layerId}: ${label} ${value} mm/min is outside (0, ${maxFeed}].`,
-  });
 }
 
 // See preflight.ts appendNonFiniteCoordIssues — a NaN/Infinity Z plunge or XY

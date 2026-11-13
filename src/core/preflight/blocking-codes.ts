@@ -16,6 +16,9 @@
 //     reconstruct a heightmap from the exact stored source data.
 //   - cnc-machine-params-invalid: malformed persisted/imported machine values
 //     cannot be formatted into truthful, streamable CNC bytes.
+//   - cnc-spindle-off: a cutting group whose spindle speed is 0 or less would
+//     send `M3 S0` and then cut, so the bit plunges without turning. No
+//     truthful program for that operation exists (ADR-233 Amd 1).
 //
 // Every other code is a heuristic policy judgment (out-of-bed, no-go-zone
 // collision, plunged travel, speed/power range, settings validity, ...). Those
@@ -47,5 +50,6 @@ export const COMPILE_INTEGRITY_PREFLIGHT_CODES: ReadonlySet<PreflightCode> = new
     'program-materialization-failed',
     'relief-materialization-failed',
     'cnc-machine-params-invalid',
+    'cnc-spindle-off',
   ],
 );

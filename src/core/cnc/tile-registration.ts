@@ -4,7 +4,7 @@ import type { CncMachineConfig, Vec2 } from '../scene';
 import { cncMaxFeedMmPerMin } from './cnc-head-feeds';
 import type { CncTile } from './cnc-tile';
 import type { EffectiveCncTileGrid } from './effective-cnc-tile-grid';
-import { capFeed, capSpindle } from './compile-cnc-helpers';
+import { cncCuttingRates } from './cnc-cutting-rates';
 import { coolantFields } from './coolant-fields';
 import { parkFields } from './motion-polish';
 import type { ResolvedTileRegistration } from './tile-registration-plan';
@@ -54,12 +54,18 @@ export function registrationGroupForTile(
     requestedDepthMm: settings.depthMm,
     registrationHoleDiameterMm: settings.holeDiameterMm,
     depthPerPassMm: settings.depthPerPassMm,
-    feedMmPerMin: capFeed(
-      isPeck ? Math.min(settings.feedMmPerMin, settings.plungeMmPerMin) : settings.feedMmPerMin,
+    // ADR-233 Amd 1: a capped spindle scales the feeds so the chip load holds.
+    ...cncCuttingRates(
+      {
+        feedMmPerMin: isPeck
+          ? Math.min(settings.feedMmPerMin, settings.plungeMmPerMin)
+          : settings.feedMmPerMin,
+        plungeMmPerMin: settings.plungeMmPerMin,
+        spindleRpm: settings.spindleRpm,
+      },
       maxFeed,
+      machine.params.spindleMaxRpm,
     ),
-    plungeMmPerMin: capFeed(settings.plungeMmPerMin, maxFeed),
-    spindleRpm: capSpindle(settings.spindleRpm, machine.params.spindleMaxRpm),
     spindleSpinupSec: Math.max(0, machine.params.spindleSpinupSec),
     safeZMm: Math.max(0, machine.params.safeZMm),
     ...coolantFields(machine),

@@ -67,6 +67,7 @@ describe('partitionSavePreflight', () => {
   it('is keyed off the canonical compile-integrity set', () => {
     expect([...COMPILE_INTEGRITY_PREFLIGHT_CODES].sort()).toEqual([
       'cnc-machine-params-invalid',
+      'cnc-spindle-off',
       'cnc-tool-geometry-invalid',
       'coordinate-unencodable',
       'empty-output',

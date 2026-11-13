@@ -3,16 +3,38 @@
 // Pure review information, never a gate or a measurement of physical motion/RPM.
 // Stage recipes (ADR-457) emit their own feed, plunge and RPM, so a recipe the
 // job runs is compared too and named with its layer (ADR-457 Amd 1 and 2).
+//
+// The values compared are the ones the program sends (CNC audit v3 N6-P3-2):
+// with the compiled job, each cutting group's own words; without it, each
+// output layer that has artwork, worked out the way the compiler would. A layer
+// with no artwork sends nothing, and a drill cycle sends no XY cutting feed.
 
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
-import type { Job } from '../../core/job';
-import { DEFAULT_CNC_LAYER_SETTINGS, type CncStock, type Project } from '../../core/scene';
+import { cncMaxFeedMmPerMin } from '../../core/cnc/cnc-head-feeds';
+import { cncCuttingRates } from '../../core/cnc/cnc-cutting-rates';
+import { cncStageRecipeRuns } from '../../core/cnc/cnc-stage-recipe-runs';
+import { effectiveGcodeFeedMmPerMin } from '../../core/gcode/feed-word';
+import type { CncGroup, Job } from '../../core/job';
 import {
-  CNC_CUTTING_STAGES,
-  cncCuttingStageLabel,
-  type CncCuttingStage,
-} from '../../core/scene/cnc-stage-recipe';
+  DEFAULT_CNC_LAYER_SETTINGS,
+  sceneObjectUsesOperation,
+  type CncCutType,
+  type CncMachineConfig,
+  type CncStock,
+  type Project,
+} from '../../core/scene';
+import { CNC_CUTTING_STAGES, cncCuttingStageLabel } from '../../core/scene/cnc-stage-recipe';
 import { reportedAxisFeedLimit } from './reported-axis-feed-limit';
+
+/** One operation's sent cutting words, named for the operator. */
+type CuttingRow = {
+  readonly source: string;
+  /** Null for a drill cycle, whose moves are all vertical at the plunge feed. */
+  readonly feedMmPerMin: number | null;
+  readonly plungeMmPerMin: number;
+  readonly spindleRpm: number;
+  readonly spindleCap?: CncGroup['spindleCap'];
+};
 
 export function detectCncMachineLimitWarnings(
   project: Project,
@@ -21,14 +43,14 @@ export function detectCncMachineLimitWarnings(
 ): ReadonlyArray<string> {
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc') return [];
-  const top = (key: CuttingValueKey): TopValue | null => maxOutputValue(project, key, job);
-  if (limits === null) return spindleVsConfiguredCeiling(project, top);
+  const rows = job === undefined ? layerRows(project, machine) : groupRows(project, job);
+  if (limits === null) return spindleVsConfiguredCeiling(machine, rows);
   return [
     ...stockVsBed(machine.stock, limits),
-    ...feedVsMax(top, limits),
-    ...plungeVsZMax(top, limits),
-    ...spindleVsMax(top, limits),
-    ...spindleVsConfiguredCeiling(project, top),
+    ...feedVsMax(rows, limits),
+    ...plungeVsZMax(rows, limits),
+    ...spindleVsMax(rows, limits),
+    ...spindleVsConfiguredCeiling(machine, rows),
   ];
 }
 
@@ -53,106 +75,158 @@ function stockVsBed(stock: CncStock, limits: ControllerSettingsSnapshot): Readon
   ];
 }
 
-type TopOf = (key: CuttingValueKey) => TopValue | null;
-
-function feedVsMax(topOf: TopOf, limits: ControllerSettingsSnapshot): ReadonlyArray<string> {
+function feedVsMax(
+  rows: ReadonlyArray<CuttingRow>,
+  limits: ControllerSettingsSnapshot,
+): ReadonlyArray<string> {
   const axisLimit = reportedAxisFeedLimit(limits);
   if (axisLimit === null) return [];
-  const top = topOf('feedMmPerMin');
+  const top = topRow(rows, (row) => row.feedMmPerMin);
   if (top === null || top.value <= axisLimit) return [];
   return [
-    `${top.source} requests feed ${top.value} mm/min, above the machine's reported max rate ` +
+    `${top.row.source} requests feed ${feedText(top.value)} mm/min, above the machine's reported max rate ` +
       `${axisLimit} mm/min — the controller clamps to its limit, so the cut ` +
       'runs slower than planned.',
   ];
 }
 
-function plungeVsZMax(topOf: TopOf, limits: ControllerSettingsSnapshot): ReadonlyArray<string> {
+function plungeVsZMax(
+  rows: ReadonlyArray<CuttingRow>,
+  limits: ControllerSettingsSnapshot,
+): ReadonlyArray<string> {
   if (limits.zMaxFeed === undefined) return [];
-  const top = topOf('plungeMmPerMin');
+  const top = topRow(rows, (row) => row.plungeMmPerMin);
   if (top === null || top.value <= limits.zMaxFeed) return [];
   return [
-    `${top.source} requests plunge ${top.value} mm/min, above the machine's reported Z max rate ($112) ` +
+    `${top.row.source} requests plunge ${feedText(top.value)} mm/min, above the machine's reported Z max rate ($112) ` +
       `${limits.zMaxFeed} mm/min — the controller clamps to its limit, so plunges ` +
       'run slower than planned.',
   ];
 }
 
 // The app's OWN configured ceiling, distinct from the controller's reported $30
-// above. capSpindle limits the compiled setting, not measured physical RPM.
-// Preflight used to refuse this outright; it is an advisory now.
-function spindleVsConfiguredCeiling(project: Project, topOf: TopOf): ReadonlyArray<string> {
-  const machine = project.machine;
-  if (machine === undefined || machine.kind !== 'cnc') return [];
+// below. Preflight used to refuse this outright; it is an advisory now, and
+// since ADR-233 Amd 1 the compiler scales the feeds with the capped S, so the
+// chip load holds and the cut runs slower. Say exactly that.
+function spindleVsConfiguredCeiling(
+  machine: CncMachineConfig,
+  rows: ReadonlyArray<CuttingRow>,
+): ReadonlyArray<string> {
+  const top = topRow(rows, (row) => row.spindleCap?.requestedRpm ?? null);
+  const cap = top?.row.spindleCap;
+  if (top === null || cap === undefined) return [];
   const ceiling = machine.params.spindleMaxRpm;
-  const top = topOf('spindleRpm');
-  if (top === null || top.value <= ceiling) return [];
+  const feed =
+    top.row.feedMmPerMin === null
+      ? ''
+      : `feed from ${feedText(cap.requestedFeedMmPerMin)} to ${feedText(top.row.feedMmPerMin)} mm/min and `;
   return [
-    `${top.source} requests spindle ${top.value} RPM but the machine's Spindle maximum is ` +
-      `${ceiling} RPM — the compiled spindle setting is limited to ${ceiling} RPM; ` +
-      'actual spindle RPM is not measured. Verify the controller-to-spindle scale.',
+    `${top.row.source} requests spindle ${cap.requestedRpm} RPM but the machine's Spindle maximum is ` +
+      `${ceiling} RPM — the program sends S${ceiling} and lowers its ${feed}plunge from ` +
+      `${feedText(cap.requestedPlungeMmPerMin)} to ${feedText(top.row.plungeMmPerMin)} mm/min ` +
+      `by the same ratio, so each tooth keeps the chip load planned at ${cap.requestedRpm} RPM and ` +
+      `the cut runs slower. To plan at the speed the machine runs, set the spindle to ${ceiling} RPM ` +
+      'or reapply the material.',
   ];
 }
 
-function spindleVsMax(topOf: TopOf, limits: ControllerSettingsSnapshot): ReadonlyArray<string> {
-  if (limits.maxPowerS === undefined) return [];
-  const top = topOf('spindleRpm');
-  if (top === null || top.value <= limits.maxPowerS) return [];
+// GRBL takes `$30` as the S value for full output (ADR-362 item 6), so it is
+// not always an RPM: a hybrid laser reports 1000. The program is compiled
+// without it, so its feeds are the ones planned at the sent S. When `$30` is the
+// spindle's real top speed, each tooth takes S / $30 times the planned chip load.
+function spindleVsMax(
+  rows: ReadonlyArray<CuttingRow>,
+  limits: ControllerSettingsSnapshot,
+): ReadonlyArray<string> {
+  const maxS = limits.maxPowerS;
+  if (maxS === undefined) return [];
+  const top = topRow(rows, (row) => row.spindleRpm);
+  if (top === null || top.value <= maxS) return [];
+  const ratio = top.value / maxS;
   return [
-    `${top.source} requests spindle ${top.value} RPM, above the machine's reported max ($30) ` +
-      `${limits.maxPowerS} RPM. On GRBL, S commands above $30 use maximum PWM output; ` +
-      'actual spindle RPM is not measured. Verify the controller-to-spindle scale.',
+    `${top.row.source} requests spindle ${top.value} RPM, above the machine's reported max ($30) ` +
+      `${maxS} RPM. On GRBL, S commands above $30 use maximum PWM output. If ${maxS} RPM is the ` +
+      `spindle's real top speed, the feeds stay as planned at ${top.value} RPM, so each tooth takes ` +
+      `${ratio.toFixed(1)}× the planned chip load: set Spindle maximum to ${maxS} RPM in Machine ` +
+      'Setup and KerfDesk lowers the feeds to match. Actual spindle RPM is not measured.',
   ];
 }
 
-// The largest value of one CNC cutting setting among layers that actually emit
-// (output on), including the stage recipes the job runs. Null when no output
-// layer exists: nothing to compare, so no advisory. A tie keeps the layer.
-type CuttingValueKey = 'feedMmPerMin' | 'plungeMmPerMin' | 'spindleRpm';
-type TopValue = { readonly value: number; readonly source: string };
+// The largest value among the rows; a tie keeps the earlier row, so a layer
+// is named before its own recipes. Null when no row has a value.
+function topRow(
+  rows: ReadonlyArray<CuttingRow>,
+  pick: (row: CuttingRow) => number | null,
+): { readonly row: CuttingRow; readonly value: number } | null {
+  let top: { readonly row: CuttingRow; readonly value: number } | null = null;
+  for (const row of rows) {
+    const value = pick(row);
+    if (value !== null && (top === null || value > top.value)) top = { row, value };
+  }
+  return top;
+}
 
-function maxOutputValue(project: Project, key: CuttingValueKey, job?: Job): TopValue | null {
-  const runs = recipeRuns(project, job);
-  const candidates: TopValue[] = [];
+function feedText(feedMmPerMin: number): string {
+  return String(effectiveGcodeFeedMmPerMin(feedMmPerMin));
+}
+
+// With the compiled job: each cutting group as the program sends it.
+function groupRows(project: Project, job: Job): ReadonlyArray<CuttingRow> {
+  const rows: CuttingRow[] = [];
+  for (const group of job.groups) {
+    if (group.kind !== 'cnc' || group.passes.length === 0) continue;
+    const name =
+      project.scene.layers.find((layer) => layer.id === group.layerId)?.name ?? group.layerId;
+    rows.push({
+      source:
+        group.cuttingStage === undefined
+          ? `Layer "${name}"`
+          : `The ${cncCuttingStageLabel(group.cuttingStage)} recipe on layer "${name}"`,
+      feedMmPerMin: group.cutType === 'drill' ? null : group.feedMmPerMin,
+      plungeMmPerMin: group.plungeMmPerMin,
+      spindleRpm: group.spindleRpm,
+      ...(group.spindleCap === undefined ? {} : { spindleCap: group.spindleCap }),
+    });
+  }
+  return rows;
+}
+
+// Without it: every output layer with artwork, and the stage recipes it can
+// run, through the compiler's own rate rule (cncCuttingRates).
+function layerRows(project: Project, machine: CncMachineConfig): ReadonlyArray<CuttingRow> {
+  const runs = cncStageRecipeRuns(machine, undefined);
+  const maxFeed = cncMaxFeedMmPerMin(project.device, machine.params);
+  const rate = (
+    source: string,
+    cutType: CncCutType,
+    values: { feedMmPerMin: number; plungeMmPerMin: number; spindleRpm: number },
+  ): CuttingRow => {
+    const drill = cutType === 'drill';
+    const rates = cncCuttingRates(
+      { ...values, feedMmPerMin: drill ? values.plungeMmPerMin : values.feedMmPerMin },
+      maxFeed,
+      machine.params.spindleMaxRpm,
+    );
+    return {
+      source,
+      feedMmPerMin: drill ? null : rates.feedMmPerMin,
+      plungeMmPerMin: rates.plungeMmPerMin,
+      spindleRpm: rates.spindleRpm,
+      ...(rates.spindleCap === undefined ? {} : { spindleCap: rates.spindleCap }),
+    };
+  };
+  const rows: CuttingRow[] = [];
   for (const layer of project.scene.layers) {
     if (!layer.output) continue;
+    if (!project.scene.objects.some((object) => sceneObjectUsesOperation(object, layer))) continue;
     const cnc = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
-    candidates.push({ value: cnc[key], source: `Layer "${layer.name}"` });
+    rows.push(rate(`Layer "${layer.name}"`, cnc.cutType, cnc));
     for (const stage of CNC_CUTTING_STAGES) {
       const recipe = cnc.stageRecipes?.[stage];
       if (recipe === undefined || !runs(layer.id, stage, recipe.toolId)) continue;
-      candidates.push({
-        value: recipe[key],
-        source: `The ${cncCuttingStageLabel(stage)} recipe on layer "${layer.name}"`,
-      });
+      const source = `The ${cncCuttingStageLabel(stage)} recipe on layer "${layer.name}"`;
+      rows.push(rate(source, cnc.cutType, recipe));
     }
   }
-  return candidates.reduce<TopValue | null>(
-    (top, candidate) => (top === null || candidate.value > top.value ? candidate : top),
-    null,
-  );
-}
-
-// A layer keeps a recipe its cut type no longer uses (ADR-481), and the
-// compiler applies one only to a stage cut with the recipe's cutter. With the
-// compiled job, a recipe counts where a group of its layer ran that stage.
-// Without one, a recipe counts when its cutter is in the tool library, since a
-// recipe for an absent cutter cannot emit.
-function recipeRuns(
-  project: Project,
-  job: Job | undefined,
-): (layerId: string, stage: CncCuttingStage, toolId: string) => boolean {
-  if (job === undefined) {
-    const machine = project.machine;
-    const toolIds = new Set(machine?.kind === 'cnc' ? machine.tools.map((tool) => tool.id) : []);
-    return (_layerId, _stage, toolId) => toolIds.has(toolId);
-  }
-  const ran = new Map<string, Set<CncCuttingStage>>();
-  for (const group of job.groups) {
-    if (group.kind !== 'cnc' || group.cuttingStage === undefined) continue;
-    const stages = ran.get(group.layerId) ?? new Set<CncCuttingStage>();
-    stages.add(group.cuttingStage);
-    ran.set(group.layerId, stages);
-  }
-  return (layerId, stage) => ran.get(layerId)?.has(stage) === true;
+  return rows;
 }

@@ -260,8 +260,25 @@ function cncGroupSummary(group: CncGroup): string {
     `${tool} · ${group.passes.length} ${plural(group.passes.length, 'pass', 'passes')}` +
     ` · ${formatGroupedUpTo3Decimals(effectiveGcodeFeedMmPerMin(group.feedMmPerMin))} mm/min feed` +
     ` · ${formatGroupedUpTo3Decimals(effectiveGcodeFeedMmPerMin(group.plungeMmPerMin))} mm/min plunge` +
-    ` · ${formatGroupedUpTo3Decimals(Math.max(0, Math.round(group.spindleRpm)))} RPM · ${coolant}` +
+    ` · ${formatGroupedUpTo3Decimals(Math.max(0, Math.round(group.spindleRpm)))} RPM` +
+    spindleCapSummary(group) +
+    ` · ${coolant}` +
     nominalChiploadSummary(group)
+  );
+}
+
+// ADR-233 Amd 1: the operation asked for more RPM than the machine's Spindle
+// maximum. Say what was asked and that the feeds were lowered with it, so the
+// lower feed is not mistaken for the operation's own setting.
+function spindleCapSummary(group: CncGroup): string {
+  const cap = group.spindleCap;
+  if (cap === undefined) return '';
+  const feed = (value: number): string =>
+    formatGroupedUpTo3Decimals(effectiveGcodeFeedMmPerMin(value));
+  return (
+    ` (capped from ${formatGroupedUpTo3Decimals(Math.round(cap.requestedRpm))} RPM requested; ` +
+    `feed lowered from ${feed(cap.requestedFeedMmPerMin)} and plunge from ` +
+    `${feed(cap.requestedPlungeMmPerMin)} mm/min by the same ratio to hold the chip load)`
   );
 }
 

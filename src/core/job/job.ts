@@ -404,6 +404,14 @@ export type CncGroup = {
   readonly feedMmPerMin: number; // already capped to device.maxFeed
   readonly plungeMmPerMin: number;
   readonly spindleRpm: number; // S value; capped to machine spindleMaxRpm
+  // ADR-233 Amd 1: present only when the operation asked for more RPM than the
+  // machine's Spindle maximum. S is capped and feedMmPerMin/plungeMmPerMin are
+  // scaled by the same ratio so the chip load holds; these are the asked values.
+  readonly spindleCap?: {
+    readonly requestedRpm: number;
+    readonly requestedFeedMmPerMin: number;
+    readonly requestedPlungeMmPerMin: number;
+  };
   readonly spindleSpinupSec: number; // dwell after spindle start / speed change
   // Machine-wide coolant (a job-level setting copied onto every group). Absent
   // = 'off'; the emitter reads the first group's value once. Optional so 'off'

@@ -12,7 +12,6 @@ export type CncGroupCompileOptions = {
   readonly retractBetweenPasses?: boolean;
 };
 
-const MIN_FEED_MM_PER_MIN = 1;
 const COORD_EPS = 1e-9;
 
 export function contourPassFromPolyline(polyline: Polyline, zMm: number): CncContourPass {
@@ -70,15 +69,7 @@ export function resolveRetractBetweenPasses(settings: CncLayerSettings): boolean
   return eligible ? (settings.retractBetweenPasses ?? true) : false;
 }
 
-export function capFeed(feedMmPerMin: number, maxFeed: number): number {
-  if (!Number.isFinite(feedMmPerMin) || feedMmPerMin <= 0) return MIN_FEED_MM_PER_MIN;
-  return Math.min(feedMmPerMin, maxFeed);
-}
-
-export function capSpindle(spindleRpm: number, spindleMaxRpm: number): number {
-  if (!Number.isFinite(spindleRpm) || spindleRpm <= 0) return 0;
-  return Math.min(spindleRpm, spindleMaxRpm);
-}
+export { capFeed, capSpindle } from './cnc-cutting-rates';
 
 function ensureRingClosure(polyline: Polyline): ReadonlyArray<Vec2> {
   const first = polyline.points[0];

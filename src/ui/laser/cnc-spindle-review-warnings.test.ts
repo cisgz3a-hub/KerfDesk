@@ -4,10 +4,37 @@ import {
   createProject,
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
   type Project,
 } from '../../core/scene';
 import { detectCncMachineLimitWarnings } from './cnc-machine-limit-warnings';
 import { detectMachineJobWarnings } from './machine-job-warnings';
+
+// The warnings read what the program sends, so the layer needs artwork.
+const PART: ImportedSvg = {
+  kind: 'imported-svg',
+  id: 'part',
+  source: 'part.svg',
+  bounds: { minX: 10, minY: 10, maxX: 30, maxY: 30 },
+  transform: IDENTITY_TRANSFORM,
+  paths: [
+    {
+      color: '#ff0000',
+      polylines: [
+        {
+          closed: true,
+          points: [
+            { x: 10, y: 10 },
+            { x: 30, y: 10 },
+            { x: 30, y: 30 },
+            { x: 10, y: 30 },
+          ],
+        },
+      ],
+    },
+  ],
+};
 
 function cncProject(requestedRpm = 12000, ceilingRpm = 6000, isOutput = true): Project {
   const layer = {
@@ -21,7 +48,7 @@ function cncProject(requestedRpm = 12000, ceilingRpm = 6000, isOutput = true): P
       ...DEFAULT_CNC_MACHINE_CONFIG,
       params: { ...DEFAULT_CNC_MACHINE_CONFIG.params, spindleMaxRpm: ceilingRpm },
     },
-    scene: { layers: [layer], objects: [] },
+    scene: { layers: [layer], objects: [PART] },
   };
 }
 
@@ -33,8 +60,10 @@ describe('CNC spindle review advisories', () => {
       expect(rest).toEqual([]);
       expect(warning).toContain('12000 RPM');
       expect(warning).toContain('6000 RPM');
-      expect(warning).toContain('compiled spindle setting is limited to 6000 RPM');
-      expect(warning).toContain('actual spindle RPM is not measured');
+      // ADR-233 Amd 1: the feeds are scaled with S, so the chip load holds.
+      expect(warning).toContain('the program sends S6000');
+      expect(warning).toContain('keeps the chip load planned at 12000 RPM');
+      expect(warning).not.toContain('Verify the controller-to-spindle scale');
       expect(warning).not.toContain('will run at');
     },
   );

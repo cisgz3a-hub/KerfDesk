@@ -7,8 +7,14 @@
 // spindle-ceiling advisory cannot explain generic feed/plunge defaults. This
 // detector provides that guidance without a connection. Advisory,
 // not a gate — the defaults are legitimate once the operator confirms them.
+// A layer with no artwork sends nothing, so it is not named (CNC audit v3
+// N6-P3-2, as the angled-bit advisory already skips it).
 
-import { DEFAULT_CNC_LAYER_SETTINGS, type Project } from '../../core/scene';
+import {
+  DEFAULT_CNC_LAYER_SETTINGS,
+  sceneObjectUsesOperation,
+  type Project,
+} from '../../core/scene';
 
 export function detectCncDefaultFeedWarnings(project: Project): ReadonlyArray<string> {
   const machine = project.machine;
@@ -17,6 +23,7 @@ export function detectCncDefaultFeedWarnings(project: Project): ReadonlyArray<st
   const warnings: string[] = [];
   for (const layer of project.scene.layers) {
     if (!layer.output) continue;
+    if (!project.scene.objects.some((object) => sceneObjectUsesOperation(object, layer))) continue;
     const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
     // Compared against the constants (not magic numbers) so they stay in sync if
     // the defaults change. Silent once a material is picked or the feeds are

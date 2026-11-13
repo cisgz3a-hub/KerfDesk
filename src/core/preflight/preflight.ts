@@ -87,6 +87,8 @@ export type PreflightCode =
   | 'print-and-cut-registration-invalid'
   | 'cnc-settings-invalid'
   | 'cnc-machine-params-invalid'
+  // Compile integrity (ADR-233 Amd 1): a cutting group whose spindle is S0.
+  | 'cnc-spindle-off'
   | 'cnc-helix-entry-invalid'
   | 'cnc-vcarve-entry-fallback'
   // Advisory-only (ADR-471): a ramp entry left passes whose paths are too
