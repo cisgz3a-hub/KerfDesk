@@ -1,3 +1,4 @@
+import { clickDialogButtonIfReady } from './dialog-button-now';
 import { expect, type Page } from './kerfdesk-test';
 
 /**
@@ -20,10 +21,7 @@ export async function finishGcodeSave(
     .poll(
       async () => {
         if (await saved()) return true;
-        if ((await saveAs.isVisible()) && (await saveAs.isEnabled())) {
-          // The dialog may close under the click when the save finishes first.
-          await saveAs.click({ timeout: 2_000 }).catch(() => undefined);
-        }
+        await clickDialogButtonIfReady(saveAs);
         return saved();
       },
       { timeout },
