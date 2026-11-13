@@ -148,7 +148,8 @@ describe('FeedsCalculatorRow', () => {
       expect(next).toMatchObject({
         feedMmPerMin: 300,
         plungeMmPerMin: 120,
-        spindleRpm: 12_000,
+        // ADR-256 Amd 1: 300 mm/min meets the 1/8" MDF chart at the spindle's 3,000 RPM floor.
+        spindleRpm: 3_000,
         depthPerPassMm: 0.75,
         feedSource: {
           kind: 'material-recipe',
@@ -221,7 +222,7 @@ describe('FeedsCalculatorRow', () => {
       xMaxFeedMmPerMin: 500,
       yMaxFeedMmPerMin: 450,
       zMaxFeedMmPerMin: 80,
-      spindleMaxRpm: 10_000,
+      spindleMaxRpm: 2_500,
     });
     const onCommitSettings = vi.fn();
     const { host, root } = await render(onCommitSettings);
@@ -230,7 +231,7 @@ describe('FeedsCalculatorRow', () => {
       expect(onCommitSettings.mock.calls[0]?.[0]).toMatchObject({
         feedMmPerMin: 300,
         plungeMmPerMin: 80,
-        spindleRpm: 10_000,
+        spindleRpm: 2_500,
       });
     } finally {
       await act(async () => root.unmount());
@@ -263,7 +264,7 @@ describe('FeedsCalculatorRow', () => {
       expect(onCommitSettings.mock.calls[0]?.[0]).toMatchObject({
         feedMmPerMin: 300,
         plungeMmPerMin: 120,
-        spindleRpm: 12_000,
+        spindleRpm: 3_000,
         depthPerPassMm: 0.75,
         feedSource: { kind: 'material-recipe', materialKey: 'plywood-mdf', fluteCount: 2 },
       });
@@ -282,7 +283,7 @@ describe('FeedsCalculatorRow', () => {
         ...project,
         machine: {
           ...project.machine,
-          params: { ...project.machine.params, spindleMaxRpm: 9_000 },
+          params: { ...project.machine.params, spindleMaxRpm: 2_500 },
         },
       },
     });
@@ -290,7 +291,7 @@ describe('FeedsCalculatorRow', () => {
     const { host, root } = await render(onCommitSettings);
     try {
       await apply(host);
-      expect(onCommitSettings.mock.calls[0]?.[0]).toMatchObject({ spindleRpm: 9_000 });
+      expect(onCommitSettings.mock.calls[0]?.[0]).toMatchObject({ spindleRpm: 2_500 });
     } finally {
       await act(async () => root.unmount());
       host.remove();

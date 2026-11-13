@@ -132,6 +132,7 @@ function refreshMaterialRecipeLayer(
     spindleRpm: settings.spindleRpm,
     machineSpindleMaxRpm: context.machine.params.spindleMaxRpm,
     fluteCount,
+    automaticSpindleRpm: true,
     ...(context.liveCaps === null ? {} : { liveCaps: context.liveCaps }),
   });
   if (patch !== null) return layerWithAutomaticPatch(layer, settings, patch);

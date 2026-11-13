@@ -40,6 +40,7 @@ export function FeedsCalculatorRow(props: {
             materialKey: material,
             tool,
             spindleRpm: rpm,
+            automaticSpindleRpm: props.settings.feedSource !== undefined,
             profile,
             machineParams: machine.params,
             liveCaps,

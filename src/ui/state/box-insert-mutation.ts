@@ -130,6 +130,7 @@ export function cutFreshCncOperationsWithActiveBit<T extends { readonly project:
             spindleRpm: settings.spindleRpm,
             machineSpindleMaxRpm: machine.params.spindleMaxRpm,
             fluteCount: activeTool.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT,
+            automaticSpindleRpm: true,
             ...(liveCaps === null ? {} : { liveCaps }),
           })
         : null;

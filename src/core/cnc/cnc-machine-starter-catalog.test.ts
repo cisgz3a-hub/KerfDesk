@@ -23,15 +23,16 @@ describe('CNC_MACHINE_STARTER_CATALOG', () => {
       starter: {
         confidence: 'unverified-starter',
         operatorNotice:
-          'Unverified cutting starter: retained legacy values for a 3.175 mm 2-flute cutter and assumed 500 W spindle. Public specifications do not provide this recipe, and no attributable physical cutting record is attached. Confirm the fitted spindle, bit, stock and cut before production.',
+          'Unverified cutting starter for a 3.175 mm 2-flute cutter and assumed 500 W spindle: feed held at 300 mm/min with the spindle at its 3,000 RPM minimum, so each tooth takes about 0.05 mm. Public specifications do not provide this recipe, and no attributable physical cutting record is attached. Confirm the fitted spindle, bit, stock and cut before production.',
         tool: { toolId: 'em-3175', diameterMm: 3.175, fluteCount: 2 },
         material: { key: 'plywood-mdf', label: 'Wood / MDF' },
         values: {
           feedMmPerMin: 300,
           plungeMmPerMin: 250,
-          spindleRpm: 12000,
+          spindleRpm: 3000,
           depthPerPassMm: 0.75,
         },
+        spindleMinRpm: 3000,
       },
     });
   });
@@ -57,7 +58,7 @@ describe('CNC_MACHINE_STARTER_CATALOG', () => {
   it('looks up persisted starter provenance by id', () => {
     expect(findCncMachineStarterById('neotronics-4040-shallow-wood-mdf')).toMatchObject({
       label: 'Neotronics 4040 shallow wood / MDF starter',
-      revision: 2,
+      revision: 3,
     });
     expect(findCncMachineStarterById('unknown-starter')).toBeNull();
   });

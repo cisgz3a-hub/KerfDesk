@@ -27,12 +27,12 @@ function expect4040Starter(color: string): void {
     toolId: 'em-3175',
     feedMmPerMin: 300,
     plungeMmPerMin: 250,
-    spindleRpm: 12_000,
+    spindleRpm: 3_000,
     depthPerPassMm: 0.75,
     feedSource: {
       kind: 'machine-starter',
       starterId: 'neotronics-4040-shallow-wood-mdf',
-      revision: 2,
+      revision: 3,
     },
   });
 }
@@ -98,7 +98,7 @@ describe('4040 machine-aware CNC starters', () => {
       xMaxFeedMmPerMin: 500,
       yMaxFeedMmPerMin: 250,
       zMaxFeedMmPerMin: 80,
-      spindleMaxRpm: 10_000,
+      spindleMaxRpm: 2_500,
     });
 
     useStore.getState().createManualLayer('#222222');
@@ -107,12 +107,12 @@ describe('4040 machine-aware CNC starters', () => {
     expect(layers.find((layer) => layer.color === '#111111')?.cnc).toMatchObject({
       feedMmPerMin: 300,
       plungeMmPerMin: 250,
-      spindleRpm: 12_000,
+      spindleRpm: 3_000,
     });
     expect(layers.find((layer) => layer.color === '#222222')?.cnc).toMatchObject({
       feedMmPerMin: 250,
       plungeMmPerMin: 80,
-      spindleRpm: 10_000,
+      spindleRpm: 2_500,
     });
   });
 
