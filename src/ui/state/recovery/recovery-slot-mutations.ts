@@ -1,4 +1,5 @@
 import {
+  recordControllerRestart,
   settleLinkLossRestart,
   type JobInterruption,
   type LinkLossRestartEvidence,
@@ -129,10 +130,12 @@ export function interruptRunMutation(
  * restarted gets the planner step-back, one that kept running loses the
  * held-back backlog (ADR-398 Amendment 3). Only the saved, unclaimed capsule
  * still waiting for that verdict changes; its execution history keeps the
- * record made at the stop. */
+ * record made at the stop. A CNC capsule (`cnc-restart`) records the sign
+ * instead, for its retained-position check (ADR-215 Amendment 4). */
 export function settleLinkLossRestartMutation(
   expected: { readonly runId: RunId; readonly revision: number },
   evidence: LinkLossRestartEvidence,
+  mode: 'laser-backlog' | 'cnc-restart' = 'laser-backlog',
 ): (slots: PersistedRecoverySlots) => SlotMutation<boolean> {
   return (slots) => {
     const capsule = slots.recoveryCapsule;
@@ -143,7 +146,10 @@ export function settleLinkLossRestartMutation(
     ) {
       return unchanged(slots, false);
     }
-    const interruption = settleLinkLossRestart(capsule.interruption, evidence);
+    const interruption =
+      mode === 'cnc-restart'
+        ? recordControllerRestart(capsule.interruption, evidence.sign)
+        : settleLinkLossRestart(capsule.interruption, evidence);
     if (interruption === null) return unchanged(slots, false);
     const revision = slots.revision + 1;
     return {

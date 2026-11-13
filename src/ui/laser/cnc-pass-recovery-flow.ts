@@ -42,9 +42,17 @@ import {
   streamCncRecoveryProgram,
   type CncRecoveryStreamPlan,
 } from './cnc-supervised-recovery-stream';
-import { mergeCncRecoveryWarnings } from './merge-cnc-recovery-warnings';
+import { mergeCncRecoveryWarnings, withoutOmittedLayerIssues } from './merge-cnc-recovery-warnings';
 import { cncRecoveryOpenProjectIssue } from './cnc-recovery-open-project';
 import { refuseCncRecoveryStartBit } from './cnc-recovery-start-bit';
+import {
+  cncKeptWorkZNote,
+  cncRecoveryBitLines,
+  cncRecoveryWorkZ,
+  liveCncRetainedWorkZIssue,
+} from './cnc-recovery-work-z';
+import { CNC_NO_WORK_ZERO_START_MESSAGE } from './cnc-start-advisories';
+import { useStore } from '../state/store';
 import { partitionEmitPreflight } from './start-job-readiness-policy';
 import { prepareArchivedRecoverySource, type PreparedRecoverySource } from './start-job-source';
 
@@ -137,7 +145,8 @@ function planPassRecovery(
     return null;
   }
   // A resume in a later operation streams only its bit, with no M0 before it.
-  if (refuseCncRecoveryStartBit(source, resume.job)) return null;
+  if (refuseCncRecoveryStartBit(source, resume.job, capsule)) return null;
+  const workZ = cncRecoveryWorkZ(source.controllerSnapshot, capsule);
   const emitted = emitPreparedGcode(
     { ...source.prepared, job: resume.job },
     resumeEmitOptions(capsule, source),
@@ -148,15 +157,24 @@ function planPassRecovery(
   // out-of-bed, no-go-zone, plunged travel, speed range — and stranded a
   // partially-cut workpiece. Those are demoted into the warnings the operator
   // confirms, which also archives them in the run's provenance record.
-  const emitSplit = partitionEmitPreflight(emitted.preflight);
+  const emitSplit = partitionEmitPreflight(withoutOmittedLayerIssues(emitted.preflight));
   if (emitSplit.blocking.length > 0) {
     const messages = emitSplit.blocking.map((message) => `• ${message}`).join('\n');
     jobAwareAlert(`Cannot start CNC recovery:\n\n${messages}`);
     return null;
   }
-  const warnings = mergeCncRecoveryWarnings(source.warnings, emitSplit.warnings);
+  const warnings = withKeptWorkZNote(
+    mergeCncRecoveryWarnings(source.warnings, emitSplit.warnings),
+    cncKeptWorkZNote(source.project, workZ),
+  );
   if (!confirmWarnings(warnings)) return null;
-  if (!confirmPlan(review, resume)) return null;
+  const bitLines = cncRecoveryBitLines(
+    source.project,
+    resume.job,
+    workZ,
+    source.controllerSnapshot,
+  );
+  if (!confirmPlan(review, resume, bitLines)) return null;
   return passRecoveryStreamPlan(
     capsule,
     review,
@@ -221,20 +239,37 @@ function liveRetainedPositionIssue(capsule: RecoveryCapsule): string | null {
     capsule,
     laser.wcoCache,
     laser.reportUnitsUnconfirmed === true ? undefined : laser.controllerSettings?.reportInches,
+    liveCncRetainedWorkZIssue(laser, capsule, useStore.getState().project),
   );
+}
+
+// The Abort's reset voided the Work Z record, so Start's checks say no work
+// zero is set; where the controller kept the zero, say which one is used.
+function withKeptWorkZNote(
+  warnings: ReadonlyArray<string>,
+  note: string | null,
+): ReadonlyArray<string> {
+  if (note === null) return warnings;
+  return warnings.map((warning) => (warning === CNC_NO_WORK_ZERO_START_MESSAGE ? note : warning));
 }
 
 function confirmPlan(
   review: CncPassRecoveryReview,
   resume: Extract<ReturnType<typeof buildCncPassResumeJob>, { kind: 'resume-job' }>,
+  bitLines: ReadonlyArray<string>,
 ): boolean {
   const boundaryGroup = resume.job.groups[0];
   if (boundaryGroup?.kind !== 'cnc') return false;
   return jobAwareConfirm(
-    passRecoveryConfirmation(review, resume, {
-      spindleRpm: boundaryGroup.spindleRpm,
-      spindleSpinupSec: boundaryGroup.spindleSpinupSec,
-    }),
+    passRecoveryConfirmation(
+      review,
+      resume,
+      {
+        spindleRpm: boundaryGroup.spindleRpm,
+        spindleSpinupSec: boundaryGroup.spindleSpinupSec,
+      },
+      bitLines,
+    ),
   );
 }
 

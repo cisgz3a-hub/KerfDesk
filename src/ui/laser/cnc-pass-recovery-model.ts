@@ -57,6 +57,7 @@ export function cncPassRecoveryDefaultPoint(capsule: RecoveryCapsule): CncResume
     streamingMode: artifact.controller.streamingMode,
     rxBufferBytes: artifact.controller.rxBufferBytes,
     plannerBlocks: recordedPlannerBlocks(artifact),
+    heldAtToolChange: capsule.interruption.heldAtToolChange === true,
   });
 }
 
@@ -71,6 +72,7 @@ export function buildCncPassRecoveryModel(
   capsule: RecoveryCapsule,
   liveWco: WorkCoordinateOffset | null,
   liveReportInches?: boolean,
+  workZIssue: string | null = null,
 ): CncPassRecoveryModel {
   const artifact = capsule.artifact;
   if (artifact.machineKind !== 'cnc') {
@@ -83,7 +85,7 @@ export function buildCncPassRecoveryModel(
   const spans = deriveCncArtifactPassSpans(artifact);
   const lastPossiblePass =
     resumePoint?.kind === 'resume-at-pass' && spans !== null
-      ? passContainingRawLine(spans, resumePoint.lastPossiblyExecutedRawLine)
+      ? lastPassBegunBy(spans, resumePoint.lastPossiblyExecutedRawLine)
       : null;
   const passes = collectPassOptions(artifact.prepared.job.groups, resumePoint, lastPossiblePass);
   return {
@@ -94,7 +96,7 @@ export function buildCncPassRecoveryModel(
       resumePoint?.kind === 'resume-at-pass'
         ? { groupIndex: resumePoint.groupIndex, passIndex: resumePoint.passIndex }
         : null,
-    retainedPositionIssue: retainedPositionIssue(capsule, liveWco, liveReportInches),
+    retainedPositionIssue: retainedPositionIssue(capsule, liveWco, liveReportInches, workZIssue),
   };
 }
 
@@ -105,20 +107,24 @@ type SpanLike = {
   readonly lastRawLine: number;
 };
 
-function passContainingRawLine(
+// The last pass whose first line is at or before `rawLine`: a pass only begins
+// with its own line, so a line between passes (a group's spin-up, a bit
+// change, the postamble) leaves the next pass unsent. Before any pass, nothing
+// past the proven frontier has begun (CNC audit v3 N5-P2-1).
+function lastPassBegunBy(
   spans: ReadonlyArray<SpanLike>,
   rawLine: number,
-): { readonly groupIndex: number; readonly passIndex: number } | null {
-  const containing = spans.find((span) => span.lastRawLine >= rawLine);
-  return containing === null || containing === undefined
-    ? null
-    : { groupIndex: containing.groupIndex, passIndex: containing.passIndex };
+): { readonly groupIndex: number; readonly passIndex: number } | 'none' {
+  const begun = spans.filter((span) => span.firstRawLine <= rawLine).at(-1);
+  return begun === undefined
+    ? 'none'
+    : { groupIndex: begun.groupIndex, passIndex: begun.passIndex };
 }
 
 function collectPassOptions(
   groups: ReadonlyArray<Group>,
   resumePoint: CncResumePoint | null,
-  lastPossiblePass: { readonly groupIndex: number; readonly passIndex: number } | null,
+  lastPossiblePass: { readonly groupIndex: number; readonly passIndex: number } | 'none' | null,
 ): ReadonlyArray<CncPassRecoveryPassOption> {
   const options: CncPassRecoveryPassOption[] = [];
   let operationNumber = 0;
@@ -148,13 +154,14 @@ function collectPassOptions(
 function passStatus(
   pass: { readonly groupIndex: number; readonly passIndex: number },
   resumePoint: CncResumePoint | null,
-  lastPossiblePass: { readonly groupIndex: number; readonly passIndex: number } | null,
+  lastPossiblePass: { readonly groupIndex: number; readonly passIndex: number } | 'none' | null,
 ): CncPassRecoveryPassStatus {
   if (resumePoint === null) return 'unknown';
   if (resumePoint.kind === 'after-last-pass') return 'proven-complete';
   if (resumePoint.kind !== 'resume-at-pass') return 'unknown';
   if (isBefore(pass, resumePoint)) return 'proven-complete';
   if (lastPossiblePass === null) return 'uncertain';
+  if (lastPossiblePass === 'none') return 'pending';
   return isBefore(lastPossiblePass, pass) ? 'pending' : 'uncertain';
 }
 

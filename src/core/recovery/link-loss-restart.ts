@@ -83,6 +83,20 @@ function unconfirmedMessage(link: LinkLossLink): string {
   );
 }
 
+/** A CNC stop's record once a reconnect has shown `sign`; null when nothing
+ * changes. A sign that the controller may have restarted sticks: a later
+ * reconnect that finds it running cannot give back the position the restart
+ * zeroed (CNC audit v3 N5r-P1-1, ADR-215 Amendment 4). CNC pass recovery
+ * keeps its own planner reserve, so the backlog and message stay as they were. */
+export function recordControllerRestart(
+  interruption: JobInterruption,
+  sign: LinkLossRestartSign,
+): JobInterruption | null {
+  const prior = interruption.controllerRestart;
+  if (prior === sign || (prior !== undefined && prior !== 'kept-running')) return null;
+  return { ...interruption, controllerRestart: sign };
+}
+
 /** Whether this interruption still waits for the first reconnect's verdict. */
 export function awaitsLinkLossVerdict(interruption: JobInterruption): boolean {
   return interruption.kind === 'disconnect' && interruption.plannerBacklogIfRestarted !== undefined;

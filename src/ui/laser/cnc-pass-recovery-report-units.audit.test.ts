@@ -17,7 +17,12 @@ async function interruptedInchesRun(): Promise<RecoveryCapsule> {
     revision: 1,
     ackedLines: 1,
     sendableLines: artifact.sendableLines,
-    interruption: { kind: 'disconnect', message: 'The connection was lost.' },
+    // The reconnect showed the board kept running (ADR-215 Amendment 4).
+    interruption: {
+      kind: 'disconnect',
+      message: 'The connection was lost.',
+      controllerRestart: 'kept-running',
+    },
     updatedAtIso: artifact.createdAtIso,
     artifact,
   };

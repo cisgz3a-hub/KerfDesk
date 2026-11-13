@@ -122,6 +122,9 @@ function exactCapsule(options?: {
     interruption: {
       kind: options?.interruptionKind ?? 'disconnect',
       message: 'Connection lost.',
+      // A lost link counts as session-continuous only once a reconnect showed the
+      // board kept running (ADR-215 Amendment 4).
+      controllerRestart: 'kept-running' as const,
     },
     updatedAtIso: '2026-07-16T12:01:00.000Z',
     artifact,

@@ -21,6 +21,8 @@ import { clearCncLiveCaps } from './detected-settings-action';
 import { isGrblFamilyDriver, runGrblDisconnectTransaction } from './laser-disconnect-transaction';
 import { reportedWorkOffsetMm } from './infer-machine-position';
 import {
+  heldAtDrainedToolChange,
+  plainJobStopRequest,
   streamResetRecord,
   type JobStopReason,
   type JobStopRequest,
@@ -204,9 +206,7 @@ async function freezeAndStopWithoutReset(
       streamer: cancelStreamer(initial.streamer),
       controllerOperation: operation,
       ...frameProofReset(),
-      ...(reason === undefined
-        ? {}
-        : { jobStopRequest: { reason, streamerEpoch: initial.streamerEpoch } }),
+      ...(reason === undefined ? {} : { jobStopRequest: plainJobStopRequest(reason, initial) }),
       ...(isControllerHaltedNotice(initial.safetyNotice)
         ? {}
         : {
@@ -315,7 +315,7 @@ async function stopWithReset(
       // the requested stop, not an unexplained end (ADR-341 Amendment 3).
       ...(reason === undefined || state.streamer === null
         ? {}
-        : { jobStopRequest: { reason, streamerEpoch: state.streamerEpoch } }),
+        : { jobStopRequest: plainJobStopRequest(reason, state) }),
       // And whether the reset may kill the steppers mid-motion (ADR-215
       // Amendment 1): decided now, because ALARM:3 arrives after the stream
       // is recorded as stopped.
@@ -356,6 +356,7 @@ async function stopWithOwnedReset(
             reason,
             streamerEpoch: state.streamerEpoch,
             ...g92OriginAtStop(state),
+            ...heldAtDrainedToolChange(state),
             // Read here too: the stop outcome clears the job's own kind.
             ...(state.activeJobMachineKind === null
               ? {}

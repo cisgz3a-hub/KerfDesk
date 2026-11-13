@@ -1,5 +1,6 @@
 import { isNonNegativeInteger } from '../util/finite';
 import { isRecord } from '../util/is-record';
+import type { LinkLossRestartSign } from './link-loss-restart';
 
 export type JobInterruptionKind =
   | 'disconnect'
@@ -67,6 +68,23 @@ export type JobInterruption = {
    * over it; the restart hint names the line that would (ADR-398 Amendment 4).
    */
   readonly unconfirmedPlannerBacklog?: PlannerBacklog;
+  /**
+   * What a reconnect after a CNC run's stop showed about the controller: a
+   * boot banner, an Alarm, a run or hold that proves it kept running, or
+   * nothing either way. A board that resets when its port opens restarts with
+   * machine position zeroed where the head stands, so CNC pass recovery offers
+   * "Position retained" only while every reconnect showed it kept running.
+   * A sign other than 'kept-running' is never replaced (CNC audit v3
+   * N5r-P1-1, ADR-215 Amendment 4).
+   */
+  readonly controllerRestart?: LinkLossRestartSign;
+  /**
+   * The stream was held at a tool-change M0, drained to a fresh Idle with
+   * nothing in flight, when KerfDesk stopped it. The host never sends that
+   * M0, so it is not among the acknowledged lines, yet every line before it
+   * has run (CNC audit v3 N5-P2-1, ADR-215 Amendment 4).
+   */
+  readonly heldAtToolChange?: true;
 };
 
 export function withJobInterruption<T extends { readonly updatedAtIso: string }>(
@@ -109,7 +127,11 @@ function parseStopEvidence(
   | 'sentLines'
   | 'plannerBacklogIfRestarted'
   | 'unconfirmedPlannerBacklog'
+  | 'controllerRestart'
+  | 'heldAtToolChange'
 > | null {
+  const cnc = parseCncStopEvidence(value);
+  if (cnc === null) return null;
   const positionLost = parsePositionLost(value['positionLost']);
   const plannerBacklog = parsePlannerBacklog(value['plannerBacklog']);
   const sentLines = parseSentLines(value['sentLines']);
@@ -118,6 +140,7 @@ function parseStopEvidence(
   if (positionLost === null || plannerBacklog === null || sentLines === null) return null;
   if (ifRestarted === null || unconfirmed === null) return null;
   return {
+    ...cnc,
     ...(plannerBacklog === undefined ? {} : { plannerBacklog }),
     ...(positionLost === undefined ? {} : { positionLost }),
     ...(sentLines === undefined ? {} : { sentLines }),
@@ -126,6 +149,32 @@ function parseStopEvidence(
   };
 }
 
+/** What CNC pass recovery reads (ADR-215 Amendment 4); null when one is corrupt. */
+function parseCncStopEvidence(
+  value: Record<string, unknown>,
+): Pick<JobInterruption, 'controllerRestart' | 'heldAtToolChange'> | null {
+  const controllerRestart = parseControllerRestart(value['controllerRestart']);
+  const heldAtToolChange = parsePositionLost(value['heldAtToolChange']);
+  if (controllerRestart === null || heldAtToolChange === null) return null;
+  return {
+    ...(controllerRestart === undefined ? {} : { controllerRestart }),
+    ...(heldAtToolChange === undefined ? {} : { heldAtToolChange }),
+  };
+}
+
+const RESTART_SIGNS: ReadonlyArray<LinkLossRestartSign> = [
+  'boot-banner',
+  'alarm',
+  'kept-running',
+  'unknown',
+];
+
+function parseControllerRestart(value: unknown): LinkLossRestartSign | undefined | null {
+  if (value === undefined) return undefined;
+  return RESTART_SIGNS.find((sign) => sign === value) ?? null;
+}
+
+/** An optional `true` flag: absent, true, or corrupt (null). */
 function parsePositionLost(value: unknown): true | undefined | null {
   return value === undefined || value === true ? value : null;
 }

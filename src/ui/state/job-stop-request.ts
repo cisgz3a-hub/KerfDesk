@@ -30,7 +30,37 @@ export type JobStopRequest = {
    *  before the stop clears it. Only a laser job's origin goes back by itself
    *  after the operator's Abort (ADR-341 Amendment 14). */
   readonly jobMachineKind?: MachineKind;
+  /** The stream was held at a tool-change M0, drained to a fresh Idle with
+   *  nothing in flight, when the stop was asked for (heldAtDrainedToolChange). */
+  readonly heldAtToolChange?: true;
 };
+
+/** The request for a stop that reads no origin: the reason, the stream, and
+ *  a drained bit-change hold it was asked at. */
+export function plainJobStopRequest(
+  reason: JobStopReason,
+  state: Parameters<typeof heldAtDrainedToolChange>[0] & { readonly streamerEpoch: number },
+): JobStopRequest {
+  return { reason, streamerEpoch: state.streamerEpoch, ...heldAtDrainedToolChange(state) };
+}
+
+/** Read before the stop cancels the stream: a CNC bit-change hold that had
+ *  drained to a fresh Idle proves every line before its unsent M0 ran, so pass
+ *  recovery starts after it (CNC audit v3 N5-P2-1, ADR-215 Amendment 4). */
+export function heldAtDrainedToolChange(state: {
+  readonly streamer: {
+    readonly status: StreamerStatus;
+    readonly inFlight: ReadonlyArray<unknown>;
+  } | null;
+  readonly toolChangeIdleSeen?: boolean;
+}): Pick<JobStopRequest, 'heldAtToolChange'> {
+  const streamer = state.streamer;
+  return streamer?.status === 'tool-change' &&
+    streamer.inFlight.length === 0 &&
+    state.toolChangeIdleSeen === true
+    ? { heldAtToolChange: true }
+    : {};
+}
 
 /** Where a dedicated-axis rotary job started, in machine units of its axis. */
 export type RotaryStartTurn = {

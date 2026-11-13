@@ -37,7 +37,10 @@ export function checkpointInterruption(
   const cause = interruptionCause(status, notice, stopRequest);
   if (cause === null) return null;
   const interruption = withSentLines(
-    positionLost ? { ...cause, positionLost: true as const } : cause,
+    withHeldToolChange(
+      positionLost ? { ...cause, positionLost: true as const } : cause,
+      stopRequest,
+    ),
     sentLines,
   );
   if (plannerBacklog === undefined) return interruption;
@@ -46,6 +49,18 @@ export function checkpointInterruption(
   }
   return PLANNER_DISCARDING_KINDS.includes(interruption.kind) || streamReset
     ? { ...interruption, plannerBacklog }
+    : interruption;
+}
+
+/** A stop asked for at a drained bit-change hold keeps that fact for pass
+ * recovery, which never rewinds across the hold's unsent M0 (ADR-215
+ * Amendment 4). Any other cause, a lost link at a hold included, does not. */
+function withHeldToolChange(
+  interruption: JobInterruption,
+  stopRequest: JobStopRequest | null,
+): JobInterruption {
+  return interruption.kind === 'cancelled' && stopRequest?.heldAtToolChange === true
+    ? { ...interruption, heldAtToolChange: true }
     : interruption;
 }
 

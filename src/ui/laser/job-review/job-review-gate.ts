@@ -249,7 +249,7 @@ export function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJo
   const identified = refreshControllerIdentityWarnings(model, device, liveLaser);
   // Who refills this connection's stream is live too. A beam that can stay on
   // over a stopped head leads the whole list (ADR-676 Amendment 5).
-  const litStopFirst = withLitStopFirst(identified, liveLaser, bundle.prepared.gcode);
+  const litStopFirst = withLitStopFirst(identified, liveLaser, bundle);
   return withConvertedLaserQuestion(litStopFirst, bundle.project, liveLaser);
 }
 

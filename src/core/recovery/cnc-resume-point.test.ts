@@ -178,6 +178,47 @@ describe('resolveCncResumePoint', () => {
       );
       expect(point).toMatchObject({ kind: 'resume-at-pass', groupIndex: 0 });
     });
+
+    // CNC audit v3 N5-P2-1: KerfDesk never sends a tool-change M0, so a stop
+    // at the hold leaves it one line past the acknowledged ones.
+    it('caps the rewind at a drained hold whose M0 was never sent', () => {
+      for (const controllerKind of ['grbl-v1.1', 'grblhal', 'fluidnc'] as const) {
+        const point = resolveCncResumePoint(
+          args({
+            gcode: emission.gcode,
+            spans: emission.spans,
+            ackedLines: throughM0 - 1,
+            controllerKind,
+            heldAtToolChange: true,
+          }),
+        );
+        expect(point).toMatchObject({
+          kind: 'resume-at-pass',
+          groupIndex: 1,
+          passIndex: 0,
+          provenCompletePassCount: 2,
+        });
+      }
+    });
+
+    it('ends the possibly-executed bound before a held M0', () => {
+      const point = resolveCncResumePoint(
+        args({
+          gcode: emission.gcode,
+          spans: emission.spans,
+          ackedLines: throughM0 - 1,
+          heldAtToolChange: true,
+        }),
+      );
+      if (point.kind !== 'resume-at-pass') throw new Error('Expected a pass.');
+      expect(point.lastPossiblyExecutedRawLine).toBeLessThan(m0Raw);
+      // Short of the hold, the RX buffer walk stops at the M0 as well.
+      const before = resolveCncResumePoint(
+        args({ gcode: emission.gcode, spans: emission.spans, ackedLines: throughM0 - 4 }),
+      );
+      if (before.kind !== 'resume-at-pass') throw new Error('Expected a pass.');
+      expect(before.lastPossiblyExecutedRawLine).toBeLessThan(m0Raw);
+    });
   });
 
   it('reports after-last-pass when the proven frontier clears every span', () => {

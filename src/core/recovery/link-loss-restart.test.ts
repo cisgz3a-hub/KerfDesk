@@ -8,6 +8,7 @@ import { automaticRestart } from './automatic-restart-line';
 import { parseOptionalJobInterruption, type JobInterruption } from './job-interruption';
 import {
   awaitsLinkLossVerdict,
+  recordControllerRestart,
   settleLinkLossRestart,
   type LinkLossRestartEvidence,
   type LinkLossRestartSign,
@@ -166,5 +167,41 @@ describe('the stored record', () => {
         unconfirmedPlannerBacklog: { ackedAtStatus: 1, queuedBlocks: 2, bound: 'other' },
       }),
     ).toBeNull();
+  });
+});
+
+// CNC audit v3 N5r-P1-1: a CNC record keeps what each reconnect showed, for
+// pass recovery's "Position retained" check.
+describe('recordControllerRestart', () => {
+  const CANCELLED: JobInterruption = {
+    kind: 'cancelled',
+    message: 'Stopped by the operator (Abort).',
+  };
+
+  it('records the sign without touching the backlog or the message', () => {
+    const recorded = recordControllerRestart(LOST_LINK, 'boot-banner');
+    expect(recorded).toEqual({ ...LOST_LINK, controllerRestart: 'boot-banner' });
+    expect(recordControllerRestart(CANCELLED, 'unknown')).toEqual({
+      ...CANCELLED,
+      controllerRestart: 'unknown',
+    });
+  });
+
+  it('never lets a later reconnect give back what a possible restart took', () => {
+    const restarted = { ...CANCELLED, controllerRestart: 'alarm' as const };
+    expect(recordControllerRestart(restarted, 'kept-running')).toBeNull();
+    expect(recordControllerRestart(restarted, 'boot-banner')).toBeNull();
+    const kept = { ...CANCELLED, controllerRestart: 'kept-running' as const };
+    expect(recordControllerRestart(kept, 'kept-running')).toBeNull();
+    expect(recordControllerRestart(kept, 'unknown')?.controllerRestart).toBe('unknown');
+  });
+
+  it('round-trips the sign and the held tool change through the saved record', () => {
+    const saved = { ...CANCELLED, controllerRestart: 'boot-banner', heldAtToolChange: true };
+    expect(parseOptionalJobInterruption(saved)).toEqual({ interruption: saved });
+    expect(
+      parseOptionalJobInterruption({ ...CANCELLED, controllerRestart: 'rebooted' }),
+    ).toBeNull();
+    expect(parseOptionalJobInterruption({ ...CANCELLED, heldAtToolChange: false })).toBeNull();
   });
 });

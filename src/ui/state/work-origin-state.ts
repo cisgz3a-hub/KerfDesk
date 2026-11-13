@@ -15,6 +15,7 @@ import type { LaserState, WorkOriginSource } from './laser-store';
 import type { WorkCoordinateOffset } from './origin-actions';
 import type { BitFileSequenceState } from './bit-file-sequence';
 import type { SpindleBitState } from './spindle-bit';
+import type { WorkZBeforeResetState } from './work-z-before-reset';
 
 /** What the first accepted work-offset report of a connection showed. */
 export type OriginAtConnect = {
@@ -33,7 +34,8 @@ export type OriginAtConnect = {
 // Amendment 4). It is kept for the app session: a reconnect does not change
 // the bit in the collet.
 export type WorkOriginState = BitFileSequenceState &
-  SpindleBitState & {
+  SpindleBitState &
+  WorkZBeforeResetState & {
     readonly workOriginActive: boolean;
     readonly workOriginSource: WorkOriginSource;
     // Monotonic identity for XY work-origin mutations. Place Board registration
