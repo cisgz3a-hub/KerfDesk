@@ -4,6 +4,11 @@
 v4 finding H5-P2-1 (P2). Frame, Start, output policy and licences are unchanged. | **Date:**
 2026-10-27
 
+**Amended by [ADR-480 Amendment 6](ADR-480-amendment-6-the-mask-is-the-fill-region-and-the-bake-keeps-real-pixels.md):** the bake no longer whitens
+the pixels outside the mask. It keeps real pixels, the ones the clip overlaps plus a 2 mm margin,
+and the owned clip alone decides what burns. The clip is the Fill region of the mask object, and
+Decision 3 now covers a live mask too: the canvas clips the photo to it.
+
 ### Context
 
 Crop Image and Flatten Image Mask baked the pixels outside the mask as white and dropped the mask.

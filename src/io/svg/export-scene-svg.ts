@@ -269,7 +269,17 @@ function imageMaskClip(image: RasterImage, index: number, project: Project): str
     throw new Error('The image mask is missing or is not vector artwork.');
   // The raster pipeline ignores a mask whose last closed contour was removed.
   if (closedMaskCurves(mask.paths).length === 0) return '';
-  return compoundClip(mask.paths, mask.transform, 'mask-' + index);
+  // A clipPath keeps the union of its children, each read under its own
+  // clip-rule: the Fill region of the mask object (ADR-480 Amendment 6).
+  const children = mask.paths
+    .map((path) => {
+      const curves = closedMaskCurves([path]);
+      if (curves.length === 0) return '';
+      const rule = path.fillRule ?? (mask.kind === 'text' ? 'nonzero' : 'evenodd');
+      return clipChild(curves, mask.transform, rule);
+    })
+    .join('');
+  return clipPathDefs('mask-' + index, children);
 }
 
 function closedMaskCurves(paths: readonly ColoredPath[]): CurveSubpath[] {
@@ -285,14 +295,32 @@ function closedMaskCurves(paths: readonly ColoredPath[]): CurveSubpath[] {
 function compoundClip(paths: readonly ColoredPath[], transform: Transform, id: string): string {
   // All colors share one even-odd contour set. Each independent clip gets its
   // own group so an external mask intersects the owned clip rather than XORing.
+  return clipPathDefs(id, clipChild(closedMaskCurves(paths), transform, 'evenodd'));
+}
+
+function clipPathDefs(id: string, children: string): string {
   return (
     '<defs><clipPath id="' +
     id +
-    '" clipPathUnits="userSpaceOnUse"><path d="' +
-    formatSvgPathData(closedMaskCurves(paths), null) +
+    '" clipPathUnits="userSpaceOnUse">' +
+    children +
+    '</clipPath></defs>'
+  );
+}
+
+function clipChild(
+  curves: readonly CurveSubpath[],
+  transform: Transform,
+  rule: 'nonzero' | 'evenodd',
+): string {
+  return (
+    '<path d="' +
+    formatSvgPathData(curves, null) +
     '" transform="' +
     svgMatrixAttribute(transform) +
-    '" clip-rule="evenodd"/></clipPath></defs>'
+    '" clip-rule="' +
+    rule +
+    '"/>'
   );
 }
 
