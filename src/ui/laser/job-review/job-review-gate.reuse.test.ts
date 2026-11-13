@@ -118,6 +118,23 @@ afterEach(() => {
 });
 
 describe('Job Review reuse of the displayed compile', () => {
+  // ADR-345 Amendment 1 Decision 2 (C2 verification E4-P3-4, mutant K2): with
+  // no key from its own preparation, nothing proves which machine and camera
+  // facts the displayed compile read, so Confirm compiles again.
+  it('recompiles on Confirm a displayed compile that has no preparation key', async () => {
+    const { preparedMachineInputsKey: _key, ...keyless } = await unframedReviewBundle();
+    void _key;
+    const capture = captureJobReviewModels();
+    const review = runJobReviewGate({ initial: keyless, completedReceipt: null, purpose: 'frame' });
+    await vi.waitFor(() => expect(capture.models).toHaveLength(1));
+    useJobReviewStore.getState().confirm();
+    const confirmed = await review;
+    capture.stop();
+    expect(confirmed).not.toBeNull();
+    expect(confirmed?.bundle.prepared).not.toBe(keyless.prepared);
+    expect(confirmed?.bundle.prepared.gcode).toBe(keyless.prepared.gcode);
+  });
+
   it('reuses the displayed compile on Confirm when nothing it depends on changed', async () => {
     const initial = await unframedReviewBundle();
     const capture = captureJobReviewModels();

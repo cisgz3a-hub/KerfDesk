@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeJobBounds, frameBoundsSignature, machineSpaceJob } from '../../core/job';
-import type { RotaryType } from '../../core/devices';
+import type { RotarySetup, RotaryType } from '../../core/devices';
 import { createLayer, createProject, EMPTY_SCENE, IDENTITY_TRANSFORM } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
 import { requiredFrameIssueFromPrepared } from './required-frame-readiness';
@@ -95,4 +95,64 @@ describe('required Frame rotary compatibility', () => {
       ).toContain('completed Frame');
     },
   );
+});
+
+// Code quality verification C2, E4-P3-4: ADR-695 Amendment 5 leaves the Z work
+// offset out of this check only for a job whose rotary turns on Z. On every
+// other job Z is a real reference (CNC cut depth, a laser's focus), and on a
+// Z rotary X and Y still place the job.
+describe('the Frame-first check and the Z work offset', () => {
+  const BOUNDS = { minX: 0, minY: 0, maxX: 10, maxY: 10 };
+  const FRAMED = { x: 20, y: 30, z: 0 };
+  const CHUCK = { enabled: true, type: 'chuck', mmPerRotation: 40, objectDiameterMm: 60 } as const;
+
+  function issueAfter(rotary: RotarySetup | undefined, live: { x: number; y: number; z: number }) {
+    const base = rotaryProject('chuck');
+    const { rotary: _chuck, ...flatBed } = base.device;
+    void _chuck;
+    const project = { ...base, device: rotary === undefined ? flatBed : { ...flatBed, rotary } };
+    const prepared = prepareOutput(project);
+    if (!prepared.ok) throw new Error('Expected prepared output');
+    return requiredFrameIssueFromPrepared({
+      prepared,
+      measuredFrameBounds: BOUNDS,
+      machine: {
+        wcoCache: live,
+        workOriginActive: true,
+        frameVerification: {
+          boundsSignature: frameBoundsSignature(BOUNDS),
+          wco: FRAMED,
+          workOriginActive: true,
+        },
+      },
+    });
+  }
+
+  it.each<[string, RotarySetup | undefined]>([
+    ['no rotary', undefined],
+    [
+      'a Z rotary that is switched off',
+      { ...CHUCK, enabled: false, axis: 'Z', axisConfirmed: 'Z' },
+    ],
+    ['a Y rotary', CHUCK],
+    ['an A rotary', { ...CHUCK, axis: 'A', axisConfirmed: 'A' }],
+  ])('refuses a Z-only offset change on %s', (_name, rotary) => {
+    expect(issueAfter(rotary, FRAMED)).toBeNull();
+    expect(issueAfter(rotary, { ...FRAMED, z: 3 })).toContain('completed Frame');
+  });
+
+  describe('on a Z rotary', () => {
+    const Z_ROTARY: RotarySetup = { ...CHUCK, axis: 'Z', axisConfirmed: 'Z' };
+
+    it('accepts the Z offset the Frame’s own G92 Z0 left', () => {
+      expect(issueAfter(Z_ROTARY, { ...FRAMED, z: 3 })).toBeNull();
+    });
+
+    it.each([
+      ['X', { ...FRAMED, x: 21 }],
+      ['Y', { ...FRAMED, y: 31 }],
+    ])('refuses a change of the %s offset alone', (_axis, live) => {
+      expect(issueAfter(Z_ROTARY, live)).toContain('completed Frame');
+    });
+  });
 });
