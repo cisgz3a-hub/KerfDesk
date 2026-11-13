@@ -1,0 +1,185 @@
+// T24a: Re-trace Original through the real command action, real dialog commit and real store.
+// Question: what survives a re-trace of a trace the user has moved, tuned, renamed, grouped, locked or edited?
+import { describe, it, vi } from 'vitest';
+import type { RawImageData } from '../t22-main/src/core/trace';
+import { IDENTITY_TRANSFORM, operationIdsForObject, type Project, type SceneObject, type RasterImage } from '../t22-main/src/core/scene';
+import { useStore } from '../t22-main/src/ui/state';
+import { useUiStore } from '../t22-main/src/ui/state/ui-store';
+import { retraceOriginalAction, traceSourceForTracedImage } from '../t22-main/src/ui/commands/image-command-actions';
+import { serializeProject } from '../t22-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t22-main/src/io/project/deserialize-project';
+import { logger, segBounds as segBoundsFix } from './t24-common';
+import { runTrace, seedRaster, setupProject } from './t24-fixture';
+import { burnOfTrace } from './t24-measure';
+
+vi.mock('../t22-main/src/ui/trace/off-thread-trace-decode', async () => {
+  const mask = await import('../t22-main/src/ui/trace/trace-source-mask');
+  const transp = await import('../t22-main/src/ui/trace/raw-image-transparency');
+  return {
+    decodeTraceSourceImage: async (file: File) => {
+      const image = mask.maskTraceSourcePixels(file, (globalThis as { __T23_PIXELS?: RawImageData }).__T23_PIXELS!);
+      return { image, hasTransparency: transp.rawImageHasTransparency(image) };
+    },
+  };
+});
+
+const log = logger('C:/Users/stolk/kd-t1/zz-t24/t24a.log');
+const T = (o: Partial<typeof IDENTITY_TRANSFORM>) => ({ ...IDENTITY_TRANSFORM, ...o });
+const st = () => useStore.getState();
+const obj = (id: string) => st().project.scene.objects.find((o) => o.id === id);
+const traces = () => st().project.scene.objects.filter((o) => o.kind === 'traced-image');
+function opsOf(o: SceneObject | undefined, p: Project = st().project) {
+  if (!o) return 'missing';
+  const ids = operationIdsForObject(o, p.scene.layers);
+  return ids
+    .map((id) => {
+      const l = p.scene.layers.find((x) => x.id === id) as unknown as Record<string, unknown> | undefined;
+      return l ? `${id}{name:${l.name},mode:${l.mode},power:${l.power},speed:${l.speed},passes:${l.passes},color:${l.color},fillStyle:${l.fillStyle},hatch:${l.hatchSpacingMm}}` : `${id}{dangling}`;
+    })
+    .join(' + ');
+}
+function burnBox(p: Project, id: string) {
+  const { segs } = burnOfTrace(p, id);
+  return segBoundsFix(segs);
+}
+async function retrace(traceId: string, toasts: string[]) {
+  const before = st().project;
+  const selected = obj(traceId) ?? null;
+  let opened: { source: RasterImage; opts?: unknown } | null = null;
+  retraceOriginalAction(before, selected, (source, opts) => { opened = { source, opts }; }, (m, k) => toasts.push(`${k}: ${m}`))();
+  if (opened === null) return { opened: null, out: null };
+  const o = opened as { source: RasterImage; opts?: { replaceTraceId?: string } };
+  const out = await runTrace(o.source, 'Line Art', { replaceTraceId: o.opts?.replaceTraceId });
+  toasts.push(...out.toasts);
+  return { opened: o, out };
+}
+
+describe('T24a re-trace', () => {
+  it('1 moved/rotated/scaled/mirrored trace, tuned operation, renamed, grouped, locked', async () => {
+    const seed = seedRaster({ transform: T({ x: 60, y: 80 }) });
+    setupProject([seed]);
+    await runTrace(seed, 'Line Art');
+    const t0 = traces()[0]!;
+    log(`fresh trace id=${t0.id} transform=${JSON.stringify(t0.transform)} ops=${opsOf(t0)}`);
+    log(`fresh trace burn box ${JSON.stringify(burnBox(st().project, t0.id))}`);
+    // User edits on the TRACE (not the source)
+    const moved = T({ x: 220, y: 160, rotationDeg: 30, scaleX: 0.5, scaleY: 0.5, mirrorX: true });
+    st().setObjectTransform(t0.id, moved);
+    const [opId] = operationIdsForObject(obj(t0.id)!, st().project.scene.layers);
+    st().setLayerParam(opId!, { power: 77, speed: 2222, passes: 3 } as never);
+    st().renameArtwork(t0.id, 'Coaster logo');
+    st().setObjectsPowerScale([t0.id], 40 as never);
+    const tuned = obj(t0.id)!;
+    log(`edited trace transform=${JSON.stringify(tuned.transform)} name=${tuned.name} powerScale=${JSON.stringify((tuned as { powerScale?: unknown }).powerScale)} ops=${opsOf(tuned)}`);
+    const editedBurn = burnBox(st().project, t0.id);
+    log(`edited trace burn box ${JSON.stringify(editedBurn)}`);
+    const beforeRetrace = st().project;
+    const undoDepth = st().undoStack.length;
+    const toasts: string[] = [];
+    const r = await retrace(t0.id, toasts);
+    log(`retrace opened source=${r.opened?.source.id} opts=${JSON.stringify(r.opened?.opts)} landed=${r.out?.landed}`);
+    log(`toasts: ${JSON.stringify(toasts)}`);
+    const t1 = obj(t0.id)!;
+    log(`after: traces=${traces().length} sameId=${t1 !== undefined} transform=${JSON.stringify(t1.transform)} name=${t1.name} powerScale=${JSON.stringify((t1 as { powerScale?: unknown }).powerScale)}`);
+    log(`after ops=${opsOf(t1)}`);
+    log(`after layers: ${st().project.scene.layers.map((l) => `${l.id}/${l.name}/${(l as { power?: number }).power}/${(l as { speed?: number }).speed}`).join(', ')}`);
+    log(`after burn box ${JSON.stringify(burnBox(st().project, t0.id))} (was ${JSON.stringify(editedBurn)})`);
+    log(`undo depth ${undoDepth} -> ${st().undoStack.length}`);
+    st().undo();
+    log(`undo restores identical project: ${st().project === beforeRetrace}  json-equal: ${JSON.stringify(st().project) === JSON.stringify(beforeRetrace)}`);
+    const afterRe = JSON.stringify(st().project);
+    st().redo();
+    log(`redo: trace transform=${JSON.stringify(obj(t0.id)?.transform)}; differs from undo state: ${JSON.stringify(st().project) !== afterRe}`);
+  });
+
+  it('2 group, lock, hidden, draw order, node edit, per-object override', async () => {
+    const seed = seedRaster({ transform: T({ x: 60, y: 80 }) });
+    setupProject([seed]);
+    await runTrace(seed, 'Line Art');
+    const t0 = traces()[0]!;
+    // second trace from another seed for group partner: just reuse a copy of the source as a partner
+    const partner: RasterImage = { ...seed, id: 'partner', transform: T({ x: 300, y: 300 }) };
+    useStore.setState({ project: { ...st().project, scene: { ...st().project.scene, objects: [...st().project.scene.objects, partner] } } });
+    useStore.setState({ selectedObjectId: t0.id, additionalSelectedIds: new Set(['partner']) });
+    st().groupSelection();
+    log(`groups before: ${JSON.stringify(st().project.scene.groups)}`);
+    const [opId] = operationIdsForObject(obj(t0.id)!, st().project.scene.layers);
+    st().setObjectsOperationOverrideForOperation([t0.id], opId!, { power: 12, hatchSpacingMm: 0.3 } as never);
+    // node edit: drop the last polyline of the first path
+    const cur = obj(t0.id) as SceneObject & { paths: { polylines: unknown[] }[] };
+    const nPolys = cur.paths.reduce((n, p) => n + p.polylines.length, 0);
+    const edited = { ...cur, paths: cur.paths.map((p, i) => (i === 0 ? { ...p, polylines: p.polylines.slice(0, -1) } : p)) };
+    useStore.setState({ project: { ...st().project, scene: { ...st().project.scene, objects: st().project.scene.objects.map((o) => (o.id === t0.id ? (edited as never) : o)) } } });
+    useStore.setState({ selectedObjectId: t0.id, additionalSelectedIds: new Set() });
+    st().lockSelection();
+    const pre = obj(t0.id)!;
+    log(`before retrace: locked=${pre.locked} hidden=${(pre as { hidden?: boolean }).hidden} override=${JSON.stringify(pre.operationOverride)} polylines=${nPolys}->${(pre as never as { paths: { polylines: unknown[] }[] }).paths.reduce((n, p) => n + p.polylines.length, 0)} order=${JSON.stringify(st().project.scene.objects.map((o) => o.id))}`);
+    const toasts: string[] = [];
+    const r = await retrace(t0.id, toasts);
+    const post = obj(t0.id)!;
+    log(`retrace on LOCKED trace allowed: ${r.opened !== null} landed=${r.out?.landed}; toasts ${JSON.stringify(toasts)}`);
+    log(`after: locked=${post.locked} override=${JSON.stringify(post.operationOverride)} polylines=${(post as never as { paths: { polylines: unknown[] }[] }).paths.reduce((n, p) => n + p.polylines.length, 0)} order=${JSON.stringify(st().project.scene.objects.map((o) => o.id))}`);
+    log(`groups after: ${JSON.stringify(st().project.scene.groups)}`);
+  });
+
+  it('3 duplicate: copies share the source; re-trace of a moved copy', async () => {
+    const seed = seedRaster({ transform: T({ x: 60, y: 80 }) });
+    setupProject([seed]);
+    await runTrace(seed, 'Line Art');
+    const a = traces()[0]!;
+    useStore.setState({ selectedObjectId: a.id, additionalSelectedIds: new Set() });
+    st().duplicateSelection();
+    const bId = st().selectedObjectId!;
+    const b = obj(bId)!;
+    log(`copy: id=${bId} traceSourceId=${(b as { traceSourceId?: string }).traceSourceId} canRetrace=${traceSourceForTracedImage(st().project, b) !== null} copyOps=${opsOf(b)} origOps=${opsOf(obj(a.id))}`);
+    st().setObjectTransform(bId, T({ x: 250, y: 60 }));
+    const aBefore = obj(a.id)!;
+    const toasts: string[] = [];
+    await retrace(bId, toasts);
+    const b2 = obj(bId)!;
+    log(`after retrace of copy: traces=${traces().length} copy transform=${JSON.stringify(b2.transform)} original transform=${JSON.stringify(obj(a.id)!.transform)} originalUnchanged=${obj(a.id) === aBefore}`);
+    log(`copy burn box ${JSON.stringify(burnBox(st().project, bId))} original burn box ${JSON.stringify(burnBox(st().project, a.id))}`);
+    log(`toasts ${JSON.stringify(toasts)}`);
+  });
+
+  it('4 source edited in Image Studio / moved / deleted', async () => {
+    const seed = seedRaster({ transform: T({ x: 60, y: 80 }) });
+    setupProject([seed]);
+    await runTrace(seed, 'Line Art');
+    const t0 = traces()[0]!;
+    st().applyEditedImage(seed.id, { dataUrl: 'data:image/png;base64,EDITED', lumaBase64: 'AAAA' } as never);
+    const opened: RasterImage[] = [];
+    retraceOriginalAction(st().project, obj(t0.id)!, (s) => opened.push(s), () => {})();
+    log(`after Image Studio edit: retrace opens dataUrl=${opened[0]?.dataUrl} (edited version, live object)`);
+    // moved source, trace untouched: trace follows the source
+    const live = obj(seed.id) as RasterImage;
+    st().setObjectTransform(seed.id, T({ x: 150, y: 40, rotationDeg: 90 }));
+    const live2 = obj(seed.id) as RasterImage;
+    const toasts: string[] = [];
+    await runTrace(live2, 'Line Art', { replaceTraceId: t0.id });
+    log(`source moved (trace not): trace transform after retrace ${JSON.stringify(obj(t0.id)?.transform)} toasts ${JSON.stringify(toasts)} live!==orig ${live !== live2}`);
+    // deleted source
+    useStore.setState({ project: { ...st().project, scene: { ...st().project.scene, objects: st().project.scene.objects.filter((o) => o.id !== seed.id) } } });
+    const t = obj(t0.id)!;
+    const msgs: string[] = [];
+    retraceOriginalAction(st().project, t, () => msgs.push('OPENED'), (m, k) => msgs.push(`${k}: ${m}`))();
+    log(`deleted source: canRetrace=${traceSourceForTracedImage(st().project, t) !== null} action=${JSON.stringify(msgs)}`);
+  });
+
+  it('5 save and reopen, then re-trace', async () => {
+    const seed = seedRaster({ transform: T({ x: 60, y: 80, rotationDeg: 20 }) });
+    setupProject([seed]);
+    await runTrace(seed, 'Line Art', { overrides: { smoothness: 0.5 }, fillStyle: 'offset' });
+    const t0 = traces()[0]!;
+    const back = deserializeProject(serializeProject(st().project, { compact: true })) as unknown as { kind: string; project: Project };
+    log(`deserialize kind=${back.kind}`);
+    useStore.setState({ project: back.project, undoStack: [], redoStack: [] });
+    const t = obj(t0.id)!;
+    const captured: unknown[] = [];
+    retraceOriginalAction(st().project, t, (s, o) => captured.push({ src: s.id, o }), () => {})();
+    log(`reopened retrace opens: ${JSON.stringify(captured)}`);
+    const toasts: string[] = [];
+    await retrace(t0.id, toasts);
+    log(`after reopen+retrace traces=${traces().length} sameId=${obj(t0.id) !== undefined} ops=${opsOf(obj(t0.id))} toasts=${JSON.stringify(toasts)}`);
+  });
+});

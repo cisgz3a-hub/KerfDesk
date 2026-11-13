@@ -1,0 +1,329 @@
+// T25 helpers: file byte builders (PNG pHYs, JPEG JFIF, TIFF, PGM), an independent SVG/DXF
+// reader and a scanline region comparator. Nothing here imports the app's own writers or parsers.
+import { writeFileSync } from 'node:fs';
+
+export type P = { x: number; y: number };
+export function logger(path: string): (s: string) => void {
+  const lines: string[] = [];
+  return (s: string) => {
+    lines.push(s);
+    writeFileSync(path, lines.join('\n'));
+  };
+}
+
+// ---------------- byte builders ----------------
+function crc32(b: Uint8Array): number {
+  let c = ~0;
+  for (const x of b) {
+    c ^= x;
+    for (let k = 0; k < 8; k++) c = c & 1 ? (c >>> 1) ^ 0xedb88320 : c >>> 1;
+  }
+  return ~c >>> 0;
+}
+function pngChunk(type: string, data: Uint8Array): Uint8Array {
+  const out = new Uint8Array(12 + data.length);
+  const dv = new DataView(out.buffer);
+  dv.setUint32(0, data.length);
+  for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+  out.set(data, 8);
+  dv.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
+  return out;
+}
+function concat(parts: Uint8Array[]): Uint8Array {
+  const n = parts.reduce((s, p) => s + p.length, 0);
+  const out = new Uint8Array(n);
+  let o = 0;
+  for (const p of parts) {
+    out.set(p, o);
+    o += p.length;
+  }
+  return out;
+}
+/** PNG signature + IHDR (+ optional pHYs in DPI, + optional padding tEXt before it) + IEND. */
+export function pngBytes(w: number, h: number, dpi?: number, padBeforePhys = 0): Uint8Array {
+  const ihdr = new Uint8Array(13);
+  const dv = new DataView(ihdr.buffer);
+  dv.setUint32(0, w);
+  dv.setUint32(4, h);
+  ihdr.set([8, 6, 0, 0, 0], 8);
+  const parts = [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]), pngChunk('IHDR', ihdr)];
+  if (padBeforePhys > 0) {
+    const t = new Uint8Array(padBeforePhys);
+    t.set([0x43, 0x6f, 0x6d, 0x6d, 0x65, 0x6e, 0x74, 0]); // "Comment\0"
+    t.fill(0x41, 8);
+    parts.push(pngChunk('tEXt', t));
+  }
+  if (dpi !== undefined) {
+    const phys = new Uint8Array(9);
+    const pv = new DataView(phys.buffer);
+    const ppm = Math.round(dpi / 0.0254);
+    pv.setUint32(0, ppm);
+    pv.setUint32(4, ppm);
+    phys[8] = 1;
+    parts.push(pngChunk('pHYs', phys));
+  }
+  parts.push(pngChunk('IEND', new Uint8Array(0)));
+  return concat(parts);
+}
+/** JPEG SOI + JFIF APP0 (units 1 = DPI) + SOF0 + EOI: enough for the header readers. */
+export function jpegBytes(w: number, h: number, dpi: number): Uint8Array {
+  const app0 = [0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1, 1, 1, dpi >> 8, dpi & 255, dpi >> 8, dpi & 255, 0, 0];
+  const sof = [0xff, 0xc0, 0, 17, 8, h >> 8, h & 255, w >> 8, w & 255, 3, 1, 0x11, 0, 2, 0x11, 1, 3, 0x11, 1];
+  return new Uint8Array([0xff, 0xd8, ...app0, ...sof, 0xff, 0xd9]);
+}
+/** Uncompressed 8-bit grey TIFF, resolution `res` per `unit` (2 inch, 3 cm), little endian. */
+export function tiffBytes(w: number, h: number, gray: Uint8Array, res?: { value: number; unit: 2 | 3 }): Uint8Array {
+  const tags: [number, number, number, number][] = []; // tag, type, count, value
+  const SHORT = 3, LONG = 4, RATIONAL = 5;
+  const nTags = res ? 12 : 9;
+  const ifdSize = 2 + nTags * 12 + 4;
+  const ratOff = 8 + ifdSize;
+  const dataOff = ratOff + (res ? 16 : 0);
+  tags.push([256, LONG, 1, w], [257, LONG, 1, h], [258, SHORT, 1, 8], [259, SHORT, 1, 1], [262, SHORT, 1, 1]);
+  tags.push([273, LONG, 1, dataOff], [277, SHORT, 1, 1], [278, LONG, 1, h], [279, LONG, 1, w * h]);
+  if (res) tags.push([282, RATIONAL, 1, ratOff], [283, RATIONAL, 1, ratOff + 8], [296, SHORT, 1, res.unit]);
+  const out = new Uint8Array(dataOff + w * h);
+  const dv = new DataView(out.buffer);
+  out.set([0x49, 0x49, 42, 0]);
+  dv.setUint32(4, 8, true);
+  dv.setUint16(8, nTags, true);
+  tags.forEach(([tag, type, count, value], i) => {
+    const o = 10 + i * 12;
+    dv.setUint16(o, tag, true);
+    dv.setUint16(o + 2, type, true);
+    dv.setUint32(o + 4, count, true);
+    if (type === SHORT) dv.setUint16(o + 8, value, true);
+    else dv.setUint32(o + 8, value, true);
+  });
+  dv.setUint32(10 + nTags * 12, 0, true);
+  if (res) {
+    dv.setUint32(ratOff, Math.round(res.value * 1000), true);
+    dv.setUint32(ratOff + 4, 1000, true);
+    dv.setUint32(ratOff + 8, Math.round(res.value * 1000), true);
+    dv.setUint32(ratOff + 12, 1000, true);
+  }
+  out.set(gray, dataOff);
+  return out;
+}
+export function pgmBytes(w: number, h: number, gray: Uint8Array): Uint8Array {
+  const head = new TextEncoder().encode(`P5\n${w} ${h}\n255\n`);
+  return concat([head, gray]);
+}
+
+// ---------------- independent SVG reader ----------------
+export type Sub = { pts: P[]; closed: boolean };
+export type SvgPathEl = { d: string; fill: string; fillRule: string; stroke: string };
+export type SvgDoc = { widthMm: number; heightMm: number; vbW: number; vbH: number; paths: SvgPathEl[] };
+export function readSvg(text: string): SvgDoc {
+  const attr = (s: string, n: string) => s.match(new RegExp(`\\s${n}="([^"]*)"`))?.[1] ?? '';
+  const root = text.match(/<svg[^>]*>/)![0];
+  const vb = attr(root, 'viewBox').split(/[\s,]+/).map(Number);
+  const mm = (v: string) => (v.endsWith('mm') ? Number(v.slice(0, -2)) : NaN);
+  const paths = [...text.matchAll(/<path[^>]*\/>/g)].map((m) => ({
+    d: attr(m[0], 'd'),
+    fill: attr(m[0], 'fill'),
+    fillRule: attr(m[0], 'fill-rule'),
+    stroke: attr(m[0], 'stroke'),
+  }));
+  return { widthMm: mm(attr(root, 'width')), heightMm: mm(attr(root, 'height')), vbW: vb[2]!, vbH: vb[3]!, paths };
+}
+export function parsePathD(d: string, cubicSteps = 12): Sub[] {
+  const toks = d.match(/[MmLlHhVvCcZz]|-?(?:\d+\.?\d*|\.\d+)(?:e-?\d+)?/g) ?? [];
+  const subs: Sub[] = [];
+  let i = 0, cmd = '', cx = 0, cy = 0, sx = 0, sy = 0;
+  let cur: Sub | null = null;
+  const num = () => Number(toks[i++]);
+  while (i < toks.length) {
+    const t = toks[i]!;
+    if (/[A-Za-z]/.test(t)) {
+      cmd = t;
+      i++;
+      if (cmd === 'Z' || cmd === 'z') {
+        if (cur) cur.closed = true;
+        cx = sx;
+        cy = sy;
+        cur = null;
+        continue;
+      }
+    } else if (cmd === 'M') cmd = 'L';
+    else if (cmd === 'm') cmd = 'l';
+    const rel = cmd === cmd.toLowerCase();
+    const C = cmd.toUpperCase();
+    if (C === 'M') {
+      const x = num(), y = num();
+      cx = rel ? cx + x : x;
+      cy = rel ? cy + y : y;
+      sx = cx;
+      sy = cy;
+      cur = { pts: [{ x: cx, y: cy }], closed: false };
+      subs.push(cur);
+      cmd = rel ? 'l' : 'L';
+    } else {
+      if (!cur) {
+        cur = { pts: [{ x: cx, y: cy }], closed: false };
+        subs.push(cur);
+        sx = cx;
+        sy = cy;
+      }
+      if (C === 'L') {
+        const x = num(), y = num();
+        cx = rel ? cx + x : x;
+        cy = rel ? cy + y : y;
+        cur.pts.push({ x: cx, y: cy });
+      } else if (C === 'H') {
+        const x = num();
+        cx = rel ? cx + x : x;
+        cur.pts.push({ x: cx, y: cy });
+      } else if (C === 'V') {
+        const y = num();
+        cy = rel ? cy + y : y;
+        cur.pts.push({ x: cx, y: cy });
+      } else if (C === 'C') {
+        const a = [num(), num(), num(), num(), num(), num()];
+        const ox = rel ? cx : 0, oy = rel ? cy : 0;
+        const p0 = { x: cx, y: cy }, p1 = { x: a[0]! + ox, y: a[1]! + oy }, p2 = { x: a[2]! + ox, y: a[3]! + oy }, p3 = { x: a[4]! + ox, y: a[5]! + oy };
+        for (let k = 1; k <= cubicSteps; k++) {
+          const t2 = k / cubicSteps, u = 1 - t2;
+          cur.pts.push({
+            x: u * u * u * p0.x + 3 * u * u * t2 * p1.x + 3 * u * t2 * t2 * p2.x + t2 * t2 * t2 * p3.x,
+            y: u * u * u * p0.y + 3 * u * u * t2 * p1.y + 3 * u * t2 * t2 * p2.y + t2 * t2 * t2 * p3.y,
+          });
+        }
+        cx = p3.x;
+        cy = p3.y;
+      } else throw new Error('unsupported command ' + cmd);
+    }
+  }
+  return subs;
+}
+
+// ---------------- independent DXF reader (LWPOLYLINE) ----------------
+export type DxfDoc = { insunits: number | null; subs: Sub[]; bulges: number; layers: Set<string> };
+export function readDxf(text: string): DxfDoc {
+  const lines = text.split(/\r?\n/);
+  const pairs: [number, string][] = [];
+  for (let i = 0; i + 1 < lines.length; i += 2) pairs.push([Number(lines[i]!.trim()), lines[i + 1]!.trim()]);
+  let insunits: number | null = null;
+  const subs: Sub[] = [];
+  const layers = new Set<string>();
+  let bulges = 0;
+  let cur: Sub | null = null;
+  let pendingX: number | null = null;
+  const bl = new Map<Sub, number[]>();
+  for (let k = 0; k < pairs.length; k++) {
+    const [code, value] = pairs[k]!;
+    if (code === 9 && value === '$INSUNITS') insunits = Number(pairs[k + 1]![1]);
+    if (code === 0) {
+      cur = value === 'LWPOLYLINE' ? { pts: [], closed: false } : null;
+      if (cur) subs.push(cur);
+      continue;
+    }
+    if (!cur) continue;
+    if (code === 8) layers.add(value);
+    if (code === 70) cur.closed = (Number(value) & 1) === 1;
+    if (code === 10) pendingX = Number(value);
+    if (code === 20 && pendingX !== null) {
+      cur.pts.push({ x: pendingX, y: Number(value) });
+      bl.set(cur, [...(bl.get(cur) ?? []), 0]);
+      pendingX = null;
+    }
+    if (code === 42 && Number(value) !== 0) {
+      bulges++;
+      const arr = bl.get(cur)!;
+      arr[arr.length - 1] = Number(value);
+    }
+  }
+  // flatten bulge arcs: bulge = tan(theta/4), positive = counter-clockwise from vertex i to i+1
+  const flat = subs.map((s) => {
+    const b = bl.get(s) ?? [];
+    const out: P[] = [];
+    const n = s.pts.length;
+    const segs = s.closed ? n : n - 1;
+    for (let i = 0; i < n; i++) {
+      const a = s.pts[i]!;
+      out.push(a);
+      if (i >= segs) continue;
+      const c = s.pts[(i + 1) % n]!;
+      const bulge = b[i] ?? 0;
+      if (bulge === 0) continue;
+      const theta = 4 * Math.atan(bulge);
+      const chord = Math.hypot(c.x - a.x, c.y - a.y);
+      if (chord === 0) continue;
+      const r = chord / (2 * Math.sin(theta / 2));
+      const h = r * Math.cos(theta / 2);
+      const ux = -(c.y - a.y) / chord, uy = (c.x - a.x) / chord;
+      const cx = (a.x + c.x) / 2 + ux * h, cy = (a.y + c.y) / 2 + uy * h;
+      const a0 = Math.atan2(a.y - cy, a.x - cx);
+      const R = Math.abs(r);
+      for (let k = 1; k < 16; k++) {
+        const t = a0 + (theta * k) / 16;
+        out.push({ x: cx + R * Math.cos(t), y: cy + R * Math.sin(t) });
+      }
+    }
+    return { pts: out, closed: s.closed };
+  });
+  return { insunits, subs: flat, bulges, layers };
+}
+
+// ---------------- scanline region sampler ----------------
+type Edge = { x0: number; y0: number; x1: number; y1: number; dir: number };
+export function edgesOf(contours: P[][]): Edge[] {
+  const out: Edge[] = [];
+  for (const c of contours)
+    for (let i = 0; i < c.length; i++) {
+      const a = c[i]!, b = c[(i + 1) % c.length]!;
+      if (a.y === b.y) continue;
+      out.push({ x0: a.x, y0: a.y, x1: b.x, y1: b.y, dir: b.y > a.y ? 1 : -1 });
+    }
+  return out;
+}
+/** Inside flags along row y at xs (sorted ascending), even-odd or nonzero. */
+export function rowInside(edges: Edge[], y: number, xs: number[], rule: 'evenodd' | 'nonzero'): boolean[] {
+  const hits: { x: number; dir: number }[] = [];
+  for (const e of edges) {
+    const lo = Math.min(e.y0, e.y1), hi = Math.max(e.y0, e.y1);
+    if (y < lo || y >= hi) continue;
+    const t = (y - e.y0) / (e.y1 - e.y0);
+    hits.push({ x: e.x0 + t * (e.x1 - e.x0), dir: e.dir });
+  }
+  hits.sort((a, b) => a.x - b.x);
+  const out: boolean[] = [];
+  let h = 0, w = 0, n = 0;
+  for (const x of xs) {
+    while (h < hits.length && hits[h]!.x <= x) {
+      w += hits[h]!.dir;
+      n++;
+      h++;
+    }
+    out.push(rule === 'nonzero' ? w !== 0 : n % 2 === 1);
+  }
+  return out;
+}
+export function bbox(subs: { pts: P[] }[]): { x0: number; y0: number; x1: number; y1: number } {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const s of subs)
+    for (const p of s.pts) {
+      x0 = Math.min(x0, p.x);
+      y0 = Math.min(y0, p.y);
+      x1 = Math.max(x1, p.x);
+      y1 = Math.max(y1, p.y);
+    }
+  return { x0, y0, x1, y1 };
+}
+export const r3 = (v: number) => Math.round(v * 1000) / 1000;
+
+/** Distance from p to the nearest segment of any polyline. */
+export function distToPolys(p: P, polys: P[][], closed: boolean[]): number {
+  let d = Infinity;
+  polys.forEach((c, k) => {
+    const n = closed[k] ? c.length : c.length - 1;
+    for (let i = 0; i < n; i++) {
+      const a = c[i]!, b = c[(i + 1) % c.length]!;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const L = dx * dx + dy * dy;
+      const t = L === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / L));
+      d = Math.min(d, Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy)));
+    }
+  });
+  return d;
+}

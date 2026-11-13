@@ -1,0 +1,12 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+const dir = 'C:/Users/stolk/kd-t1/zz-t22/';
+let s = readFileSync(dir + 't22c.test.tsx', 'utf8');
+const rep = (a, b) => { if (!s.includes(a)) throw new Error('missing: ' + a.slice(0, 60)); s = s.replace(a, b); };
+rep("const groups = [{ id: 'g', memberIds: ['a', 'b', 'c'] }];", "const groups = [{ id: 'g', name: 'G', objectIds: ['a', 'b', 'c'] }];");
+rep("    await convertSelectedVectorsToBitmap([a] as unknown as ConvertibleVector[], layers, { renderType: 'fill-all', dpi: 254, brightnessPercent: 50 }, useStore.getState().convertToBitmap, () => {});",
+  "    const oc = await convertSelectedVectorsToBitmap([a] as unknown as ConvertibleVector[], layers, { renderType: 'fill-all', dpi: 254, brightnessPercent: 50 }, useStore.getState().convertToBitmap, (m) => log('c4 toast ' + m));");
+rep('log(`c4 groups', 'log(`c4 outcome ${JSON.stringify(oc)} groups');
+rep('if (!back.ok) {', "if (back.kind !== 'ok') {");
+for (const k of ['c1', 'c2', 'c3', 'c6', 'c7', 'c8']) rep(`it('${k}`, `it.skip('${k}`);
+rep('zz-t22/t22c.log', 'zz-t22/t22c2.log');
+writeFileSync(dir + 't22c2.test.tsx', s);

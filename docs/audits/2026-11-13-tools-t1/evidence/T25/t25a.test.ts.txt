@@ -1,0 +1,224 @@
+// T25a: does each Multi-File Trace output equal what Trace Image makes of the same file alone?
+// Batch: real buildMultiFileTraceExports (real header size + density readers on real PNG/JPEG
+// header bytes, real tracer, real SVG/DXF writers); only the pixel decode is injected.
+// Single: the real Trace dialog commit on a raster sized exactly as Import Image sizes it
+// (rasterImportGeometry with the same density); only its decode is replaced (T23 harness).
+// Oracles: the synthetic pixels (dark = ink) mapped at the file's own DPI; an own SVG/DXF reader.
+import { describe, expect, it, vi } from 'vitest';
+import type { RawImageData } from '../t22-main/src/core/trace';
+import { TRACE_PRESETS } from '../t22-main/src/core/trace/trace-presets';
+import { useStore } from '../t22-main/src/ui/state';
+import { rasterImportGeometry } from '../t22-main/src/ui/common/image-import';
+import { buildMultiFileTraceExports, runMultiFileTrace } from '../t22-main/src/ui/commands/multi-file-trace-action';
+import { batchTraceSettings, lastTraceSettingsRecord } from '../t22-main/src/ui/commands/multi-file-trace-settings';
+import { parseSvg } from '../t22-main/src/io/svg/parse-svg';
+import { mergeLightBurnTraceSettings } from '../t22-main/src/ui/trace/trace-options';
+import { makePixels, runTrace, seedRaster, setupProject, tracedWorldPaths, W, H } from '../zz-t23/t23-fixture';
+import { xf } from '../zz-t23/t23-common';
+import {
+  bbox, distToPolys, edgesOf, jpegBytes, logger, parsePathD, pngBytes, r3, readDxf, readSvg, rowInside, type P,
+} from './t25-common';
+
+vi.mock('../t22-main/src/ui/trace/off-thread-trace-decode', async () => {
+  const transp = await import('../t22-main/src/ui/trace/raw-image-transparency');
+  return {
+    decodeTraceSourceImage: async () => {
+      const image = (globalThis as { __T23_PIXELS?: RawImageData }).__T23_PIXELS!;
+      return { image, hasTransparency: transp.rawImageHasTransparency(image) };
+    },
+  };
+});
+
+const log = logger('C:/Users/stolk/kd-t1/zz-t25/t25a.log');
+const PIX = makePixels();
+const dark = (u: number, v: number) => {
+  const x = Math.floor(u), y = Math.floor(v);
+  if (x < 0 || y < 0 || x >= W || y >= H) return false;
+  return PIX.data[(y * W + x) * 4]! < 128;
+};
+const nearEdge = (u: number, v: number) => {
+  const x = Math.floor(u), y = Math.floor(v);
+  const c = dark(x + 0.5, y + 0.5);
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dark(x + dx + 0.5, y + dy + 0.5) !== c) return true;
+  return false;
+};
+
+type Region = { contours: P[][]; rule: 'evenodd' | 'nonzero' }[];
+function svgRegion(text: string): { region: Region; strokes: { pts: P[]; closed: boolean }[]; doc: ReturnType<typeof readSvg> } {
+  const doc = readSvg(text);
+  const sx = doc.widthMm / doc.vbW, sy = doc.heightMm / doc.vbH;
+  const region: Region = [];
+  const strokes: { pts: P[]; closed: boolean }[] = [];
+  for (const p of doc.paths) {
+    const subs = parsePathD(p.d).map((s) => ({ ...s, pts: s.pts.map((q) => ({ x: q.x * sx, y: q.y * sy })) }));
+    if (p.fill !== 'none') region.push({ contours: subs.filter((s) => s.closed).map((s) => s.pts), rule: p.fillRule === 'evenodd' ? 'evenodd' : 'nonzero' });
+    else strokes.push(...subs);
+  }
+  return { region, strokes, doc };
+}
+function singleObject() {
+  const o = useStore.getState().project.scene.objects.find((k) => k.kind === 'traced-image') as unknown as {
+    paths: { fillRule?: 'evenodd' | 'nonzero'; polylines: { points: P[]; closed: boolean }[] }[];
+    transform: unknown;
+  };
+  return o;
+}
+function singleRegion(): Region {
+  return tracedWorldPaths(singleObject() as never) as Region;
+}
+function compareRegions(a: Region, b: Region, mmPerPx: number, wMm: number, hMm: number) {
+  const step = mmPerPx / 4;
+  const ea = a.map((p) => ({ e: edgesOf(p.contours), rule: p.rule }));
+  const eb = b.map((p) => ({ e: edgesOf(p.contours), rule: p.rule }));
+  const nx = Math.ceil(wMm / step), ny = Math.ceil(hMm / step);
+  const xs = Array.from({ length: nx }, (_, i) => (i + 0.5) * step);
+  let A = 0, B = 0, X = 0, Xfar = 0, PA = 0, Apx = 0, ApxFar = 0, Bpx = 0, BpxFar = 0;
+  for (let j = 0; j < ny; j++) {
+    const y = (j + 0.5) * step;
+    const ia = ea.map((p) => rowInside(p.e, y, xs, p.rule));
+    const ib = eb.map((p) => rowInside(p.e, y, xs, p.rule));
+    for (let i = 0; i < nx; i++) {
+      const inA = ia.some((r) => r[i]), inB = ib.some((r) => r[i]);
+      const u = xs[i]! / mmPerPx, v = y / mmPerPx;
+      const d = dark(u, v), far = !nearEdge(u, v);
+      if (inA) A++;
+      if (inB) B++;
+      if (d) PA++;
+      if (inA !== inB) {
+        X++;
+        if (far) Xfar++;
+      }
+      if (inA !== d) {
+        Apx++;
+        if (far) ApxFar++;
+      }
+      if (inB !== d) {
+        Bpx++;
+        if (far) BpxFar++;
+      }
+    }
+  }
+  const s2 = step * step;
+  return {
+    areaBatch: r3(A * s2), areaSingle: r3(B * s2), areaPixels: r3(PA * s2),
+    xorBatchSingle: r3(X * s2), xorBatchSingleFar: r3(Xfar * s2),
+    xorBatchPixels: r3(Apx * s2), xorBatchPixelsFar: r3(ApxFar * s2),
+    xorSinglePixels: r3(Bpx * s2), xorSinglePixelsFar: r3(BpxFar * s2),
+  };
+}
+
+async function batchOne(name: string, bytes: Uint8Array, presetOptions: Parameters<typeof buildMultiFileTraceExports>[1]) {
+  const file = new File([bytes], name, { type: name.endsWith('.jpg') ? 'image/jpeg' : 'image/png' });
+  const loads: (number | undefined)[] = [];
+  const result = await buildMultiFileTraceExports([file], {
+    loadImage: async (_f, maxEdge) => {
+      loads.push(maxEdge);
+      return PIX;
+    },
+    ...presetOptions,
+  });
+  return { result, loads };
+}
+
+type Case = { name: string; file: string; bytes: Uint8Array; dpi: number | null; preset: string; overrides?: Record<string, unknown> };
+const cases: Case[] = [
+  { name: 'A PNG 300 DPI, Line Art', file: 'a.png', bytes: pngBytes(W, H, 300), dpi: 300, preset: 'Line Art' },
+  { name: 'B PNG no density, Line Art', file: 'b.png', bytes: pngBytes(W, H), dpi: null, preset: 'Line Art' },
+  { name: 'C JPEG JFIF 150 DPI, Line Art', file: 'c.jpg', bytes: jpegBytes(W, H, 150), dpi: 150, preset: 'Line Art' },
+  { name: 'D PNG 300 DPI, Smooth', file: 'd.png', bytes: pngBytes(W, H, 300), dpi: 300, preset: 'Smooth' },
+  { name: 'E PNG 300 DPI, Sharp', file: 'e.png', bytes: pngBytes(W, H, 300), dpi: 300, preset: 'Sharp' },
+  { name: 'F PNG 300 DPI, Centerline', file: 'f.png', bytes: pngBytes(W, H, 300), dpi: 300, preset: 'Centerline' },
+  { name: 'G PNG 300 DPI, Line Art + overrides via Last Trace Image settings', file: 'g.png', bytes: pngBytes(W, H, 300), dpi: 300, preset: 'Line Art', overrides: { smoothness: 0.2, ignoreLessThanPixels: 30 } },
+];
+
+describe('T25a batch vs single', () => {
+  for (const c of cases.filter((k) => !process.env.T25_ONLY || k.name.startsWith(process.env.T25_ONLY)))
+    it(c.name, async () => {
+      // physical size expected from the file's own DPI, as Import Image sizes it
+      const density = c.dpi === null ? null : { xDpi: Math.round(c.dpi / 0.0254) * 0.0254, yDpi: Math.round(c.dpi / 0.0254) * 0.0254 };
+      const jpegDensity = c.file.endsWith('.jpg') ? { xDpi: c.dpi!, yDpi: c.dpi! } : density;
+      const geo = rasterImportGeometry({ naturalWidth: W, naturalHeight: H, sampledWidth: W, sampledHeight: H, density: jpegDensity });
+      const wMm = geo.bounds.maxX, hMm = geo.bounds.maxY, mmPerPx = wMm / W;
+      // ---- single Trace Image commit on that raster
+      const seed = seedRaster({ bounds: geo.bounds });
+      setupProject([seed]);
+      const single = await runTrace(seed, c.preset, c.overrides ? { overrides: c.overrides } : {});
+      const singleObj = singleObject();
+      // ---- batch
+      let deps: Parameters<typeof buildMultiFileTraceExports>[1] = {};
+      let label = `the ${c.preset} preset`;
+      if (c.overrides) {
+        const rec = lastTraceSettingsRecord(useStore.getState().project.scene.objects);
+        const chosen = batchTraceSettings('last-trace', 'Line Art', rec, 'laser');
+        deps = { ...(chosen.options ? { options: chosen.options } : {}) };
+        label = chosen.label;
+        const direct = mergeLightBurnTraceSettings(TRACE_PRESETS[c.preset]!, c.overrides as never);
+        log(`${c.name}: last-trace options equal dialog options: ${JSON.stringify(chosen.options) === JSON.stringify(direct)}`);
+      } else deps = { options: TRACE_PRESETS[c.preset]! };
+      const svgRun = await batchOne(c.file, c.bytes, { ...deps, output: { format: 'svg' } });
+      const dxfRun = await batchOne(c.file, c.bytes, { ...deps, output: { format: 'dxf' } });
+      const svgFile = svgRun.result.files[0];
+      const dxfFile = dxfRun.result.files[0];
+      log(`\n== ${c.name}  (label: ${label})`);
+      log(`single toasts: ${JSON.stringify(single.toasts)}`);
+      log(`expected import size ${r3(wMm)} x ${r3(hMm)} mm (${geo.densitySource}); batch densitySource ${svgFile?.densitySource}; skipped ${JSON.stringify(svgRun.result.skipped)}; loads maxEdge ${JSON.stringify(svgRun.loads)}`);
+      expect(svgFile).toBeDefined();
+      const { region, strokes, doc } = svgRegion(svgFile!.text);
+      log(`SVG: ${svgFile!.filename} width ${doc.widthMm} mm height ${doc.heightMm} mm viewBox ${doc.vbW} x ${doc.vbH}; paths ${doc.paths.length} (${doc.paths.map((p) => `fill=${p.fill} rule=${p.fillRule} stroke=${p.stroke}`).join(' | ')})`);
+      const sb = singleObj.paths.flatMap((p) => p.polylines.map((l) => ({ pts: l.points.map((q) => xf(q, singleObj.transform as never)) })));
+      const bbS = bbox(sb);
+      const bbB = bbox([...region.flatMap((r) => r.contours.map((pts) => ({ pts }))), ...strokes]);
+      log(`bbox single (${r3(bbS.x0)},${r3(bbS.y0)})-(${r3(bbS.x1)},${r3(bbS.y1)})  batch (${r3(bbB.x0)},${r3(bbB.y0)})-(${r3(bbB.x1)},${r3(bbB.y1)})`);
+      if (region.length > 0) {
+        const cmp = compareRegions(region, singleRegion(), mmPerPx, wMm, hMm);
+        log(`regions (mm²): ${JSON.stringify(cmp)}  [1 px = ${r3(mmPerPx * mmPerPx * 1000) / 1000} mm²]`);
+      }
+      if (strokes.length > 0) {
+        const sPolys = singleObj.paths.flatMap((p) => p.polylines.map((l) => l.points.map((q) => xf(q, singleObj.transform as never))));
+        const sClosed = singleObj.paths.flatMap((p) => p.polylines.map((l) => l.closed));
+        let maxBS = 0, maxSB = 0;
+        for (const s of strokes) for (const p of s.pts) maxBS = Math.max(maxBS, distToPolys(p, sPolys, sClosed));
+        const bPolys = strokes.map((s) => s.pts), bClosed = strokes.map((s) => s.closed);
+        for (const pl of sPolys) for (const p of pl) maxSB = Math.max(maxSB, distToPolys(p, bPolys, bClosed));
+        // ink check: every batch vertex on ink (in source px)
+        let offInk = 0, maxOff = 0;
+        for (const s of strokes)
+          for (const p of s.pts) {
+            const u = p.x / mmPerPx, v = p.y / mmPerPx;
+            if (!dark(u, v)) {
+              offInk++;
+              let best = 9;
+              for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) if (dark(u + dx, v + dy)) best = Math.min(best, Math.hypot(dx, dy));
+              maxOff = Math.max(maxOff, best);
+            }
+          }
+        log(`strokes: batch ${strokes.length} subpaths, ${strokes.reduce((s, k) => s + k.pts.length, 0)} pts; single ${sPolys.length} polylines. Hausdorff batch->single ${r3(maxBS)} mm, single->batch ${r3(maxSB)} mm (= ${r3(Math.max(maxBS, maxSB) / mmPerPx)} px); batch vertices off ink ${offInk}, max ${maxOff} px`);
+      }
+      // ---- DXF agrees with SVG
+      if (dxfFile) {
+        const dxf = readDxf(dxfFile.text);
+        const bbD = bbox(dxf.subs.map((s) => ({ pts: s.pts.map((q) => ({ x: q.x, y: hMm - q.y })) })));
+        log(`DXF: ${dxfFile.filename} $INSUNITS ${dxf.insunits}; ${dxf.subs.length} LWPOLYLINE (closed ${dxf.subs.filter((s) => s.closed).length}); bulges ${dxf.bulges}; layers ${[...dxf.layers].join(',')}; bbox (Y flipped back) (${r3(bbD.x0)},${r3(bbD.y0)})-(${r3(bbD.x1)},${r3(bbD.y1)})`);
+        if (region.length > 0) {
+          const dReg: Region = [{ rule: 'evenodd', contours: dxf.subs.filter((s) => s.closed).map((s) => s.pts.map((q) => ({ x: q.x, y: hMm - q.y }))) }];
+          const cmp = compareRegions(dReg, region, mmPerPx, wMm, hMm);
+          log(`DXF vs SVG region: xor ${cmp.xorBatchSingle} mm² (far ${cmp.xorBatchSingleFar}); DXF area ${cmp.areaBatch} vs SVG ${cmp.areaSingle}`);
+        }
+      }
+      // ---- reopen: the app's own SVG import of the written file
+      const re = parseSvg({ svgText: svgFile!.text, id: 're', source: svgFile!.filename });
+      const ob = re.object as unknown as { bounds: { minX: number; minY: number; maxX: number; maxY: number }; paths: { fillRule?: string; color: string }[] } | null;
+      log(`re-import: bounds ${ob ? `(${r3(ob.bounds.minX)},${r3(ob.bounds.minY)})-(${r3(ob.bounds.maxX)},${r3(ob.bounds.maxY)})` : 'null'}; paths ${ob?.paths.length} rules ${ob?.paths.map((p) => p.fillRule).join(',')}; notes ${JSON.stringify(re.notes)}`);
+    });
+
+  it('H runMultiFileTrace toast for the B (default-DPI) file and the A file together', async () => {
+    const toasts: string[] = [];
+    const written: string[] = [];
+    await runMultiFileTrace(
+      [new File([pngBytes(W, H, 300)], 'a.png', { type: 'image/png' }), new File([pngBytes(W, H)], 'b.png', { type: 'image/png' })],
+      (m, k) => toasts.push(`${k}: ${m}`),
+      { loadImage: async () => PIX, write: async (f) => (written.push(f.filename), true), settingsLabel: 'the Line Art preset' },
+    );
+    log(`\n== H toast: ${JSON.stringify(toasts)} written ${JSON.stringify(written)}`);
+  });
+});

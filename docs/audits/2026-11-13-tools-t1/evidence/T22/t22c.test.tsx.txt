@@ -1,0 +1,173 @@
+// T22c: Use Cut Settings, output-off, burn order vs cut, image-mask dependency, groups,
+// save/reopen, budgets, dialog blank fields.
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import { describe, it, vi } from 'vitest';
+import { type Layer, type RasterImage, type SceneObject } from '../t22-main/src/core/scene';
+import { useStore } from '../t22-main/src/ui/state';
+import { resetStore } from '../t22-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t22-main/src/ui/state/toast-store';
+import { convertSelectedVectorsToBitmap } from '../t22-main/src/ui/commands/bitmap-conversion';
+import type { ConvertibleVector } from '../t22-main/src/ui/raster/vector-to-bitmap';
+import { estimateBitmapConversion } from '../t22-main/src/ui/raster/bitmap-conversion-plan';
+import { ConvertToBitmapDialog } from '../t22-main/src/ui/raster/ConvertToBitmapDialog';
+import { serializeProject } from '../t22-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t22-main/src/io/project/deserialize-project';
+import { IDENTITY_TRANSFORM } from '../t22-main/src/core/scene';
+import {
+  burnedSegments, compare, fillLayer, gcodeOf, insideAll, lineLayer, logger, mkObj, project, rect, xf,
+} from './t22-common';
+
+vi.mock('../t22-main/src/ui/raster/convert-bitmap-worker-client', async () => {
+  const asm = await import('../t22-main/src/ui/raster/bitmap-assembly');
+  const lb = await import('../t22-main/src/ui/raster/luma-bitmap');
+  return {
+    convertBitmapInWorker: (objects: never, options: never, id: string) =>
+      Promise.resolve(asm.assembleBitmap(objects, (r) => ({ dataUrl: 'data:image/png;base64,iVBORw0KGgo=', lumaBase64: lb.lumaToBase64(r.luma) }), id, options)),
+  };
+});
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const log = logger('C:/Users/stolk/kd-t1/zz-t22/t22c.log');
+
+async function conv(all: SceneObject[], sel: SceneObject[], layers: Layer[], renderType: 'fill-all' | 'outlines' | 'use-cut-settings', brightness = 0, extra: object = {}) {
+  resetStore();
+  useToastStore.setState({ toasts: [] } as never);
+  useStore.setState({ project: { ...project(all, layers), ...extra } as never, selectedObjectId: sel[0]!.id });
+  const toasts: string[] = [];
+  const outcome = await convertSelectedVectorsToBitmap(sel as unknown as ConvertibleVector[], layers, { renderType, dpi: 254, brightnessPercent: brightness }, useStore.getState().convertToBitmap, (m) => toasts.push(m));
+  const storeToasts = (useToastStore.getState() as { toasts: { message: string }[] }).toasts.map((t) => t.message);
+  return { outcome, toasts: [...toasts, ...storeToasts], project: useStore.getState().project };
+}
+
+describe('T22c', () => {
+  it('c1 Use Cut Settings: Line object, Fill object, Output-off Fill object', async () => {
+    const layers = [lineLayer('L', '#000000'), fillLayer('F', '#ff0000'), fillLayer('O', '#00ff00', { output: false })];
+    const a = mkObj('a', 'shape', [{ contours: [rect(10, 10, 20, 20)] }], undefined, ['L']);
+    const b = mkObj('b', 'shape', [{ contours: [rect(25, 10, 35, 20)], color: '#ff0000' }], undefined, ['F']);
+    const c = mkObj('c', 'shape', [{ contours: [rect(40, 10, 50, 20)], color: '#00ff00' }], undefined, ['O']);
+    const before = burnedSegments(gcodeOf(project([a, b, c], layers)));
+    const r = await conv([a, b, c], [a, b, c], layers, 'use-cut-settings');
+    const segs = burnedSegments(gcodeOf(r.project));
+    const inX = (x0: number, x1: number, s: typeof segs) => s.filter((q) => Math.min(q.a.x, q.b.x) < x1 && Math.max(q.a.x, q.b.x) > x0);
+    const len = (s: typeof segs) => s.reduce((t, q) => t + Math.hypot(q.b.x - q.a.x, q.b.y - q.a.y), 0).toFixed(2);
+    log(`c1 outcome ${JSON.stringify(r.outcome)}; before: line-obj ${len(inX(9, 21, before))} mm, fill-obj ${len(inX(24, 36, before))} mm, output-off obj ${len(inX(39, 51, before))} mm`);
+    log(`   after bitmap: line-obj region ${len(inX(9, 21, segs))} mm (${inX(9, 21, segs).length} segs), fill-obj ${len(inX(24, 36, segs))} mm, output-off obj ${len(inX(39, 51, segs))} mm; layers ${r.project.scene.layers.map((l) => `${l.name}:${l.mode}:out=${l.output}`).join(', ')}`);
+    const fillCmp = compare(inX(24, 36, segs), 0.1, (p) => insideAll(p, [{ paths: [{ contours: [rect(25, 10, 35, 20)], rule: 'evenodd' }] }], 'union'), [rect(25, 10, 35, 20)], { x0: 23, y0: 8, x1: 37, y1: 22 });
+    log(`   fill-obj vs oracle ${JSON.stringify(fillCmp)}`);
+  });
+
+  it('c2 burn order: engrave Fill (1st) + cut Line (2nd); convert the engraving', async () => {
+    const layers = [fillLayer('F', '#000000'), lineLayer('L', '#ff0000')];
+    const eng = mkObj('eng', 'shape', [{ contours: [rect(15, 15, 25, 25)] }], undefined, ['F']);
+    const cut = mkObj('cut', 'shape', [{ contours: [rect(10, 10, 30, 30)], color: '#ff0000' }], undefined, ['L']);
+    const order = (g: string) => {
+      const out: string[] = [];
+      for (const l of g.split('\n')) {
+        const m = l.match(/^; (\w+) layer .* color (#[0-9a-f]+)/i) ?? l.match(/^;.*(image|fill|line).*(#[0-9a-f]{6})/i);
+        if (m) out.push(`${m[1]} ${m[2]}`);
+      }
+      return out;
+    };
+    const g0 = gcodeOf(project([eng, cut], layers));
+    log(`c2 before: ${JSON.stringify(order(g0))}`);
+    log(`   comments before: ${g0.split('\n').filter((l) => l.startsWith(';')).slice(0, 8).join(' | ')}`);
+    const r = await conv([eng, cut], [eng], layers, 'fill-all');
+    const g1 = gcodeOf(r.project);
+    log(`   after layers order: ${r.project.scene.layers.map((l) => `${l.name}:${l.mode}`).join(', ')}`);
+    log(`   comments after: ${g1.split('\n').filter((l) => l.startsWith(';')).slice(0, 8).join(' | ')}`);
+    // first burn y-position by kind: find index of first S>0 on the image vs on the cut perimeter
+    const segs = burnedSegments(g1);
+    const firstCut = segs.findIndex((s) => s.a.x === 10 || s.b.x === 10 || s.a.x === 30 || s.b.x === 30);
+    const firstImg = segs.findIndex((s) => s.a.x >= 14.9 && s.b.x <= 25.1 && s.a.x <= 25.1 && s.b.x >= 14.9);
+    const lastImg = segs.map((s, i) => [s, i] as const).filter(([s]) => s.a.x >= 14.9 && s.b.x <= 25.1 && s.a.x <= 25.1 && s.b.x >= 14.9).pop()?.[1];
+    log(`   seg index: first cut ${firstCut}, first image ${firstImg}, last image ${lastImg}, total ${segs.length}`);
+  });
+
+  it('c3 converting a vector that masks a photo', async () => {
+    const layers = [lineLayer('L', '#000000'), { ...fillLayer('I', '#808080'), mode: 'image' } as Layer];
+    const mask = mkObj('m', 'shape', [{ contours: [rect(10, 10, 20, 20)] }], undefined, ['L']);
+    const photo = {
+      kind: 'raster-image', id: 'ph', source: 'p.png', dataUrl: 'data:image/png;base64,iVBORw0KGgo=', pixelWidth: 10, pixelHeight: 10,
+      bounds: { minX: 5, minY: 5, maxX: 25, maxY: 25 }, transform: IDENTITY_TRANSFORM, color: '#808080', dither: 'threshold', linesPerMm: 10,
+      lumaBase64: Buffer.from(new Uint8Array(100)).toString('base64'), imageMaskId: 'm', operationIds: ['I'],
+    } as unknown as SceneObject;
+    const r = await conv([photo, mask], [mask], layers, 'fill-all');
+    const ph = r.project.scene.objects.find((o) => o.id === 'ph') as RasterImage;
+    log(`c3 outcome ${JSON.stringify(r.outcome)} photo imageMaskId after ${ph?.imageMaskId}; toasts ${JSON.stringify(r.toasts)}`);
+  });
+
+  it('c4 group membership and artwork order', async () => {
+    const layers = [fillLayer('F', '#000000')];
+    const a = mkObj('a', 'shape', [{ contours: [rect(10, 10, 20, 20)] }], undefined, ['F']);
+    const b = mkObj('b', 'shape', [{ contours: [rect(25, 10, 35, 20)] }], undefined, ['F']);
+    const c = mkObj('c', 'shape', [{ contours: [rect(40, 10, 50, 20)] }], undefined, ['F']);
+    const groups = [{ id: 'g', memberIds: ['a', 'b', 'c'] }];
+    resetStore();
+    const p0 = project([a, b, c], layers);
+    useStore.setState({ project: { ...p0, scene: { ...p0.scene, groups, artworkOrder: ['a', 'b', 'c'] } } as never, selectedObjectId: 'a' });
+    await convertSelectedVectorsToBitmap([a] as unknown as ConvertibleVector[], layers, { renderType: 'fill-all', dpi: 254, brightnessPercent: 50 }, useStore.getState().convertToBitmap, () => {});
+    const s = useStore.getState().project.scene;
+    log(`c4 groups after ${JSON.stringify(s.groups)} artworkOrder ${JSON.stringify(s.artworkOrder)} objects ${s.objects.map((o) => o.id.slice(0, 8)).join(',')}`);
+  });
+
+  it('c5 save and reopen', async () => {
+    const layers = [fillLayer('F', '#000000')];
+    const a = mkObj('a', 'shape', [{ contours: [rect(10.013, 10.041, 17.343, 13.211)] }], undefined, ['F']);
+    const r = await conv([a], [a], layers, 'fill-all', 50);
+    const json = serializeProject(r.project);
+    const back = deserializeProject(json);
+    if (!back.ok) { log(`c5 reopen FAILED ${JSON.stringify(back).slice(0, 400)}`); return; }
+    const i0 = r.project.scene.objects[0] as RasterImage;
+    const i1 = back.project.scene.objects[0] as RasterImage;
+    const g0 = gcodeOf(r.project), g1 = gcodeOf(back.project);
+    log(`c5 reopen ok; bounds same ${JSON.stringify(i0.bounds) === JSON.stringify(i1.bounds)} luma same ${i0.lumaBase64 === i1.lumaBase64} px ${i1.pixelWidth}x${i1.pixelHeight} layer lpm ${back.project.scene.layers.find((l) => l.mode === 'image')?.linesPerMm}; gcode identical ${g0 === g1} (${g0.length} chars)`);
+    const segs = burnedSegments(g0);
+    const inked = segs.length;
+    log(`   50% brightness, default layer: burned segments ${inked}, S values ${[...new Set(segs.map((s) => s.s))].join(',')}`);
+  });
+
+  it('c6 budgets and non-finite bounds', () => {
+    const t = (mm: number, dpi: number) => {
+      const p = estimateBitmapConversion({ bounds: { minX: 0, minY: 0, maxX: mm, maxY: mm }, transform: IDENTITY_TRANSFORM }, dpi);
+      return `${mm}mm@${dpi}: ${p.pixelWidth}x${p.pixelHeight} ${p.verdict.kind}`;
+    };
+    log(`c6 ${[t(100, 254), t(144, 254), t(145, 254), t(200, 254), t(200, 127), t(289, 127), t(290, 127), t(300, 127), t(400, 127)].join(' | ')}`);
+    const nan = estimateBitmapConversion({ bounds: { minX: 0, minY: 0, maxX: NaN, maxY: 5 }, transform: IDENTITY_TRANSFORM }, 254);
+    const inf = estimateBitmapConversion({ bounds: { minX: 0, minY: 0, maxX: Infinity, maxY: 5 }, transform: IDENTITY_TRANSFORM }, 254);
+    const dpiNaN = estimateBitmapConversion({ bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 }, transform: IDENTITY_TRANSFORM }, NaN);
+    log(`   NaN bounds ${nan.verdict.kind} ${nan.pixelWidth}x${nan.pixelHeight}; Inf ${inf.verdict.kind}; dpi NaN -> ${dpiNaN.dpi}`);
+  });
+
+  it('c7 dialog: blank DPI and blank brightness at submit', async () => {
+    const results: string[] = [];
+    for (const [dpi, br] of [['', '50'], ['254', ''], ['100', '50'], ['254', '1e3'], ['254', '-5']] as const) {
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+      const root = createRoot(host);
+      let got: unknown = null;
+      await act(async () => root.render(<ConvertToBitmapDialog sourceName="x" target={{ bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 }, transform: IDENTITY_TRANSFORM }} onCancel={() => {}} onConvert={(o) => { got = o; }} />));
+      const dpiInput = host.ownerDocument.querySelector('input[name="dpi"]') as HTMLInputElement;
+      const brInput = host.ownerDocument.querySelector('input[name="brightness"]') as HTMLInputElement;
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+      await act(async () => { setter.call(dpiInput, dpi); dpiInput.dispatchEvent(new Event('input', { bubbles: true })); });
+      await act(async () => { setter.call(brInput, br); brInput.dispatchEvent(new Event('input', { bubbles: true })); });
+      const estimate = host.ownerDocument.querySelector('[role="status"]')?.textContent;
+      const btn = [...host.ownerDocument.querySelectorAll('button')].find((b) => b.textContent === 'Convert')!;
+      await act(async () => { btn.click(); });
+      results.push(`dpi '${dpi}' brightness '${br}' -> field shows dpi '${dpiInput.value}', estimate '${estimate}', submitted ${JSON.stringify(got)}`);
+      await act(async () => root.unmount());
+      host.remove();
+    }
+    log(`c7\n   ${results.join('\n   ')}`);
+  });
+
+  it('c8 rotated 45 square: bitmap footprint vs the art', async () => {
+    const layers = [fillLayer('F', '#000000')];
+    const t = { ...IDENTITY_TRANSFORM, x: 30, y: 30, rotationDeg: 45 };
+    const a = mkObj('a', 'shape', [{ contours: [rect(-10, -10, 10, 10)] }], t, ['F']);
+    const r = await conv([a], [a], layers, 'fill-all', 50);
+    const img = r.project.scene.objects[0] as RasterImage;
+    const pts = rect(-10, -10, 10, 10).map((p) => xf(p, t));
+    log(`c8 art AABB x ${Math.min(...pts.map((p) => p.x)).toFixed(3)}..${Math.max(...pts.map((p) => p.x)).toFixed(3)}; image bounds ${JSON.stringify(img.bounds)} ${img.pixelWidth}x${img.pixelHeight}`);
+  });
+});
