@@ -20,6 +20,7 @@ import {
   type Project,
 } from '../../core/scene';
 import type { CncMachinePreset } from '../../core/cnc';
+import { cncPresetZTravelPatch } from '../../core/cnc/cnc-machine-catalog';
 import type { CncMachineStarterLiveCaps } from '../../core/cnc/machine-starters';
 import type { DeviceProfile } from '../../core/devices';
 import { jobPlacementAfterDeviceChange, jobPlacementAfterProfileSelection } from '../job-placement';
@@ -183,6 +184,7 @@ export function machineActions(set: MachineSet, get: MachineGet): MachineActions
           devicePatch: {
             bedWidth: preset.bedWidthMm,
             bedHeight: preset.bedHeightMm,
+            ...cncPresetZTravelPatch(preset, state.project.device),
           },
           paramsPatch: { spindleMaxRpm: preset.spindleMaxRpm },
         });

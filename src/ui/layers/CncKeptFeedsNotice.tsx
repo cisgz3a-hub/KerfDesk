@@ -14,7 +14,7 @@ import {
   type DisplayLengthUnit,
 } from '../display-length';
 import { useStore } from '../state';
-import { materialFeedsPatch } from '../state/cnc-project-material';
+import { keptFeedsMaterialPatch } from './cnc-material-starter-patches';
 import { useLengthUnit } from '../state/display-units';
 
 type CncCuttingValues = Pick<
@@ -78,12 +78,11 @@ export function CncKeptFeedsNotice(props: {
   const patch =
     material === null
       ? null
-      : materialFeedsPatch({
+      : keptFeedsMaterialPatch({
           materialKey: material,
-          tool,
-          spindleRpm: props.settings.spindleRpm,
+          settings: props.settings,
+          machine: props.machine,
           profile,
-          machineParams: props.machine.params,
           liveCaps,
         });
   const recipe = patch === null ? null : recipeValues(patch);

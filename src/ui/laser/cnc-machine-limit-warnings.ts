@@ -11,6 +11,7 @@
 
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
 import { cncMaxFeedMmPerMin } from '../../core/cnc/cnc-head-feeds';
+import { cncSpindleMinRpm } from '../../core/cnc/cnc-machine-starter-catalog';
 import { cncCuttingRates } from '../../core/cnc/cnc-cutting-rates';
 import { cncStageRecipeRuns } from '../../core/cnc/cnc-stage-recipe-runs';
 import { effectiveGcodeFeedMmPerMin } from '../../core/gcode/feed-word';
@@ -44,13 +45,15 @@ export function detectCncMachineLimitWarnings(
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc') return [];
   const rows = job === undefined ? layerRows(project, machine) : groupRows(project, job);
-  if (limits === null) return spindleVsConfiguredCeiling(machine, rows);
+  const belowMinimum = spindleBelowMinimum(project, rows);
+  if (limits === null) return [...spindleVsConfiguredCeiling(machine, rows), ...belowMinimum];
   return [
     ...stockVsBed(machine.stock, limits),
     ...feedVsMax(rows, limits),
     ...plungeVsZMax(rows, limits),
     ...spindleVsMax(rows, limits),
     ...spindleVsConfiguredCeiling(machine, rows),
+    ...belowMinimum,
   ];
 }
 
@@ -127,6 +130,29 @@ function spindleVsConfiguredCeiling(
       `by the same ratio, so each tooth keeps the chip load planned at ${cap.requestedRpm} RPM and ` +
       `the cut runs slower. To plan at the speed the machine runs, set the spindle to ${ceiling} RPM ` +
       'or reapply the material. KerfDesk sends the S value only; actual spindle RPM is not measured.',
+  ];
+}
+
+// CNC audit v3 N7r-P3-1: where the machine's starter records its spindle's
+// lowest rated speed (ADR-256 Amd 1: 3,000 RPM on the 4040's 500 W spindle), a
+// slower S, typed by hand, is named. A 0 RPM spindle is refused by preflight.
+function spindleBelowMinimum(
+  project: Project,
+  rows: ReadonlyArray<CuttingRow>,
+): ReadonlyArray<string> {
+  const minimum = cncSpindleMinRpm(project.device);
+  if (minimum === undefined) return [];
+  let slowest: CuttingRow | null = null;
+  for (const row of rows) {
+    if (row.spindleRpm <= 0 || row.spindleRpm >= minimum) continue;
+    if (slowest === null || row.spindleRpm < slowest.spindleRpm) slowest = row;
+  }
+  if (slowest === null) return [];
+  return [
+    `${slowest.source} runs the spindle at ${slowest.spindleRpm} RPM, below the ${minimum} RPM ` +
+      'minimum of the spindle this machine profile assumes. Below its rated range a spindle loses ' +
+      `torque and can stall in the cut. Set at least ${minimum} RPM, or confirm the fitted ` +
+      'spindle runs that slow.',
   ];
 }
 

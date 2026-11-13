@@ -11,7 +11,7 @@ import {
 import type { CncCuttingStage, CncStageRecipe } from '../../core/scene/cnc-stage-recipe';
 import { RailSection } from '../kit';
 import { useStore } from '../state';
-import { materialFeedsPatch } from '../state/cnc-project-material';
+import { stageMaterialStarterPatch } from './cnc-material-starter-patches';
 import { NumberField } from './CncLayerPrimitives';
 
 type Stage = { readonly id: CncCuttingStage; readonly label: string; readonly tool: CncTool };
@@ -70,12 +70,13 @@ function useStageValues(props: Props & { readonly stage: Stage }) {
     (settings.feedSource?.kind === 'material-recipe' ? settings.feedSource.materialKey : undefined);
   const starter =
     machine?.kind === 'cnc' && material !== undefined
-      ? materialFeedsPatch({
+      ? stageMaterialStarterPatch({
           materialKey: material,
-          tool: stage.tool,
-          spindleRpm: effective.spindleRpm,
+          settings,
+          stageTool: stage.tool,
+          stageSpindleRpm: effective.spindleRpm,
+          machine,
           profile,
-          machineParams: machine.params,
           liveCaps,
         })
       : null;

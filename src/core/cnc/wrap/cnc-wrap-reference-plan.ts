@@ -100,6 +100,7 @@ export function planCncWrapReference(job: Job, setup: CncWrapStudy): CncWrapPlan
       linearAxis: setup.circumferentialAxis === 'x' ? 'Y' : 'X',
       paths,
       warnings: [
+        ...wrapOverlapWarnings(paths, setup.radiusMm),
         'Offline reference only. No controller firmware or physical machine/accessory is qualified.',
         'Coordinates describe a cutter-tip locus; cutter-envelope contact, rotary limits, fixture clearance and backlash remain unqualified.',
         'The angular coordinate is unwrapped continuously. A seam crossing does not choose the shortest rotary route.',
@@ -109,6 +110,36 @@ export function planCncWrapReference(job: Job, setup: CncWrapStudy): CncWrapPlan
     },
   };
 }
+// CNC audit v3 N6-P3-4: a design whose circumferential extent passes one
+// circumference wraps onto itself, so its end is cut over its start: 40 mm on a
+// 5 mm radius spans 458° of A. Named first, with the numbers behind it.
+const FULL_TURN_DEG = 360;
+const SPAN_TOLERANCE_DEG = 1e-6;
+
+function wrapOverlapWarnings(
+  paths: readonly CncWrapReferencePath[],
+  radiusMm: number,
+): readonly string[] {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const path of paths) {
+    for (const point of path.points) {
+      min = Math.min(min, point.angleDeg);
+      max = Math.max(max, point.angleDeg);
+    }
+  }
+  const spanDeg = max - min;
+  if (!(spanDeg > FULL_TURN_DEG + SPAN_TOLERANCE_DEG)) return [];
+  const circumferenceMm = 2 * Math.PI * radiusMm;
+  const extentMm = (spanDeg * Math.PI * radiusMm) / 180;
+  return [
+    `The design wraps onto itself: it is ${extentMm.toFixed(1)} mm around the cylinder, more ` +
+      `than one ${circumferenceMm.toFixed(1)} mm circumference at a ${radiusMm} mm radius, so it ` +
+      `spans ${spanDeg.toFixed(1)}° of A and its end is cut over its start. Shorten the design ` +
+      'around the cylinder, or use a larger radius.',
+  ];
+}
+
 function wrapGroupIssue(group: CncGroup): string | null {
   if (group.cutType !== 'profile-on-path' || group.toolKind !== 'end-mill')
     return 'Only a declared end-mill profile-on-path operation is supported by this reference planner.';

@@ -200,6 +200,33 @@ describe('CNC wrap capability reference', () => {
       ).kind,
     ).toBe('unavailable');
   });
+  // CNC audit v3 N6-P3-4: 40 mm around a 5 mm radius is 458 degrees of A.
+  it('names a design taller than one circumference, and is quiet at one turn', () => {
+    const tall = {
+      ...group,
+      passes: [
+        {
+          kind: 'contour' as const,
+          polyline: [
+            { x: 4, y: 0 },
+            { x: 4, y: 40 },
+          ],
+          zMm: -1,
+          closed: false,
+        },
+      ],
+    };
+    const result = planCncWrapReference(job([tall]), { ...DEFAULT_CNC_WRAP_STUDY, radiusMm: 5 });
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    expect(result.plan.warnings[0]).toBe(
+      'The design wraps onto itself: it is 40.0 mm around the cylinder, more than one 31.4 mm ' +
+        'circumference at a 5 mm radius, so it spans 458.4° of A and its end is cut over its ' +
+        'start. Shorten the design around the cylinder, or use a larger radius.',
+    );
+    const oneTurn = planCncWrapReference(job(), DEFAULT_CNC_WRAP_STUDY);
+    if (oneTurn.kind !== 'ok') throw new Error(oneTurn.reason);
+    expect(oneTurn.plan.warnings.some((w) => w.includes('wraps onto itself'))).toBe(false);
+  });
   it('retains setup study intent without changing ordinary emitted CNC bytes', () => {
     const project = { ...projectWithLine(), machine: DEFAULT_CNC_MACHINE_CONFIG };
     const study = {

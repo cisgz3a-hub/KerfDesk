@@ -9,6 +9,12 @@ import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useSourceTrackedState } from '../common/use-source-tracked-state';
 import { useStore } from '../state/store';
 import { surfacingSeed } from './surfacing-seed';
+import { surfacingSentRates } from './surfacing-rates';
+
+// A scaled feed can carry decimals; the note shows one (the F word carries three).
+function roundedRate(mmPerMin: number): number {
+  return Math.round(mmPerMin * 10) / 10;
+}
 export function useSurfacingValues(
   machine: CncMachineConfig,
   project: Project,
@@ -76,10 +82,11 @@ export function SurfacingFields({
   readonly machine: CncMachineConfig;
 }): JSX.Element {
   const { tool, starter, maxFeed, inputs } = values;
+  const sent = surfacingSentRates(inputs, maxFeed, machine.params.spindleMaxRpm);
   const limited =
-    inputs.feedMmPerMin > maxFeed ||
-    inputs.plungeMmPerMin > maxFeed ||
-    inputs.spindleRpm > machine.params.spindleMaxRpm;
+    sent.feedMmPerMin !== inputs.feedMmPerMin ||
+    sent.plungeMmPerMin !== inputs.plungeMmPerMin ||
+    sent.spindleRpm !== inputs.spindleRpm;
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
@@ -95,9 +102,12 @@ export function SurfacingFields({
       </p>
       {limited ? (
         <p role="note">
-          Output uses {Math.min(inputs.feedMmPerMin, maxFeed)} mm/min feed,{' '}
-          {Math.min(inputs.plungeMmPerMin, maxFeed)} mm/min plunge and{' '}
-          {Math.min(inputs.spindleRpm, machine.params.spindleMaxRpm)} RPM after machine limits.
+          Output uses {roundedRate(sent.feedMmPerMin)} mm/min feed,{' '}
+          {roundedRate(sent.plungeMmPerMin)} mm/min plunge and {sent.spindleRpm} RPM after machine
+          limits.
+          {sent.spindleCap === undefined
+            ? null
+            : ` The spindle is capped at ${sent.spindleRpm} RPM, so feed and plunge are lowered by the same ratio to keep the chip load planned at ${sent.spindleCap.requestedRpm} RPM.`}
         </p>
       ) : null}
     </>

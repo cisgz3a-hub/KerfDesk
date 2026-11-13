@@ -151,6 +151,16 @@ export function findCncMachineStarter(
     : null;
 }
 
+/**
+ * The lowest rated speed of the spindle this profile's starter assumes
+ * (ADR-256 Amendment 1), or undefined when no starter records one.
+ */
+export function cncSpindleMinRpm(
+  profile: Pick<DeviceProfile, 'profileId' | 'machineFamily'>,
+): number | undefined {
+  return findCncMachineStarter(profile)?.starter.spindleMinRpm;
+}
+
 function findByKey(
   catalog: ReadonlyArray<CncMachineStarter>,
   key: 'profileIds' | 'machineFamilies',
