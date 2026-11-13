@@ -5,6 +5,15 @@ import type { CncTool } from './cnc-tool';
 // match the bit in hand while the app stays metric. Diameters in mm. Existing
 // ids are STABLE (referenced by .lf2 files, the default toolId, and tests) —
 // only ever append here.
+//
+// Flute count (ADR-233 Amendment 1): the end mills and ball noses carry the two
+// flutes the automatic feeds already assumed for them (DEFAULT_ASSUMED_FLUTE_COUNT),
+// so planned feeds are unchanged and Job Review can show each operation's chip
+// load. The operator corrects it in the bit library for a bit with another count.
+// V-bits carry none: their cutting diameter changes with depth, so a nominal
+// chip load at the full diameter would not describe the cut.
+const STARTER_FLUTE_COUNT = 2;
+
 export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
   {
     id: 'em-3175',
@@ -12,6 +21,7 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
     kind: 'end-mill',
     diameterMm: 3.175,
     family: 'straight',
+    fluteCount: STARTER_FLUTE_COUNT,
   },
   {
     id: 'em-1588',
@@ -19,6 +29,7 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
     kind: 'end-mill',
     diameterMm: 1.588,
     family: 'straight',
+    fluteCount: STARTER_FLUTE_COUNT,
   },
   {
     id: 'em-6350',
@@ -26,6 +37,7 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
     kind: 'end-mill',
     diameterMm: 6.35,
     family: 'straight',
+    fluteCount: STARTER_FLUTE_COUNT,
   },
   {
     id: 'em-9525',
@@ -33,17 +45,47 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
     kind: 'end-mill',
     diameterMm: 9.525,
     family: 'straight',
+    fluteCount: STARTER_FLUTE_COUNT,
   },
-  { id: 'em-1000', name: '1 mm end mill', kind: 'end-mill', diameterMm: 1, family: 'straight' },
-  { id: 'em-2000', name: '2 mm end mill', kind: 'end-mill', diameterMm: 2, family: 'straight' },
-  { id: 'em-3000', name: '3 mm end mill', kind: 'end-mill', diameterMm: 3, family: 'straight' },
-  { id: 'em-6000', name: '6 mm end mill', kind: 'end-mill', diameterMm: 6, family: 'straight' },
+  {
+    id: 'em-1000',
+    name: '1 mm end mill',
+    kind: 'end-mill',
+    diameterMm: 1,
+    family: 'straight',
+    fluteCount: STARTER_FLUTE_COUNT,
+  },
+  {
+    id: 'em-2000',
+    name: '2 mm end mill',
+    kind: 'end-mill',
+    diameterMm: 2,
+    family: 'straight',
+    fluteCount: STARTER_FLUTE_COUNT,
+  },
+  {
+    id: 'em-3000',
+    name: '3 mm end mill',
+    kind: 'end-mill',
+    diameterMm: 3,
+    family: 'straight',
+    fluteCount: STARTER_FLUTE_COUNT,
+  },
+  {
+    id: 'em-6000',
+    name: '6 mm end mill',
+    kind: 'end-mill',
+    diameterMm: 6,
+    family: 'straight',
+    fluteCount: STARTER_FLUTE_COUNT,
+  },
   {
     id: 'dc-3175',
     name: '3.175 mm (1/8") downcut end mill',
     kind: 'end-mill',
     diameterMm: 3.175,
     family: 'downcut',
+    fluteCount: STARTER_FLUTE_COUNT,
   },
   {
     id: 'cp-6350',
@@ -51,6 +93,7 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
     kind: 'end-mill',
     diameterMm: 6.35,
     family: 'compression',
+    fluteCount: STARTER_FLUTE_COUNT,
   },
   {
     id: 'bn-3175',
@@ -58,6 +101,7 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
     kind: 'ball-nose',
     diameterMm: 3.175,
     family: 'ball-nose',
+    fluteCount: STARTER_FLUTE_COUNT,
   },
   {
     id: 'bn-1588',
@@ -65,6 +109,7 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
     kind: 'ball-nose',
     diameterMm: 1.588,
     family: 'ball-nose',
+    fluteCount: STARTER_FLUTE_COUNT,
   },
   {
     id: 'bn-6350',
@@ -72,6 +117,7 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
     kind: 'ball-nose',
     diameterMm: 6.35,
     family: 'ball-nose',
+    fluteCount: STARTER_FLUTE_COUNT,
   },
   // An angled bit's CUT diameter is load-bearing, not decoration: it sets the
   // cone-height depth clamp ((D/2)/tan(θ/2)) and the auto ring pitch (D/8). A

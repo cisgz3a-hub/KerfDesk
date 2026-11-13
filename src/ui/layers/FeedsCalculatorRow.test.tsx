@@ -32,6 +32,15 @@ function install4040Cnc(): void {
   useStore.getState().updateCncMachine({ stock: { materialKey: 'plywood-mdf' } });
 }
 
+// A project saved before ADR-233 Amd 1 has starter bits with no flute count.
+function withoutRecordedFluteCounts(): void {
+  const machine = useStore.getState().project.machine;
+  if (machine?.kind !== 'cnc') throw new Error('expected a CNC machine');
+  useStore.getState().updateCncMachine({
+    tools: machine.tools.map(({ fluteCount: _flutes, ...tool }) => tool),
+  });
+}
+
 async function render(
   onCommitSettings: (settings: CncLayerSettings) => void,
   settings: CncLayerSettings = { ...DEFAULT_CNC_LAYER_SETTINGS, materialKey: 'plywood-mdf' },
@@ -95,6 +104,7 @@ describe('FeedsCalculatorRow', () => {
 
   it('opens on the layer’s own material recipe rather than the chart default', async () => {
     install4040Cnc();
+    withoutRecordedFluteCounts();
     const onCommitSettings = vi.fn();
     const { host, root } = await render(onCommitSettings, {
       ...DEFAULT_CNC_LAYER_SETTINGS,

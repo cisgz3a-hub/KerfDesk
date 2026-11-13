@@ -46,7 +46,20 @@ export function appendCncGroupComments(lines: string[], group: CncGroup): void {
       `plunge-mm-min: ${fmtFeed(group.plungeMmPerMin)}`,
   );
   lines.push(`; cnc spindle-rpm: ${Math.max(0, Math.round(group.spindleRpm))}`);
+  appendSpindleCapComment(lines, group);
   appendFeedSourceComments(lines, group);
+}
+
+// ADR-233 Amd 1: the operation asked for more RPM than Spindle maximum, so S
+// was capped and the feed and plunge above were scaled by the same ratio.
+function appendSpindleCapComment(lines: string[], group: CncGroup): void {
+  const cap = group.spindleCap;
+  if (cap === undefined) return;
+  lines.push(
+    `; cnc spindle-capped: requested-rpm: ${Math.round(cap.requestedRpm)}; ` +
+      `requested-feed-mm-min: ${fmtFeed(cap.requestedFeedMmPerMin)}; ` +
+      `requested-plunge-mm-min: ${fmtFeed(cap.requestedPlungeMmPerMin)}`,
+  );
 }
 
 function appendVCarveComments(lines: string[], group: CncGroup): void {

@@ -2,12 +2,8 @@ import type { DeviceProfile } from '../devices';
 import type { CncGroup, CncPass } from '../job';
 import type { CncLayerSettings, CncMachineConfig, CncTool, Layer } from '../scene';
 import { coolantFields } from './coolant-fields';
-import {
-  capFeed,
-  capSpindle,
-  resolveRetractBetweenPasses,
-  type CncGroupCompileOptions,
-} from './compile-cnc-helpers';
+import { resolveRetractBetweenPasses, type CncGroupCompileOptions } from './compile-cnc-helpers';
+import { cncCuttingRates } from './cnc-cutting-rates';
 import { cncGroupProvenance } from './cnc-group-provenance';
 import { withPassAirFloors } from './cnc-pass-air-floors';
 import { parkFields } from './motion-polish';
@@ -35,9 +31,16 @@ export function cncGroupForPasses(
     toolName: tool.name,
     toolDiameterMm: tool.diameterMm,
     ...cncGroupProvenance(settings, tool, options),
-    feedMmPerMin: capFeed(cutFeed, device.maxFeed),
-    plungeMmPerMin: capFeed(settings.plungeMmPerMin, device.maxFeed),
-    spindleRpm: capSpindle(settings.spindleRpm, config.params.spindleMaxRpm),
+    // ADR-233 Amd 1: a capped spindle scales the feeds so the chip load holds.
+    ...cncCuttingRates(
+      {
+        feedMmPerMin: cutFeed,
+        plungeMmPerMin: settings.plungeMmPerMin,
+        spindleRpm: settings.spindleRpm,
+      },
+      device.maxFeed,
+      config.params.spindleMaxRpm,
+    ),
     spindleSpinupSec: Math.max(0, config.params.spindleSpinupSec),
     ...coolantFields(config),
     safeZMm: Math.max(0, config.params.safeZMm),

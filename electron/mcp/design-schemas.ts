@@ -47,7 +47,9 @@ export const mcpCncPatchSchema = z
     depthPerPassMm: z.number().min(0.01).max(50).optional(),
     feedMmPerMin: z.number().min(1).max(100_000).optional(),
     plungeMmPerMin: z.number().min(1).max(100_000).optional(),
-    spindleRpm: z.number().min(0).max(100_000).optional(),
+    // The layer card's floor (CncLayerAdvancedFields): 0 compiled to M3 S0 and
+    // plunged a still bit (CNC audit v3 N6r-P2-1, ADR-233 Amd 1).
+    spindleRpm: z.number().min(1000).max(100_000).optional(),
     stepoverPercent: z.number().min(1).max(100).optional(),
     pocketStrategy: z.enum(MCP_POCKET_STRATEGIES).optional(),
   })

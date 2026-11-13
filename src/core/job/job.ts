@@ -11,7 +11,7 @@ import type { CncTaperedInlaySettings } from '../scene/cnc-tapered-inlay';
 // Consumers that only operate on vectors (optimizer, planner, estimator's
 // vector path) filter on kind. The emit strategy dispatches based on kind.
 
-import type { CncCompilationSidecar } from './cnc-compilation-sidecar-types';
+import type { CncCompilationSidecar, CncSpindleCap } from './cnc-compilation-sidecar-types';
 export type { CncCompilationSidecar } from './cnc-compilation-sidecar-types';
 import type { CutArcMoves, LeadContour } from './cut-segment-geometry';
 export type { CutArcMoves } from './cut-segment-geometry';
@@ -404,6 +404,7 @@ export type CncGroup = {
   readonly feedMmPerMin: number; // already capped to device.maxFeed
   readonly plungeMmPerMin: number;
   readonly spindleRpm: number; // S value; capped to machine spindleMaxRpm
+  readonly spindleCap?: CncSpindleCap; // ADR-233 Amd 1: what a capped S was asked for
   readonly spindleSpinupSec: number; // dwell after spindle start / speed change
   // Machine-wide coolant (a job-level setting copied onto every group). Absent
   // = 'off'; the emitter reads the first group's value once. Optional so 'off'

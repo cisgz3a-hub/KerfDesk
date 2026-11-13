@@ -335,7 +335,8 @@ describe('CNC automatic-setting transition policy', () => {
     if (machine?.kind !== 'cnc') throw new Error('CNC machine missing');
     expect(machine.tools.some((tool) => tool.id === customId)).toBe(false);
     expect(machine.toolId).not.toBe(customId);
-    expect(machine.tools.find((tool) => tool.id === machine.toolId)?.fluteCount).toBeUndefined();
+    // The starter bit records its two flutes (ADR-233 Amd 1), as the recipe assumed.
+    expect(machine.tools.find((tool) => tool.id === machine.toolId)?.fluteCount).toBe(2);
     const inherited = requiredCncSettings('inherited');
     const removedOverride = requiredCncSettings('removed-override');
     const pinnedOther = requiredCncSettings('pinned-other');

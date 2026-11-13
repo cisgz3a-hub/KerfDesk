@@ -3,10 +3,10 @@ import type { CncGroup, CncPass } from '../job';
 import type { CncLayerSettings, CncMachineConfig, CncTool, Layer } from '../scene';
 import type { CncCuttingStage } from '../scene/cnc-stage-recipe';
 import { coolantFields } from './coolant-fields';
+import { cncCuttingRates } from './cnc-cutting-rates';
 import { cncGroupProvenance } from './cnc-group-provenance';
 import { parkFields } from './motion-polish';
 import { cncStageProvenance } from './cnc-stage-settings';
-const MIN_FEED_MM_PER_MIN = 1;
 export function reliefGroup(
   layer: Layer,
   settings: CncLayerSettings,
@@ -39,9 +39,8 @@ export function reliefGroup(
       layerPrimaryTool,
       ...(stage === undefined ? {} : cncStageProvenance(settings, stage, tool)),
     }),
-    feedMmPerMin: cap(settings.feedMmPerMin, device.maxFeed),
-    plungeMmPerMin: cap(settings.plungeMmPerMin, device.maxFeed),
-    spindleRpm: Math.min(Math.max(0, settings.spindleRpm), config.params.spindleMaxRpm),
+    // ADR-233 Amd 1: a capped spindle scales the feeds so the chip load holds.
+    ...cncCuttingRates(settings, device.maxFeed, config.params.spindleMaxRpm),
     spindleSpinupSec: Math.max(0, config.params.spindleSpinupSec),
     ...coolantFields(config),
     safeZMm: Math.max(0, config.params.safeZMm),
@@ -57,9 +56,4 @@ export function reliefGroup(
       : {}),
     passes,
   };
-}
-
-function cap(feedMmPerMin: number, maxFeed: number): number {
-  if (!Number.isFinite(feedMmPerMin) || feedMmPerMin <= 0) return MIN_FEED_MM_PER_MIN;
-  return Math.min(feedMmPerMin, maxFeed);
 }
