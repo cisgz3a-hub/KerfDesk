@@ -1,0 +1,40 @@
+// @vitest-environment jsdom
+// T29: placed tabs dropped by Union silhouette, against Weld's notice (ADR-494 Amd 3).
+import { beforeEach, it } from 'vitest';
+import type { Layer, SceneObject } from '../t29-main/src/core/scene';
+import { resetStore } from '../t29-main/src/ui/state/test-helpers';
+import { totalLen } from './decode';
+import { box, burn, clearToasts, f3, layer, logger, proj, setProject, st, svg, toasts } from './common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t29/t29-tabs.log');
+beforeEach(() => {
+  resetStore();
+  clearToasts();
+});
+
+it('T placed tabs', () => {
+  for (const perShape of [4, 0]) {
+    const L = layer('L', 'line', 1000, 80, { tabsEnabled: true, tabSizeMm: 2, tabsPerShape: perShape } as Partial<Layer>);
+    const A = svg('A', [box(10, 10, 40, 20)], {
+      operationIds: ['L'],
+      laserTabAnchors: [
+        { layerColor: '#000000', pathIndex: 0, polylineIndex: 0, pathT: 0.1 },
+        { layerColor: '#000000', pathIndex: 0, polylineIndex: 0, pathT: 0.6 },
+      ],
+    });
+    const B = svg('B', [box(45, 15, 20, 10)], { operationIds: ['L'] });
+    const p0 = proj([A, B] as SceneObject[], [L]);
+    const lit0 = totalLen(burn(p0).moves);
+    for (const tool of ['union', 'weld'] as const) {
+      setProject(p0, ['A', 'B']);
+      clearToasts();
+      if (tool === 'union') st().unionSilhouetteSelection('L');
+      else st().weldSelection();
+      const p1 = st().project;
+      const b1 = burn(p1);
+      const res = p1.scene.objects[0] as SceneObject & { laserTabAnchors?: unknown };
+      // union outline perimeter: 2*(55+20) = 150 (B sticks out 15 x 10 to the right of A: 120 + 2*15 = 150)
+      out(`tabsPerShape ${perShape} ${tool}: before lit ${f3(lit0)} (A 120 - 2 placed tabs x 2 mm, B 60 - auto); after lit ${f3(totalLen(b1.moves))} of union perimeter 150.000 (gap ${f3(150 - totalLen(b1.moves))} mm); result anchors ${JSON.stringify(res.laserTabAnchors)}; toasts ${JSON.stringify(toasts())}`);
+    }
+  }
+});

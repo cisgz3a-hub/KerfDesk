@@ -1,0 +1,121 @@
+// @vitest-environment jsdom
+// Refuter R1: variable text in bundled single-line fonts through Join Paths.
+import { writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { createLayer, createProject, DEFAULT_PROJECT_OPTIMIZATION, DEFAULT_PROJECT_VARIABLE_DATA, IDENTITY_TRANSFORM, type ImportedSvg, type Layer, type Project, type SceneObject, type TextObject } from '../t29-main/src/core/scene';
+import { FONT_REGISTRY } from '../t29-main/src/core/text/font-registry';
+import { parseVariableTemplateSource } from '../t29-main/src/core/variables';
+import { computeTextGeometry } from '../t29-main/src/ui/text/text-geometry-compute';
+import { renderVariableText } from '../t29-main/src/ui/text/render-variable-text';
+import { prepareOutputSnapshot } from '../t29-main/src/io/gcode/prepare-output-snapshot';
+import { emitPreparedGcode } from '../t29-main/src/io/gcode/emit-gcode';
+import { joinOpenVectorPaths } from '../t29-main/src/core/geometry/vector-path-join';
+import { useStore } from '../t29-main/src/ui/state/store';
+import { useToastStore } from '../t29-main/src/ui/state/toast-store';
+import { resetStore } from '../t29-main/src/ui/state/test-helpers';
+import { selectionCanJoinPaths, selectionCanWeld } from '../t29-main/src/ui/commands/selection-command-state';
+import { decode, litBox, litLen } from './gdecode';
+
+const lines: string[] = [];
+const log = (s: string) => {
+  lines.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t30r/r1-variable.log', lines.join('\n'));
+};
+const n3 = (v: number) => v.toFixed(3);
+const noParse = async () => {
+  throw new Error('outline parse not expected for single-line fonts');
+};
+
+async function makeText(id: string, content: string, fontKey: string, x: number, y: number): Promise<TextObject> {
+  const parsed = parseVariableTemplateSource(content);
+  if (!parsed.ok) throw new Error(parsed.message);
+  const r = await computeTextGeometry({ fontKey, content, sizeMm: 8, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000' } as never, undefined, noParse as never);
+  return {
+    kind: 'text', id, content, fontKey, sizeMm: 8, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, bendDeg: 0, color: '#000000',
+    variableTemplate: parsed.template, bounds: r.bounds, transform: { ...IDENTITY_TRANSFORM, x, y }, paths: r.paths,
+  } as unknown as TextObject;
+}
+
+function proj(objects: SceneObject[], serial: number): Project {
+  const base = createProject();
+  const L = { ...createLayer({ id: 'L', color: '#000000', name: 'Engrave', mode: 'line' }), speed: 3000, power: 30 } as Layer;
+  return {
+    ...base,
+    optimization: { ...DEFAULT_PROJECT_OPTIMIZATION },
+    variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: serial },
+    scene: { ...base.scene, objects, layers: [L], groups: [] },
+  } as Project;
+}
+
+async function burnAt(p: Project, serial: number) {
+  const prepared = await prepareOutputSnapshot({ ...p, variables: { ...p.variables, serialValue: serial } }, { clock: () => new Date(0), renderVariableText } as never);
+  if (!prepared.ok) return { len: NaN, w: NaN, why: JSON.stringify(prepared).slice(0, 200) };
+  const { lit } = decode(emitPreparedGcode(prepared).gcode);
+  const b = litBox(lit);
+  return { len: litLen(lit), w: b.maxX - b.minX, why: '' };
+}
+
+it('R1a single-line fonts in the registry', () => {
+  const single = (FONT_REGISTRY as ReadonlyArray<any>).filter((f) => f.geometry === 'single-line').map((f) => `${f.key} (${f.displayName})`);
+  log(`R1a bundled single-line fonts: ${single.length}: ${single.join(', ')}`);
+});
+
+it('R1b variable text per single-line font: menu, Join, burn', async () => {
+  const fonts = (FONT_REGISTRY as ReadonlyArray<any>).filter((f) => f.geometry === 'single-line').map((f) => f.key as string);
+  for (const fontKey of fonts) {
+    for (const content of ['SN {{serial:4}}', '{{serial:3}}', 'Lot {{date:YYYY}}-{{serial:4}}']) {
+      let text: TextObject;
+      try {
+        text = await makeText('VT', content, fontKey, 30, 30);
+      } catch (e) {
+        log(`R1b ${fontKey} "${content}": build failed ${String(e).slice(0, 160)}`);
+        continue;
+      }
+      const openCurves = text.paths.flatMap((p) => p.curves ?? p.polylines.map((pl) => ({ closed: pl.closed }))).filter((c: any) => !c.closed).length;
+      const p0 = proj([text], 42);
+      resetStore();
+      useToastStore.setState({ toasts: [] } as never);
+      useStore.setState({ project: p0, selectedObjectId: 'VT', additionalSelectedIds: new Set(), undoStack: [], redoStack: [] });
+      const menu = selectionCanJoinPaths(p0, ['VT']);
+      const weldMenu = selectionCanWeld(p0, ['VT']);
+      const plan = joinOpenVectorPaths([text as never], p0.scene.layers, 0.05);
+      const applied = useStore.getState().joinSelectedPaths(0.05);
+      const p1 = useStore.getState().project;
+      const after = p1.scene.objects[0]!;
+      const toast = useToastStore.getState().toasts.map((t) => t.message).join(' | ');
+      const b42 = await burnAt(p0, 42), b43 = await burnAt(p0, 43), a42 = await burnAt(p1, 42), a43 = await burnAt(p1, 43);
+      const valueOracle = await computeTextGeometry({ fontKey, content: content.replace(/\{\{serial:(\d)\}\}/, (_m, d) => '42'.padStart(Number(d), '0')).replace('{{date:YYYY}}', '1970'), sizeMm: 8, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000' } as never, undefined, noParse as never);
+      log(`R1b ${fontKey} "${content}": open curves ${openCurves}; Join menu ${menu} (Weld menu ${weldMenu}); plan ${plan.kind === 'ok' ? `joins ${plan.value.joins} closures ${plan.value.closures}` : plan.error.message}; applied ${applied}; kind after ${after.kind}, template kept ${'variableTemplate' in after}; toast "${toast}"`);
+      log(`    before: #42 lit ${n3(b42.len)} w ${n3(b42.w)} | #43 lit ${n3(b43.len)}${b42.why}`);
+      log(`    after : #42 lit ${n3(a42.len)} w ${n3(a42.w)} | #43 lit ${n3(a43.len)} | serial changes burn: ${Math.abs(a42.len - a43.len) > 1e-6}${a42.why}`);
+      log(`    oracle value render width ${n3(valueOracle.bounds.maxX - valueOracle.bounds.minX)}; stored template width ${n3(text.bounds.maxX - text.bounds.minX)}`);
+    }
+  }
+});
+
+it('R1c Select All with variable single-line text plus ordinary open art', async () => {
+  const text = await makeText('VT', 'SN {{serial:4}}', 'relief-single-line', 30, 60);
+  const outlineSvg = {
+    kind: 'imported-svg', id: 'ART', source: 'art.svg', bounds: { minX: 0, minY: 0, maxX: 20, maxY: 10 }, transform: { ...IDENTITY_TRANSFORM, x: 30, y: 20 },
+    paths: [{ color: '#000000', polylines: [{ points: [{ x: 0, y: 0 }, { x: 20, y: 0 }], closed: false }, { points: [{ x: 20.01, y: 0 }, { x: 20, y: 10 }], closed: false }] }],
+  } as unknown as ImportedSvg;
+  const p0 = proj([outlineSvg, text], 7);
+  resetStore();
+  useToastStore.setState({ toasts: [] } as never);
+  useStore.setState({ project: p0, selectedObjectId: null, additionalSelectedIds: new Set(), undoStack: [], redoStack: [] });
+  useStore.getState().selectAllObjects();
+  const s = useStore.getState();
+  const sel = [s.selectedObjectId, ...s.additionalSelectedIds].filter(Boolean) as string[];
+  const menu = selectionCanJoinPaths(s.project, sel);
+  useStore.getState().joinSelectedPaths(0.05);
+  const p1 = useStore.getState().project;
+  const vt = p1.scene.objects.find((o) => o.id === 'VT')!;
+  const toast = useToastStore.getState().toasts.map((t) => t.message).join(' | ');
+  const b7 = await burnAt(p0, 7), b8 = await burnAt(p0, 8), a7 = await burnAt(p1, 7), a8 = await burnAt(p1, 8);
+  log(`R1c Select All -> [${sel}]; Join menu ${menu}; VT after kind ${vt.kind} template ${'variableTemplate' in vt}; toast "${toast}"`);
+  log(`    before #7 ${n3(b7.len)} #8 ${n3(b8.len)}; after #7 ${n3(a7.len)} #8 ${n3(a8.len)}`);
+  // Undo restores?
+  useStore.getState().undo();
+  const u = useStore.getState().project.scene.objects.find((o) => o.id === 'VT')!;
+  log(`    after Undo: VT kind ${u.kind}, template ${'variableTemplate' in u}`);
+});

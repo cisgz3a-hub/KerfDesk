@@ -1,0 +1,34 @@
+// @vitest-environment jsdom
+// T29 edge: a contour flagged open whose end returns to its start (closed-enough rule).
+import { beforeEach, it } from 'vitest';
+import { resetStore } from '../t29-main/src/ui/state/test-helpers';
+import { unionSilhouetteOperations } from '../t29-main/src/ui/commands/selection-command-state';
+import { totalLen } from './decode';
+import { box, burn, clearToasts, f3, layer, logger, proj, setProject, st, svg, toasts } from './common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t29/t29-edge.log');
+beforeEach(() => {
+  resetStore();
+  clearToasts();
+});
+
+it('E closed-enough open-flagged contour', () => {
+  const L = layer('L', 'line', 1000, 50);
+  const pts = [...box(0, 0, 10, 10), { x: 0, y: 0 }];
+  const A = svg('A', [pts], { operationIds: ['L'] }, false);
+  const B = svg('B', [box(5, 5, 10, 10)], { operationIds: ['L'] });
+  const p0 = proj([A, B], [L]);
+  setProject(p0, ['A', 'B']);
+  const ops = unionSilhouetteOperations(p0.scene, ['A', 'B']).map((l) => l.id);
+  const applied = st().unionSilhouetteSelection('L');
+  out(`E open-flagged but returning contour: menu ops [${ops}]; applied ${applied}; lit ${f3(totalLen(burn(st().project).moves))} (oracle perimeter 60); toasts ${JSON.stringify(toasts())}`);
+  // near-closed within 0.005 mm
+  const pts2 = [...box(0, 0, 10, 10), { x: 0.004, y: 0 }];
+  const A2 = svg('A', [pts2], { operationIds: ['L'] }, false);
+  const p2 = proj([A2, B], [L]);
+  setProject(p2, ['A', 'B']);
+  clearToasts();
+  const ops2 = unionSilhouetteOperations(p2.scene, ['A', 'B']).map((l) => l.id);
+  const applied2 = st().unionSilhouetteSelection('L');
+  out(`E2 end 0.004 mm from start: menu ops [${ops2}]; applied ${applied2}; toasts ${JSON.stringify(toasts())}`);
+});

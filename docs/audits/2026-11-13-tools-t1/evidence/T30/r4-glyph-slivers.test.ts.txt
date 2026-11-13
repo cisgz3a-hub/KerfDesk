@@ -1,0 +1,57 @@
+// @vitest-environment jsdom
+// Refuter R4: do bundled single-line glyphs retrace (out-and-back) so Join closes them into zero-area loops?
+import { writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { IDENTITY_TRANSFORM, flattenCurveSubpath, polylineToCurveSubpath, type TextObject } from '../t29-main/src/core/scene';
+import { FONT_REGISTRY } from '../t29-main/src/core/text/font-registry';
+import { computeTextGeometry } from '../t29-main/src/ui/text/text-geometry-compute';
+import { joinOpenVectorPaths } from '../t29-main/src/core/geometry/vector-path-join';
+
+const lines: string[] = [];
+const log = (s: string) => {
+  lines.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t30r/r4-glyph-slivers.log', lines.join('\n'));
+};
+const noParse = async () => {
+  throw new Error('no outline parse');
+};
+const shoelace = (pts: ReadonlyArray<{ x: number; y: number }>) => {
+  let a = 0;
+  for (let i = 0; i < pts.length; i += 1) {
+    const p = pts[i]!, q = pts[(i + 1) % pts.length]!;
+    a += p.x * q.y - q.x * p.y;
+  }
+  return Math.abs(a) / 2;
+};
+
+it('R4 glyph scan', async () => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789{}:-#/()&@';
+  for (const f of (FONT_REGISTRY as ReadonlyArray<any>).filter((e) => e.geometry === 'single-line')) {
+    const slivers: string[] = [];
+    let closures = 0;
+    for (const ch of chars) {
+      const r = await computeTextGeometry({ fontKey: f.key, content: ch, sizeMm: 10, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000' } as never, undefined, noParse as never);
+      const text = { kind: 'text', id: 't', content: ch, fontKey: f.key, sizeMm: 10, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000', bounds: r.bounds, transform: IDENTITY_TRANSFORM, paths: r.paths, operationIds: ['L'] } as unknown as TextObject;
+      const before = new Set(r.paths.flatMap((p) => (p.curves ?? p.polylines.map(polylineToCurveSubpath)).filter((c) => c.closed).map((c) => JSON.stringify(c.start))));
+      const plan = joinOpenVectorPaths([text as never], [], 0.05);
+      if (plan.kind !== 'ok') continue;
+      closures += plan.value.closures;
+      for (const o of plan.value.objects) {
+        for (const p of o.paths) {
+          for (const c of p.curves ?? []) {
+            if (!c.closed) continue;
+            const fl = flattenCurveSubpath(c, { toleranceMm: 0.01 });
+            if (fl.kind !== 'ok') continue;
+            const pts = fl.polyline.points;
+            let len = 0;
+            for (let i = 0; i < pts.length; i += 1) len += Math.hypot(pts[(i + 1) % pts.length]!.x - pts[i]!.x, pts[(i + 1) % pts.length]!.y - pts[i]!.y);
+            const area = shoelace(pts);
+            // mean width = 2*area/length; a retraced stroke has ~0
+            if (len > 0.5 && (2 * area) / len < 0.02 && !before.has(JSON.stringify(c.start))) slivers.push(`${ch}(len ${len.toFixed(2)} area ${area.toFixed(4)})`);
+          }
+        }
+      }
+    }
+    log(`R4 ${f.key}: closures over ${chars.length} glyphs ${closures}; near-zero-area closures ${slivers.length}: ${slivers.join(' ')}`);
+  }
+});

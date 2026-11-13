@@ -1,0 +1,97 @@
+// T29 refuter: own G-code decoder (absolute G0/G1/G2/G3, M3/M4/M5, modal S/F).
+// Returns lit segments in scene coordinates (arcs sampled at 0.05 mm).
+import { toSceneCoords, type DeviceProfile } from '../t29-main/src/core/devices';
+
+export type Pt = { x: number; y: number };
+export type Seg = { a: Pt; b: Pt; f: number; s: number };
+
+export function decode(gcode: string, device: DeviceProfile): { segs: Seg[]; relative: boolean } {
+  let x = 0, y = 0, f = 0, s = 0, mode = 0, on = false, relative = false;
+  const segs: Seg[] = [];
+  const toScene = (p: Pt) => toSceneCoords(p, device);
+  for (const raw of gcode.split(/\r?\n/)) {
+    const line = raw.replace(/;.*$/, '').replace(/\([^)]*\)/g, '').trim().toUpperCase();
+    if (line === '') continue;
+    const w: Record<string, number> = {};
+    const gs: number[] = [];
+    const ms: number[] = [];
+    for (const m of line.matchAll(/([A-Z])\s*([-+]?\d*\.?\d+)/g)) {
+      const k = m[1]!;
+      const v = Number(m[2]);
+      if (k === 'G') gs.push(v);
+      else if (k === 'M') ms.push(v);
+      else w[k] = v;
+    }
+    for (const g of gs) {
+      if (g === 0 || g === 1 || g === 2 || g === 3) mode = g;
+      if (g === 91) relative = true;
+      if (g === 90) relative = false;
+    }
+    for (const m of ms) {
+      if (m === 3 || m === 4) on = true;
+      if (m === 5 || m === 2 || m === 30) on = false;
+    }
+    if (w.F !== undefined) f = w.F;
+    if (w.S !== undefined) s = w.S;
+    if (w.X === undefined && w.Y === undefined) continue;
+    const nx = w.X ?? x;
+    const ny = w.Y ?? y;
+    const lit = on && s > 0 && mode !== 0;
+    if (lit) {
+      if (mode === 1) segs.push({ a: toScene({ x, y }), b: toScene({ x: nx, y: ny }), f, s });
+      else {
+        const cx = x + (w.I ?? 0), cy = y + (w.J ?? 0);
+        const r = Math.hypot(x - cx, y - cy);
+        let a0 = Math.atan2(y - cy, x - cx), a1 = Math.atan2(ny - cy, nx - cx);
+        if (mode === 2) { while (a1 >= a0) a1 -= 2 * Math.PI; } else { while (a1 <= a0) a1 += 2 * Math.PI; }
+        const n = Math.max(2, Math.ceil((Math.abs(a1 - a0) * r) / 0.05));
+        let px = x, py = y;
+        for (let i = 1; i <= n; i += 1) {
+          const t = a0 + ((a1 - a0) * i) / n;
+          const qx = cx + r * Math.cos(t), qy = cy + r * Math.sin(t);
+          segs.push({ a: toScene({ x: px, y: py }), b: toScene({ x: qx, y: qy }), f, s });
+          px = qx; py = qy;
+        }
+      }
+    }
+    x = nx; y = ny;
+  }
+  return { segs, relative };
+}
+
+export const len = (segs: Seg[]) => segs.reduce((t, g) => t + Math.hypot(g.b.x - g.a.x, g.b.y - g.a.y), 0);
+export function bb(segs: Seg[]) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const g of segs) for (const p of [g.a, g.b]) {
+    minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+  }
+  return [minX, minY, maxX, maxY].map((v) => Number(v.toFixed(3)));
+}
+/** Lit length whose sample points fall outside `inside`, sampled every 0.02 mm. */
+export function lenOutside(segs: Seg[], inside: (p: Pt) => boolean): number {
+  let out = 0;
+  for (const g of segs) {
+    const L = Math.hypot(g.b.x - g.a.x, g.b.y - g.a.y);
+    const n = Math.max(1, Math.ceil(L / 0.02));
+    for (let i = 0; i < n; i += 1) {
+      const t = (i + 0.5) / n;
+      if (!inside({ x: g.a.x + (g.b.x - g.a.x) * t, y: g.a.y + (g.b.y - g.a.y) * t })) out += L / n;
+    }
+  }
+  return out;
+}
+export const byFS = (segs: Seg[]) => {
+  const m = new Map<string, number>();
+  for (const g of segs) m.set(`F${g.f} S${g.s}`, (m.get(`F${g.f} S${g.s}`) ?? 0) + Math.hypot(g.b.x - g.a.x, g.b.y - g.a.y));
+  return [...m].map(([k, v]) => `${k}=${v.toFixed(3)}`).join(' | ');
+};
+/** Number of separate lit runs (a gap > 0.01 mm between consecutive lit segments starts a new run). */
+export function runs(segs: Seg[]): number {
+  let n = 0;
+  let prev: Pt | null = null;
+  for (const g of segs) {
+    if (prev === null || Math.hypot(g.a.x - prev.x, g.a.y - prev.y) > 0.01) n += 1;
+    prev = g.b;
+  }
+  return n;
+}
