@@ -22,7 +22,7 @@ import {
   type RdMotionPart,
   type RdMotionStep,
 } from './rd-motion-plan';
-import { nextGroup, orderedPieceSteps, type Head } from './rd-rotary-order';
+import { laserOffTravelUm, nextGroup, orderedPieceSteps, type Head } from './rd-rotary-order';
 
 /** Speed classes tried in turn, as the ratio between neighbouring classes. */
 const CLASS_STEPS = [1.05, 1.1, 1.2] as const;
@@ -71,30 +71,21 @@ function splitAll(
   const held = new Map<string, Held>();
   let head: Head = { at: null, dir: 0 };
   for (const part of parts) {
-    const classes = classifyPart(part, match, classStep, spread, held);
-    // ADR-127 Amd 7 and 8 (C2 verify E1-P2-2, E3-P2-2): each class burns
-    // whole, its pieces in the order rd-rotary-order.ts picks, and the next
-    // class is the one that order would go on into from where the last left
-    // the head and the rotary.
-    const left = [...classes.values()].sort((a, b) => a.key - b.key);
-    while (left.length > 0) {
-      const [group] = left.splice(
-        nextGroup(
-          left.map((entry) => entry.pieces),
-          head,
-          part.bounds,
-        ),
-        1,
-      );
-      if (group === undefined) break;
-      const next = orderedPieceSteps(group.pieces, head, part.bounds);
-      head = next.head;
-      const steps = next.steps;
+    const classes = [...classifyPart(part, match, classStep, spread, held).values()].sort(
+      (a, b) => a.key - b.key,
+    );
+    // ADR-127 Amd 9 (C2 verify E4-P3-3): the sweep, unless it travels clearly
+    // further than the pieces' own order, which on a k > 1 roller it can.
+    const sweep = sweepOrder(classes, head, part.bounds);
+    const path = pathOrder(classes, head, part.bounds);
+    const chosen = sweep.travelUm <= path.travelUm * SWEEP_TRAVEL_ALLOWANCE ? sweep : path;
+    head = chosen.head;
+    for (const group of chosen.groups) {
       out.push({
         part: out.length,
         group: { ...part.group, speed: group.speed },
-        steps,
-        bounds: boundsOf(steps),
+        steps: group.steps,
+        bounds: boundsOf(group.steps),
       });
     }
   }
@@ -104,6 +95,56 @@ function splitAll(
     maxDose: spread.max || 1,
     held: [...held.values()].filter((entry) => Math.round(entry.rise * 100) > 100),
   };
+}
+
+/** How much more laser-off travel the sweep may take than the pieces' own
+ *  order before that order is used instead (ADR-127 Amendment 9). */
+const SWEEP_TRAVEL_ALLOWANCE = 1.05;
+
+type LayerOrder = {
+  readonly groups: ReadonlyArray<{ readonly speed: number; readonly steps: RdMotionStep[] }>;
+  readonly head: Head;
+  readonly travelUm: number;
+};
+
+/** ADR-127 Amd 8 (C2 verify E3-P2-2): each class burns whole, its pieces in
+ *  the sweep rd-rotary-order.ts makes, and the next class is the one that
+ *  sweep would go on into from where the last left the head and the rotary. */
+function sweepOrder(classes: ReadonlyArray<Class>, from: Head, bounds: RdBoundsUm): LayerOrder {
+  const left = [...classes];
+  const groups: { speed: number; steps: RdMotionStep[] }[] = [];
+  let head = from;
+  let travelUm = 0;
+  while (left.length > 0) {
+    const index = nextGroup(
+      left.map((entry) => entry.pieces),
+      head,
+      bounds,
+    );
+    const [group] = left.splice(index, 1);
+    if (group === undefined) break;
+    const next = orderedPieceSteps(group.pieces, head, bounds);
+    travelUm += laserOffTravelUm(next.steps, head.at);
+    head = next.head;
+    groups.push({ speed: group.speed, steps: next.steps });
+  }
+  return { groups, head, travelUm };
+}
+
+/** The classes in speed order and each class's pieces in path order, as
+ *  before Amendment 7, each still reached past its start when it would start
+ *  against the rotary. */
+function pathOrder(classes: ReadonlyArray<Class>, from: Head, bounds: RdBoundsUm): LayerOrder {
+  const groups: { speed: number; steps: RdMotionStep[] }[] = [];
+  let head = from;
+  let travelUm = 0;
+  for (const group of classes) {
+    const next = orderedPieceSteps(group.pieces, head, bounds, true);
+    travelUm += laserOffTravelUm(next.steps, head.at);
+    head = next.head;
+    groups.push({ speed: group.speed, steps: next.steps });
+  }
+  return { groups, head, travelUm };
 }
 
 function classifyPart(
