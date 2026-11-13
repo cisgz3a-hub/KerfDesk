@@ -62,12 +62,11 @@ export function OffsetShapesDialog(props: {
     const entry = evaluateNumericEntry(distanceText, { kind: 'length' });
     return { ...rest, distanceMm: entry.kind === 'ok' ? entry.value : Number.NaN };
   }, [form]);
-  const sources = useStableObjects(
-    useMemo(
-      () => offsetShapesTargets(props.scene, props.selectedIds),
-      [props.scene, props.selectedIds],
-    ),
+  const picked = useMemo(
+    () => offsetShapesTargets(props.scene, props.selectedIds, form.deleteOriginals),
+    [props.scene, props.selectedIds, form.deleteOriginals],
   );
+  const sources = useStableObjects(picked.targets);
   const { preview, prepared } = useOffsetShapesPreview(props.scene, sources, request);
   const shown = preview.settled?.sources === sources ? preview.settled.result : null;
   const canApply = prepared !== undefined || preview.unavailable !== null;
@@ -87,6 +86,7 @@ export function OffsetShapesDialog(props: {
         onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
       />
       <OffsetShapesPreview sources={sources} result={shown?.kind === 'ok' ? shown.value : null} />
+      {picked.notice === '' ? null : <p role="note">{picked.notice}</p>}
       <p role="status" aria-live="polite">
         {offsetStatus(preview)}
       </p>

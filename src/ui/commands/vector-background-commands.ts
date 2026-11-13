@@ -5,10 +5,13 @@
 // the newest command, so it first cancels any one still running.
 
 import { isVectorPathObject, type VectorSceneObject } from '../../core/geometry';
-import { isUnlockedVectorArtwork } from '../../core/geometry/trim-contours';
 import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 import { useStore } from '../state';
-import { cutShapesSelection, cutShapesUsedIds } from '../state/cut-shapes-actions';
+import {
+  cutShapesSelection,
+  cutShapesSources,
+  cutShapesUsedIds,
+} from '../state/cut-shapes-actions';
 import { selectedObjectIds } from '../state/scene-group-actions';
 import { uniqueObjectId } from '../state/vector-path-selection';
 import {
@@ -49,9 +52,7 @@ export function offsetOutlinesInBackground(deltaMm: number): Promise<boolean> {
 export function cutShapesInBackground(): Promise<boolean> {
   const state = useStore.getState();
   const scene = state.project.scene;
-  const sources = cutShapesSelection(scene, selectedObjectIds(state)).filter(
-    isUnlockedVectorArtwork,
-  );
+  const { sources } = cutShapesSources(scene, cutShapesSelection(scene, selectedObjectIds(state)));
   if (sources.length < 2) {
     cancelBackgroundVectorCommand(CUT_SHAPES);
     state.cutSelectedShapes();

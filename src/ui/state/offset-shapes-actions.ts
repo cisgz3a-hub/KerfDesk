@@ -7,6 +7,7 @@ import { isVectorPathObject, type VectorSceneObject } from '../../core/geometry'
 import { offsetShapes, type OffsetShapesOptions } from '../../core/geometry/offset-shapes';
 import { ok } from '../../core/result';
 import { addObject, type ImportedSvg, type Project, type Scene } from '../../core/scene';
+import { geometryToolSkippedNotice, geometryToolSources } from './geometry-tool-sources';
 import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
 import { removedTabsNotice } from './removed-tabs-notice';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
@@ -93,16 +94,27 @@ export function offsetShapesResultIds(scene: Scene): {
   };
 }
 
-/** The unlocked vector shapes Offset Shapes works on, in scene order. */
+/**
+ * The unlocked vector shapes Offset Shapes works on, in scene order, and the
+ * notice for what it left out (ADR-350 Amendment 2): variable data always, and
+ * the registration jig too when the originals are deleted.
+ */
 export function offsetShapesTargets(
   scene: Scene,
   selectedIds: ReadonlyArray<string>,
-): ReadonlyArray<VectorSceneObject> {
+  deleteOriginals: boolean,
+): { readonly targets: ReadonlyArray<VectorSceneObject>; readonly notice: string } {
   const selected = new Set(selectedIds);
-  return scene.objects.filter(
+  const candidates = scene.objects.filter(
     (object): object is VectorSceneObject =>
       selected.has(object.id) && object.locked !== true && isVectorPathObject(object),
   );
+  const { kept, skipped } = geometryToolSources(
+    scene,
+    candidates,
+    deleteOriginals ? 'replace' : 'variable',
+  );
+  return { targets: kept, notice: geometryToolSkippedNotice(skipped) };
 }
 
 function offsetShapesMutation(
@@ -111,7 +123,16 @@ function offsetShapesMutation(
   afterCommit: (notify: () => void) => void,
   prepared?: PreparedOffsetShapes,
 ): OffsetShapesMutation | OffsetShapesState {
-  const targets = offsetShapesTargets(state.project.scene, selectedObjectIds(state));
+  const { targets, notice } = offsetShapesTargets(
+    state.project.scene,
+    selectedObjectIds(state),
+    request.deleteOriginals,
+  );
+  if (notice !== '') {
+    const tone = targets.length === 0 ? 'warning' : 'info';
+    afterCommit(() => useToastStore.getState().pushToast(notice, tone));
+    if (targets.length === 0) return state;
+  }
   const scene0 = state.project.scene;
   const reused = reusableOffsetShapes(prepared, scene0, targets, request);
   const result =

@@ -8,7 +8,9 @@
 
 import { planCutShapes, type CutShapesPlan } from '../../core/geometry/cut-shapes';
 import { isUnlockedVectorArtwork } from '../../core/geometry/trim-contours';
+import type { VectorSceneObject } from '../../core/geometry';
 import type { Scene, SceneObject } from '../../core/scene';
+import { geometryToolSkippedNotice, geometryToolSources } from './geometry-tool-sources';
 import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
 import { refuseSceneLimitOverrun } from './scene-copy-room';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
@@ -59,7 +61,8 @@ function cutShapesMutation(
 ): AppState | Partial<AppState> {
   const scene = state.project.scene;
   const selected = cutShapesSelection(scene, selectedObjectIds(state));
-  const sources = selected.filter(isUnlockedVectorArtwork);
+  const { sources, notice } = cutShapesSources(scene, selected);
+  if (notice !== '') report(() => useToastStore.getState().pushToast(notice, 'info'));
   const plan =
     reusableCutShapes(prepared, scene, sources) ?? planCutShapes(sources, cutShapesUsedIds(scene));
   if (plan.kind === 'error') {
@@ -95,6 +98,22 @@ export function cutShapesSelection(
 ): ReadonlyArray<SceneObject> {
   const ids = new Set(selectedIds);
   return scene.objects.filter((object) => ids.has(object.id));
+}
+
+/**
+ * The objects Cut Shapes cuts or cuts with. Cutting replaces them with pieces,
+ * so variable data and the registration jig are left out (ADR-350 Amendment 2).
+ */
+export function cutShapesSources(
+  scene: Scene,
+  selected: ReadonlyArray<SceneObject>,
+): { readonly sources: ReadonlyArray<VectorSceneObject>; readonly notice: string } {
+  const { kept, skipped } = geometryToolSources(
+    scene,
+    selected.filter(isUnlockedVectorArtwork),
+    'replace',
+  );
+  return { sources: kept, notice: geometryToolSkippedNotice(skipped) };
 }
 
 /** Every object id, which new piece ids avoid. */
