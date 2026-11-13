@@ -35,6 +35,9 @@ audit v12 X2-P1-1 (P1, confirmed by its auditor, refuter and coordinator), X2-P3
 2. **A copy's mode comes from its operations.** A part without `svgImport` counts as Fill artwork
    when every operation its paths use is a Fill operation, or when its own override says Fill. A copy
    on a Line operation stays a cut and is left alone.
+   *Amended by Amendment 5: copies made together (same source and placement) form one group; every
+   path, original or copy, is judged by the Fill operations it burns through; and only those
+   bindings are knocked out, so a Line cut or score on the same path is left as it was.*
 3. **The count is the knock-out.** The open notice, the Job Review row and the Tools command count
    what Leave white unburned would actually leave unburned. A cheap test comes first (a burning
    paper white beside a burning darker fill), and only then the knock-out geometry. The result is

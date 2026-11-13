@@ -15,6 +15,8 @@ import {
 } from './photo-engraving-settings';
 import type { PhotoEngravingPreviewResult } from './photo-engraving-preview';
 import type { PhotoEngravingSession } from './photo-engraving-store';
+import { otherPhotoBurns, otherPhotoBurnsSentence } from './photo-engraving-other-burns';
+import { useStore } from '../state';
 import { autoTonesPatch, photoRecipe, photoRecipePatch } from './photo-recipes';
 import { PhotoEngravingFields } from './PhotoEngravingFields';
 import { PhotoEngravingPreview } from './PhotoEngravingPreview';
@@ -181,12 +183,15 @@ function useSourceHistogram(result: PhotoEngravingPreviewResult | null): Uint32A
 }
 
 function PhotoOperationHint({ session }: { readonly session: PhotoEngravingSession }): JSX.Element {
+  const layers = useStore((state) => state.project.scene.layers);
+  const others = otherPhotoBurnsSentence(otherPhotoBurns(session.image, session.operation, layers));
   return (
     <p className="lf-photo-engraving__hint lf-photo-engraving__operation">
       <strong>Operation: {session.operation.name}.</strong>{' '}
       {session.operation.output
         ? 'The preview and engraving settings apply to this operation for the selected photo.'
         : 'Output is off for this operation. These settings will engrave when you enable its output.'}
+      {others === null ? null : <> {others}</>}
     </p>
   );
 }

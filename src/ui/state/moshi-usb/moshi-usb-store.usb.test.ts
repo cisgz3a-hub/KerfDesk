@@ -21,6 +21,7 @@ import {
 import { MOSHI_NO_DEVICE_CHOSEN, moshiUsbOpener } from './moshi-usb-link';
 import { resetMoshiUsbStoreForTests, useMoshiUsbStore } from './moshi-usb-store';
 import type { MoshiUsbJob } from './moshi-usb-types';
+import { testLinkJobOutcome } from '../link-job-outcome-test-helpers';
 
 const JOB: Job = {
   groups: [
@@ -52,7 +53,7 @@ function compiled(): MoshiUsbJob {
   return {
     programs: result.programs.map((program) => program.bytes),
     footprint: result.footprint,
-    advisories: [],
+    ...testLinkJobOutcome(),
     framingFeedMmPerMin: 3000,
   };
 }

@@ -3,6 +3,7 @@
 import type { LhyBoardSetting } from '../../../core/controllers/lihuiyu/lhy-encoder';
 import type { LhyFootprint } from '../../../core/controllers/lihuiyu/lhy-frame';
 import type { LhyChannel } from '../../../core/controllers/lihuiyu/lhy-link';
+import type { LinkJobOutcome } from '../link-job-outcome';
 import type { LhyPoint } from '../../../core/controllers/lihuiyu/lhy-motion-plan';
 
 /** An open board: the EPP channel and the USB session's lifecycle. */
@@ -27,17 +28,15 @@ export type LihuiyuUsbPhase =
   | 'paused'
   | 'stopping';
 
-/** A compiled job: the exact stream Start sends, and where it runs. */
-export type LihuiyuUsbJob = {
+/** A compiled job: the exact stream Start sends, and where it runs; its
+ *  warnings and completion come from linkJobOutcome (ADR-705 Amendment 7). */
+export type LihuiyuUsbJob = LinkJobOutcome & {
   readonly stream: Uint8Array;
   readonly footprint: LhyFootprint;
   /** Machine coordinates from home; the head must be known (after Home). */
   readonly absolute: boolean;
   readonly board: LhyBoardSetting;
   readonly framingMmPerMin: number;
-  readonly advisories: ReadonlyArray<string>;
-  /** Runs once the board reports the job finished (variable advance). */
-  readonly completed?: () => void;
 };
 
 export type LihuiyuUsbFramed = { readonly footprint: LhyFootprint; readonly absolute: boolean };

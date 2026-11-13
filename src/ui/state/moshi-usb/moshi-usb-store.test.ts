@@ -12,6 +12,7 @@ import type { Job } from '../../../core/job';
 import { MOSHI_FRAME_FIRST } from './moshi-usb-messages';
 import { resetMoshiUsbStoreForTests, useMoshiUsbStore } from './moshi-usb-store';
 import type { MoshiUsbConnection, MoshiUsbJob } from './moshi-usb-types';
+import { testLinkJobOutcome } from '../link-job-outcome-test-helpers';
 
 const JOB: Job = {
   groups: [
@@ -45,7 +46,7 @@ function compiled(job: Job = JOB): MoshiUsbJob {
   return {
     programs: result.programs.map((program) => program.bytes),
     footprint: result.footprint,
-    advisories: ['Layer L1: a warning'],
+    ...testLinkJobOutcome(['Layer L1: a warning']),
     framingFeedMmPerMin: 3000,
   };
 }

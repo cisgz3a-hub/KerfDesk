@@ -13,6 +13,9 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   timeout: 60_000,
+  // On CI, end before the "checks" job's 30-minute limit, which also covers the
+  // web build and the cold start, so Playwright still reports (C2 D7).
+  globalTimeout: process.env['CI'] ? 15 * 60_000 : 0,
   expect: { timeout: 10_000 },
   reporter: process.env['CI'] ? 'github' : 'list',
   use: {
