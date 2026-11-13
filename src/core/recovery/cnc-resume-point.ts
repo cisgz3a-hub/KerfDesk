@@ -20,6 +20,13 @@
 // acknowledging it. Everything before an acknowledged M0 has therefore run,
 // and rewinding across it would preselect the previous bit's pass while the
 // next bit is in the spindle (controller audit cnc-controller-2).
+//
+// KerfDesk never sends a tool-change M0: the stream holds in front of it, so
+// at a hold it is not among the acknowledged lines. A stop at a hold that had
+// drained to a fresh Idle (`heldAtToolChange`) proves every line before that
+// M0 ran, and the M0 caps the rewind as if it had been sent. Nothing past a
+// held M0 can have left the host either, so the upper bound stops at it
+// (CNC audit v3 N5-P2-1, ADR-215 Amendment 4).
 
 import { isSendableGcodeLine } from '../controllers/grbl';
 import { isToolChangeLine } from '../controllers/grbl/streamer';
@@ -89,6 +96,8 @@ export type CncResumePointArgs = {
   readonly rxBufferBytes: number;
   /** Usable planner blocks the run's controller reported (idle `Bf`, `$I`). */
   readonly plannerBlocks?: number | undefined;
+  /** The run stopped at a drained tool-change hold (JobInterruption.heldAtToolChange). */
+  readonly heldAtToolChange?: boolean | undefined;
 };
 
 export type CncResumePoint =
@@ -117,7 +126,11 @@ export function resolveCncResumePoint(args: CncResumePointArgs): CncResumePoint 
   const sendableTotal = countSendableLines(args.gcode);
   const acked = Math.min(Math.max(Math.floor(args.ackedLines), 0), sendableTotal);
   const reserve = cncResumePlannerReserveLines(args.controllerKind, args.plannerBlocks);
-  const proven = Math.max(0, acked - reserve, lastAcknowledgedToolChange(args.gcode, acked));
+  const proven = Math.max(
+    0,
+    acked - reserve,
+    lastAcknowledgedToolChange(args.gcode, args.heldAtToolChange === true ? acked + 1 : acked),
+  );
   if (proven >= sendableTotal) return { kind: 'after-last-pass' };
 
   const firstUnprovenRawLine = rawResumeLine(args.gcode, proven);
@@ -172,12 +185,17 @@ function lastPossiblyExecutedRawLine(
   sendableTotal: number,
 ): number {
   const firstUnackedRaw = rawResumeLine(args.gcode, acked);
+  // The stream holds in front of a tool-change M0 without sending it.
+  if (acked < sendableTotal && isToolChangeLine(rawLines[firstUnackedRaw - 1] ?? '')) {
+    return firstUnackedRaw - 1;
+  }
   if (acked >= sendableTotal || args.streamingMode === 'ping-pong') return firstUnackedRaw;
   let budget = Math.max(0, args.rxBufferBytes);
   let last = firstUnackedRaw;
   for (let raw = firstUnackedRaw; raw <= rawLines.length; raw += 1) {
     const line = rawLines[raw - 1] ?? '';
     if (!isSendableGcodeLine(line)) continue;
+    if (isToolChangeLine(line)) break;
     const bytes = line.length + 1;
     if (bytes > budget) break;
     budget -= bytes;

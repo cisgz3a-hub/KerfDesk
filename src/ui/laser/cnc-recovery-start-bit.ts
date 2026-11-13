@@ -13,9 +13,14 @@
 // not an ordinary Start: re-zeroing or probing with that bit clears it. The
 // final recovery assertion (recovery-start-authorization.ts) refuses any Work Z
 // change after this check, so the zero checked here is the one that streams.
+//
+// An Abort's reset voids the live record, so the check also reads the record
+// that reset voided, and refuses a zero the reset cleared or one it cannot
+// name after a bit change (cnc-recovery-work-z.ts, ADR-215 Amendment 3).
 
 import type { Job } from '../../core/job';
 import type { Project } from '../../core/scene';
+import type { RecoveryCapsule } from '../state/recovery';
 import { cncToolPlan } from '../state/cnc-tool-plan';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { WorkZZeroEvidence } from '../state/work-z-zero-evidence';
@@ -24,6 +29,11 @@ import {
   cncWorkZeroToolStartIssue,
 } from './cnc-start-advisories';
 import type { PreparedRecoverySource } from './start-job-source';
+import {
+  cncRecoveryWorkZ,
+  cncRecoveryWorkZEvidence,
+  cncRecoveryWorkZIssue,
+} from './cnc-recovery-work-z';
 
 const RECOVERY_SUBJECT = 'The recovery program';
 
@@ -59,12 +69,12 @@ export function cncRecoveryStartBitIssue(
 export function refuseCncRecoveryStartBit(
   source: Pick<PreparedRecoverySource, 'project' | 'controllerSnapshot'>,
   recoveryJob: Job,
+  capsule: RecoveryCapsule,
 ): boolean {
-  const issue = cncRecoveryStartBitIssue(
-    source.project,
-    recoveryJob,
-    source.controllerSnapshot.workZZeroEvidence,
-  );
+  const workZ = cncRecoveryWorkZ(source.controllerSnapshot, capsule);
+  const issue =
+    cncRecoveryWorkZIssue(source.project, recoveryJob, workZ) ??
+    cncRecoveryStartBitIssue(source.project, recoveryJob, cncRecoveryWorkZEvidence(workZ));
   if (issue === null) return false;
   jobAwareAlert(`Cannot start CNC recovery:\n\n${issue}`);
   return true;

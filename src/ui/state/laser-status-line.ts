@@ -43,6 +43,7 @@ import { releaseAbandonedMotionAtIdle } from './laser-motion-release';
 import { isProbeAlarmedToolChangeHold } from './tool-change-probe-alarm';
 import { probeTestTouchPatch } from './probe-test-touch';
 import { cancelActiveStreamerPatch } from './laser-alarm-stream-end';
+import { workZBeforeResetPatch } from './work-z-before-reset';
 import {
   homeAlarmReplyWindowPatch,
   isStaleHomeAlarmReply,
@@ -416,24 +417,25 @@ export function originUnknownAfterControllerReset(
   state: LaserState,
 ): Pick<
   LaserState,
-  'workOriginActive' | 'workOriginSource' | 'workZZeroEvidence' | 'workZReferenceEpoch'
+  | 'workOriginActive'
+  | 'workOriginSource'
+  | 'workZZeroEvidence'
+  | 'workZReferenceEpoch'
+  | 'workZBeforeReset'
 > {
   // A controller reset/alarm/reboot voids the bit-to-stock Z relationship
-  // regardless of what happens to the XY origin (Codex audit P1).
-  if (state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown') {
-    return {
-      workOriginActive: true,
-      workOriginSource: 'unknown',
-      workZZeroEvidence: null,
-      workZReferenceEpoch: state.workZReferenceEpoch + 1,
-    };
-  }
-  return {
-    workOriginActive: false,
-    workOriginSource: 'none',
+  // regardless of what happens to the XY origin (Codex audit P1). CNC pass
+  // recovery keeps what it voided (work-z-before-reset.ts, ADR-215 Amd 3).
+  const workZReferenceEpoch = state.workZReferenceEpoch + 1;
+  const voided = {
     workZZeroEvidence: null,
-    workZReferenceEpoch: state.workZReferenceEpoch + 1,
+    workZReferenceEpoch,
+    ...workZBeforeResetPatch(state, workZReferenceEpoch),
   };
+  if (state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown') {
+    return { workOriginActive: true, workOriginSource: 'unknown', ...voided };
+  }
+  return { workOriginActive: false, workOriginSource: 'none', ...voided };
 }
 
 function mpgOwnershipPatch(

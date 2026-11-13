@@ -12,8 +12,13 @@
 // worker from there (ADR-676 Amendment 5): reconnecting cannot help where the
 // setting is already on. Advisory only, never a Start gate (ADR-565): the
 // transport can still deliver the job.
+//
+// A CNC job's M3 is a spindle, not a beam: it never takes the laser's M4
+// advice (the CNC emitter always writes M3, and M4 turns a spindle backwards).
+// Its risk is the bit turning in a stopped cut (CNC audit v3 N5-P3-1).
 
 import type { ControllerKind } from '../../../core/devices';
+import { machineKindOf, type MachineKind, type Project } from '../../../core/scene';
 import {
   findStoppedHeadPower,
   type StoppedHeadPower,
@@ -45,6 +50,8 @@ export function detectWindowStreamLitStopWarnings(args: {
   readonly windowStreamReason?: WindowStreamReason | null | undefined;
   readonly controllerKind: ControllerKind;
   readonly gcode: string;
+  /** Laser unless said otherwise. */
+  readonly machineKind?: MachineKind;
 }): ReadonlyArray<string> {
   if (!args.connected || args.jobStreamHost !== 'window') return [];
   const firmware = scannedFirmware(args.controllerKind);
@@ -52,7 +59,11 @@ export function detectWindowStreamLitStopWarnings(args: {
   const finding = findStoppedHeadPower(args.gcode, firmware);
   if (finding === null) return [];
   const route = WORKER_ROUTE[args.windowStreamReason ?? 'no-worker'];
-  return [`${HEAD} ${riskSentence(finding.kind, finding.line)} ${route}`];
+  const risk =
+    args.machineKind === 'cnc' && finding.kind === 'grbl-constant'
+      ? spindleRiskSentence(finding.line)
+      : riskSentence(finding.kind, finding.line);
+  return [`${HEAD} ${risk} ${route}`];
 }
 
 type LiveStreamHost = Pick<
@@ -64,6 +75,7 @@ type LiveStreamHost = Pick<
 export function liveWindowStreamLitStopWarnings(
   live: LiveStreamHost,
   gcode: string,
+  machineKind?: MachineKind,
 ): ReadonlyArray<string> {
   return detectWindowStreamLitStopWarnings({
     connected: live.connection.kind === 'connected',
@@ -71,6 +83,7 @@ export function liveWindowStreamLitStopWarnings(
     windowStreamReason: live.windowStreamReason,
     controllerKind: live.activeControllerKind,
     gcode,
+    ...(machineKind === undefined ? {} : { machineKind }),
   });
 }
 
@@ -90,14 +103,28 @@ export function leadWithLitStop<M extends { readonly warnings: ReadonlyArray<str
 export function withLitStopFirst<M extends { readonly warnings: ReadonlyArray<string> }>(
   model: M,
   live: LiveStreamHost,
-  gcode: string,
+  reviewed: {
+    readonly prepared: { readonly gcode: string };
+    readonly project: Pick<Project, 'machine'>;
+  },
 ): M {
-  return leadWithLitStop(model, liveWindowStreamLitStopWarnings(live, gcode));
+  return leadWithLitStop(
+    model,
+    liveWindowStreamLitStopWarnings(
+      live,
+      reviewed.prepared.gcode,
+      machineKindOf(reviewed.project.machine),
+    ),
+  );
 }
 
 function scannedFirmware(kind: ControllerKind): 'grbl' | 'marlin' | null {
   if (kind === 'grbl-v1.1' || kind === 'grblhal' || kind === 'fluidnc') return 'grbl';
   return kind === 'marlin' ? 'marlin' : null;
+}
+
+function spindleRiskSentence(line: number): string {
+  return `The spindle keeps turning (M3, from line ${line}) while the head is stopped, until the window sends again, with no timeout, or until the E-stop if the window does not recover: the bit rubs in one spot of the cut, heats, and can scorch the stock or break. Keep a hand on the E-stop.`;
 }
 
 function riskSentence(kind: StoppedHeadPower, line: number): string {

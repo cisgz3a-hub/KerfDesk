@@ -17,6 +17,7 @@ import { runCncPassRecoveryFlow } from './cnc-pass-recovery-flow';
 import { CNC_RECOVERY_NEEDS_CNC_PROJECT } from './cnc-recovery-open-project';
 import { cncExtractionGuidance } from './cnc-pass-recovery-guidance';
 import { buildCncPassRecoveryModel } from './cnc-pass-recovery-model';
+import { liveCncRetainedWorkZIssue } from './cnc-recovery-work-z';
 import { isLaterThanDefault, type CncPassRecoveryChecklistDraft } from './cnc-pass-recovery-review';
 
 const EMPTY_CHECKLIST: CncPassRecoveryChecklistDraft = {
@@ -35,9 +36,14 @@ export function CncPassRecoveryWizard(props: {
   const liveReportInches = useLaserStore((state) =>
     state.reportUnitsUnconfirmed === true ? undefined : state.controllerSettings?.reportInches,
   );
+  const openProject = useStore((state) => state.project);
+  // The Work Z an Abort's reset left behind (cnc-recovery-work-z.ts).
+  const workZIssue = useLaserStore((state) =>
+    liveCncRetainedWorkZIssue(state, props.capsule, openProject),
+  );
   const model = useMemo(
-    () => buildCncPassRecoveryModel(props.capsule, liveWco, liveReportInches),
-    [props.capsule, liveWco, liveReportInches],
+    () => buildCncPassRecoveryModel(props.capsule, liveWco, liveReportInches, workZIssue),
+    [props.capsule, liveWco, liveReportInches, workZIssue],
   );
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [selection, setSelection] = useState<{ groupIndex: number; passIndex: number } | null>(

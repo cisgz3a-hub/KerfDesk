@@ -58,16 +58,21 @@ export function retainedPositionIssue(
   capsule: RecoveryCapsule,
   liveWco: WorkCoordinateOffset | null,
   liveReportInches?: boolean,
+  // Why the Z zero cannot stand (cncRetainedWorkZIssue), from the live store.
+  workZIssue: string | null = null,
 ): string | null {
   if (capsule.interruption.kind === 'controller-reboot') {
     return 'The controller rebooted during the incident, so its position cannot be retained. Re-establish the XY/Z zero, then choose the re-zeroed option.';
   }
+  const restartIssue = reconnectRestartIssue(capsule);
+  if (restartIssue !== null) return restartIssue;
   // The work offset survives a reset that killed the steppers mid-motion, so a
   // matching offset proves nothing about steps the motors never took
   // (ADR-215 Amendment 1).
   if (capsule.interruption.positionLost === true) {
     return 'The machine was stopped while it may still have been moving, so the motors may have lost steps and the position cannot be retained. Re-home the machine, re-establish the XY/Z zero, then choose the re-zeroed option.';
   }
+  if (workZIssue !== null) return workZIssue;
   const archivedWco =
     capsule.artifact.kind === 'exact-execution'
       ? capsule.artifact.archivedControllerObservation.wco
@@ -83,6 +88,30 @@ export function retainedPositionIssue(
       ? capsule.artifact.archivedControllerObservation.settings?.reportInches
       : undefined;
   return retainedWorkOffsetIssue(archivedWco, archivedReportInches, liveWco, liveReportInches);
+}
+
+// A board that resets when its port opens (an Arduino-class board), or one
+// that lost USB power, restarts with machine position zeroed where the head
+// stands while its saved G54 still matches the archived offset. Only a
+// reconnect that found the job still running or held proves it did not
+// (CNC audit v3 N5r-P1-1, ADR-215 Amendment 4; laser twin X1-P1-1).
+function reconnectRestartIssue(capsule: RecoveryCapsule): string | null {
+  const { kind, controllerRestart } = capsule.interruption;
+  if (controllerRestart === 'kept-running') return null;
+  if (controllerRestart !== undefined) {
+    return (
+      'A reconnect after the stop did not show that the controller kept running. A board that ' +
+      'resets when its port opens, or that lost USB power, restarts with its machine position ' +
+      'zeroed wherever the head stands, so the position cannot be retained. Home the machine if ' +
+      'it has homing, re-establish the XY/Z zero, then choose the re-zeroed option.'
+    );
+  }
+  if (kind !== 'disconnect') return null;
+  return (
+    'The link to the controller was lost, and no reconnect has shown yet whether the controller ' +
+    'kept running or restarted, so the position cannot be retained. Reconnect, or re-establish ' +
+    'the XY/Z zero and choose the re-zeroed option.'
+  );
 }
 
 function retainedWorkOffsetIssue(
@@ -138,12 +167,16 @@ export function passRecoveryConfirmation(
   review: CncPassRecoveryReview,
   resume: CncPassResumeJob,
   motion: { readonly spindleRpm: number; readonly spindleSpinupSec: number },
+  // The bits and the Z zero (cncRecoveryBitLines, CNC audit v3 N5-P1-1).
+  bitLines: ReadonlyArray<string> = [],
 ): string {
   return (
     'START CNC PASS RECOVERY?\n\n' +
     `Boundary: operation ${review.groupIndex + 1}, pass ${review.passIndex + 1}\n` +
     `Omitted as already complete: ${resume.omittedPassCount} of ${resume.totalPassCount} passes\n` +
-    `Spindle: ${motion.spindleRpm} rpm with ${motion.spindleSpinupSec} s spin-up dwell at safe Z\n\n` +
+    `Spindle: ${motion.spindleRpm} rpm with ${motion.spindleSpinupSec} s spin-up dwell at safe Z\n` +
+    bitLines.map((line) => `${line}\n`).join('') +
+    '\n' +
     'The machine will retract to safe Z, start and dwell the spindle, rapid to the boundary ' +
     "pass's start, plunge at plunge feed, and recut that pass from its beginning before " +
     'continuing with all later work. Expect light recutting of already-cleared kerf.\n\n' +

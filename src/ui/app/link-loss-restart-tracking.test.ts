@@ -156,6 +156,35 @@ describe('installLinkLossRestartTracking', () => {
     save(lostLinkCapsule('saved-cnc', 'cnc'));
     expect(settle).not.toHaveBeenCalled();
   });
+
+  // CNC audit v3 N5r-P1-1 (ADR-215 Amendment 4): a CNC record, an Abort's
+  // included, takes every later connection's sign for "Position retained".
+  it('records each connection’s sign on a CNC record saved before it', () => {
+    const aborted = {
+      ...lostLinkCapsule('aborted-cnc', 'cnc'),
+      interruption: { kind: 'cancelled', message: 'Stopped by the operator (Abort).' },
+    } as unknown as RecoveryCapsule;
+    const { repository, settle } = fakeRepository(aborted);
+    uninstall = installLinkLossRestartTracking(repository);
+    connect();
+    useLaserStore.setState({ detectedControllerKind: 'grbl-v1.1' });
+    expect(settle).toHaveBeenCalledWith(
+      { runId: 'aborted-cnc', revision: 4 },
+      usb('boot-banner'),
+      'cnc-restart',
+    );
+    useLaserStore.setState({ statusReport: status('Idle') });
+    expect(settle).toHaveBeenCalledTimes(1);
+    dropLink();
+    connect();
+    useLaserStore.setState({ statusReport: status('Idle') });
+    expect(settle).toHaveBeenCalledTimes(2);
+    expect(settle).toHaveBeenLastCalledWith(
+      { runId: 'aborted-cnc', revision: 4 },
+      usb('unknown'),
+      'cnc-restart',
+    );
+  });
 });
 
 describe('linkLossRestartEvidence', () => {

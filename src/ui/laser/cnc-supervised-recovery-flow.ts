@@ -37,7 +37,7 @@ import {
   claimCncRecoveryCapsule,
   streamCncRecoveryProgram,
 } from './cnc-supervised-recovery-stream';
-import { mergeCncRecoveryWarnings } from './merge-cnc-recovery-warnings';
+import { mergeCncRecoveryWarnings, withoutOmittedLayerIssues } from './merge-cnc-recovery-warnings';
 import { cncRecoveryOpenProjectIssue } from './cnc-recovery-open-project';
 import { refuseCncRecoveryStartBit } from './cnc-recovery-start-bit';
 import {
@@ -182,7 +182,7 @@ function planRecoveryProgram(
     jobAwareAlert(`Cannot start CNC recovery:\n\n${describeRecoveryRefusal(recovery.reason)}`);
     return null;
   }
-  if (refuseCncRecoveryStartBit(context.source, recovery.job)) return null;
+  if (refuseCncRecoveryStartBit(context.source, recovery.job, capsule)) return null;
   const emitted = emitPreparedGcode(
     { ...context.source.prepared, job: recovery.job },
     recoveryEmitOptions(capsule, context.source),
@@ -194,7 +194,7 @@ function planRecoveryProgram(
   // which feeds both the operator's confirmation and the `warningsShown`
   // execution evidence archived with the run — so the audit record shows
   // exactly what the operator was told.
-  const emitSplit = partitionEmitPreflight(emitted.preflight);
+  const emitSplit = partitionEmitPreflight(withoutOmittedLayerIssues(emitted.preflight));
   if (emitSplit.blocking.length > 0) {
     const messages = emitSplit.blocking.map((message) => `• ${message}`).join('\n');
     jobAwareAlert(`Cannot start CNC recovery:\n\n${messages}`);

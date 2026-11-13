@@ -8437,13 +8437,22 @@ as the pane's design record.
    first line NOT provably executed (acked count minus a per-controller planner
    reserve). Pass spans are re-derived by replaying the artifact's emitter
    lineage and trusted only when the re-emission reproduces the sealed bytes.
+   The default never rewinds across a bit change: an Abort at a bit-change hold
+   that had settled at Idle proves every line before the hold's unsent `M0`
+   ran, so the default is the new bit's first pass, which the map shows as not
+   reached (ADR-215 Amendment 4).
 5. The operator confirms four physical facts — cutter clear, spindle stopped,
    workholding unchanged, tool installed/intact/Z-zeroed — and chooses position
    evidence: **retained** (enabled only with session-continuity evidence: the
    interruption was not a controller reboot, did not stop a moving machine by
    a reset (Abort, or the automatic stop after a rejected line) or by a
    position-losing alarm such as a hard limit (ADR-215 Amendment 1), AND the live work offset matches the offset archived with the
-   run) or **re-zeroed**.
+   run) or **re-zeroed**. Retained is also off after a lost link, and after any
+   reconnect, unless the first status from the controller showed Run or Hold: a
+   board that resets when its port opens restarts with machine position zeroed
+   where the head stands (ADR-215 Amendment 4). It is off too when the Abort's
+   reset cleared a Zero Z (G92) set at a bit change, or when the run had reached
+   a bit change and no Z zero is on record (ADR-215 Amendment 3).
 6. Start generates a NEW recovery job — safe-Z retract → spindle start with its
    full spin-up dwell → rapid to the boundary pass start → plunge at plunge
    feed into already-cut kerf → recut that pass → every later pass and
@@ -8473,6 +8482,15 @@ as the pane's design record.
    and then zeroed (ADR-416 Amendment 4). The runway
    review checks the same way. Nothing is sent and the card stays retryable
    (ADR-215 Amendment 2).
+5. An Abort's reset voids the app's Work Z record, so recovery reads the
+   record that reset voided (ADR-215 Amendment 3). A zero the controller kept
+   (the probe's `G10 L20`, the controller read-back, or grblHAL's G92) is
+   checked against the recovery's first bit as above, and the warnings name it
+   instead of saying no work zero is set. A Zero Z (G92) that stock GRBL or
+   FluidNC cleared at the reset refuses until Z is zeroed again, and so does a
+   run that had reached a bit change with no Z zero on record. The
+   **START CNC PASS RECOVERY?** confirmation names the bit the recovery starts
+   with, the bit in the spindle and the Z zero on record.
 
 #### Empty
 1. Without a retained CNC capsule no recovery card is shown (unchanged).

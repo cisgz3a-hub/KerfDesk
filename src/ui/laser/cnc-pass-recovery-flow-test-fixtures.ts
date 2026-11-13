@@ -131,6 +131,9 @@ export async function saveInterruptedRun(
         {
           kind: options?.interruptionKind ?? 'disconnect',
           message: 'USB connection was lost.',
+          // A lost link counts as session-continuous only once a reconnect
+          // showed the board kept running (ADR-215 Amendment 4).
+          controllerRestart: 'kept-running',
         },
         LATER,
       )

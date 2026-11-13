@@ -146,3 +146,19 @@ describe('the lit-stop warning leads the list (ADR-676 decision 5)', () => {
     expect(leadWithLitStop(model, [])).toBe(model);
   });
 });
+
+// CNC audit v3 N5-P3-1: a CNC job's M3 is a spindle; M4 would turn it backwards.
+describe('window-stream warning for a CNC job', () => {
+  it('names the turning bit instead of a beam and gives no M4 advice', () => {
+    const [warning] = detectWindowStreamLitStopWarnings({
+      connected: true,
+      jobStreamHost: 'window',
+      controllerKind: 'grbl-v1.1',
+      gcode: 'M3 S12000\nG4 P3\nG0 X1\nG1 Z-1 F300\nG1 X2 F1000\nM5\n',
+      machineKind: 'cnc',
+    });
+    expect(warning).toContain(WINDOW_STREAM_LIT_STOP_PREFIX);
+    expect(warning).toContain('The spindle keeps turning (M3, from line 4)');
+    expect(warning).not.toMatch(/M4|Dynamic|burn-through|beam/);
+  });
+});

@@ -13,6 +13,13 @@
 // did restart printed its boot banner before its network came up. There the
 // first status decides: a running or held machine kept running, an Alarm
 // stopped it, and anything else leaves the restart unknown.
+//
+// A CNC run's record takes no backlog: pass recovery keeps its own planner
+// reserve. It takes the sign instead, from every connection that begins while
+// it is saved or that its run was live on as the link dropped, because a board
+// that restarted has zeroed machine position where the head stood and
+// "Position retained" must not be offered (CNC audit v3 N5r-P1-1, ADR-215
+// Amendment 4).
 
 import { awaitsLinkLossVerdict } from '../../core/recovery';
 import type {
@@ -87,6 +94,7 @@ export function installLinkLossRestartTracking(
   let savedBefore: SavedBefore = null;
   const droppedRuns = new Set<string>();
   let attempted: string | null = null;
+  let connectionCount = 0;
 
   const savedRunId = (): SavedBefore => {
     const snapshot = repository.getSnapshot();
@@ -95,17 +103,20 @@ export function installLinkLossRestartTracking(
   const settle = (): void => {
     if (connected && savedBefore === undefined) savedBefore = savedRunId();
     const capsule = repository.getSnapshot().recoveryCapsule;
-    // CNC pass recovery keeps its own planner reserve and reads no backlog.
-    if (evidence === null || capsule?.artifact.machineKind !== 'laser') return;
-    if (!awaitsLinkLossVerdict(capsule.interruption)) return;
+    if (evidence === null || capsule === null) return;
     if (capsule.runId !== savedBefore && !droppedRuns.has(capsule.runId)) return;
-    const attempt = `${capsule.runId}@${capsule.revision}`;
+    const cnc = capsule.artifact.machineKind === 'cnc';
+    if (!cnc && !awaitsLinkLossVerdict(capsule.interruption)) return;
+    // A CNC record takes each connection's sign; a laser one waits for one verdict.
+    const attempt = cnc
+      ? `${capsule.runId}#${connectionCount}@${capsule.revision}`
+      : `${capsule.runId}@${capsule.revision}`;
     if (attempted === attempt) return;
     attempted = attempt;
-    void repository.settleLinkLossRestart(
-      { runId: capsule.runId, revision: capsule.revision },
-      evidence,
-    );
+    const expected = { runId: capsule.runId, revision: capsule.revision };
+    void (cnc
+      ? repository.settleLinkLossRestart(expected, evidence, 'cnc-restart')
+      : repository.settleLinkLossRestart(expected, evidence));
   };
   const observe = (state: LaserState, prior?: LaserState): void => {
     if (state.connection.kind !== 'connected') {
@@ -118,6 +129,7 @@ export function installLinkLossRestartTracking(
     }
     if (!connected) {
       connected = true;
+      connectionCount += 1;
       savedBefore = savedRunId();
     }
     if (watching && evidence === null) evidence = linkLossRestartEvidence(state);
