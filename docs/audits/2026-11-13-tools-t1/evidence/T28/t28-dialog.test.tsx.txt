@@ -1,0 +1,85 @@
+// @vitest-environment jsdom
+// T28 Weld dialog: a selection with one locked shape. The dialog previews the weld of the
+// unlocked shapes; what does Apply do?
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, it, vi } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type ImportedSvg } from '../t26-main/src/core/scene';
+import { setActiveEdition } from '../t26-main/src/ui/licensing/edition';
+import { useStore } from '../t26-main/src/ui/state';
+import { resetStore } from '../t26-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t26-main/src/ui/state/toast-store';
+import { BooleanDialogHost } from '../t26-main/src/ui/commands/BooleanDialogHost';
+import { openBooleanDialog, useBooleanDialogStore } from '../t26-main/src/ui/commands/boolean-dialog-store';
+import { selectionCanWeld } from '../t26-main/src/ui/commands/selection-command-state';
+
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t28/t28-dialog.log', log.join('\n'));
+};
+let host: HTMLDivElement, root: Root;
+beforeEach(() => {
+  resetStore();
+  useBooleanDialogStore.setState({ session: null });
+  useToastStore.setState({ toasts: [] } as never);
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  host = document.createElement('div');
+  document.body.appendChild(host);
+  root = createRoot(host);
+});
+afterEach(async () => {
+  await act(async () => root.unmount());
+  host.remove();
+  vi.unstubAllGlobals();
+  setActiveEdition(null);
+});
+function square(id: string, x: number, locked = false): ImportedSvg {
+  return {
+    kind: 'imported-svg', id, source: `${id}.svg`, transform: { ...IDENTITY_TRANSFORM, x },
+    bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 }, operationIds: ['cut'], ...(locked ? { locked: true } : {}),
+    paths: [{ color: '#000000', polylines: [{ closed: true, points: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }] }] }],
+  };
+}
+const button = (label: string) => [...document.querySelectorAll('button')].find((b) => b.textContent === label);
+
+it('locked shape in the selection', async () => {
+  useStore.setState({
+    project: { ...createProject(), scene: { objects: [square('a', 0), square('b', 5), square('c', 40, true)], layers: [createLayer({ id: 'cut', color: '#000000' })], groups: [] } },
+    selectedObjectId: 'a',
+    additionalSelectedIds: new Set(['b', 'c']),
+  });
+  const before = useStore.getState().project;
+  out(`menu enabled: ${selectionCanWeld(before, ['a', 'b', 'c'])}`);
+  await act(async () => {
+    root.render(<BooleanDialogHost />);
+    openBooleanDialog('weld');
+  });
+  await act(async () => new Promise((r) => setTimeout(r, 300)));
+  const apply = button('Apply');
+  out(`dialog open: ${useBooleanDialogStore.getState().session !== null}; status "${document.querySelector('[role="status"]')?.textContent ?? ''}"; Apply disabled ${apply?.disabled}`);
+  await act(async () => apply?.click());
+  await act(async () => new Promise((r) => setTimeout(r, 100)));
+  out(`after Apply: project changed ${useStore.getState().project !== before}; dialog still open ${useBooleanDialogStore.getState().session !== null}; toasts ${JSON.stringify(useToastStore.getState().toasts.map((t) => t.message))}; status "${document.querySelector('[role="status"]')?.textContent ?? ''}"`);
+});
+
+it('control: same selection, nothing locked', async () => {
+  useStore.setState({
+    project: { ...createProject(), scene: { objects: [square('a', 0), square('b', 5), square('c', 40)], layers: [createLayer({ id: 'cut', color: '#000000' })], groups: [] } },
+    selectedObjectId: 'a',
+    additionalSelectedIds: new Set(['b', 'c']),
+  });
+  const before = useStore.getState().project;
+  out(`menu enabled: ${selectionCanWeld(before, ['a', 'b', 'c'])}`);
+  await act(async () => {
+    root.render(<BooleanDialogHost />);
+    openBooleanDialog('weld');
+  });
+  await act(async () => new Promise((r) => setTimeout(r, 300)));
+  const apply = button('Apply');
+  out(`dialog open: ${useBooleanDialogStore.getState().session !== null}; status "${document.querySelector('[role="status"]')?.textContent ?? ''}"; Apply disabled ${apply?.disabled}`);
+  await act(async () => apply?.click());
+  await act(async () => new Promise((r) => setTimeout(r, 100)));
+  out(`after Apply: project changed ${useStore.getState().project !== before}; dialog still open ${useBooleanDialogStore.getState().session !== null}; toasts ${JSON.stringify(useToastStore.getState().toasts.map((t) => t.message))}; status "${document.querySelector('[role="status"]')?.textContent ?? ''}"`);
+});

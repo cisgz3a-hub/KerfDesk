@@ -1,0 +1,294 @@
+// @vitest-environment jsdom
+// T28 Weld: what the result inherits and what burns (variable text, registration jig,
+// mixed operations, power scale, overrides, groups, locked, open, undo/redo, metadata).
+import { beforeEach, it } from 'vitest';
+import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  createRegistrationLayer,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  DEFAULT_PROJECT_VARIABLE_DATA,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type TextObject,
+  type Transform,
+} from '../t26-main/src/core/scene';
+import { createRectangle } from '../t26-main/src/core/shapes/primitives/create-rectangle';
+import { createEllipse } from '../t26-main/src/core/shapes/primitives/create-ellipse';
+import { createRegistrationBox } from '../t26-main/src/core/shapes';
+import { registrationJigCopyId } from '../t26-main/src/core/scene/registration-jig-artwork';
+import { registrationJigCompilationRuns } from '../t26-main/src/core/job/registration-jig-compilation-runs';
+import { findRegistrationBoxes } from '../t26-main/src/core/scene/registration-layer';
+import { textToPolylines } from '../t26-main/src/core/text';
+import { prepareOutput } from '../t26-main/src/io/gcode/prepare-output';
+import { prepareOutputSnapshot, type VariableTextRenderer } from '../t26-main/src/io/gcode/prepare-output-snapshot';
+import { emitPreparedGcode } from '../t26-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t26-main/src/ui/state/store';
+import { resetStore } from '../t26-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t26-main/src/ui/state/toast-store';
+import { selectionCanWeld } from '../t26-main/src/ui/commands/selection-command-state';
+import { litMoves, totalLen, bbox, type LitMove } from './decode';
+import { compareRegions, loops } from './oracle';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t28/t28-burn.log';
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync(LOG, log.join('\n'));
+};
+beforeEach(() => {
+  resetStore();
+  useToastStore.setState({ toasts: [] } as never);
+});
+const st = () => useStore.getState();
+const f3 = (n: number) => n.toFixed(3);
+const toasts = () => useToastStore.getState().toasts.map((t) => `${t.message}`);
+
+const roboto = (() => {
+  const b = readFileSync('C:/Users/stolk/kd-t1/t26-main/src/ui/text/fonts/Roboto-Regular.ttf');
+  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+})();
+const renderer: VariableTextRenderer = ({ text, content }) =>
+  textToPolylines({ content, sizeMm: text.sizeMm, alignment: text.alignment, lineHeight: text.lineHeight, letterSpacing: text.letterSpacing, color: text.color, fontBuffer: roboto });
+
+const layer = (id: string, mode: 'line' | 'fill', speed: number, power: number, extra: Partial<Layer> = {}) =>
+  ({ ...createLayer({ id, color: '#000000', name: id, mode }), speed, power, ...extra }) as Layer;
+function proj(objects: SceneObject[], layers: Layer[], extra: Partial<Project> = {}): Project {
+  const base = createProject();
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers, groups: [] }, ...extra };
+}
+function setProject(project: Project, selected: string[]): void {
+  useStore.setState({ project, selectedObjectId: selected[0] ?? null, additionalSelectedIds: new Set(selected.slice(1)), undoStack: [], redoStack: [], dirty: false });
+}
+function burn(project: Project) {
+  const prepared = prepareOutput(project);
+  if (!prepared.ok) return { ok: false, gcode: '', moves: [] as LitMove[], why: JSON.stringify(prepared.preflight).slice(0, 300) };
+  const g = emitPreparedGcode(prepared).gcode;
+  return { ok: true, gcode: g, moves: litMoves(g, project.device), why: '' };
+}
+const rect = (id: string, w: number, h: number, t: Partial<Transform>, extra: Record<string, unknown> = {}) =>
+  ({ ...createRectangle({ id, color: '#000000', spec: { widthMm: w, heightMm: h, cornerRadiusMm: 0 }, transform: { ...IDENTITY_TRANSFORM, ...t } }), ...extra }) as SceneObject;
+const circ = (id: string, d: number, t: Partial<Transform>, extra: Record<string, unknown> = {}) =>
+  ({ ...createEllipse({ id, color: '#000000', spec: { widthMm: d, heightMm: d }, transform: { ...IDENTITY_TRANSFORM, ...t } }), ...extra }) as SceneObject;
+/** Lit length per F/S pair. */
+const byFS = (moves: LitMove[]) => {
+  const m = new Map<string, number>();
+  for (const mv of moves) m.set(`F${mv.f} S${mv.s}`, (m.get(`F${mv.f} S${mv.s}`) ?? 0) + mv.len);
+  return [...m].map(([k, v]) => `${k}: ${f3(v)}`).join(' | ');
+};
+
+it('A. variable text welded with a plate: what burns', async () => {
+  const template = 'SN {{serial:4}}';
+  const base = {
+    kind: 'text', id: 'VT', content: template,
+    variableTemplate: { tokens: [{ kind: 'literal', value: 'SN ' }, { kind: 'serial', prefix: '', width: 4 }] },
+    fontKey: 'roboto-regular', sizeMm: 10, alignment: 'left', lineHeight: 1.4, letterSpacing: 0, color: '#000000',
+    bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 }, transform: { ...IDENTITY_TRANSFORM, x: 50, y: 50 }, paths: [], operationIds: ['L'],
+  } as unknown as TextObject;
+  const src = await renderer({ text: base, content: template, project: createProject() });
+  const text = { ...base, bounds: src.bounds, paths: src.paths } as TextObject;
+  // a bar across the bottom of the first glyph only ("S"), as a tag would sit under a name
+  const bar = rect('BAR', 4, 2, { x: 49, y: 50 + src.bounds.maxY - 1 }, { operationIds: ['L'] });
+  const p0 = proj([text, bar], [layer('L', 'line', 1234, 37)], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 42 } });
+  setProject(p0, ['VT', 'BAR']);
+  const snap = async (p: Project) => {
+    const prepared = await prepareOutputSnapshot(p, { clock: () => new Date(0), renderVariableText: renderer });
+    if (!prepared.ok) return { len: NaN, b: null as unknown, moves: [] as LitMove[] };
+    const g = emitPreparedGcode(prepared).gcode;
+    const moves = litMoves(g, p.device);
+    return { len: totalLen(moves), b: bbox(moves), moves };
+  };
+  const before = await snap(p0);
+  out(`A menu Weld enabled on variable text + bar: ${selectionCanWeld(p0, ['VT', 'BAR'])}`);
+  st().weldSelection();
+  const p1 = st().project;
+  const after = await snap(p1);
+  const kinds = p1.scene.objects.map((o) => `${o.id}:${o.kind}${'source' in o ? `(${o.source})` : ''}`);
+  out(`A objects after: ${kinds.join(', ')}`);
+  out(`A before lit ${f3(before.len)} bbox ${JSON.stringify(before.b)}`);
+  out(`A after  lit ${f3(after.len)} bbox ${JSON.stringify(after.b)}`);
+  const value = await renderer({ text: base, content: 'SN 0042', project: p0 });
+  out(`A oracle: rendered value "SN 0042" width ${f3(value.bounds.maxX - value.bounds.minX)} mm; template width ${f3(src.bounds.maxX - src.bounds.minX)} mm`);
+  out(`A toasts ${JSON.stringify(toasts())}`);
+  // serial 43 after weld: does the burn change with the record?
+  const p2 = { ...p1, variables: { ...p1.variables, serialValue: 43 } };
+  const after2 = await snap(p2);
+  out(`A after weld, serial 43: lit ${f3(after2.len)} (same as serial 42: ${Math.abs(after2.len - after.len) < 1e-6})`);
+});
+
+it('B. registration jig: Select All then Weld', () => {
+  const BOX_A = '379754e4-b1f1-45b1-853d-75a769147a71';
+  const BOX_B = '389754e4-b1f1-45b1-853d-75a769147a72';
+  const SRC = 'd9c94761-4f55-4e18-b166-3dbb322a789a';
+  const SRC2 = 'e9c94761-4f55-4e18-b166-3dbb322a789b';
+  const boxes = [BOX_A, BOX_B].map((id, i) => createRegistrationBox({ id, widthMm: 60, heightMm: 60, x: 10 + i * 80, y: 10 }));
+  const s1 = circ(SRC, 20, { x: 25, y: 25 }, { operationIds: ['art'] });
+  const s2 = circ(SRC2, 20, { x: 35, y: 30 }, { operationIds: ['art'] });
+  const c1 = { ...s1, id: registrationJigCopyId(SRC, BOX_B), transform: { ...s1.transform, x: 105 } };
+  const c2 = { ...s2, id: registrationJigCopyId(SRC2, BOX_B), transform: { ...s2.transform, x: 115 } };
+  const eng = rect('ENG', 6, 6, { x: 30, y: 50 }, { operationIds: ['eng'] });
+  const engC = { ...eng, id: registrationJigCopyId('ENG', BOX_B), transform: { ...eng.transform, x: 110 } };
+  const layers = [
+    { ...createRegistrationLayer(), output: false },
+    layer('eng', 'line', 1111, 10),
+    layer('art', 'line', 2222, 90),
+  ];
+  const p0 = proj([...boxes, s1, s2, c1, c2, eng, engC], layers);
+  setProject(p0, []);
+  st().selectAllObjects();
+  const sel = [st().selectedObjectId, ...st().additionalSelectedIds];
+  out(`B Select All picked ${sel.length} of ${p0.scene.objects.length}; Weld enabled ${selectionCanWeld(p0, sel as string[])}`);
+  const order = (p: Project) =>
+    burn(p).moves.reduce<string[]>((acc, m) => {
+      const tag = `F${m.f}@${m.from.x < 85 ? 'A' : 'B'}`;
+      if (acc.at(-1) !== tag) acc.push(tag);
+      return acc;
+    }, []);
+  const runs0 = registrationJigCompilationRuns(p0.scene)?.length ?? 0;
+  const o0 = order(p0);
+  st().weldSelection();
+  const p1 = st().project;
+  out(`B boxes before ${findRegistrationBoxes(p0.scene).length} after ${findRegistrationBoxes(p1.scene).length}; jig runs before ${runs0} after ${registrationJigCompilationRuns(p1.scene)?.length ?? 0}`);
+  out(`B objects after: ${p1.scene.objects.map((o) => `${o.id.slice(0, 8)}:${o.kind}`).join(' ')}`);
+  out(`B layers after: ${p1.scene.layers.map((l) => `${l.id}/${l.name}/out=${l.output}`).join(', ')}`);
+  out(`B burn order before: ${o0.join(' > ')}`);
+  out(`B burn order after:  ${order(p1).join(' > ')}`);
+  out(`B toasts ${JSON.stringify(toasts())}`);
+  // jig art only (no boxes): does the jig copy weld with its own source?
+  const p2 = proj([...boxes, s1, s2, c1, c2], layers);
+  setProject(p2, [SRC, SRC2, c1.id, c2.id]);
+  st().weldSelection();
+  const p3 = st().project;
+  out(`B2 art+copies only: boxes after ${findRegistrationBoxes(p3.scene).length}; jig runs before ${registrationJigCompilationRuns(p2.scene)?.length ?? 0} after ${registrationJigCompilationRuns(p3.scene)?.length ?? 0}; objects ${p3.scene.objects.map((o) => o.id.slice(0, 8)).join(' ')}`);
+  out(`B2 burn order before: ${order(p2).join(' > ')} after: ${order(p3).join(' > ')}`);
+});
+
+it('C. mixed operations, power scale, overrides', () => {
+  // L1: A and C overlap; L2: B overlaps A. All Line.
+  const L1 = layer('L1', 'line', 1000, 80);
+  const L2 = layer('L2', 'line', 500, 40);
+  const A = rect('A', 20, 10, { x: 10, y: 10 }, { operationIds: ['L1'] });
+  const C = rect('C', 20, 10, { x: 20, y: 15 }, { operationIds: ['L1'] });
+  const B = rect('B', 20, 10, { x: 15, y: 5 }, { operationIds: ['L2'] });
+  const p0 = proj([A, B, C], [L1, L2]);
+  setProject(p0, ['A', 'B', 'C']);
+  const b0 = burn(p0);
+  st().weldSelection();
+  const p1 = st().project;
+  const b1 = burn(p1);
+  out(`C1 mixed ops: before ${byFS(b0.moves)}; after ${byFS(b1.moves)}; objects ${p1.scene.objects.map((o) => o.id).join(',')}; layers ${p1.scene.layers.map((l) => l.id).join(',')}`);
+
+  // power scale: A,C powerScale 50 on L1 (overlap), D unscaled overlapping A
+  const As = { ...A, powerScale: 50 } as SceneObject;
+  const Cs = { ...C, powerScale: 50 } as SceneObject;
+  const D = rect('D', 6, 6, { x: 8, y: 8 }, { operationIds: ['L1'] });
+  const p2 = proj([As, Cs, D], [L1]);
+  setProject(p2, ['A', 'C', 'D']);
+  const b2 = burn(p2);
+  st().weldSelection();
+  const p3 = st().project;
+  const b3 = burn(p3);
+  const w = p3.scene.objects.find((o) => o.id.startsWith('welded')) as ImportedSvg | undefined;
+  out(`C2 powerScale 50: before ${byFS(b2.moves)}; after ${byFS(b3.moves)}; layers ${p3.scene.layers.map((l) => `${l.id}/${l.name}/P${l.power}`).join(', ')}; welded powerScale ${w?.powerScale} paths ${w?.paths.map((p) => p.operationIds?.join('+')).join(';')}`);
+  out(`C2 toasts ${JSON.stringify(toasts())}`);
+
+  // override
+  const ov = { byOperation: { L1: { power: 12, speed: 777 } } };
+  const Ao = { ...A, operationOverride: ov } as SceneObject;
+  const Co = { ...C, operationOverride: ov } as SceneObject;
+  const p4 = proj([Ao, Co], [L1]);
+  setProject(p4, ['A', 'C']);
+  const b4 = burn(p4);
+  st().weldSelection();
+  const p5 = st().project;
+  const b5 = burn(p5);
+  out(`C3 override power12 speed777: before ${byFS(b4.moves)}; after ${byFS(b5.moves)}; layers ${p5.scene.layers.map((l) => `${l.id}/${l.name}/P${l.power}/F${l.speed}`).join(', ')}`);
+  // Later edit of the source operation: does the welded art follow?
+  const p6 = { ...p5, scene: { ...p5.scene, layers: p5.scene.layers.map((l) => (l.id === 'L1' ? { ...l, power: 20 } : l)) } };
+  out(`C3 after editing L1 power 80->20: welded burns ${byFS(burn(p6).moves)}`);
+
+  // object with two operations (Fill + Line) both overlapping
+  const F = layer('F', 'fill', 3000, 30, { hatchSpacingMm: 0.1 });
+  const A2 = rect('A', 20, 10, { x: 10, y: 10 }, { operationIds: ['F', 'L1'] });
+  const C2 = rect('C', 20, 10, { x: 20, y: 15 }, { operationIds: ['F', 'L1'] });
+  const p7 = proj([A2, C2], [F, L1]);
+  setProject(p7, ['A', 'C']);
+  const b7 = burn(p7);
+  st().weldSelection();
+  const b8 = burn(st().project);
+  out(`C4 Fill+Line on both: before ${byFS(b7.moves)}; after ${byFS(b8.moves)}; (Fill area oracle 350 mm2 -> hatch ~3500 mm)`);
+
+  // same op, different colours (explicit operationIds)
+  const Ar = { ...A, color: '#ff0000', paths: (A as ImportedSvg).paths.map((p) => ({ ...p, color: '#ff0000' })) } as SceneObject;
+  const p9 = proj([Ar, C], [L1]);
+  setProject(p9, ['A', 'C']);
+  const b9 = burn(p9);
+  st().weldSelection();
+  const p10 = st().project;
+  const b10 = burn(p10);
+  const cmp = compareRegions([{ contours: loops(b9.moves), rule: 'nonzero' }], [{ contours: loops(b10.moves), rule: 'evenodd' }]);
+  out(`C5 same op, colours #ff0000 + #000000: changed ${p10 !== p9}; objects ${p10.scene.objects.map((o) => o.id).join(',')}; lit before ${f3(totalLen(b9.moves))} after ${f3(totalLen(b10.moves))} (union perimeter 90); toasts ${JSON.stringify(toasts().slice(-1))}`);
+  void cmp;
+});
+
+it('D. groups, locked, open, undo/redo, metadata, tabs', () => {
+  const L = layer('L', 'line', 1000, 80);
+  const A = rect('A', 20, 10, { x: 10, y: 10 }, { operationIds: ['L'], name: 'Left plate' });
+  const C = rect('C', 20, 10, { x: 20, y: 15 }, { operationIds: ['L'], name: 'Right plate' });
+  const E = circ('E', 10, { x: 80, y: 80 }, { operationIds: ['L'] });
+  const base = proj([A, C, E], [L]);
+  const p0 = { ...base, scene: { ...base.scene, groups: [{ id: 'G', name: 'grp', objectIds: ['A', 'C', 'E'] }] } } as Project;
+  setProject(p0, ['A', 'C']);
+  st().weldSelection();
+  const p1 = st().project;
+  const w = p1.scene.objects.find((o) => o.id.startsWith('welded')) as ImportedSvg;
+  out(`D1 group of A,C,E; weld A+C: groups after ${JSON.stringify(p1.scene.groups)}; welded id ${w.id} name ${w.name} source ${w.source}`);
+  // undo / redo
+  st().undo();
+  out(`D2 undo restores exact project: ${st().project === p0}; redo stack ${st().redoStack.length}`);
+  st().redo();
+  out(`D2 redo equals weld result: ${JSON.stringify(st().project.scene) === JSON.stringify(p1.scene)}`);
+
+  // locked in mixed selection
+  const Al = { ...A, locked: true } as SceneObject;
+  const p2 = proj([Al, C], [L]);
+  out(`D3 menu enabled with locked A + C: ${selectionCanWeld(p2, ['A', 'C'])}`);
+  setProject(p2, ['A', 'C']);
+  useToastStore.setState({ toasts: [] } as never);
+  st().weldSelection();
+  out(`D3 locked A + C weld: changed ${st().project !== p2}; toasts ${JSON.stringify(toasts())}`);
+
+  // open path in selection
+  const open = { kind: 'imported-svg', id: 'O', source: 'o.svg', bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 }, transform: IDENTITY_TRANSFORM, operationIds: ['L'], paths: [{ color: '#000000', polylines: [{ closed: false, points: [{ x: 0, y: 0 }, { x: 30, y: 30 }] }] }] } as ImportedSvg;
+  const p3 = proj([A, C, open], [L]);
+  out(`D4 menu enabled with open path selected: ${selectionCanWeld(p3, ['A', 'C', 'O'])}`);
+  setProject(p3, ['A', 'C', 'O']);
+  useToastStore.setState({ toasts: [] } as never);
+  st().weldSelection();
+  out(`D4 weld with open path: changed ${st().project !== p3}; toasts ${JSON.stringify(toasts())}`);
+
+  // metadata: library provenance, whiteInk kept, tabs
+  const lib = { ...A, libraryProvenance: { schemaVersion: 1, assetId: 'a', title: 'T', sourceName: 'S', licenseId: 'CC-BY-4.0', creator: 'Creator' } } as SceneObject;
+  const tabbed = { ...C, laserTabAnchors: [{ layerColor: '#000000', pathIndex: 0, polylineIndex: 0, pathT: 0.3 }] } as SceneObject;
+  const p4 = proj([lib, tabbed], [L]);
+  setProject(p4, ['A', 'C']);
+  useToastStore.setState({ toasts: [] } as never);
+  st().weldSelection();
+  const w4 = st().project.scene.objects[0] as ImportedSvg;
+  out(`D5 welded libraryProvenance ${JSON.stringify(w4.libraryProvenance)} laserTabAnchors ${JSON.stringify(w4.laserTabAnchors)} toasts ${JSON.stringify(toasts())}`);
+  const W = layer('W', 'fill', 3000, 30);
+  const wA = { kind: 'imported-svg', id: 'WA', source: 'w.svg', bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 }, transform: IDENTITY_TRANSFORM, operationIds: ['W'], paths: [{ color: '#ffffff', whiteInk: 'kept', polylines: [{ closed: true, points: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }] }] }] } as unknown as ImportedSvg;
+  const wB = { ...wA, id: 'WB', paths: [{ ...wA.paths[0]!, polylines: [{ closed: true, points: [{ x: 5, y: 5 }, { x: 15, y: 5 }, { x: 15, y: 15 }, { x: 5, y: 15 }] }] }] } as ImportedSvg;
+  const p5 = proj([wA, wB], [W]);
+  setProject(p5, ['WA', 'WB']);
+  const b5 = burn(p5);
+  st().weldSelection();
+  const p6 = st().project;
+  const w6 = p6.scene.objects[0] as ImportedSvg;
+  const b6 = burn(p6);
+  out(`D6 kept white: welded path whiteInk ${w6.paths[0]?.whiteInk}; burn before ok ${b5.ok} lit ${f3(totalLen(b5.moves))} after ok ${b6.ok} lit ${f3(totalLen(b6.moves))} ${b6.why}`);
+});

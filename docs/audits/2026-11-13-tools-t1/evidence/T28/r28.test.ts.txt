@@ -1,0 +1,290 @@
+// @vitest-environment jsdom
+// T28 Weld refuter: own scenes, own G-code reader (gread.ts), real store actions.
+import { beforeEach, it } from 'vitest';
+import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  DEFAULT_PROJECT_VARIABLE_DATA,
+  IDENTITY_TRANSFORM,
+  findRegistrationBoxes,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type TextObject,
+} from '../t26-main/src/core/scene';
+import { createRectangle } from '../t26-main/src/core/shapes/primitives/create-rectangle';
+import { createEllipse } from '../t26-main/src/core/shapes/primitives/create-ellipse';
+import { textToPolylines } from '../t26-main/src/core/text';
+import { parseVariableTemplateSource } from '../t26-main/src/core/variables';
+import { createBarcodeObject, defaultBarcodeSpec } from '../t26-main/src/core/barcode';
+import { prepareOutput } from '../t26-main/src/io/gcode/prepare-output';
+import { prepareOutputSnapshot, type VariableTextRenderer } from '../t26-main/src/io/gcode/prepare-output-snapshot';
+import { emitPreparedGcode } from '../t26-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t26-main/src/ui/state/store';
+import { resetStore } from '../t26-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t26-main/src/ui/state/toast-store';
+import { selectionCanWeld } from '../t26-main/src/ui/commands/selection-command-state';
+import { registrationJigCompilationRuns } from '../t26-main/src/core/job/registration-jig-compilation-runs';
+import {
+  centerJigArtwork,
+  changeJigDraft,
+  commitJigEditorSession,
+  createJigEditorSession,
+  replaceJigLayout,
+  selectJigObjects,
+} from '../t26-main/src/ui/workspace/registration-jig/jig-editor-session';
+import { readGcode, litLength, extent, runOrder, fingerprint } from './gread';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t28r/r28.log';
+const lines: string[] = [];
+const out = (s: string) => {
+  lines.push(s);
+  writeFileSync(LOG, lines.join('\n'));
+};
+beforeEach(() => {
+  resetStore();
+  useToastStore.setState({ toasts: [] } as never);
+});
+const st = () => useStore.getState();
+const f3 = (n: number) => n.toFixed(3);
+const toasts = () => useToastStore.getState().toasts.map((t) => t.message);
+const selected = () => [st().selectedObjectId, ...st().additionalSelectedIds].filter((x): x is string => x !== null);
+
+const tinos = (() => {
+  const b = readFileSync('C:/Users/stolk/kd-t1/t26-main/src/ui/text/fonts/Tinos-Regular.ttf');
+  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+})();
+const render: VariableTextRenderer = ({ text, content }) =>
+  textToPolylines({ content, sizeMm: text.sizeMm, alignment: text.alignment, lineHeight: text.lineHeight, letterSpacing: text.letterSpacing, color: text.color, fontBuffer: tinos });
+
+const op = (id: string, mode: 'line' | 'fill', speed: number, power: number, color = '#000000') =>
+  ({ ...createLayer({ id, color, name: id, mode }), speed, power, ...(mode === 'fill' ? { hatchSpacingMm: 0.1 } : {}) }) as Layer;
+function project(objects: SceneObject[], layers: Layer[], extra: Partial<Project> = {}): Project {
+  const base = createProject();
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers, groups: [] }, ...extra };
+}
+function load(p: Project, sel: string[]) {
+  useStore.setState({ project: p, selectedObjectId: sel[0] ?? null, additionalSelectedIds: new Set(sel.slice(1)), undoStack: [], redoStack: [], dirty: false });
+}
+const box = (id: string, color: string, w: number, h: number, x: number, y: number, ops: string[]) =>
+  ({ ...createRectangle({ id, color, spec: { widthMm: w, heightMm: h, cornerRadiusMm: 0 }, transform: { ...IDENTITY_TRANSFORM, x, y } }), operationIds: ops }) as SceneObject;
+const disc = (id: string, r: number, x: number, y: number, ops: string[], color = '#000000') =>
+  ({ ...createEllipse({ id, color, spec: { widthMm: 2 * r, heightMm: 2 * r }, transform: { ...IDENTITY_TRANSFORM, x, y } }), operationIds: ops }) as SceneObject;
+
+async function snapBurn(p: Project) {
+  const prepared = await prepareOutputSnapshot(p, { clock: () => new Date(0), renderVariableText: render });
+  if (!prepared.ok) return { ok: false as const, segs: [], why: JSON.stringify((prepared as { preflight?: unknown }).preflight ?? prepared).slice(0, 300) };
+  return { ok: true as const, segs: readGcode(emitPreparedGcode(prepared).gcode), keys: Object.keys(prepared) };
+}
+function plainBurn(p: Project) {
+  const prepared = prepareOutput(p);
+  if (!prepared.ok) return [];
+  return readGcode(emitPreparedGcode(prepared).gcode);
+}
+
+it('R1 variable text + crossing bar, welded through the real store', async () => {
+  const source = 'No.{{serial:3}}';
+  const parsed = parseVariableTemplateSource(source);
+  if (!parsed.ok) throw new Error(parsed.message);
+  const base = {
+    kind: 'text', id: 'VT', content: source, variableTemplate: parsed.template,
+    fontKey: 'tinos-regular', sizeMm: 8, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000',
+    bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 }, transform: { ...IDENTITY_TRANSFORM, x: 30, y: 30 }, paths: [], operationIds: ['T'],
+  } as unknown as TextObject;
+  const stored = await render({ text: base, content: source, project: createProject() });
+  const text = { ...base, bounds: stored.bounds, paths: stored.paths } as TextObject;
+  // a 0.8 mm underline bar that crosses the bottom of the first glyphs
+  const bar = box('BAR', '#000000', 12, 0.8, 29, 30 + (stored.bounds.minY + stored.bounds.maxY) / 2, ['T']);
+  const T = op('T', 'line', 900, 55);
+  const p0 = project([text, bar], [T], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 7 } });
+  load(p0, ['VT', 'BAR']);
+  out(`R1 menu Weld enabled: ${selectionCanWeld(p0, ['VT', 'BAR'])}`);
+  const b7 = await snapBurn(p0);
+  const b8 = await snapBurn({ ...p0, variables: { ...p0.variables, serialValue: 8 } });
+  st().weldSelection();
+  const p1 = st().project;
+  const a7 = await snapBurn(p1);
+  const a8 = await snapBurn({ ...p1, variables: { ...p1.variables, serialValue: 8 } });
+  const valueOracle = await render({ text: base, content: 'No.007', project: p0 });
+  out(`R1 objects after: ${p1.scene.objects.map((o) => `${o.id}:${o.kind}${o.kind === 'imported-svg' ? `(${o.source})` : ''}`).join(', ')}; toasts ${JSON.stringify(toasts())}`);
+  out(`R1 before weld serial 7: lit ${f3(litLength(b7.segs))} ext ${JSON.stringify(extent(b7.segs))} fp ${fingerprint(b7.segs)}`);
+  out(`R1 before weld serial 8: lit ${f3(litLength(b8.segs))} fp ${fingerprint(b8.segs)} (differs from 7: ${fingerprint(b8.segs) !== fingerprint(b7.segs)})`);
+  out(`R1 after  weld serial 7: lit ${f3(litLength(a7.segs))} ext ${JSON.stringify(extent(a7.segs))} fp ${fingerprint(a7.segs)}`);
+  out(`R1 after  weld serial 8: fp ${fingerprint(a8.segs)} (differs from 7: ${fingerprint(a8.segs) !== fingerprint(a7.segs)})`);
+  out(`R1 oracle: value "No.007" maxX ${f3(30 + valueOracle.bounds.maxX)}; template "${source}" maxX ${f3(30 + stored.bounds.maxX)}`);
+  out(`R1 snapshot result keys after weld: ${JSON.stringify(a7.ok ? a7.keys : a7.why)}`);
+  out(`R1 project still has variable data after weld: ${p1.scene.objects.some((o) => o.kind === 'text' && o.variableTemplate !== undefined)}`);
+});
+
+it('R1b variable barcode welded with an overlapping tab', async () => {
+  const parsed = parseVariableTemplateSource('LOT-{{serial:3}}');
+  if (!parsed.ok) throw new Error(parsed.message);
+  const spec = { ...defaultBarcodeSpec('code128'), moduleMm: 0.3, data: 'LOT-{{serial:3}}', variableTemplate: parsed.template };
+  const created = await createBarcodeObject({
+    id: 'BC', color: '#000000', spec, value: 'LOT-041',
+    renderCaption: async () => ({ polylines: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }),
+    transform: { ...IDENTITY_TRANSFORM, x: 20, y: 20 },
+  });
+  if (!created.ok) throw new Error(created.message);
+  const bc = { ...created.object, operationIds: ['F'] } as SceneObject;
+  // a hanging tab overlapping the barcode's left quiet zone
+  const tab = box('TAB', '#000000', 8, 6, 18, 22, ['F']);
+  const F = op('F', 'fill', 3000, 40);
+  const p0 = project([bc, tab], [F], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 41 } });
+  load(p0, ['BC', 'TAB']);
+  out(`R1b menu Weld enabled: ${selectionCanWeld(p0, ['BC', 'TAB'])}`);
+  const b41 = await snapBurn(p0);
+  const b42 = await snapBurn({ ...p0, variables: { ...p0.variables, serialValue: 42 } });
+  st().weldSelection();
+  const p1 = st().project;
+  const a42 = await snapBurn({ ...p1, variables: { ...p1.variables, serialValue: 42 } });
+  // what the unwelded barcode alone burns at 41 vs 42
+  const bcOnly = project([bc], [F], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 41 } });
+  const o41 = await snapBurn(bcOnly);
+  const o42 = await snapBurn({ ...bcOnly, variables: { ...bcOnly.variables, serialValue: 42 } });
+  out(`R1b objects after: ${p1.scene.objects.map((o) => `${o.id}:${o.kind}`).join(', ')}; toasts ${JSON.stringify(toasts())}`);
+  out(`R1b barcode alone: serial 41 fp ${fingerprint(o41.segs)} lit ${f3(litLength(o41.segs))}; serial 42 fp ${fingerprint(o42.segs)} lit ${f3(litLength(o42.segs))}`);
+  out(`R1b before weld: serial 41 fp ${fingerprint(b41.segs)}; serial 42 fp ${fingerprint(b42.segs)} (changes with serial: ${fingerprint(b41.segs) !== fingerprint(b42.segs)})`);
+  const a43 = await snapBurn({ ...p1, variables: { ...p1.variables, serialValue: 43 } });
+  out(`R1b after weld: serial 42 fp ${fingerprint(a42.segs)} lit ${f3(litLength(a42.segs))}; serial 43 fp ${fingerprint(a43.segs)} (changes with serial: ${fingerprint(a42.segs) !== fingerprint(a43.segs)})`);
+  // oracle: the same weld made from a plain (non-variable) LOT-041 code, i.e. the stored insert-time value
+  const plainSpec = { ...defaultBarcodeSpec('code128'), moduleMm: 0.3, data: 'LOT-041' };
+  const plain = await createBarcodeObject({
+    id: 'BC', color: '#000000', spec: plainSpec, value: 'LOT-041',
+    renderCaption: async () => ({ polylines: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }),
+    transform: { ...IDENTITY_TRANSFORM, x: 20, y: 20 },
+  });
+  const plain42 = plain.ok ? { ...plain.object, operationIds: ['F'] } as SceneObject : bc;
+  const plainSpec42 = { ...plainSpec, data: 'LOT-042' };
+  const pl42 = await createBarcodeObject({
+    id: 'BC', color: '#000000', spec: plainSpec42, value: 'LOT-042',
+    renderCaption: async () => ({ polylines: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }),
+    transform: { ...IDENTITY_TRANSFORM, x: 20, y: 20 },
+  });
+  const weldOf = async (obj: SceneObject) => {
+    load(project([obj, tab], [F], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 42 } }), ['BC', 'TAB']);
+    st().weldSelection();
+    return (await snapBurn(st().project)).segs;
+  };
+  const w041 = await weldOf(plain42);
+  const w042 = pl42.ok ? await weldOf({ ...pl42.object, operationIds: ['F'] } as SceneObject) : [];
+  out(`R1b oracle: weld of plain LOT-041 fp ${fingerprint(w041)}; weld of plain LOT-042 fp ${fingerprint(w042)}; variable weld at serial 42 equals LOT-041 weld: ${fingerprint(a42.segs) === fingerprint(w041)}, equals LOT-042 weld: ${fingerprint(a42.segs) === fingerprint(w042)}`);
+});
+
+it('R1c Select All -> Weld absorbs variable text that overlaps nothing', async () => {
+  const source = 'ID {{serial:4}}';
+  const parsed = parseVariableTemplateSource(source);
+  if (!parsed.ok) throw new Error(parsed.message);
+  const base = {
+    kind: 'text', id: 'VT', content: source, variableTemplate: parsed.template,
+    fontKey: 'tinos-regular', sizeMm: 6, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000',
+    bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 }, transform: { ...IDENTITY_TRANSFORM, x: 100, y: 100 }, paths: [], operationIds: ['T'],
+  } as unknown as TextObject;
+  const stored = await render({ text: base, content: source, project: createProject() });
+  const text = { ...base, bounds: stored.bounds, paths: stored.paths } as TextObject;
+  const r1 = box('R1', '#000000', 20, 10, 10, 10, ['T']);
+  const r2 = box('R2', '#000000', 20, 10, 20, 15, ['T']);
+  const T = op('T', 'line', 900, 55);
+  const p0 = project([r1, r2, text], [T], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 12 } });
+  load(p0, []);
+  st().selectAllObjects();
+  st().weldSelection();
+  const p1 = st().project;
+  const before = await snapBurn(p0);
+  const after = await snapBurn(p1);
+  const textRegion = (s: { x0: number }[]) => s.filter((g) => g.x0 >= 95);
+  out(`R1c objects after: ${p1.scene.objects.map((o) => `${o.id}:${o.kind}`).join(', ')}; toasts ${JSON.stringify(toasts())}`);
+  out(`R1c text-area lit before ${f3(litLength(textRegion(before.segs) as never))} max X ${f3(extent(textRegion(before.segs) as never)?.maxX ?? NaN)}; after ${f3(litLength(textRegion(after.segs) as never))} max X ${f3(extent(textRegion(after.segs) as never)?.maxX ?? NaN)}; template max X ${f3(100 + stored.bounds.maxX)}`);
+});
+
+it('R3 same operation, different stored colour', () => {
+  // a) the real Assign-to-operation path
+  const L1 = op('L1', 'line', 1000, 70, '#000000');
+  const L2 = op('L2', 'line', 400, 20, '#ff0000');
+  const A = box('A', '#000000', 30, 20, 0 + 40, 40, ['L1']);
+  const B = box('B', '#ff0000', 30, 20, 55, 50, ['L2']); // overlaps A in [55,70]x[50,60]
+  load(project([A, B], [L1, L2]), ['B']);
+  st().assignSelectionToLayer('L1');
+  const pa = st().project;
+  const Bb = pa.scene.objects.find((o) => o.id === 'B') as SceneObject & { paths: { color: string }[] };
+  out(`R3a B after assign: ops ${JSON.stringify(Bb.operationIds)} path colour ${Bb.paths[0]?.color}; operations left ${pa.scene.layers.map((l) => `${l.id}(${l.color})`).join(',')}`);
+  useStore.setState({ selectedObjectId: 'A', additionalSelectedIds: new Set(['B']) });
+  const canvasColours = pa.scene.objects.map((o) => `${o.id}->${pa.scene.layers.find((l) => (o.operationIds ?? []).includes(l.id))?.color}`);
+  out(`R3a canvas paint colour (operation colour for bound paths, object-display.ts resolvePaint): ${canvasColours.join(' ')}`);
+  st().weldSelection();
+  out(`R3a weld A+B: changed ${st().project !== pa}; toasts ${JSON.stringify(toasts())}`);
+  // b) control: same scene, B drawn black
+  const Bk = box('B', '#000000', 30, 20, 55, 50, ['L1']);
+  const pc = project([A, Bk], [L1]);
+  load(pc, ['A', 'B']);
+  useToastStore.setState({ toasts: [] } as never);
+  st().weldSelection();
+  const wc = st().project;
+  out(`R3b control (both black): changed ${wc !== pc}; lit ${f3(litLength(plainBurn(pc)))} -> ${f3(litLength(plainBurn(wc)))} (union perimeter oracle 2*(45+30)=150)`);
+  // c) mixed: A black, C black overlapping A, B red overlapping both, all L1 Line
+  const C = box('C', '#000000', 30, 20, 50, 45, ['L1']);
+  const Bred = box('B', '#ff0000', 30, 20, 55, 50, ['L1']);
+  const pm = project([A, C, Bred], [L1]);
+  load(pm, ['A', 'C', 'B']);
+  useToastStore.setState({ toasts: [] } as never);
+  const before = plainBurn(pm);
+  st().weldSelection();
+  const wm = st().project;
+  const after = plainBurn(wm);
+  const w = wm.scene.objects[0] as ImportedSvg;
+  // union of A [40,70]x[40,60], C [50,80]x[45,65], Bred [55,85]x[50,70]: staircase outline
+  // perimeter = 2*(85-40) + 2*(70-40) = 150 (orthogonally convex)
+  out(`R3c mixed: welded object paths ${w.paths.length} colours ${w.paths.map((p) => p.color).join(',')}; lit ${f3(litLength(before))} -> ${f3(litLength(after))}; union perimeter oracle 150; A+C union perimeter 2*(40+25)=130 + B perimeter 100 = 230; toasts ${JSON.stringify(toasts())}`);
+});
+
+it('R2 registration jig built through the real jig editor, then Select All -> Weld', async () => {
+  // Main canvas starts empty; the jig is made in the editor as ADR-652 describes.
+  const A = op('art', 'line', 2222, 90, '#ff0000');
+  const E = op('eng', 'line', 1111, 10, '#0000ff');
+  load(project([], [E, A]), []);
+  let session = createJigEditorSession(st() as never);
+  const d1 = disc('C1', 8, 10, 10, ['art'], '#ff0000');
+  const d2 = disc('C2', 8, 18, 12, ['art'], '#ff0000');
+  const sq = box('SQ', '#0000ff', 5, 5, 12, 22, ['eng']);
+  const dp = session.draft.project;
+  session = changeJigDraft(session, { project: { ...dp, scene: { ...dp.scene, objects: [...dp.scene.objects, d1, d2, sq], layers: [...dp.scene.layers.filter((l) => l.id !== 'art' && l.id !== 'eng'), E, A] } } });
+  session = replaceJigLayout(session, { outline: { kind: 'rectangle', widthMm: 60, heightMm: 50 }, rows: 1, columns: 2, spacingX: 10, spacingY: 10 });
+  session = selectJigObjects(session, new Set(['C1', 'C2', 'SQ']));
+  session = centerJigArtwork(session);
+  const { validateSceneIntegrity } = await import('../t26-main/src/io/project/project-scene-integrity-validator');
+  out(`R2 draft integrity: ${JSON.stringify(validateSceneIntegrity({ ...session.draft.project.scene }))}`);
+  const committed = commitJigEditorSession(st() as never, session);
+  if (committed.kind !== 'saved') throw new Error(`commit ${committed.reason}`);
+  useStore.setState(committed.change as never);
+  out(`R2 run state after first save: layers ${st().project.scene.layers.map((l) => `${l.id}/out=${l.output}`).join(',')}`);
+  // the operator burns the outlines, then switches the jig to Artwork only
+  st().setRegistrationOutput('artwork' as never);
+  const p0 = st().project;
+  const boxes = findRegistrationBoxes(p0.scene);
+  const midX = boxes.length === 2 ? (boxes[0]!.transform.x + 60 + boxes[1]!.transform.x) / 2 : 0;
+  const region = (x: number) => (x < midX ? 'A' : 'B');
+  out(`R2 after jig save: objects ${p0.scene.objects.map((o) => `${o.id.slice(0, 26)}${o.locked ? '[L]' : ''}`).join(' | ')}`);
+  out(`R2 boxes ${boxes.length}, locked ${boxes.map((b) => b.locked === true).join(',')}; jig runs ${registrationJigCompilationRuns(p0.scene)?.length ?? 0}; layers ${p0.scene.layers.map((l) => `${l.id}/out=${l.output}`).join(',')}`);
+  const o0 = runOrder(plainBurn(p0), region);
+  st().selectAllObjects();
+  const sel = selected();
+  out(`R2 Select All picked ${sel.length} of ${p0.scene.objects.length} (boxes included: ${sel.some((id) => boxes.some((b) => b.id === id))}); Weld enabled ${selectionCanWeld(p0, sel)}`);
+  st().weldSelection();
+  const p1 = st().project;
+  out(`R2 after weld: objects ${p1.scene.objects.map((o) => o.id.slice(0, 26)).join(' | ')}; boxes ${findRegistrationBoxes(p1.scene).length}; jig runs ${registrationJigCompilationRuns(p1.scene)?.length ?? 0}; toasts ${JSON.stringify(toasts())}`);
+  out(`R2 burn order before: ${o0.join(' > ')}`);
+  out(`R2 burn order after:  ${runOrder(plainBurn(p1), region).join(' > ')}`);
+  out(`R2 lit before ${f3(litLength(plainBurn(p0)))} after ${f3(litLength(plainBurn(p1)))}`);
+  // Now the auditor's trigger: outlines unlocked on purpose (Unlock All), then Select All -> Weld
+  load(p0, []);
+  st().unlockAllObjects();
+  st().selectAllObjects();
+  const sel2 = selected();
+  useToastStore.setState({ toasts: [] } as never);
+  st().weldSelection();
+  const p2 = st().project;
+  out(`R2u after Unlock All + Select All (${sel2.length}) + Weld: boxes ${findRegistrationBoxes(p2.scene).length}; jig runs ${registrationJigCompilationRuns(p2.scene)?.length ?? 0}`);
+});
