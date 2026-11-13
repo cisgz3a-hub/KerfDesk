@@ -190,22 +190,32 @@ test('Apply, Remove, Crop and Flatten masks preserve pixels, reference rules and
   await undo(page);
   await command(page, 'crop-image');
   await expect
-    .poll(async () => ((await project(page)).scene.objects[0] as RasterImage).pixelWidth)
-    .toBe(32);
+    .poll(async () => (await project(page)).scene.objects[0])
+    .not.toHaveProperty('imageMaskId');
+  // ADR-480 Amendment 6: the crop keeps the mask's 32 columns plus a margin of
+  // real (unwhitened) pixels for sharpening; the owned clip decides what burns.
   const cropped = (await project(page)).scene.objects[0] as RasterImage;
+  const width = cropped.pixelWidth;
+  expect(width).toBeGreaterThanOrEqual(32);
+  expect(width).toBeLessThanOrEqual(64);
+  expect(cropped.pixelHeight).toBe(64);
+  expect(cropped.imageClip?.length ?? 0).toBeGreaterThan(0);
   const sourcePixels = Buffer.from(image.lumaBase64 ?? '', 'base64');
   const croppedPixels = Buffer.from(cropped.lumaBase64 ?? '', 'base64');
-  expect(croppedPixels.length).toBe(32 * 64);
+  expect(croppedPixels.length).toBe(width * 64);
   for (let row = 0; row < 64; row++) {
-    expect(croppedPixels.subarray(row * 32, (row + 1) * 32)).toEqual(
-      sourcePixels.subarray(row * 64, row * 64 + 32),
+    expect(croppedPixels.subarray(row * width, (row + 1) * width)).toEqual(
+      sourcePixels.subarray(row * 64, row * 64 + width),
     );
   }
   expect((await project(page)).scene.objects).toHaveLength(2);
   await undo(page);
   await command(page, 'flatten-image-mask');
   await expect.poll(async () => (await project(page)).scene.objects.length).toBe(1);
-  expect((await project(page)).scene.objects[0]).toMatchObject({ pixelWidth: 32, pixelHeight: 64 });
+  expect((await project(page)).scene.objects[0]).toMatchObject({
+    pixelWidth: width,
+    pixelHeight: 64,
+  });
   expect((await project(page)).scene.objects[0]).not.toHaveProperty('imageMaskId');
   await undo(page);
   expect((await project(page)).scene.objects).toHaveLength(2);
