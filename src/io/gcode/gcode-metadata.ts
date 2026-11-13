@@ -192,7 +192,11 @@ export type GcodeMetadata = {
 // ADR-052 Amd 2 moves every row of a calibrated two-way fill or image half the
 // scan offset along its own travel, as LightBurn does, instead of moving reverse
 // rows the whole offset; carries forward v44 above.
-export const EMITTER_REVISION = 'scan-offset-half-each-row-20261111-v45';
+// CNC audit v3 N3 pockets resolve a text object's own glyphs non-zero
+// (ADR-286 Amd 1), island-adaptive cells overlap 0.1 mm across each seam
+// (ADR-154 Amd 6) and raster pocket rows stop at 100 % stepover (ADR-105
+// Amd 1); carries forward v45 above.
+export const EMITTER_REVISION = 'cnc-pocket-text-seams-raster-20261113-v46';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

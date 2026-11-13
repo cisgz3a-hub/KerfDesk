@@ -49,16 +49,16 @@ const PROFILE: CncGroup = {
   spindleRpm: 12000,
   spindleSpinupSec: 0,
   safeZMm: 4,
+  // An open diagonal cut: a closed square filling the grid would leave no
+  // overlap strip clear of the part, and its seams would rightly get no bore.
   passes: [
     {
       kind: 'contour',
-      closed: true,
+      closed: false,
       zMm: -6,
       polyline: [
         { x: 0, y: 0 },
-        { x: 190, y: 0 },
         { x: 190, y: 190 },
-        { x: 0, y: 190 },
       ],
     },
   ],
@@ -133,8 +133,15 @@ describe('owned registration plan and per-file order (O3/O5)', () => {
       CONTEXT,
     );
     if (changed.kind !== 'ready') throw new Error(changed.kind);
-    expect(changed.tiles.map(({ job }) => job.groups[0])).toEqual(
-      result.tiles.map(({ job }) => job.groups[0]),
+    // The bore recipe never borrows the profile's; only where the bores sit
+    // depends on the profile, whose wider cutter needs more room.
+    const recipe = (group: Job['groups'][number] | undefined) => {
+      if (group?.kind !== 'cnc') throw new Error('registration group missing');
+      const { passes, ...settings } = group;
+      return { settings, bores: passes.length };
+    };
+    expect(changed.tiles.map(({ job }) => recipe(job.groups[0]))).toEqual(
+      result.tiles.map(({ job }) => recipe(job.groups[0])),
     );
   });
 

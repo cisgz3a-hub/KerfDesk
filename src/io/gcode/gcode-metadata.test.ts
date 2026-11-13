@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('scan-offset-half-each-row-20261111-v45');
+    expect(EMITTER_REVISION).toBe('cnc-pocket-text-seams-raster-20261113-v46');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

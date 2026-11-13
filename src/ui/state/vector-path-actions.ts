@@ -144,7 +144,7 @@ function dogboneSelectionMutation(
   bitDiameterMm: number,
   onRelieved: (relieved: ReadonlyArray<SceneObject>) => void,
 ): VectorPathMutation | VectorPathState {
-  const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
+  const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state), 'variable');
   if (selected.length === 0 || selected.some((object) => object.locked === true)) return state;
   let scene = state.project.scene;
   let changed = false;
@@ -184,7 +184,7 @@ function weldSelectionMutation(
   retainCompound = false,
   background?: PreparedVectorCombine,
 ): VectorPathMutation | VectorPathState {
-  const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
+  const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state), 'replace');
   if (selected.length === 0 || selected.some((object) => object.locked === true)) return state;
   const weldResult = weldPlanForSelection(state.project.scene, selected, background);
   if (weldResult.kind === 'error') {
@@ -247,7 +247,7 @@ function booleanSelectionMutation(
   retainCompound = false,
   background?: PreparedVectorCombine,
 ): VectorPathMutation | VectorPathState {
-  const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
+  const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state), 'replace');
   if (selected.length < 2 || selected.some((object) => object.locked === true)) return state;
   const combineResult = combineForSelection(state.project.scene, selected, op, background);
   if (combineResult.kind === 'error') {
@@ -295,7 +295,7 @@ function offsetSelectionMutation(
   deltaMm: number,
   background?: PreparedOffsetPaths,
 ): VectorPathMutation | VectorPathState {
-  const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
+  const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state), 'variable');
   if (selected.length === 0 || selected.some((object) => object.locked === true)) return state;
   const offsetResult = offsetOutlinesForSelection(
     state.project.scene,

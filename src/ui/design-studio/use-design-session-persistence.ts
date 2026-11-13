@@ -26,61 +26,68 @@ import {
 const SAVE_DEBOUNCE_MS = 400;
 
 export function useDesignSessionPersistence(): void {
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let preparedProject: ReturnType<typeof useStore.getState>['project'] | null = null;
+  useEffect(startDesignSessionPersistence, []);
+}
 
-    const prepareOwner = () => {
-      const { project, projectDocumentEpoch } = useStore.getState();
-      if (preparedProject !== null && preparedProject !== project)
-        cancelPendingDesignRecoveryOwner(preparedProject);
-      preparedProject = project;
-      const state = useDesignStudioStore.getState();
-      if (state.documentEpoch !== projectDocumentEpoch || (state.session ?? state.stash) === null)
-        return;
-      const pending = designRecoveryOwner(project);
-      if (pending instanceof Promise) void pending.catch(() => undefined);
-    };
+/**
+ * Starts saving the Studio drawing as it changes; returns the stop, which also
+ * writes anything still pending. The lazy Studio runtime starts it once, as
+ * the session store loads and before any session opens (ADR-272 Amendment 9).
+ */
+export function startDesignSessionPersistence(): () => void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let preparedProject: ReturnType<typeof useStore.getState>['project'] | null = null;
 
-    const scheduleSave = () => {
-      prepareOwner();
-      if (timer !== null) return;
-      timer = setTimeout(() => {
-        timer = null;
-        void saveCurrentSession(false);
-      }, SAVE_DEBOUNCE_MS);
-    };
-    const unsubscribe = useDesignStudioStore.subscribe(scheduleSave);
-    // Main-workspace edits change the saved project identity even while the
-    // Studio drawing is stashed. Keep that same document's recovery owner current.
-    const unsubscribeProject = useStore.subscribe((next, previous) => {
-      if (
-        next.projectDocumentEpoch === previous.projectDocumentEpoch &&
-        (next.project !== previous.project || next.savedName !== previous.savedName)
-      )
-        scheduleSave();
-    });
-    // A save, open or autosave that now holds the Apply is recorded with the
-    // drawing (ADR-590 Amendment 3).
-    const unsubscribeCopies = subscribeDesignDocumentCopies(scheduleSave);
+  const prepareOwner = () => {
+    const { project, projectDocumentEpoch } = useStore.getState();
+    if (preparedProject !== null && preparedProject !== project)
+      cancelPendingDesignRecoveryOwner(preparedProject);
+    preparedProject = project;
+    const state = useDesignStudioStore.getState();
+    if (state.documentEpoch !== projectDocumentEpoch || (state.session ?? state.stash) === null)
+      return;
+    const pending = designRecoveryOwner(project);
+    if (pending instanceof Promise) void pending.catch(() => undefined);
+  };
+
+  const scheduleSave = () => {
     prepareOwner();
-
-    const flush = () => {
-      if (timer !== null) clearTimeout(timer);
+    if (timer !== null) return;
+    timer = setTimeout(() => {
       timer = null;
-      // Document teardown cannot await a task turn. Finish only remaining
-      // current owner slices, even if the debounced save was awaiting them.
-      void saveCurrentSession(true);
-    };
-    window.addEventListener('pagehide', flush);
-    return () => {
-      unsubscribe();
-      unsubscribeProject();
-      unsubscribeCopies();
-      window.removeEventListener('pagehide', flush);
-      flush();
-    };
-  }, []);
+      void saveCurrentSession(false);
+    }, SAVE_DEBOUNCE_MS);
+  };
+  const unsubscribe = useDesignStudioStore.subscribe(scheduleSave);
+  // Main-workspace edits change the saved project identity even while the
+  // Studio drawing is stashed. Keep that same document's recovery owner current.
+  const unsubscribeProject = useStore.subscribe((next, previous) => {
+    if (
+      next.projectDocumentEpoch === previous.projectDocumentEpoch &&
+      (next.project !== previous.project || next.savedName !== previous.savedName)
+    )
+      scheduleSave();
+  });
+  // A save, open or autosave that now holds the Apply is recorded with the
+  // drawing (ADR-590 Amendment 3).
+  const unsubscribeCopies = subscribeDesignDocumentCopies(scheduleSave);
+  prepareOwner();
+
+  const flush = () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+    // Document teardown cannot await a task turn. Finish only remaining
+    // current owner slices, even if the debounced save was awaiting them.
+    void saveCurrentSession(true);
+  };
+  window.addEventListener('pagehide', flush);
+  return () => {
+    unsubscribe();
+    unsubscribeProject();
+    unsubscribeCopies();
+    window.removeEventListener('pagehide', flush);
+    flush();
+  };
 }
 
 async function saveCurrentSession(teardown: boolean): Promise<void> {

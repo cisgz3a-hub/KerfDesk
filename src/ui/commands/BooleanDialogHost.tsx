@@ -12,6 +12,7 @@ import {
 import { ok, type Result } from '../../core/result';
 import { artworkOperationName, type ImportedSvg } from '../../core/scene';
 import { useStore } from '../state';
+import { geometryToolSkipReasons } from '../state/geometry-tool-sources';
 import { selectedObjectIds } from '../state/scene-group-actions';
 import type { PreparedVectorCombine } from '../state/vector-op-prepared';
 import { uniqueObjectId, uniqueWeldId } from '../state/vector-path-selection';
@@ -215,14 +216,18 @@ type BooleanPreviewState = {
 // Apply commits the settled result instead of computing it again on this thread.
 function useBooleanPreview(session: BooleanSession, operation: BooleanPreviewOperation) {
   const scene = session.project.scene;
-  const sources = useMemo(
-    () =>
-      scene.objects.filter(
-        (object): object is VectorSceneObject =>
-          session.ids.includes(object.id) && isVectorPathObject(object) && object.locked !== true,
-      ),
-    [scene, session.ids],
-  );
+  // The objects Apply will rebuild: variable data and the registration jig are
+  // left out, as the store leaves them out (ADR-350 Amendment 1).
+  const sources = useMemo(() => {
+    const skipReason = geometryToolSkipReasons(scene, 'replace');
+    return scene.objects.filter(
+      (object): object is VectorSceneObject =>
+        session.ids.includes(object.id) &&
+        isVectorPathObject(object) &&
+        object.locked !== true &&
+        skipReason(object) === null,
+    );
+  }, [scene, session.ids]);
   const weld = useMemo(
     () => (operation === 'weld' ? prepareWeldSelection(scene, sources, uniqueWeldId(scene)) : null),
     [scene, sources, operation],

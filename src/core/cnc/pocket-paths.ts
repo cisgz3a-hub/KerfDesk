@@ -34,6 +34,8 @@ import { appendAll } from '../util';
 
 const MIN_CLOSED_POINTS = 3;
 const MIN_STEPOVER_PERCENT = 10;
+/** Raster rows are never further apart than the cut width (ADR-105 Amd 1). */
+export const MAX_RASTER_STEPOVER_PERCENT = 100;
 // Existing backstop against degenerate inputs (huge pocket + microscopic
 // effective stepover). This slice preserves current-main planner semantics.
 const MAX_POCKET_RINGS = 4096;
@@ -264,7 +266,14 @@ export function pocketRasterToolpaths(
   const contours = pocketContours(polylines);
   if (contours.length === 0 || !(toolDiameterMm > 0)) return NO_POCKET_TOOLPATHS;
   const clearingMm = usableClearingDiameterMm(clearingDiameterMm, toolDiameterMm);
-  const stepMm = (positiveStepoverPercent(stepoverPercent) / 100) * clearingMm;
+  // Rows further apart than the cut leave a full-depth strip between each pair
+  // that no pass removes, and legacy rest assumes they were cut. Unlike rings,
+  // raster has no core pass to find them, so the spacing stops at 100 % (CNC
+  // audit v3 N3-P3-2, ADR-105 Amendment 1).
+  const stepMm = Math.min(
+    (positiveStepoverPercent(stepoverPercent) / 100) * clearingMm,
+    clearingMm * (MAX_RASTER_STEPOVER_PERCENT / 100),
+  );
   const wall = insetContoursChecked(contours, toolDiameterMm / 2);
   if (wall.contours.length === 0) {
     return {

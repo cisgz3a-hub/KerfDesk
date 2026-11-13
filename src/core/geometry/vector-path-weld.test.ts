@@ -155,6 +155,41 @@ describe('weldVectorObjects render-batch topology', () => {
     ]);
   });
 
+  // T28-P2-2 (ADR-350 Amendment 1): the colour of a path bound by id is display only.
+  it('welds paths bound to one operation whatever their colours, keeping the first colour', () => {
+    const black = artwork('black', [
+      { color: '#000000', operationIds: ['op'], polylines: [rectangle(0, 0, 20, 10)] },
+    ]);
+    const red = artwork('red', [
+      { color: '#FF0000', operationIds: ['op'], polylines: [rectangle(10, 0, 30, 10)] },
+    ]);
+
+    const welded = unwrap(weldVectorObjects([black, red], 'out'));
+
+    expect(welded.paths).toHaveLength(1);
+    expect(welded.paths[0]?.color).toBe('#000000');
+    expect(welded.paths[0]?.operationIds).toEqual(['op']);
+    expect(welded.paths[0]?.polylines).toHaveLength(1);
+    expect(perimeter(welded.paths[0]?.polylines[0]?.points ?? [])).toBeCloseTo(80, 6);
+  });
+
+  it('keeps legacy colour-bound and explicitly unbound paths apart by colour', () => {
+    const legacy = (id: string, color: string, x0: number) =>
+      artwork(id, [{ color, polylines: [rectangle(x0, 0, x0 + 20, 10)] }]);
+    expect(
+      unwrap(
+        weldVectorObjects([legacy('a', '#000000', 0), legacy('b', '#ff0000', 10)], 'out'),
+      ).paths.map((path) => path.color),
+    ).toEqual(['#000000', '#ff0000']);
+    const unbound = (id: string, color: string, x0: number) =>
+      artwork(id, [{ color, operationIds: [], polylines: [rectangle(x0, 0, x0 + 20, 10)] }]);
+    expect(
+      unwrap(
+        weldVectorObjects([unbound('a', '#000000', 0), unbound('b', '#ff0000', 10)], 'out'),
+      ).paths.map((path) => path.color),
+    ).toEqual(['#000000', '#ff0000']);
+  });
+
   it('splits multi-bound paths so each operation unions only its own geometry', () => {
     const object = artwork('multi-bound', [
       {

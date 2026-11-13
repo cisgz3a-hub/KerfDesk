@@ -193,7 +193,7 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
           'Check the effective overlap and tile step readout instead of relying only on the requested value. If needed, enable Drill registration holes in overlap strips and Configure registration with the actual cutter and intended hole settings.',
         focus: 'Effective overlap · tile step',
         result:
-          'You can compare the planned spacing and optional registration holes with the physical fixture.',
+          'You can compare the planned spacing with the physical fixture. Preview draws any registration holes in purple, placed clear of the parts and on the stock.',
       },
       {
         title: 'Save the setup and export the files',

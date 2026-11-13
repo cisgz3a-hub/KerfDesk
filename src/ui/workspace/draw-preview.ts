@@ -43,6 +43,7 @@ import {
 } from './executable-plan-preview-route';
 import type { PreviewIssue, PreviewToolpath } from './preview-status';
 import { withPreviewCncFallbacks } from './preview-cnc-fallbacks';
+import { withPreviewTileRegistration } from './preview-tile-registration';
 import { previewRouteExceedsBudget } from './preview-route-budget';
 import {
   mapOwnedToolpathToPackedScene,
@@ -247,10 +248,15 @@ export function buildPreviewToolpathFromPrepared(
     : previewRouteExceedsBudget(machineToolpath)
       ? mapOwnedToolpathToPackedScene
       : mapOwnedToolpathToScene;
-  const previewToolpath = withPreviewCncFallbacks(
-    mapPreview(machineToolpath, prepared.jobOriginOffset, project.device),
+  const previewToolpath = withPreviewTileRegistration(
+    withPreviewCncFallbacks(
+      mapPreview(machineToolpath, prepared.jobOriginOffset, project.device),
+      project,
+      prepared.job,
+    ),
     project,
     prepared.job,
+    prepared.jobOriginOffset,
   );
   registerPreviewJobOriginOffset(previewToolpath, prepared.jobOriginOffset);
   if (planPreview) {

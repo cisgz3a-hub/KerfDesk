@@ -76,3 +76,61 @@ preview parity, SVG serialization and async export boundaries, variable-copy per
 success advancement. The final combined checks and exact included commits are recorded in
 `docs/audits/2026-09-23-combined-audit-remediation.md`. Local browser evidence does not establish
 installed desktop, hosted-release, material or machine qualification.
+
+### Amendment 1 - Geometry tools leave variable data and the jig alone; Weld groups bound paths by operation (2026-11-13)
+
+**Context.** Tools audit T1 (`docs/audits/2026-11-13-tools-t1/`) found three Weld defects on
+main 045670634:
+
+- **T28-P1-1.** Weld rebuilds an object from its stored outlines. For variable text those are the
+  template glyphs (`SN {{serial:4}}`), so every record burned the braces and the serial stopped
+  changing. A variable barcode froze at the code stored when it was made, so each piece burned a
+  valid but repeated serial. Neither showed a notice. PR #1875 had fixed only Convert to Path
+  (T26-P1-1); every tool that rebuilds an object's outlines had the same exposure.
+- **T28-P2-1.** Select All then Weld merged jig artwork with its copies in the other outlines. The
+  jig's separately compiled runs fell from 4 to 0, and the burn order changed from piece by piece
+  to operation by operation (ADR-606 locks the outlines themselves; after Unlock All they were lost
+  too).
+- **T28-P2-2.** Weld split its unions by path colour. Paths bound to an operation by id keep their
+  colour for display only: Assign to operation keeps the old colour and an operation recolour
+  leaves bound art alone. Two shapes in one operation therefore refused with a false "Nothing to
+  weld", or the off-colour shape's whole outline was still cut inside the union (230 mm burned
+  against a 150 mm union).
+
+**Decision.**
+
+1. **Variable data is not rebuilt.** Weld, Subtract / Intersect / Exclude, Offset and Dogbone
+   leave variable text and variable barcodes out of their sources, process the rest of the
+   selection, and show "… left as text: use Bake Variable Text first to fix its value" (barcodes:
+   "… left as it is: …"), the wording PR #1875 introduced. Their menu gating counts only the
+   objects they will rebuild, so a selection of only variable data leaves them disabled. Convert
+   to Path keeps its rule: it skips variable text, while ADR-386 Amendment 2's acceptance that it
+   converts a barcode's stored code still stands for that command alone.
+2. **Tools that replace their sources leave the registration jig alone.** Weld and Subtract /
+   Intersect / Exclude replace their sources with one new object, which takes jig artwork out of
+   its outline. They leave out the registration outlines and every object that belongs to a jig
+   piece (a source and its copies), with "The registration jig was left as it is: change its
+   artwork in the jig editor." Weld does not weld within each outline instead: the result would
+   need the jig identity and copy links that only the jig editor maintains. Offset adds a new
+   object and Dogbone keeps the object's id, so they may still work on jig artwork.
+3. **Weld groups bound paths by operation, not colour.** For a path with explicit operation ids,
+   the union key is the operation, stroke width and stroke transform; the result takes the first
+   source's colour. A legacy path with no ids, and an explicitly unbound path, still keep colour
+   in the key, because there the colour binds or shows the path.
+
+The rule lives in one place (`src/ui/state/geometry-tool-sources.ts`), used by the store
+mutations through `selectedVectorObjects`, by the menu gating (`selectionCanWeld`,
+`selectionCanCombine`) and by the Combine Shapes review's preview sources, so the preview, the
+worker plan and Apply see the same objects (ADR-609).
+
+**Not covered.** Offset Shapes (its own dialog), Duplicate Shapes, Cut Shape Sides, Copy Along
+Path, Warp, the nest outline and the rubber-band outline also read stored outlines and are not
+guarded yet; each is left to its own audit entry. Locked members (T28-P2-3, now P3) are unchanged.
+
+**Verification.** `weld-skips-variable-data-and-jig.test.ts` checks the burned value against an
+independent render of "SN 0042", the serial advancing after Weld, a variable Code 128, and a
+two-outline jig's runs and decoded piece order with locked and unlocked outlines.
+`weld-bound-colours.test.ts` uses the real Assign to operation and operation recolour, and reads
+back lit length from the G-code (80 mm and 110 mm union outlines).
+`vector-path-weld.test.ts` covers the batch key. All fail on main 0163a852b except the legacy
+colour case, which guards the kept behaviour.

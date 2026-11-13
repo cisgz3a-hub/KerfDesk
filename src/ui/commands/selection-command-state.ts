@@ -11,6 +11,7 @@ import { isVectorPathObject, type VectorSceneObject } from '../../core/geometry'
 import { subpathCount } from '../../core/geometry/outer-shape-groups';
 import { isConvertibleVector, type ConvertibleVector } from '../raster/vector-to-bitmap';
 import { groupsWithinFocus } from '../state/design-hierarchy-store';
+import { geometryToolSkipReasons, type GeometryToolGuard } from '../state/geometry-tool-sources';
 
 export function selectedObject(project: Project, selectedObjectId: string | null) {
   if (selectedObjectId === null) return null;
@@ -94,13 +95,35 @@ export function selectedConvertibleVectors(
   return convertibles.length === selectedIds.length ? convertibles : [];
 }
 
-export function selectionCanWeld(project: Project, selectedIds: ReadonlyArray<string>): boolean {
-  const selected = new Set(selectedIds);
-  const objects = project.scene.objects.filter(
-    (object): object is VectorSceneObject =>
-      selected.has(object.id) && object.locked !== true && isVectorPathObject(object),
-  );
+/**
+ * Weld, and with `guard` 'variable' Offset outlines and Dogbone: at least one
+ * unlocked object the tool may rebuild, each with closed contours only.
+ * Variable data, and for Weld the registration jig, are left out (ADR-350
+ * Amendment 1), so a selection of only those leaves the command disabled.
+ */
+export function selectionCanWeld(
+  project: Project,
+  selectedIds: ReadonlyArray<string>,
+  guard: GeometryToolGuard = 'replace',
+): boolean {
+  const objects = geometryToolCandidates(project, selectedIds, guard);
   return objects.length > 0 && objects.every(objectHasOnlyClosedContours);
+}
+
+function geometryToolCandidates(
+  project: Project,
+  selectedIds: ReadonlyArray<string>,
+  guard: GeometryToolGuard,
+): ReadonlyArray<VectorSceneObject> {
+  const selected = new Set(selectedIds);
+  const skipReason = geometryToolSkipReasons(project.scene, guard);
+  return project.scene.objects.filter(
+    (object): object is VectorSceneObject =>
+      selected.has(object.id) &&
+      object.locked !== true &&
+      isVectorPathObject(object) &&
+      skipReason(object) === null,
+  );
 }
 
 /** Available result operations only when the entire selection qualifies for silhouette union. */
@@ -146,9 +169,8 @@ export function selectionCanJoinPaths(
 
 // ADR-103 G1: booleans need a subject AND at least one clip.
 export function selectionCanCombine(project: Project, selectedIds: ReadonlyArray<string>): boolean {
-  const selected = new Set(selectedIds);
-  const objects = project.scene.objects.filter(
-    (object) => selected.has(object.id) && object.locked !== true && isConvertibleVector(object),
+  const objects = geometryToolCandidates(project, selectedIds, 'replace').filter(
+    isConvertibleVector,
   );
   return objects.length >= 2 && objects.every(objectHasOnlyClosedContours);
 }

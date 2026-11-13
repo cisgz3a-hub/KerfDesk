@@ -3,6 +3,7 @@ import type { Project } from '../../core/scene';
 import { rasterPreviewDisplayAdvisory } from './draw-raster-preview';
 import { hasOutOfBoundsObjects } from './out-of-bounds';
 import { previewCncFallbacksOf } from './preview-cnc-fallbacks';
+import { previewTileRegistrationNotices } from './preview-tile-registration';
 import { previewRouteSummary } from './preview-route-summary';
 import { previewHasBurnableContent, previewIssueFor, type PreviewIssue } from './preview-status';
 
@@ -19,6 +20,7 @@ export function previewStatusOverlayModel(project: Project, toolpath: Toolpath) 
   const outOfBounds = hasOutOfBoundsObjects(project);
   const rasterDisplay = rasterPreviewDisplayAdvisory(project);
   const cncFallbacks = previewCncFallbacksOf(toolpath);
+  const tileRegistration = previewTileRegistrationNotices(toolpath);
   return {
     primaryIssue,
     displayDecimation,
@@ -26,6 +28,7 @@ export function previewStatusOverlayModel(project: Project, toolpath: Toolpath) 
     outOfBounds,
     rasterDisplay,
     cncFallbacks,
+    tileRegistration,
     visible: [
       primaryIssue !== null,
       displayDecimation !== null,
@@ -33,6 +36,7 @@ export function previewStatusOverlayModel(project: Project, toolpath: Toolpath) 
       outOfBounds,
       rasterDisplay !== null,
       cncFallbacks.length > 0,
+      tileRegistration.length > 0,
     ].includes(true),
   };
 }

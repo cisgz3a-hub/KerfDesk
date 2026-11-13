@@ -5,39 +5,43 @@
 // corner sits at the program origin: the operator slides the stock between
 // tiles and re-zeros XY on the tile frame. Adjacent tiles share
 // registration holes drilled in the overlap strip at IDENTICAL stock
-// positions, so dowel pins re-index the stock physically.
+// positions, so dowel pins re-index the stock physically. Those holes are
+// placed clear of every part and cut and inside the stock
+// (tile-registration-placement.ts), and each piece a tile edge starts is
+// entered the way its operation asked (tile-clipped-entries.ts).
 
-import { cncPassXyPoints, type CncGroup, type CncPass, type Job } from '../job';
+import { type CncGroup, type Job, cncPassXyPoints } from '../job';
 import { placeCncParks } from '../job/job-origin';
-import { cncHelicalContourPoints } from '../job/helical-representation';
-import type { CncMachineConfig, CncTiling } from '../scene';
+import type { CncMachineConfig, CncTiling, Vec2 } from '../scene';
 import type { DeviceProfile } from '../devices';
-import type { CncTile, TiledJob } from './cnc-tile';
+import type { CncTile, TiledJob, TileRegistrationHole } from './cnc-tile';
 import type { TiledJobsResult } from './tile-plan-result';
 import { planTiles } from './plan-tiles';
 import { maximumRegistrationHolesPerTile, registrationGroupForTile } from './tile-registration';
 import { resolveTileRegistration, type ResolvedTileRegistration } from './tile-registration-plan';
+import {
+  placeTileRegistrationHoles,
+  registrationHolesForTile,
+  type RegistrationPlacement,
+} from './tile-registration-placement';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import type { EffectiveCncTileGrid } from './effective-cnc-tile-grid';
-import { vcarveConservativeZ } from './vcarve-cutting-constraints';
-import { lerp3 } from '../geometry/vec3';
-
-const MIN_CLIPPED_POINTS = 2;
+import type { TileEntryReport } from './tile-clipped-entries';
+import { clipGroupToTile, clippedLengthMm, tiledSourceLengthMm } from './tile-clip';
+import { countsTowardCutLength, tileSetAdvisories } from './tile-plan-advisories';
 
 export type { CncTile, TiledJob } from './cnc-tile';
 export type { TilePlanResult, TiledJobsResult } from './tile-plan-result';
 export { planTiles } from './plan-tiles';
 export { REGISTRATION_HOLE_DEPTH_MM } from './tile-registration';
 
+type TileContext = {
+  readonly machine: CncMachineConfig;
+  readonly device: DeviceProfile;
+};
+
 /** Split a CNC job across a bounded effective grid, dropping motionless tiles. */
-export function tileJobs(
-  job: Job,
-  tiling: CncTiling,
-  context?: {
-    readonly machine: CncMachineConfig;
-    readonly device: DeviceProfile;
-  },
-): TiledJobsResult {
+export function tileJobs(job: Job, tiling: CncTiling, context?: TileContext): TiledJobsResult {
   const bounds = cncJobBounds(job);
   if (bounds === null) return { kind: 'empty' };
   const plan = planTiles(bounds, tiling);
@@ -45,24 +49,127 @@ export function tileJobs(
   const registration = registrationForGrid(tiling, plan.grid, context?.machine);
   if (typeof registration === 'string')
     return { kind: 'registration-invalid', message: registration };
+  const bores =
+    registration === null || context === undefined
+      ? null
+      : boresFor(job, plan.tiles, registration, context);
   const out: TiledJob[] = [];
+  const entryReports: TileEntryReport[] = [];
+  let tiledLengthMm = 0;
   for (const tile of plan.tiles) {
-    const groups = clippedGroupsForTile(job, tile);
-    if (registration !== null && context !== undefined) {
-      const registrationGroup = registrationGroupForTile(
-        tile,
-        plan.grid,
-        registration,
-        context.machine,
-        context.device,
-      );
-      if (registrationGroup !== null) groups.push(registrationGroup);
-    }
-    // This ordering belongs to this indexed file only; another tile may have
-    // completed its profile in a separately executed file already.
-    if (groups.length > 0) out.push({ tile, job: tileLocalJob(groups) });
+    const clipped = clippedTile(job, tile, bores);
+    entryReports.push(...clipped.reports);
+    tiledLengthMm += clipped.lengthMm;
+    if (clipped.tiled !== null) out.push(clipped.tiled);
   }
-  return tiledJobsResult(plan.grid, out);
+  if (out.length === 0) return { kind: 'empty' };
+  return readyTiles(plan.grid, out, bores, {
+    entryReports,
+    jobLengthMm: jobCutLengthMm(job),
+    tiledLengthMm,
+  });
+}
+
+function readyTiles(
+  grid: EffectiveCncTileGrid,
+  tiles: ReadonlyArray<TiledJob>,
+  bores: TileBores | null,
+  facts: Omit<Parameters<typeof tileSetAdvisories>[0], 'tiles' | 'placement' | 'holeDiameterMm'>,
+): TiledJobsResult {
+  const advisories = tileSetAdvisories({
+    tiles,
+    placement: bores?.placement ?? null,
+    holeDiameterMm: bores?.registration.settings.holeDiameterMm ?? null,
+    ...facts,
+  });
+  return { kind: 'ready', grid, tiles, ...(advisories.length === 0 ? {} : { advisories }) };
+}
+
+function boresFor(
+  job: Job,
+  tiles: ReadonlyArray<CncTile>,
+  registration: ResolvedTileRegistration,
+  context: TileContext,
+): TileBores {
+  const placement = placeTileRegistrationHoles(
+    job,
+    tiles,
+    context.machine.stock,
+    registration.settings.holeDiameterMm,
+  );
+  return { registration, context, placement };
+}
+
+type TileBores = {
+  readonly registration: ResolvedTileRegistration;
+  readonly context: TileContext;
+  readonly placement: RegistrationPlacement;
+};
+
+function clippedTile(
+  job: Job,
+  tile: CncTile,
+  bores: TileBores | null,
+): {
+  readonly tiled: TiledJob | null;
+  readonly reports: ReadonlyArray<TileEntryReport>;
+  readonly lengthMm: number;
+} {
+  const groups: CncGroup[] = [];
+  const reports: TileEntryReport[] = [];
+  let lengthMm = 0;
+  for (const group of job.groups) {
+    if (group.kind !== 'cnc') continue;
+    const clipped = clipGroupToTile(group, tile);
+    if (clipped === null) continue;
+    groups.push(clipped.group);
+    reports.push(clipped.report);
+    if (countsTowardCutLength(group)) lengthMm += clippedLengthMm(clipped.group.passes);
+  }
+  const holes = bores === null ? [] : registrationHolesForTile(bores.placement, tile);
+  const registrationGroup =
+    bores === null
+      ? null
+      : registrationGroupForTile(
+          tile,
+          holes,
+          bores.registration,
+          bores.context.machine,
+          bores.context.device,
+        );
+  if (registrationGroup !== null) groups.push(registrationGroup);
+  // This ordering belongs to this indexed file only; another tile may have
+  // completed its profile in a separately executed file already.
+  return {
+    tiled: groups.length === 0 ? null : tiledJob(tile, groups, holes),
+    reports,
+    lengthMm,
+  };
+}
+
+function tiledJob(
+  tile: CncTile,
+  groups: ReadonlyArray<CncGroup>,
+  holes: ReadonlyArray<Vec2>,
+): TiledJob {
+  const registrationHoles: ReadonlyArray<TileRegistrationHole> = holes.map((stock) => ({
+    stock,
+    tile: { x: stock.x - tile.rect.minX, y: stock.y - tile.rect.minY },
+  }));
+  return {
+    tile,
+    job: tileLocalJob(groups),
+    ...(registrationHoles.length === 0 ? {} : { registrationHoles }),
+  };
+}
+
+function jobCutLengthMm(job: Job): number {
+  let length = 0;
+  for (const group of job.groups) {
+    if (group.kind !== 'cnc' || !countsTowardCutLength(group)) continue;
+    for (const pass of group.passes) length += tiledSourceLengthMm(pass);
+  }
+  return length;
 }
 
 // Each tile is zeroed by hand on its own frame (F-CNC19), so where that frame
@@ -86,67 +193,29 @@ function registrationForGrid(
   );
 }
 
-function clippedGroupsForTile(job: Job, tile: CncTile): CncGroup[] {
-  const groups: CncGroup[] = [];
-  for (const group of job.groups) {
-    if (group.kind !== 'cnc') continue;
-    const clipped = clipGroupToTile(group, tile);
-    if (clipped !== null) groups.push(clipped);
-  }
-  return groups;
-}
-
-function tiledJobsResult(
-  grid: Extract<TiledJobsResult, { readonly kind: 'ready' }>['grid'],
-  tiles: ReadonlyArray<TiledJob>,
-): TiledJobsResult {
-  if (tiles.length === 0) return { kind: 'empty' };
-  const advisories = tiledRampAdvisories(tiles);
+/**
+ * The registration bores a tiled save of this job would drill, in the job's
+ * own (stock) coordinates, for Preview. Null when tiling or its holes are off,
+ * the grid is one tile, or the registration plan is not usable yet (the tiled
+ * save then refuses and says why).
+ */
+export function plannedTileRegistration(
+  job: Job,
+  machine: CncMachineConfig,
+): { readonly placement: RegistrationPlacement; readonly holeDiameterMm: number } | null {
+  const tiling = machine.tiling;
+  if (tiling === undefined || !tiling.registrationHoles) return null;
+  const bounds = cncJobBounds(job);
+  if (bounds === null) return null;
+  const plan = planTiles(bounds, tiling);
+  if (plan.kind === 'work-budget-exceeded') return null;
+  const registration = registrationForGrid(tiling, plan.grid, machine);
+  if (registration === null || typeof registration === 'string') return null;
+  const holeDiameterMm = registration.settings.holeDiameterMm;
   return {
-    kind: 'ready',
-    grid,
-    tiles,
-    ...(advisories.length === 0 ? {} : { advisories }),
+    placement: placeTileRegistrationHoles(job, plan.tiles, machine.stock, holeDiameterMm),
+    holeDiameterMm,
   };
-}
-
-function tiledRampAdvisories(tiles: ReadonlyArray<TiledJob>): ReadonlyArray<string> {
-  const advisories: string[] = [];
-  if (hasTiledEntryRamp(tiles)) {
-    advisories.push(
-      'Tiled V-carve output is derived as per-tile geometry. Its entered ramp angle remains ' +
-        'requested provenance, not a re-verified emitted maximum. Inspect each tile or keep the ' +
-        'contour wholly within one tile when the cutter requires a guaranteed maximum angle.',
-    );
-  }
-  if (hasClippedEntryRamp(tiles)) {
-    advisories.push(
-      'A tiled V-carve contour ramp crosses a tile boundary. At least one clipped tile starts ' +
-        'below stock top, so its emitted path begins with a direct plunge at the configured ' +
-        'plunge feed. Inspect each tile or place the contour wholly within one tile if the ' +
-        'exact cutter cannot plunge.',
-    );
-  }
-  return advisories;
-}
-
-function hasTiledEntryRamp(tiles: ReadonlyArray<TiledJob>): boolean {
-  return tiles.some(({ job }) =>
-    job.groups.some((group) => group.kind === 'cnc' && group.rampEntryTiled === true),
-  );
-}
-
-function hasClippedEntryRamp(tiles: ReadonlyArray<TiledJob>): boolean {
-  return tiles.some(({ job }) =>
-    job.groups.some(
-      (group) =>
-        group.kind === 'cnc' &&
-        group.passes.some(
-          (pass) =>
-            pass.kind === 'path3d' && pass.entryRamp === true && (pass.points[0]?.z ?? 0) < 0,
-        ),
-    ),
-  );
 }
 
 /** Add a one-based row and column suffix to a tiled CNC output filename. */
@@ -177,186 +246,4 @@ function cncJobBounds(job: Job): CncTile['rect'] | null {
     }
   }
   return Number.isFinite(minX) ? { minX, minY, maxX, maxY } : null;
-}
-
-function clipGroupToTile(group: CncGroup, tile: CncTile): CncGroup | null {
-  const passes: CncPass[] = [];
-  for (const pass of group.passes) {
-    if (pass.kind === 'contour') {
-      // Clipping can remove earlier cutter footprints that proved air clear.
-      // Entry advisories transfer; a whole-job clearance certificate does not.
-      const { airFloorZMm: _airFloorZMm, ...clipped } = pass;
-      const xyz = pass.polyline.map((point) => ({ x: point.x, y: point.y, z: pass.zMm }));
-      for (const piece of clipPointsToRect(xyz, tile.rect, pass.closed)) {
-        // A clipped loop is no longer closed — it continues in a neighbor.
-        passes.push({
-          ...clipped,
-          closed: false,
-          polyline: piece.map((point) => ({ x: point.x, y: point.y })),
-        });
-      }
-    } else if (pass.kind === 'path3d') {
-      for (const piece of clipPointsToRect([...pass.points], tile.rect, pass.closed)) {
-        passes.push(clippedPath3dPass(pass, piece, group.cutType === 'v-carve'));
-      }
-    } else if (pass.kind === 'helical-contour') {
-      for (const piece of clipPointsToRect(cncHelicalContourPoints(pass), tile.rect, false)) {
-        passes.push({ kind: 'path3d', closed: false, points: piece });
-      }
-    } else {
-      const xyz = cncPassXyPoints(pass).map((point) => ({ x: point.x, y: point.y, z: pass.zMm }));
-      for (const piece of clipPointsToRect(xyz, tile.rect, pass.closed)) {
-        passes.push({
-          kind: 'contour',
-          zMm: pass.zMm,
-          closed: false,
-          polyline: piece.map((point) => ({ x: point.x, y: point.y })),
-        });
-      }
-    }
-  }
-  if (passes.length === 0) return null;
-  const tiledRamp = hasEntryRamp(group);
-  // Each tile is zeroed on its own frame; the whole job's artwork extent does
-  // not describe a clipped tile, so it is not carried into one.
-  const { designBounds: _designBounds, ...untiled } = group;
-  return {
-    ...untiled,
-    ...(tiledRamp ? { rampEntryTiled: true as const } : {}),
-    passes: passes.map((pass) => translatePass(pass, tile)),
-  };
-}
-
-function clippedPath3dPass(
-  pass: Extract<CncPass, { readonly kind: 'path3d' }>,
-  points: ReadonlyArray<Xyz>,
-  vcarve: boolean,
-): Extract<CncPass, { readonly kind: 'path3d' }> {
-  const { airFloorZMm: _airFloorZMm, ...clipped } = pass;
-  return {
-    ...clipped,
-    closed: false,
-    // The V-carve certificate reserves final XY rounding. Keep interpolated
-    // Z shallow so this later split cannot consume an additional cone radius.
-    points: vcarve
-      ? points.map((point) => ({ ...point, z: vcarveConservativeZ(point.z) }))
-      : points,
-  };
-}
-
-function hasEntryRamp(group: CncGroup): boolean {
-  return (
-    group.rampEntryDeg !== undefined &&
-    group.passes.some((pass) => pass.kind === 'path3d' && pass.entryRamp === true)
-  );
-}
-
-type Xyz = { readonly x: number; readonly y: number; readonly z: number };
-
-// Keep the in-rect portions of a polyline, interpolating boundary crossings
-// (Z rides the same parameter). Closed loops include the seam segment back
-// to the start.
-function clipPointsToRect(
-  points: ReadonlyArray<Xyz>,
-  rect: CncTile['rect'],
-  closed: boolean,
-): Array<Array<Xyz>> {
-  const pieces: Array<Array<Xyz>> = [];
-  let current: Array<Xyz> = [];
-  const flush = (): void => {
-    if (current.length >= MIN_CLIPPED_POINTS) pieces.push(current);
-    current = [];
-  };
-  const segmentCount = closed ? points.length : points.length - 1;
-  for (let i = 0; i < segmentCount; i += 1) {
-    const a = points[i] as Xyz;
-    const b = points[(i + 1) % points.length] as Xyz;
-    const segment = clipSegment(a, b, rect);
-    if (segment === null) {
-      flush();
-      continue;
-    }
-    const [start, end] = segment;
-    if (current.length === 0 || !samePoint(current[current.length - 1] as Xyz, start)) {
-      flush();
-      current.push(start);
-    }
-    current.push(end);
-  }
-  flush();
-  return pieces;
-}
-
-// Liang–Barsky parametric clip of one segment against the rect; returns the
-// clipped endpoints (Z lerped) or null when fully outside.
-function clipSegment(a: Xyz, b: Xyz, rect: CncTile['rect']): [Xyz, Xyz] | null {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  let t0 = 0;
-  let t1 = 1;
-  const edges: ReadonlyArray<readonly [number, number]> = [
-    [-dx, a.x - rect.minX],
-    [dx, rect.maxX - a.x],
-    [-dy, a.y - rect.minY],
-    [dy, rect.maxY - a.y],
-  ];
-  for (const [p, q] of edges) {
-    if (p === 0) {
-      if (q < 0) return null;
-      continue;
-    }
-    const r = q / p;
-    if (p < 0) {
-      if (r > t1) return null;
-      if (r > t0) t0 = r;
-    } else {
-      if (r < t0) return null;
-      if (r < t1) t1 = r;
-    }
-  }
-  return [lerp3(a, b, t0), lerp3(a, b, t1)];
-}
-
-function samePoint(a: Xyz, b: Xyz): boolean {
-  const EPSILON = 1e-9;
-  return Math.abs(a.x - b.x) < EPSILON && Math.abs(a.y - b.y) < EPSILON;
-}
-
-function translatePass(pass: CncPass, tile: CncTile): CncPass {
-  if (pass.kind === 'contour') {
-    return {
-      ...pass,
-      polyline: pass.polyline.map((point) => ({
-        x: point.x - tile.rect.minX,
-        y: point.y - tile.rect.minY,
-      })),
-    };
-  }
-  if (pass.kind === 'arc') {
-    return {
-      ...pass,
-      start: { x: pass.start.x - tile.rect.minX, y: pass.start.y - tile.rect.minY },
-      end: { x: pass.end.x - tile.rect.minX, y: pass.end.y - tile.rect.minY },
-      center: { x: pass.center.x - tile.rect.minX, y: pass.center.y - tile.rect.minY },
-    };
-  }
-  if (pass.kind === 'helical-contour') {
-    return {
-      ...pass,
-      start: { x: pass.start.x - tile.rect.minX, y: pass.start.y - tile.rect.minY },
-      center: { x: pass.center.x - tile.rect.minX, y: pass.center.y - tile.rect.minY },
-      polyline: pass.polyline.map((point) => ({
-        x: point.x - tile.rect.minX,
-        y: point.y - tile.rect.minY,
-      })),
-    };
-  }
-  return {
-    ...pass,
-    points: pass.points.map((point) => ({
-      x: point.x - tile.rect.minX,
-      y: point.y - tile.rect.minY,
-      z: point.z,
-    })),
-  };
 }

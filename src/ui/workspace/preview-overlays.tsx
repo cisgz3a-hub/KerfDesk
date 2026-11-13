@@ -52,6 +52,11 @@ export function PreviewStatusOverlays(props: {
         <RasterPreviewDisplayBanner advisory={model.rasterDisplay} style={bannerStyle} />
       ) : null}
       <PreviewCncFallbackBanner notices={model.cncFallbacks} style={bannerStyle} />
+      <PreviewCncFallbackBanner
+        notices={model.tileRegistration}
+        style={bannerStyle}
+        label="Tile registration holes"
+      />
       {model.empty ? (
         <div className="lf-chip" style={hintStyle} role="status">
           Nothing to preview — enable Output on at least one layer with objects.

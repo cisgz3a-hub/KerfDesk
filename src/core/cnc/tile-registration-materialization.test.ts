@@ -7,6 +7,10 @@ import { planTiles, tileJobs } from './tile-plan';
 import { maximumRegistrationHolesPerTile, registrationGroupForTile } from './tile-registration';
 import * as registrationPasses from './tile-registration-passes';
 import { resolveTileRegistration } from './tile-registration-plan';
+import {
+  placeTileRegistrationHoles,
+  registrationHolesForTile,
+} from './tile-registration-placement';
 
 const MAX_ARRAY_LENGTH = 0xffff_ffff;
 const MACHINE = {
@@ -98,10 +102,22 @@ describe('registration Array representation', () => {
     if (plan.kind !== 'ready') throw new Error(plan.kind);
     const resolved = resolveTileRegistration(SETTINGS, MACHINE);
     if (typeof resolved === 'string') throw new Error(resolved);
+    // An empty job leaves every overlap strip clear, so each seam takes both bores.
+    const placement = placeTileRegistrationHoles(
+      { groups: [] },
+      plan.tiles,
+      MACHINE.stock,
+      SETTINGS.holeDiameterMm,
+    );
     const actual = plan.tiles.map(
       (tile) =>
-        registrationGroupForTile(tile, plan.grid, resolved, MACHINE, DEFAULT_DEVICE_PROFILE)?.passes
-          .length ?? 0,
+        registrationGroupForTile(
+          tile,
+          registrationHolesForTile(placement, tile),
+          resolved,
+          MACHINE,
+          DEFAULT_DEVICE_PROFILE,
+        )?.passes.length ?? 0,
     );
     expect(Math.max(...actual)).toBe(expected);
     expect(maximumRegistrationHolesPerTile(plan.grid)).toBe(expected);

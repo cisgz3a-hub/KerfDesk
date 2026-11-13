@@ -5,6 +5,10 @@
 // default cut depth is 1 mm against 6.35 mm stock (machine.ts), so the advisory
 // only fires once the operator deepens the cut.
 //
+// A pocket takes no tabs, so one cut to (or within 0.2 mm of) the stock bottom
+// frees every island its wall ring goes round; that is named in its own row
+// (cnc-through-pocket-island-warnings.ts, ADR-106 Amendment 3).
+//
 // It also reports the plainer case the free-part rule misses: fixed-depth cuts
 // set deeper than the stock are cutting into the spoilboard. V-carve is handled
 // from exact compiled pass depth because flowing mode ignores settings.depthMm.
@@ -42,6 +46,7 @@ import {
 } from '../../core/scene';
 import { cncNoteContours } from '../layers/cnc-note-contours';
 import { projectionStockWarning } from './cnc-projection-stock-warnings';
+import { throughPocketIslandWarning } from './cnc-through-pocket-island-warnings';
 import {
   compiledProjectionFactsByLayer,
   type CompiledProjectionFacts,
@@ -108,6 +113,10 @@ function layerStockWarning(
   const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
   const throughCut = throughCutWarning(project, layer, settings, stockThicknessMm);
   if (throughCut !== null) return throughCut;
+  // ADR-106 Amendment 3: a through pocket frees its islands, and says so in
+  // place of the plainer spoilboard line below.
+  const islands = throughPocketIslandWarning(project, layer, settings, stockThicknessMm);
+  if (islands !== null) return islands;
   if (settings.depthMm > stockThicknessMm && settings.cutType !== 'v-carve') {
     // Spoilboard overcut. Legitimate on purpose, so this informs and never
     // refuses; the free-part case above is the louder one and wins the row.

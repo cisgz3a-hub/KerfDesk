@@ -15,6 +15,7 @@ import {
 } from '../../core/scene';
 import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import { drawObjectsFaint, drawPreview } from './draw-preview';
+import { drawPreviewTileRegistration } from './preview-tile-registration';
 import { drawMeasurement } from './draw-measurement';
 import { drawNoGoZones } from './draw-no-go-zones';
 import { drawSelectedOpenFillContours } from './draw-open-fill-contours';
@@ -232,7 +233,7 @@ function drawPreviewModeScene(
     drawCncRemoval(ctx, opts.cncRemovalGrid, view, stockMaterialKey(project));
   }
   if (opts.previewToolpath === undefined) return;
-  if (
+  const rendered =
     opts.previewRouteRenderer?.(
       ctx,
       opts.previewToolpath,
@@ -240,14 +241,16 @@ function drawPreviewModeScene(
       opts.scrubberT ?? 1,
       opts.previewShowTravel !== false,
       opts.previewBackgroundKey,
-    ) === true
-  )
-    return;
-  drawPreview(ctx, opts.previewToolpath, view, opts.scrubberT ?? 1, {
-    showTravel: opts.previewShowTravel !== false,
-    showFuture: true,
-    showEndpoints: true,
-  });
+    ) === true;
+  if (!rendered) {
+    drawPreview(ctx, opts.previewToolpath, view, opts.scrubberT ?? 1, {
+      showTravel: opts.previewShowTravel !== false,
+      showFuture: true,
+      showEndpoints: true,
+    });
+  }
+  // Over the route: the bores a tiled save will drill (N4-P1-1).
+  drawPreviewTileRegistration(ctx, opts.previewToolpath, view);
 }
 
 function drawLiveWorkspaceOverlays(
