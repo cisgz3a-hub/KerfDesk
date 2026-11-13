@@ -1,5 +1,5 @@
+import { recordControllerRestart } from '../../../core/recovery/link-loss-restart';
 import {
-  recordControllerRestart,
   settleLinkLossRestart,
   type JobInterruption,
   type LinkLossRestartEvidence,
