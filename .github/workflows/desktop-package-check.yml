@@ -147,6 +147,13 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Restore Electron downloads
+        # A pinned older commit may predate this action (ADR-712).
+        if: hashFiles('.github/actions/electron-downloads/action.yml') != ''
+        uses: ./.github/actions/electron-downloads
+        with:
+          packaging: 'true'
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -213,6 +220,13 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+
+      - name: Restore Electron downloads
+        # A pinned older commit may predate this action (ADR-712).
+        if: hashFiles('.github/actions/electron-downloads/action.yml') != ''
+        uses: ./.github/actions/electron-downloads
+        with:
+          packaging: 'true'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -337,6 +351,13 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Restore Electron downloads
+        # A pinned older commit may predate this action (ADR-712).
+        if: hashFiles('.github/actions/electron-downloads/action.yml') != ''
+        uses: ./.github/actions/electron-downloads
+        with:
+          packaging: 'true'
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -411,6 +432,13 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+
+      - name: Restore Electron downloads
+        # A pinned older commit may predate this action (ADR-712).
+        if: hashFiles('.github/actions/electron-downloads/action.yml') != ''
+        uses: ./.github/actions/electron-downloads
+        with:
+          packaging: 'true'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -514,6 +542,13 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+
+      - name: Restore Electron downloads
+        # A pinned older commit may predate this action (ADR-712).
+        if: hashFiles('.github/actions/electron-downloads/action.yml') != ''
+        uses: ./.github/actions/electron-downloads
+        with:
+          packaging: 'true'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

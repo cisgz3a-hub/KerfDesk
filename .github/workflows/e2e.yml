@@ -66,6 +66,9 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Restore Electron downloads
+        uses: ./.github/actions/electron-downloads
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -89,6 +92,9 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+
+      - name: Restore Electron downloads
+        uses: ./.github/actions/electron-downloads
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -161,6 +167,9 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Restore Electron downloads
+        uses: ./.github/actions/electron-downloads
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -220,6 +229,9 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Restore Electron downloads
+        uses: ./.github/actions/electron-downloads
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -275,6 +287,9 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+
+      - name: Restore Electron downloads
+        uses: ./.github/actions/electron-downloads
 
       - name: Install dependencies
         # pnpm installs the dependencies before it runs a script in a checkout
