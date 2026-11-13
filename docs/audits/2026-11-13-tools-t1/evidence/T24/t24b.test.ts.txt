@@ -1,0 +1,102 @@
+// T24b: realistic repros. (1) trace scaled to half and moved onto a workpiece, power tuned, then re-traced.
+// (2) two coasters: duplicate a trace, move the copy to the second blank, re-trace the copy -> where does the job burn?
+import { describe, it, vi } from 'vitest';
+import type { RawImageData } from '../t22-main/src/core/trace';
+import { IDENTITY_TRANSFORM, operationIdsForObject, type Project, type SceneObject, type RasterImage } from '../t22-main/src/core/scene';
+import { useStore } from '../t22-main/src/ui/state';
+import { retraceOriginalAction } from '../t22-main/src/ui/commands/image-command-actions';
+import { runPreflight as preflight } from '../t22-main/src/core/preflight';
+import { burnedSegments, gcodeOf, logger, segBounds, type Seg } from './t24-common';
+import { runTrace, seedRaster, setupProject } from './t24-fixture';
+
+vi.mock('../t22-main/src/ui/trace/off-thread-trace-decode', async () => {
+  const mask = await import('../t22-main/src/ui/trace/trace-source-mask');
+  const transp = await import('../t22-main/src/ui/trace/raw-image-transparency');
+  return {
+    decodeTraceSourceImage: async (file: File) => {
+      const image = mask.maskTraceSourcePixels(file, (globalThis as { __T23_PIXELS?: RawImageData }).__T23_PIXELS!);
+      return { image, hasTransparency: transp.rawImageHasTransparency(image) };
+    },
+  };
+});
+
+const log = logger('C:/Users/stolk/kd-t1/zz-t24/t24b.log');
+const T = (o: Partial<typeof IDENTITY_TRANSFORM>) => ({ ...IDENTITY_TRANSFORM, ...o });
+const st = () => useStore.getState();
+const obj = (id: string) => st().project.scene.objects.find((o) => o.id === id);
+const traces = () => st().project.scene.objects.filter((o) => o.kind === 'traced-image');
+
+/** The job without the kept source picture (as WORKFLOW F-E1 advises: delete it or turn its Output off). */
+function jobWithoutSource(p: Project): Project {
+  return { ...p, scene: { ...p.scene, objects: p.scene.objects.filter((o) => o.kind !== 'raster-image') } } as Project;
+}
+function burnLen(segs: Seg[], box: { x0: number; y0: number; x1: number; y1: number }) {
+  let n = 0;
+  const S = new Map<number, number>();
+  for (const s of segs) {
+    const mx = (s.a.x + s.b.x) / 2, my = (s.a.y + s.b.y) / 2;
+    if (mx < box.x0 || mx > box.x1 || my < box.y0 || my > box.y1) continue;
+    const L = Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y);
+    n += L;
+    S.set(s.s, (S.get(s.s) ?? 0) + L);
+  }
+  return { mm: Math.round(n), byS: Object.fromEntries([...S].map(([k, v]) => [k, Math.round(v)])) };
+}
+async function retrace(traceId: string) {
+  const toasts: string[] = [];
+  let opened: { source: RasterImage; opts?: { replaceTraceId?: string } } | null = null;
+  retraceOriginalAction(st().project, obj(traceId) ?? null, (source, opts) => { opened = { source, opts }; }, (m, k) => toasts.push(`${k}: ${m}`))();
+  const o = opened as unknown as { source: RasterImage; opts?: { replaceTraceId?: string } };
+  const out = await runTrace(o.source, 'Line Art', { replaceTraceId: o.opts?.replaceTraceId });
+  return [...toasts, ...out.toasts];
+}
+const opDesc = (o: SceneObject | undefined) =>
+  o ? operationIdsForObject(o, st().project.scene.layers).map((id) => {
+    const l = st().project.scene.layers.find((x) => x.id === id) as unknown as Record<string, unknown>;
+    return `${l.name} power ${l.power} speed ${l.speed} passes ${l.passes}`;
+  }).join(' + ') : 'missing';
+
+describe('T24b', () => {
+  it('half-size trace placed on a workpiece, power tuned, then re-traced', async () => {
+    const seed = seedRaster({ transform: T({ x: 20, y: 20 }) }); // photo 40 x 30 mm at (20,20)
+    setupProject([seed]);
+    await runTrace(seed, 'Line Art');
+    const id = traces()[0]!.id;
+    st().setObjectTransform(id, T({ x: 200, y: 150, scaleX: 0.05, scaleY: 0.05, rotationDeg: 90 }));
+    const [op] = operationIdsForObject(obj(id)!, st().project.scene.layers);
+    st().setLayerParam(op!, { power: 80, speed: 600, passes: 2 } as never);
+    const g0 = gcodeOf(jobWithoutSource(st().project));
+    const s0 = burnedSegments(g0, st().project.device.bedHeight);
+    log(`before re-trace: op ${opDesc(obj(id))}; burn box ${JSON.stringify(segBounds(s0))}; max S ${Math.max(...s0.map((s) => s.s))}`);
+    const toasts = await retrace(id);
+    const g1 = gcodeOf(jobWithoutSource(st().project));
+    const s1 = burnedSegments(g1, st().project.device.bedHeight);
+    log(`after re-trace:  op ${opDesc(obj(id))}; burn box ${JSON.stringify(segBounds(s1))}; max S ${Math.max(...s1.map((s) => s.s))}`);
+    log(`passes (G-code burn segments) before ${s0.length} after ${s1.length}; toasts ${JSON.stringify(toasts)}`);
+  });
+
+  it('two coasters: copy moved to the second blank, copy re-traced', async () => {
+    const seed = seedRaster({ transform: T({ x: 20, y: 20 }) });
+    setupProject([seed]);
+    await runTrace(seed, 'Line Art');
+    const a = traces()[0]!.id;
+    // coaster 1: move original trace onto blank 1; coaster 2: copy onto blank 2
+    st().setObjectTransform(a, T({ x: 100, y: 100, scaleX: 0.1, scaleY: 0.1 }));
+    useStore.setState({ selectedObjectId: a, additionalSelectedIds: new Set() });
+    st().duplicateSelection();
+    const b = st().selectedObjectId!;
+    st().setObjectTransform(b, T({ x: 200, y: 100, scaleX: 0.1, scaleY: 0.1 }));
+    const blank1 = { x0: 95, y0: 95, x1: 150, y1: 140 }, blank2 = { x0: 195, y0: 95, x1: 250, y1: 140 }, photo = { x0: 15, y0: 15, x1: 70, y1: 60 };
+    const report = (tag: string) => {
+      const segs = burnedSegments(gcodeOf(jobWithoutSource(st().project)), st().project.device.bedHeight);
+      const issues = preflight(jobWithoutSource(st().project), gcodeOf(jobWithoutSource(st().project))) as unknown as ReadonlyArray<{ code: string }> | { issues?: ReadonlyArray<{ code: string }> };
+      const codes = (Array.isArray(issues) ? issues : (issues as { issues?: ReadonlyArray<{ code: string }> }).issues ?? []).map((i) => i.code);
+      log(`${tag}: burn mm blank1 ${JSON.stringify(burnLen(segs, blank1))} blank2 ${JSON.stringify(burnLen(segs, blank2))} over-photo ${JSON.stringify(burnLen(segs, photo))}; preflight codes ${JSON.stringify(codes)}`);
+      log(`${tag}: objects ${st().project.scene.objects.map((o) => `${o.kind}@${o.transform.x},${o.transform.y}`).join(' ')}; ops A=${opDesc(obj(a))} B=${opDesc(obj(b))}`);
+    };
+    report('before re-trace');
+    const toasts = await retrace(b);
+    report('after re-trace of the copy');
+    log(`toasts ${JSON.stringify(toasts)}`);
+  });
+});

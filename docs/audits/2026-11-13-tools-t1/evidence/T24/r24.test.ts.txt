@@ -1,0 +1,241 @@
+﻿// T24 refuter: mutation-level check of Re-trace Original placement and operation
+// carry-over, with Job Review's own warning list as the "is it silent?" oracle.
+// Independent of the auditor's dialog harness: hand-built objects, real
+// applyTraceToExisting / applyRasterizedTraceToExisting, real compileJob and
+// detectJobIntentWarnings.
+import { describe, it } from 'vitest';
+import { writeFileSync, appendFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  IDENTITY_TRANSFORM,
+  type Layer,
+  type Project,
+  type RasterImage,
+  type TracedImage,
+  type Transform,
+} from '../t22-main/src/core/scene';
+import { compileJob } from '../t22-main/src/core/job';
+import { applyTraceToExisting } from '../t22-main/src/ui/state/scene-mutations';
+import { applyRasterizedTraceToExisting } from '../t22-main/src/ui/state/rasterized-trace-mutation';
+import { positionTraceOverRasterSource } from '../t22-main/src/ui/state/trace-placement';
+import { detectJobIntentWarnings } from '../t22-main/src/ui/laser/job-intent-warnings';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t24r/r24.log';
+writeFileSync(LOG, '');
+const log = (...parts: unknown[]): void => {
+  appendFileSync(LOG, parts.map((p) => (typeof p === 'string' ? p : JSON.stringify(p))).join(' ') + '\n');
+};
+
+const PHOTO_T: Transform = { ...IDENTITY_TRANSFORM, x: 20, y: 20 };
+function photo(): RasterImage {
+  return {
+    kind: 'raster-image',
+    id: 'photo',
+    source: 'art.png',
+    dataUrl: 'data:image/png;base64,AAAA',
+    lumaBase64: 'AAAA',
+    pixelWidth: 400,
+    pixelHeight: 300,
+    bounds: { minX: 0, minY: 0, maxX: 40, maxY: 30 },
+    transform: PHOTO_T,
+    color: '#808080',
+    operationIds: ['op-photo'],
+    dither: 'threshold',
+    linesPerMm: 10,
+  };
+}
+
+// A 20 x 10 mm ring (200 x 100 px) in the photo's pixel grid.
+function traceGeometry(id: string): TracedImage {
+  return {
+    kind: 'traced-image',
+    id,
+    source: 'art.png',
+    traceSourceId: 'photo',
+    traceMode: 'filled-contours',
+    tracePixelWidth: 400,
+    tracePixelHeight: 300,
+    bounds: { minX: 100, minY: 100, maxX: 300, maxY: 200 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color: '#000000',
+        polylines: [
+          {
+            closed: true,
+            points: [
+              { x: 100, y: 100 },
+              { x: 300, y: 100 },
+              { x: 300, y: 200 },
+              { x: 100, y: 200 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function tunedLayer(): Layer {
+  return { ...createLayer({ id: 'op-art', name: 'art', color: '#2563eb', mode: 'fill' }), power: 80, speed: 600, passes: 2 };
+}
+
+function baseProject(objects: Project['scene']['objects'], layers: Layer[]): Project {
+  const base = createProject();
+  return { ...base, scene: { ...base.scene, objects, layers } };
+}
+
+function placed(id: string, tweak: (t: Transform) => Transform): TracedImage {
+  const registered = positionTraceOverRasterSource(photo(), traceGeometry(id));
+  return { ...registered, transform: tweak(registered.transform), operationIds: ['op-art'] };
+}
+
+function retrace(project: Project, id: string): Project {
+  // What the dialog hands the store: same id, IDENTITY transform, no ops/name.
+  return applyTraceToExisting({ project, undoStack: [] }, 'photo', traceGeometry(id), {
+    replaceTraceId: id,
+  }).project;
+}
+
+function collectXY(value: unknown, out: { x: number; y: number }[]): void {
+  if (Array.isArray(value)) {
+    for (const v of value) collectXY(v, out);
+    return;
+  }
+  if (value !== null && typeof value === 'object') {
+    const o = value as Record<string, unknown>;
+    if (typeof o.x === 'number' && typeof o.y === 'number') out.push({ x: o.x, y: o.y });
+    for (const v of Object.values(o)) if (typeof v === 'object') collectXY(v, out);
+  }
+}
+
+function burnSummary(project: Project): unknown {
+  const job = compileJob(project.scene, project.device);
+  return job.groups
+    .filter((g) => g.kind !== 'raster')
+    .map((g) => {
+      const pts: { x: number; y: number }[] = [];
+      collectXY((g as { segments?: unknown }).segments, pts);
+      const r = (n: number): number => Math.round(n * 100) / 100;
+      return {
+        layer: g.layerId,
+        kind: g.kind,
+        power: (g as { power?: number }).power,
+        speed: (g as { speed?: number }).speed,
+        passes: (g as { passes?: number }).passes,
+        box: pts.length === 0 ? null : [r(Math.min(...pts.map((p) => p.x))), r(Math.max(...pts.map((p) => p.x))), r(Math.min(...pts.map((p) => p.y))), r(Math.max(...pts.map((p) => p.y)))],
+      };
+    });
+}
+
+function photoOff(layer: Layer): Layer {
+  return { ...layer, output: false };
+}
+
+function report(label: string, before: Project, after: Project, id: string): void {
+  const b = before.scene.objects.find((o) => o.id === id) as TracedImage;
+  const a = after.scene.objects.find((o) => o.id === id) as TracedImage;
+  log(`== ${label}`);
+  log(' transform before', b.transform);
+  log(' transform after ', a.transform);
+  log(' name/powerScale before', b.name, b.powerScale, 'after', a.name, a.powerScale);
+  log(' ops before', before.scene.layers.map((l) => `${l.id}:${l.name}:${l.mode}:P${l.power}/F${l.speed}/x${l.passes}`));
+  log(' ops after ', after.scene.layers.map((l) => `${l.id}:${l.name}:${l.mode}:P${l.power}/F${l.speed}/x${l.passes}`));
+  log(' burn before', burnSummary(before));
+  log(' burn after ', burnSummary(after));
+  log(' JobReview warnings before', detectJobIntentWarnings(before));
+  log(' JobReview warnings after ', detectJobIntentWarnings(after));
+}
+
+const photoLayer = (): Layer => photoOff(createLayer({ id: 'op-photo', name: 'photo', color: '#808080', mode: 'image' }));
+
+describe('T24 refuter', () => {
+  it('A: 3 mm nudge only (trace still mostly over the photo)', () => {
+    const t = placed('trace', (tr) => ({ ...tr, x: tr.x + 3, y: tr.y - 2 }));
+    const before = baseProject([photo(), { ...t, name: 'Coaster logo', powerScale: 40 }], [photoLayer(), tunedLayer()]);
+    report('A nudge +3,-2', before, retrace(before, 'trace'), 'trace');
+  });
+
+  it('B: scaled to 95% in place (fit to blank)', () => {
+    const t = placed('trace', (tr) => ({ ...tr, scaleX: tr.scaleX * 0.95, scaleY: tr.scaleY * 0.95 }));
+    const before = baseProject([photo(), t], [photoLayer(), tunedLayer()]);
+    report('B scale 95%', before, retrace(before, 'trace'), 'trace');
+  });
+
+  it('C: moved far onto a workpiece and rotated 90', () => {
+    const t = placed('trace', (tr) => ({ ...tr, x: 200, y: 150, rotationDeg: 90 }));
+    const before = baseProject([photo(), t], [photoLayer(), tunedLayer()]);
+    report('C moved far + rot 90', before, retrace(before, 'trace'), 'trace');
+  });
+
+  it('D: unmoved original + moved copy sharing op; re-trace copy (double burn?)', () => {
+    const orig = placed('orig', (tr) => tr);
+    const copy = placed('copy', (tr) => ({ ...tr, x: tr.x + 100 }));
+    const before = baseProject([photo(), orig, copy], [photoLayer(), tunedLayer()]);
+    report('D re-trace moved copy', before, retrace(before, 'copy'), 'copy');
+  });
+
+  it('E: unmoved trace, run order: art(fill) then cut(line) around it', () => {
+    const t = placed('trace', (tr) => tr);
+    const outline: TracedImage = {
+      ...traceGeometry('outline'),
+      traceSourceId: undefined,
+      id: 'outline',
+      source: 'outline.svg',
+      transform: PHOTO_T,
+      tracePixelWidth: undefined,
+      tracePixelHeight: undefined,
+      bounds: { minX: 0, minY: 0, maxX: 40, maxY: 30 },
+      paths: [{ color: '#ff0000', operationIds: ['op-cut'], polylines: [{ closed: true, points: [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 30 }, { x: 0, y: 30 }] }] }],
+    } as TracedImage;
+    const cut = { ...createLayer({ id: 'op-cut', name: 'cut', color: '#ff0000', mode: 'line' }), power: 100, speed: 300 };
+    const before = baseProject([photo(), t, outline], [photoLayer(), tunedLayer(), cut]);
+    const after = retrace(before, 'trace');
+    report('E run order', before, after, 'trace');
+  });
+
+  it('F: unmoved trace whose operation equals the starter values (does anything still warn?)', () => {
+    const t = placed('trace', (tr) => tr);
+    const def = createLayer({ id: 'op-art', name: 'art', color: '#2563eb', mode: 'fill' });
+    const before = baseProject([photo(), t], [photoLayer(), def]);
+    report('F default op', before, retrace(before, 'trace'), 'trace');
+  });
+
+  it('G: rasterized result moved, then re-traced as raster (raster path)', () => {
+    const src = { ...photo() };
+    // buildRasterTraceOutput bakes placement into scene-space pixels: identity
+    // transform, bounds = the photo's world box (20..60, 20..50). The user then
+    // moves the result by +180, +130 (transform x/y).
+    const result: RasterImage = {
+      ...photo(),
+      id: 'result',
+      source: 'art.png (trace)',
+      traceSourceId: 'photo',
+      pixelWidth: 40, pixelHeight: 30, linesPerMm: 1, lumaBase64: Buffer.alloc(1200).toString('base64'),
+      bounds: { minX: 20, minY: 20, maxX: 60, maxY: 50 },
+      transform: { ...IDENTITY_TRANSFORM, x: 180, y: 130 },
+      operationIds: ['op-result'],
+      powerScale: 40,
+    };
+    const resultLayer = { ...createLayer({ id: 'op-result', name: 'result', color: '#16a34a', mode: 'image' }), power: 70, speed: 900 };
+    const before = baseProject([src, result], [photoLayer(), resultLayer]);
+    // trace-raster-output builds the incoming raster over the source.
+    const incoming: RasterImage = { ...photo(), id: 'result', source: 'art.png (trace)', pixelWidth: 40, pixelHeight: 30, linesPerMm: 1, lumaBase64: Buffer.alloc(1200).toString('base64'), bounds: { minX: 20, minY: 20, maxX: 60, maxY: 50 }, transform: IDENTITY_TRANSFORM, operationIds: undefined };
+    const after = applyRasterizedTraceToExisting({ project: before, undoStack: [] }, 'photo', incoming, { replaceTraceId: 'result' }).project;
+    const a = after.scene.objects.find((o) => o.id === 'result') as RasterImage;
+    const rasterBox = (p: Project): unknown => {
+      try { return rasterBoxRaw(p); } catch (e) { return `compile threw: ${String(e).slice(0, 160)}`; }
+    };
+    const rasterBoxRaw = (p: Project): unknown =>
+      compileJob(p.scene, p.device).groups.filter((g) => g.kind === 'raster').map((g) => {
+        const r = g as unknown as Record<string, unknown>;
+        return { layer: r.layerId, power: r.power, x: r.originX ?? r.x ?? r.placement, keys: Object.keys(r).filter((k) => /origin|x|y|width|height|placement|bounds/i.test(k)).map((k) => [k, typeof r[k] === 'object' ? JSON.stringify(r[k]).slice(0, 120) : r[k]]) };
+      });
+    log('== G raster result');
+    log(' transform before', result.transform, 'bounds', result.bounds, 'after', a.transform, 'bounds', a.bounds);
+    log(' raster groups before', rasterBox(before));
+    log(' raster groups after ', rasterBox(after));
+    log(' ops after', a.operationIds, 'powerScale', a.powerScale, after.scene.layers.map((l) => `${l.id}:P${l.power}/F${l.speed}`));
+  });
+});
