@@ -3,6 +3,8 @@
 export function PreviewCncFallbackBanner(props: {
   readonly notices: ReadonlyArray<string>;
   readonly style: React.CSSProperties;
+  /** Accessible name; tile registration reuses this banner. */
+  readonly label?: string;
 }): JSX.Element | null {
   if (props.notices.length === 0) return null;
   return (
@@ -10,7 +12,7 @@ export function PreviewCncFallbackBanner(props: {
       className="lf-banner lf-banner--warning"
       style={props.style}
       role="status"
-      aria-label="Operations cut differently"
+      aria-label={props.label ?? 'Operations cut differently'}
     >
       {props.notices.map((notice) => (
         <div key={notice}>{notice}</div>

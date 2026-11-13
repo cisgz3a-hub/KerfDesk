@@ -83,6 +83,10 @@ export const canvasTheme = {
   previewCut: '#2563eb',
   previewHeadFill: '#ff3b30',
   previewHeadStroke: '#fff',
+  // Planned tile registration bores (preview-tile-registration), in the
+  // registration layer's purple.
+  previewRegistrationHoleFill: 'rgba(124, 58, 237, 0.22)',
+  previewRegistrationHoleStroke: '#7c3aed',
   // Large-scene simplification notice (draw-vector-strokes)
   noticeFill: 'rgba(255, 248, 225, 0.95)',
   noticeStroke: '#d6a100',

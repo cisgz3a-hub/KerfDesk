@@ -7,6 +7,7 @@
 // type back from save-tiled-gcode would form an import cycle.
 
 import type { tileJobs } from '../../core/cnc';
+import type { TileRegistrationHole } from '../../core/cnc/cnc-tile';
 import {
   numberTileBitFiles,
   splitTileJobByBit,
@@ -78,7 +79,7 @@ export function emitTileFiles(
   const emitted: TileFile[] = [];
   const advisories = new Set<string>();
   const namesBits = tileSetUsesSeveralBits(tiles.map(({ job }) => job));
-  for (const { tile, job } of tiles) {
+  for (const { tile, job, registrationHoles } of tiles) {
     const runs = splitTileJobByBit(job).map((run) => ({
       ...run,
       body: cncGrblStrategy.emit(run.job, project.device),
@@ -106,6 +107,7 @@ export function emitTileFiles(
         name: tileBitFileName(baseName(savedName), tile, bitFile),
         gcode:
           `${tileHeader(project, machine)}; tile: row ${tile.row + 1}, column ${tile.col + 1}\n` +
+          registrationHoleHeader(registrationHoles) +
           `${namesBits ? tileBitHeader(bitFile) : ''}${body}`,
       });
     }
@@ -131,6 +133,18 @@ function cuttingRuns<Run extends TileBitRun & { readonly body: string }>(
   // The same test as runCncPreflight's empty-output rule.
   const cutting = runs.filter((run) => hasCuttingMove(run.body));
   return cutting.length === 0 ? runs : cutting;
+}
+
+// Every registration bore this tile drills, in this file's coordinates and
+// on the stock, so the operator can check them against the fixture (N4-P1-1).
+function registrationHoleHeader(holes: ReadonlyArray<TileRegistrationHole> | undefined): string {
+  return (holes ?? [])
+    .map(
+      ({ tile, stock }) =>
+        `; tile registration hole: X${tile.x.toFixed(3)} Y${tile.y.toFixed(3)} ` +
+        `(stock X${stock.x.toFixed(3)} Y${stock.y.toFixed(3)})\n`,
+    )
+    .join('');
 }
 
 function tileHeader(project: Project, machine: CncMachine): string {

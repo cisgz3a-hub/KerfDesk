@@ -183,8 +183,10 @@ describe('tiled short-ramp plunge provenance', () => {
       expect(
         tileGroup.passes.filter((pass) => pass.kind === 'contour' && pass.entryPlunge === true),
       ).toHaveLength(count);
+      // The extent line plunges where it starts (tile 1). Where tile 2's edge
+      // starts a new piece of it, that piece ramps in as the layer asks (N4-P2-1).
       expect(commandLines(gcode).filter((line) => line === 'G1 Z-1.000 F50')).toHaveLength(
-        count + (split ? 1 : 0),
+        count + (split && index === 0 ? 1 : 0),
       );
       // Provenance is informational. Removing it changes no emitted motion,
       // feed, spindle, ordering, or clipped coordinates.
@@ -194,19 +196,26 @@ describe('tiled short-ramp plunge provenance', () => {
     }
   });
 
-  it('does not invent a short-ramp plunge marker when clipping an unmarked contour', () => {
+  it('marks only the tile-edge pieces too short to ramp, never the piece that starts the loop', () => {
     const tiled = tiles({ groups: [group([EXTENT, SMALL_CONTOUR])] });
     expect(tiled).toHaveLength(2);
     for (const tile of tiled) {
-      for (const tileGroup of tile.groups) {
-        if (tileGroup.kind !== 'cnc') throw new Error('Expected a CNC tile group');
-        for (const pass of tileGroup.passes) {
-          expect(pass).not.toHaveProperty('entryPlunge');
-        }
-      }
+      const tileGroup = tile.groups[0];
+      if (tileGroup?.kind !== 'cnc') throw new Error('Expected a CNC tile group');
+      const loopPieces = tileGroup.passes.filter(
+        (pass) => pass.kind === 'contour' && pass.polyline.every((point) => point.y >= 20),
+      );
+      // A tile edge starts at least one piece of the 0.2 mm loop in each tile;
+      // each is shorter than one cut width, so it keeps a disclosed plunge.
+      expect(loopPieces.some((pass) => pass.kind === 'contour' && pass.entryPlunge)).toBe(true);
+      const loopStart = loopPieces.find(
+        (pass) =>
+          pass.kind === 'contour' && pass.polyline[0]?.x === 99.9 && pass.polyline[0]?.y === 20,
+      );
+      if (loopStart !== undefined) expect(loopStart).not.toHaveProperty('entryPlunge');
       const gcode = cncGrblStrategy.emit(tile, DEFAULT_DEVICE_PROFILE);
       expect(gcode).toContain('G1 Z-1.000 F50');
-      expect(gcode).not.toContain('path shorter than one cut width');
+      expect(gcode).toContain('path shorter than one cut width');
     }
   });
 });
