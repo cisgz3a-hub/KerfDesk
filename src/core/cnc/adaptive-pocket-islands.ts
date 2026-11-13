@@ -77,9 +77,70 @@ export function adaptiveIslandSequences(
     }
   const finish = offsetAdaptivePaths(region, -diameterMm / 2, ADAPTIVE_FINISH_ARC_TOLERANCE_MM);
   if (finish === null) return fail('Island adaptive final wall cleanup could not be calculated.');
+  const cleanupRings = [...finish.map(toPolyline), ...seamPasses(finish, xs, ys)];
   return sequences.length === 0
     ? fail('Island adaptive planning found no reachable partitions.')
-    : { ok: true, sequences, cleanupRings: finish.map(toPolyline), partitionCount };
+    : { ok: true, sequences, cleanupRings, partitionCount };
+}
+
+// Shorter stretches of a seam than this are left: the walls' rings already
+// sweep a disk round each end.
+const MIN_SEAM_PASS_MM = 0.01;
+
+/**
+ * One pass along each inner cut line, wherever the bit centre can sit on it.
+ * Each cell is cut on its own, and its finishing ring stops exactly one radius
+ * short of the line, so the seam between two cells was cleared with zero
+ * overlap: a bit 0.01 mm undersize left a full-depth foil along it (CNC audit
+ * v3 N3-P3-1, ADR-154 Amendment 6). Growing the cells instead bit notches into
+ * them beside each island, which split their clearing and refused the plan.
+ * These passes run with the wall cleanup, after all the clearing beside them,
+ * so they meet only what a seam left.
+ */
+function seamPasses(
+  centreRegion: PathsD,
+  xs: ReadonlyArray<number>,
+  ys: ReadonlyArray<number>,
+): Polyline[] {
+  const passes: Polyline[] = [];
+  for (const x of xs.slice(1, -1))
+    for (const [from, to] of lineIntervals(centreRegion, 'x', x))
+      passes.push(openPass({ x, y: from }, { x, y: to }));
+  for (const y of ys.slice(1, -1))
+    for (const [from, to] of lineIntervals(centreRegion, 'y', y))
+      passes.push(openPass({ x: from, y }, { x: to, y }));
+  return passes;
+}
+
+function openPass(from: { x: number; y: number }, to: { x: number; y: number }): Polyline {
+  return { closed: false, points: [from, to] };
+}
+
+// Where the line `axis` = `at` lies inside the region, read even-odd: the
+// region's crossings sorted along the line, paired in turn.
+function lineIntervals(
+  region: PathsD,
+  axis: 'x' | 'y',
+  at: number,
+): ReadonlyArray<readonly [number, number]> {
+  const crossings: number[] = [];
+  for (const path of region)
+    for (let i = 0; i < path.length; i += 1) {
+      const a = path[i];
+      const b = path[(i + 1) % path.length];
+      if (a === undefined || b === undefined) continue;
+      const [ua, va, ub, vb] = axis === 'x' ? [a.x, a.y, b.x, b.y] : [a.y, a.x, b.y, b.x];
+      if (ua <= at === ub <= at) continue;
+      crossings.push(va + ((at - ua) * (vb - va)) / (ub - ua));
+    }
+  crossings.sort((p, q) => p - q);
+  const intervals: Array<readonly [number, number]> = [];
+  for (let i = 0; i + 1 < crossings.length; i += 2) {
+    const from = crossings[i] as number;
+    const to = crossings[i + 1] as number;
+    if (to - from >= MIN_SEAM_PASS_MM) intervals.push([from, to]);
+  }
+  return intervals;
 }
 
 // Whether two inner cut lines cross at a point of stock off every wall.

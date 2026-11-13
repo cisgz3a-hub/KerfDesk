@@ -55,6 +55,12 @@ export type MinFeatureRequest = {
    * bounding box, however small, as one feature (CNC: the bit leaves such a
    * shape out whole; ADR-433 Amendment 3). */
   readonly wholeShapes?: boolean;
+  /** Also report material up to this much WIDER than the threshold, mm. A CNC
+   * planner insets a cleared region by exactly the bit radius, so an area as
+   * wide as the bit collapses to a zero-width centre line and gets no path
+   * (CNC audit v3 N3r-P2-2, ADR-433 Amendment 6). Gaps never take it: the
+   * cuts either side of a gap that wide meet. */
+  readonly widthTieMm?: number;
 };
 
 export type MinFeatureAnalysis = {
@@ -100,6 +106,9 @@ class PairScanner {
   private readonly sides: FeatureSides;
   private readonly stamp: Int32Array;
   private readonly thresholdSq: number;
+  // The threshold plus any width tie. A gap found inside the tie band is
+  // dropped once its side is known.
+  private readonly reachMm: number;
   // The current piece's box grown by the threshold: a cheap first reject.
   private reachMinX = 0;
   private reachMinY = 0;
@@ -113,13 +122,14 @@ class PairScanner {
   ) {
     this.sides = new FeatureSides(index, meter);
     this.stamp = new Int32Array(index.count).fill(-1);
-    this.thresholdSq = request.thresholdMm * request.thresholdMm;
+    this.reachMm = request.thresholdMm + widthTieMm(request);
+    this.thresholdSq = this.reachMm * this.reachMm;
   }
 
   /** False when the budget ran out before every pair was tested. */
   scan(): boolean {
     const index = this.index;
-    const reach = this.request.thresholdMm;
+    const reach = this.reachMm;
     for (let p = 0; p < index.count; p += 1) {
       const ax = num(index.ax, p);
       const ay = num(index.ay, p);
@@ -200,6 +210,7 @@ class PairScanner {
     if (!empty) return true;
     const material = this.isMaterial(p, q, witness, distance / 2);
     if (material === null) return false;
+    if (!material && distance >= this.request.thresholdMm) return true;
     const clusters = material ? this.widthsIfRequested() : this.gapsIfRequested();
     const pinch = arc >= PINCH_ARC_FACTOR * this.request.thresholdMm || this.onWholeShape(p, q);
     clusters?.record(p, q, distance, { px, py, qx, qy }, pinch);
@@ -218,7 +229,17 @@ class PairScanner {
     const width = num(index.pathMaxX, path) - num(index.pathMinX, path);
     const height = num(index.pathMaxY, path) - num(index.pathMinY, path);
     // The widest disk inside a shape fits inside its bounding box.
-    return Math.min(width, height) < this.request.thresholdMm;
+    return Math.min(width, height) < this.reachMm;
+  }
+
+  /** Where a whole shape is recorded; null for none. A shape in the width tie
+   * band counts only as material: a gap that wide is cut. */
+  private wholeShapeClusters(path: number, material: boolean): FeatureClusters | null {
+    if (material) return this.widthsIfRequested();
+    const index = this.index;
+    const width = num(index.pathMaxX, path) - num(index.pathMinX, path);
+    const height = num(index.pathMaxY, path) - num(index.pathMinY, path);
+    return Math.min(width, height) >= this.request.thresholdMm ? null : this.gapsIfRequested();
   }
 
   /** A whole shape no witness pair found (a triangle: each pair of its edges
@@ -236,7 +257,7 @@ class PairScanner {
       if (first >= end || area < WHOLE_SHAPE_MIN_AREA_MM2 || perimeter <= 0) continue;
       const material = this.sides.interiorIsMaterial(path);
       if (material === null) return false;
-      const clusters = material ? this.widthsIfRequested() : this.gapsIfRequested();
+      const clusters = this.wholeShapeClusters(path, material);
       if (clusters === null || clusters.flaggedIn(first, end)) continue;
       const chord = {
         px: num(index.pathMinX, path),
@@ -312,6 +333,11 @@ class PairScanner {
     }
     return true;
   }
+}
+
+function widthTieMm(request: MinFeatureRequest): number {
+  const tie = request.widthTieMm ?? 0;
+  return request.checkWidths && Number.isFinite(tie) && tie > 0 ? tie : 0;
 }
 
 const EMPTY_FINDINGS: MinFeatureFindings = { count: 0, minWidthMm: null, sites: [] };
