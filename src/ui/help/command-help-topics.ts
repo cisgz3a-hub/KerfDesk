@@ -133,6 +133,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Create an interval grid for tuning raster line spacing.',
   },
+  'tools.photo-test-card': {
+    family: 'tools',
+    tooltip: 'Burn a piece of your photo across powers and speeds, then pick the best square.',
+  },
   'tools.tone-calibration': {
     family: 'tools',
     tooltip: 'Burn a grey step wedge and record it, so photos burn true tones on this material.',

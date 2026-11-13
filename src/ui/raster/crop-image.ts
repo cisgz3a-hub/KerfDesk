@@ -81,6 +81,19 @@ export async function cropMaskedRasterImage(
   };
 }
 
+/**
+ * A photo's stored luminance, one byte a pixel, read as a crop reads it: from
+ * its paged asset or embedded luma, else decoded from its source file.
+ */
+export async function readRasterImageLuma(
+  image: RasterImage,
+  repository?: PagedRasterAssetReader,
+): Promise<Uint8Array> {
+  const width = Math.max(1, Math.floor(image.pixelWidth));
+  const height = Math.max(1, Math.floor(image.pixelHeight));
+  return readCropLuma(await hydratePagedRasterImage(image, repository), width, height);
+}
+
 function assertUsableMask(
   image: RasterImage,
   maskObject: SceneObject | null | undefined,

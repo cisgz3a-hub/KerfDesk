@@ -73,7 +73,9 @@ operation. Neither behaviour is suitable for the new selected-photo workflow.
    *Amended by Amendment 1: the source is one read under its own pixel
    ceiling; the working-set budget is the burn grid, masks and display.*
 7. Apply as one Undo step: preserve source pixels and placement, and write the
-   selected photo's tone fields and scoped operation override. Preserve sibling
+   selected photo's tone fields and scoped operation override. *Amended by
+   ADR-711: the override also takes a power and speed picked from a burned
+   Photo Test Card, when the operator chooses one.* Preserve sibling
    images, shared operation settings, existing unrelated overrides and
    sub-operations. Bind the dialog to the exact document epoch, source, operation,
    device and external mask. Cancel changes nothing.

@@ -81,6 +81,7 @@ export type CommandId =
   | 'tools.box-fit-test'
   | 'tools.material-test'
   | 'tools.interval-test'
+  | 'tools.photo-test-card'
   | 'tools.tone-calibration'
   | 'tools.scan-offset-test'
   | 'tools.focus-test'
@@ -283,6 +284,8 @@ export type AppCommandContext = CommandContextSlices & {
   readonly boxFitTest: () => void;
   readonly materialTest: () => void;
   readonly intervalTest: () => void;
+  /** ADR-711: opens the Photo Test Card; generating it asks before replacing the project. */
+  readonly photoTestCard?: () => void;
   /** ADR-670: opens Tone Calibration; generating its wedge asks before replacing the project. */
   readonly toneCalibration?: () => void;
   readonly scanOffsetTest: () => void;

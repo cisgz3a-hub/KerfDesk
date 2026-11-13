@@ -36,6 +36,8 @@ export function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandC
     ...baseCtxAppearance(),
     // ADR-670: optional in the context, so the registry runs without it.
     toneCalibration: vi.fn(),
+    // ADR-711: optional in the context, as Tone Calibration is.
+    photoTestCard: vi.fn(),
     ...overrides,
   } as AppCommandContext;
 }

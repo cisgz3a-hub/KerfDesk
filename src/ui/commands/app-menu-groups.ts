@@ -124,6 +124,7 @@ export const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupL
       ids: [
         'tools.material-test',
         'tools.interval-test',
+        'tools.photo-test-card',
         'tools.tone-calibration',
         'tools.scan-offset-test',
         'tools.focus-test',

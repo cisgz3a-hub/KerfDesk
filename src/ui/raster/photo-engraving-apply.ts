@@ -1,4 +1,5 @@
 import {
+  effectiveObjectPowerPercent,
   effectiveOperationForObject,
   operationOverrideForObject,
 } from '../../core/effective-output';
@@ -46,7 +47,12 @@ export type PhotoEngravingApply = {
   readonly layerPatch: Pick<
     Layer,
     'ditherAlgorithm' | 'linesPerMm' | 'negativeImage' | 'passThrough' | 'photoToneCurve'
-  >;
+  > & {
+    /** ADR-711: the burn power and speed a test card's square ran; omitted
+     * keeps the operation's own. They are set together or not at all. */
+    readonly power?: number;
+    readonly speed?: number;
+  };
 };
 
 /** A delayed preview or Apply never acquires a replacement document, image or operation. */
@@ -104,9 +110,10 @@ export function photoEngravingImage(
     negativeImage: patch.layerPatch.negativeImage,
     passThrough: patch.layerPatch.passThrough,
     ...photoToneCurveOverride(operation, patch.layerPatch.photoToneCurve),
+    ...testedBurnOverride(patch.layerPatch),
   };
   return {
-    ...withSharpening(image, patch.imagePatch),
+    ...withTestedPower(withSharpening(image, patch.imagePatch), patch.layerPatch),
     brightness: patch.imagePatch.brightness,
     contrast: patch.imagePatch.contrast,
     gamma: patch.imagePatch.gamma,
@@ -125,6 +132,27 @@ function withSharpening(image: RasterImage, patch: PhotoEngravingApply['imagePat
     sharpenAmount: patch.sharpenAmount,
     sharpenRadius: patch.sharpenRadius ?? image.sharpenRadius ?? DEFAULT_SHARPEN_RADIUS,
   };
+}
+
+// ADR-711: the picked square's power and speed, for this photo alone.
+function testedBurnOverride(
+  patch: PhotoEngravingApply['layerPatch'],
+): Pick<ObjectOperationSettingsOverride, 'power' | 'speed'> {
+  return patch.power === undefined || patch.speed === undefined
+    ? {}
+    : { power: patch.power, speed: patch.speed };
+}
+
+// The square burned at exactly that power, so the photo's own power multiplier
+// would burn it at another. It returns to 100%, which is no field at all.
+function withTestedPower(
+  image: RasterImage,
+  patch: PhotoEngravingApply['layerPatch'],
+): RasterImage {
+  if (patch.power === undefined || patch.speed === undefined || image.powerScale === undefined)
+    return image;
+  const { powerScale: _powerScale, ...unscaled } = image;
+  return unscaled;
 }
 
 // ADR-670: the photo's own choice. "None" over an operation that carries a
@@ -178,10 +206,22 @@ function matchesCurrentSettings(
     effective.linesPerMm === patch.layerPatch.linesPerMm &&
     effective.negativeImage === patch.layerPatch.negativeImage &&
     effective.passThrough === patch.layerPatch.passThrough &&
+    testedBurnMatches(image, effective, patch.layerPatch) &&
     photoToneCurvesEqual(
       activePhotoToneCurve(effective.photoToneCurve),
       activePhotoToneCurve(patch.layerPatch.photoToneCurve),
     )
+  );
+}
+
+function testedBurnMatches(
+  image: RasterImage,
+  effective: Layer,
+  patch: PhotoEngravingApply['layerPatch'],
+): boolean {
+  if (patch.power === undefined || patch.speed === undefined) return true;
+  return (
+    effectiveObjectPowerPercent(effective, image) === patch.power && effective.speed === patch.speed
   );
 }
 
@@ -218,7 +258,21 @@ export function photoEngravingPatchIsValid({
     DITHER_ALGORITHMS.includes(layerPatch.ditherAlgorithm) &&
     typeof layerPatch.negativeImage === 'boolean' &&
     typeof layerPatch.passThrough === 'boolean' &&
-    (layerPatch.photoToneCurve === undefined || isPhotoToneCurve(layerPatch.photoToneCurve))
+    (layerPatch.photoToneCurve === undefined || isPhotoToneCurve(layerPatch.photoToneCurve)) &&
+    testedBurnPatchIsValid(layerPatch)
+  );
+}
+
+function testedBurnPatchIsValid({ power, speed }: PhotoEngravingApply['layerPatch']): boolean {
+  if (power === undefined && speed === undefined) return true;
+  return (
+    power !== undefined &&
+    speed !== undefined &&
+    Number.isFinite(power) &&
+    power > 0 &&
+    power <= 100 &&
+    Number.isFinite(speed) &&
+    speed > 0
   );
 }
 

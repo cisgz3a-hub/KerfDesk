@@ -72,3 +72,40 @@ function writeRow(
 function composite(channel: number, alpha: number): number {
   return Math.round(channel * alpha + 255 * (1 - alpha));
 }
+
+const GREY_LEVELS = 256;
+const PALETTE_BYTES = GREY_LEVELS * 4;
+const GREY_PIXEL_OFFSET = PIXEL_OFFSET + PALETTE_BYTES;
+
+/**
+ * An 8-bit greyscale BMP: one byte a pixel over a 256-grey palette, a third of
+ * the 24-bit size. For generated greyscale images that are embedded many
+ * times, such as the squares of a Photo Test Card (ADR-711).
+ */
+export function encodeBmp8Grey(
+  luma: Uint8Array,
+  width: number,
+  height: number,
+): Uint8Array<ArrayBuffer> {
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
+    throw new Error('A BMP needs a whole-pixel width and height of at least 1.');
+  }
+  if (luma.length < width * height) throw new Error('The pixel buffer is shorter than the image.');
+  const stride = Math.ceil(width / 4) * 4;
+  const bytes = new Uint8Array(GREY_PIXEL_OFFSET + stride * height);
+  const view = new DataView(bytes.buffer);
+  writeHeaders(view, bytes.length, width, height, stride * height, 96);
+  view.setUint32(10, GREY_PIXEL_OFFSET, true);
+  view.setUint16(28, 8, true);
+  view.setUint32(46, GREY_LEVELS, true);
+  for (let grey = 0; grey < GREY_LEVELS; grey += 1) {
+    bytes.fill(grey, PIXEL_OFFSET + grey * 4, PIXEL_OFFSET + grey * 4 + 3);
+  }
+  for (let y = 0; y < height; y += 1) {
+    bytes.set(
+      luma.subarray(y * width, (y + 1) * width),
+      GREY_PIXEL_OFFSET + (height - 1 - y) * stride,
+    );
+  }
+  return bytes;
+}
