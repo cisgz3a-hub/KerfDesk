@@ -37,11 +37,20 @@ export function finishingStepDown(
   tool: CncTool,
   depthPerPassMm: number,
 ): FinishingStepDown {
-  if (reach.missedCells === 0 || !(depthPerPassMm > 0)) return { passes: [], levels: 0 };
-  const stockTop = missedStockContact(reach, tool);
+  if (!(depthPerPassMm > 0)) return { passes: [], levels: 0 };
+  const stockTop = reach.missedCells === 0 ? null : missedStockContact(reach, tool);
+  const pointed =
+    tool.kind === 'v-bit' || tool.kind === 'engraving' || tool.kind === 'tapered-ball-nose';
   // Finishing keeps one move per straight stretch, so sample every half cell.
   const dense = rows.map((row) => densified(row.points, reach.map.mmPerCell / 2));
-  const tops = dense.map((points) => points.map((p) => stockAt(reach, stockTop, p)));
+  const tops = dense.map((points) =>
+    points.map((p) =>
+      Math.max(
+        stockTop === null ? Number.NEGATIVE_INFINITY : stockAt(reach, stockTop, p),
+        stockUnderTip(reach, p, pointed),
+      ),
+    ),
+  );
   const passes: CncPath3dPass[] = [];
   let levels = 0;
   for (let level = 1; level <= MAX_LEVELS; level += 1) {
@@ -106,6 +115,38 @@ function reachOffsets(
       if (near <= kernel.radiusMm) offsets.push([dx, dy, kernel.surfaceDzAtRadius(near)]);
     }
   return offsets;
+}
+
+// CNC audit v3 N7-P2-1: the stock the previous bit left right under this
+// tip, when that is more than one depth per pass; else nothing. Judged on the bit's own path, so a pointed tip
+// riding down a band's slope is caught whatever its radius one pass up. The
+// highest of the cells round the tip: for a ball or flat tip the four whose
+// centres bracket it; for a pointed tip (tapered ball, V-bit, engraver) the
+// 3 × 3 round its own cell, since the sweep knows roughing's cutter edge only
+// to a cell and a point can sit on uncut stock between centres counted as cut.
+// A ball there would read the allowance strip it side-mills beside a wall.
+function stockUnderTip(reach: ReliefRoughingReach, p: Vec3, pointed: boolean): number {
+  const { map, stock } = reach;
+  const rows = pointed ? aroundCell(p.y / map.mmPerCell) : betweenCentres(p.y / map.mmPerCell);
+  const cols = pointed ? aroundCell(p.x / map.mmPerCell) : betweenCentres(p.x / map.mmPerCell);
+  let top = Number.NEGATIVE_INFINITY;
+  for (const row of rows)
+    for (const col of cols) {
+      const c = Math.min(map.widthCells - 1, Math.max(0, col));
+      const r = Math.min(map.heightCells - 1, Math.max(0, row));
+      top = Math.max(top, stock[r * map.widthCells + c] ?? Number.NEGATIVE_INFINITY);
+    }
+  return top - p.z > reach.underTipLimitMm + RISE_EPS_MM ? top : Number.NEGATIVE_INFINITY;
+}
+
+// The two cell indices whose centres bracket a coordinate (a ball or flat tip
+// spans them), and the 3 around its own cell (a pointed tip, N7-P2-1).
+function betweenCentres(f: number): readonly number[] {
+  return [Math.floor(f - 0.5), Math.floor(f - 0.5) + 1];
+}
+
+function aroundCell(f: number): readonly number[] {
+  return [Math.floor(f) - 1, Math.floor(f), Math.floor(f) + 1];
 }
 
 function densified(points: ReadonlyArray<Vec3>, stepMm: number): ReadonlyArray<Vec3> {

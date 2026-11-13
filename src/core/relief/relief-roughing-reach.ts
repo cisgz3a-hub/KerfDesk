@@ -42,6 +42,10 @@ export type ReliefRoughingReach = {
   readonly missedCells: number;
   readonly missedAreaMm2: number;
   readonly thresholdMm: number;
+  // CNC audit v3 N7-P2-1: the most stock the next bit may meet under its tip,
+  // one depth per pass. More than this under the tip along the bit's own path
+  // is stepped down whatever the region test said.
+  readonly underTipLimitMm: number;
 };
 
 export type ReliefRoughingReachResult =
@@ -92,6 +96,7 @@ export function reliefRoughingReach(
       missedCells,
       missedAreaMm2: missedCells * map.mmPerCell * map.mmPerCell,
       thresholdMm,
+      underTipLimitMm: Math.max(0, options.depthPerPassMm),
     },
   };
 }

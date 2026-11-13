@@ -26,7 +26,7 @@ export function reliefRoughingReachWarnings(
       ];
     }
     const areaMm2 = plan.roughingMissedAreaMm2;
-    if (areaMm2 === undefined || areaMm2 <= 0) return [];
+    if (areaMm2 === undefined || areaMm2 <= 0) return underTipWarnings(where, plan, plans);
     const missed =
       `${where}: the ${plan.toolDiameterMm} mm roughing bit cannot reach about ` +
       `${Math.max(1, Math.round(areaMm2))} mm² of the relief and leaves it more than one ` +
@@ -55,6 +55,30 @@ export function reliefRoughingReachWarnings(
         'finishing feed, before its finishing pass. A smaller roughing bit clears it faster.',
     ];
   });
+}
+
+// CNC audit v3 N7-P2-1: no region was missed, but the finishing bit's own
+// path still meets more than a complete pass of stock under its tip (a pointed
+// bit down a band's slope), so it steps down there too: say so.
+function underTipWarnings(
+  where: string,
+  roughing: CncReliefPlan,
+  plans: ReadonlyArray<CncReliefPlan>,
+): ReadonlyArray<string> {
+  const finishing = plans.find(
+    (other) =>
+      other.stage === 'finishing' &&
+      other.layerId === roughing.layerId &&
+      other.targetObjectId === roughing.targetObjectId,
+  );
+  const levels = finishing?.finishingStepLevels ?? 0;
+  if (finishing === undefined || levels === 0) return [];
+  return [
+    `${where}: the ${roughing.toolDiameterMm} mm roughing bit leaves more than one depth per pass ` +
+      `under the ${bitName(finishing)} finishing bit's path in places. The finishing bit cuts ` +
+      `that first in ${levels} step-down ${levels === 1 ? 'level' : 'levels'} of one depth per ` +
+      'pass, at the finishing feed, before its finishing pass.',
+  ];
 }
 
 // Rolling audit v12 X6-P2-2: the finishing bit's own misses, which the rest
