@@ -18,6 +18,7 @@ import {
   useRuidaNetworkStore,
   type RuidaNetworkJob,
 } from './ruida-network-store';
+import { testLinkJobOutcome } from '../link-job-outcome-test-helpers';
 
 /** `lines` horizontal 10 mm lines, 1 mm apart, shifted by `offsetX`. */
 function project(lines = 1, offsetX = 0): Project {
@@ -54,7 +55,11 @@ function project(lines = 1, offsetX = 0): Project {
 function job(source: Project): RuidaNetworkJob {
   const result = emitRdFile(source);
   if (!result.ok) throw new Error(result.messages.join('\n'));
-  return { bytes: result.bytes, footprint: result.footprint, advisories: ['A warning.'] };
+  return {
+    bytes: result.bytes,
+    footprint: result.footprint,
+    ...testLinkJobOutcome(['A warning.']),
+  };
 }
 
 const store = () => useRuidaNetworkStore.getState();

@@ -50,7 +50,7 @@ export function useMachineSetupSave(input: {
   const rows = useLaserStore((store) => store.grblSettingsRows);
   const writeGrblSetting = useLaserStore((store) => store.writeGrblSetting);
   const laserJob = useLaserStore((store) => isActiveJobStatus(store.streamer?.status ?? null));
-  // A Moshi or Ruida link job too: a profile change would unmount its Abort.
+  // A Moshi, K40 or Ruida link job too: a profile change would unmount its Abort.
   const linkJob = useLinkMachineWorkStore((store) => activeLinkMachineWork(store) !== null);
   const lockedByJob = laserJob || linkJob;
   const pushToast = useToastStore((store) => store.pushToast);

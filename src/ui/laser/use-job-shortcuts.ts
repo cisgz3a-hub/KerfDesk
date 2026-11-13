@@ -94,7 +94,7 @@ function stopShortcutAction(
   laser: LaserSnapshot,
 ): { readonly label: string; readonly run: () => Promise<void> } | null {
   if (isActiveJob(laser.streamer)) return { label: 'Abort', run: () => laser.stopJob() };
-  // A Moshi or Ruida link job: its own stop, as the Live Motion bar offers it
+  // A Moshi, K40 or Ruida link job: its own stop, as the Live Motion bar offers it
   // (code quality audit C2 D1-P2-5; ADR-705 Amendment 3).
   const link = activeLinkMachineWork();
   if (link !== null) return { label: 'Abort', run: link.abort };
