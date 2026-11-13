@@ -74,10 +74,15 @@ export function reportDependencyRepairs(
     ReturnType<typeof repairDanglingObjectDependencies>,
     'repairedImageMasks' | 'repairedPathTextGuides'
   >,
-  reason: 'deleted' | 'unavailable-vector' = 'deleted',
+  reason: 'deleted' | 'unavailable-vector' | 'replaced' = 'deleted',
 ): void {
   const messages: string[] = [];
-  const cause = reason === 'deleted' ? 'was deleted' : 'is no longer available as a vector';
+  const cause =
+    reason === 'deleted'
+      ? 'was deleted'
+      : reason === 'replaced'
+        ? 'was merged into a new shape'
+        : 'is no longer available as a vector';
   if (repair.repairedImageMasks > 0) {
     messages.push(
       `${repair.repairedImageMasks} image mask reference${repair.repairedImageMasks === 1 ? '' : 's'} was removed because its mask artwork ${cause}. The image remains editable and unmasked.`,

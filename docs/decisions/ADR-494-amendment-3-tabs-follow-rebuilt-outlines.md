@@ -2,6 +2,9 @@
 
 **Status:** Accepted; software-verified through unit and UI tests. | **Date:** 2026-10-29
 
+**Amended by ADR-350 Amendment 2 (2026-11-14):** Union Silhouette gives the same notice ("Placed
+tabs on the unioned shapes were removed. Undo restores them.").
+
 Amends ADR-494 Amendment 2, which keeps placed tabs in place through Edit nodes **Delete** and
 **Radius / Fillet**. Three more edits rebuild or restart an outline and either moved tabs placed
 by hand or dropped them without a word. Output changes only where one of these edits used to move

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Scene } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
+import { vectorRepairSources } from '../state/vector-repair-sources';
 import { unionSilhouetteOperations } from './selection-command-state';
 
 export function UnionSilhouetteDialog(props: {
@@ -10,6 +11,7 @@ export function UnionSilhouetteDialog(props: {
   readonly onApply: (operationId: string) => void;
 }): JSX.Element {
   const operations = unionSilhouetteOperations(props.scene, props.selectedIds);
+  const leftOut = vectorRepairSources(props.scene, props.selectedIds)?.notice ?? '';
   const [chosenId, setChosenId] = useState(operations[0]?.id ?? '');
   const canApply = operations.some((operation) => operation.id === chosenId);
   return (
@@ -43,6 +45,7 @@ export function UnionSilhouetteDialog(props: {
       <p>
         The result uses only this operation's settings. Individual artwork settings are replaced.
       </p>
+      {leftOut === '' ? null : <p role="note">{leftOut}</p>}
       {!canApply ? (
         <p role="status">Select closed, unlocked vector shapes and choose a result operation.</p>
       ) : null}

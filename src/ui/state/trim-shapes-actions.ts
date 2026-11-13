@@ -21,6 +21,7 @@ import {
   type Vec2,
 } from '../../core/scene';
 import { autoJoinTrimmed, preservedStretch } from './trim-shapes-extras';
+import { geometryToolSkippedNotice, geometryToolSources } from './geometry-tool-sources';
 import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
 import { synchronizePolylineShapeGeometry } from './path-node-shape-sync';
 import { removeObjectIdsFromGroups } from './scene-group-actions';
@@ -70,6 +71,15 @@ function trimShapeMutation(
   if (target === null || object === undefined || !isUnlockedVectorArtwork(object)) return state;
   if (isBooleanCompoundObject(object)) {
     notify('Edit compound sources or Expand before trimming the result.');
+    return state;
+  }
+  // A trim turns text and barcodes into plain paths from their stored outlines,
+  // which for variable data are the template (ADR-350 Amendment 2).
+  const leftOut = geometryToolSkippedNotice(
+    geometryToolSources(scene, [object], 'variable').skipped,
+  );
+  if (leftOut !== '') {
+    notify(leftOut);
     return state;
   }
   const edit = trimEdit(object, target);
