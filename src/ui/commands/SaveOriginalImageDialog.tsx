@@ -4,7 +4,11 @@
 import { useState } from 'react';
 import { create } from 'zustand';
 import type { RasterImage } from '../../core/scene';
-import { saveOriginalImage, type OriginalImageFormat } from '../app/save-original-image';
+import {
+  imageEditedInProject,
+  saveOriginalImage,
+  type OriginalImageFormat,
+} from '../app/save-original-image';
 import { usePlatform } from '../app/platform-context';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useToastStore } from '../state/toast-store';
@@ -43,10 +47,18 @@ function SaveOriginalImageDialog(props: { readonly image: RasterImage }): JSX.El
         void saveOriginalImage({ platform, image: props.image, format, pushToast });
       }}
     >
-      <p className="lf-dialog-body">
-        Saves {props.image.source} as it is in the project, before any operation's dithering,
-        adjustments or mask. Use Save Processed Bitmap for what the laser engraves.
-      </p>
+      {imageEditedInProject(props.image) ? (
+        <p className="lf-dialog-body">
+          {props.image.source} was cropped or edited in this project, and the imported file is no
+          longer stored: this saves the image as it is now, under a new name. Use Save Processed
+          Bitmap for what the laser engraves.
+        </p>
+      ) : (
+        <p className="lf-dialog-body">
+          Saves {props.image.source} as it is in the project, before any operation's dithering,
+          adjustments or mask. Use Save Processed Bitmap for what the laser engraves.
+        </p>
+      )}
       <label className="lf-field">
         <span>Format</span>
         <select
