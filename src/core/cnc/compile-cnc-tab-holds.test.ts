@@ -8,118 +8,23 @@
 // the planner.
 
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE, toMachineCoords } from '../devices';
-import { cncGrblStrategy } from '../output/cnc-grbl-strategy';
-import {
-  DEFAULT_CNC_LAYER_SETTINGS,
-  DEFAULT_CNC_MACHINE_CONFIG,
-  IDENTITY_TRANSFORM,
-  createLayer,
-  type CncLayerSettings,
-  type ImportedSvg,
-  type Polyline,
-} from '../scene';
+import type { Polyline } from '../scene';
 import { seedCncTabAnchors } from './cnc-tab-anchors';
-import { compileCncJob } from './compile-cnc-job';
 import {
-  deepestZWithin,
-  feedSegments,
-  throughCut,
-  type Box,
-  type FeedSegment,
-} from './tab-bridge-measure.test-support';
-
-const COLOR = '#ff0000';
-const DEVICE = DEFAULT_DEVICE_PROFILE;
-const BIT = 3.175;
-const QUARTER = 6.35;
-// Through 6.35 mm stock at 2 mm a pass; the default 2 mm tab tops out at -4.35.
-const THROUGH: Partial<CncLayerSettings> = { depthMm: 6.35, depthPerPassMm: 2 };
-const TAB_TOP = -4.35;
-
-function square(x: number, y: number, size: number): Polyline {
-  return rectangle(x, y, size, size);
-}
-
-function rectangle(x: number, y: number, width: number, height: number): Polyline {
-  return {
-    closed: true,
-    points: [
-      { x, y },
-      { x: x + width, y },
-      { x: x + width, y: y + height },
-      { x, y: y + height },
-    ],
-  };
-}
-
-function circle(cx: number, cy: number, diameter: number): Polyline {
-  return {
-    closed: true,
-    points: Array.from({ length: 128 }, (_, index) => {
-      const angle = (index / 128) * Math.PI * 2;
-      return { x: cx + (diameter / 2) * Math.cos(angle), y: cy + (diameter / 2) * Math.sin(angle) };
-    }),
-  };
-}
-
-function art(polylines: ReadonlyArray<Polyline>, extra: Partial<ImportedSvg> = {}): ImportedSvg {
-  return {
-    kind: 'imported-svg',
-    id: 'art',
-    source: 'art.svg',
-    bounds: { minX: 0, minY: 0, maxX: 300, maxY: 300 },
-    transform: IDENTITY_TRANSFORM,
-    paths: [{ color: COLOR, polylines: [...polylines] }],
-    ...extra,
-  };
-}
-
-function compiled(objects: ReadonlyArray<ImportedSvg>, cnc: Partial<CncLayerSettings>) {
-  const layer = {
-    ...createLayer({ id: 'L1', color: COLOR }),
-    cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, ...THROUGH, ...cnc },
-  };
-  const job = compileCncJob(
-    { objects: [...objects], layers: [layer] },
-    DEVICE,
-    DEFAULT_CNC_MACHINE_CONFIG,
-  );
-  return { job, segments: feedSegments(cncGrblStrategy.emit(job, DEVICE)) };
-}
-
-// The design-space box around a shape, in the machine coordinates the program uses.
-function machineBox(x: number, y: number, width: number, height: number, margin = 6): Box {
-  const corners = [
-    toMachineCoords({ x: x - margin, y: y - margin }, DEVICE),
-    toMachineCoords({ x: x + width + margin, y: y + height + margin }, DEVICE),
-  ];
-  return {
-    minX: Math.min(...corners.map((point) => point.x)),
-    maxX: Math.max(...corners.map((point) => point.x)),
-    minY: Math.min(...corners.map((point) => point.y)),
-    maxY: Math.max(...corners.map((point) => point.y)),
-  };
-}
-
-function holeBox(cx: number, cy: number, diameter: number): Box {
-  return machineBox(cx - diameter / 2, cy - diameter / 2, diameter, diameter, -0.01);
-}
-
-// Tab walls climbed from the full depth: one per tab on the deepest level.
-function tabRises(segments: ReadonlyArray<FeedSegment>, box: Box): number {
-  return segments.filter(
-    ({ a, b }) =>
-      a.x === b.x &&
-      a.y === b.y &&
-      Math.abs(a.z + 6.35) < 1e-6 &&
-      b.z > a.z &&
-      a.x >= box.minX &&
-      a.x <= box.maxX &&
-      a.y >= box.minY &&
-      a.y <= box.maxY,
-  ).length;
-}
+  BIT,
+  COLOR,
+  QUARTER,
+  TAB_TOP,
+  art,
+  circle,
+  compiled,
+  holeBox,
+  machineBox,
+  rectangle,
+  square,
+  tabRises,
+} from './compile-cnc-tab-holds.test-support';
+import { deepestZWithin, throughCut, type FeedSegment } from './tab-bridge-measure.test-support';
 
 describe('J1-P1-1: small holes and parts still cut through', () => {
   it('cuts 8 and 12 mm holes in a plate, and a 6 mm part beside it, through', () => {

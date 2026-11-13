@@ -95,8 +95,10 @@ const WARNINGS: Readonly<Record<Kind, (m: Message) => string>> = {
     'Edit positions, or use narrower tabs.',
   'closed-gap': ({ shapes, w, layer, cut }) =>
     `${layer}${shapes.length} open ${w.outlines} (${sizes(shapes)}) ` +
-    `${w.ends} closer to ${w.its} start than the ${cut} cut width, ` +
-    `so the bit cuts ${w.it} free like a closed shape. ` +
+    // ADR-258 Amendment 7: also an outline just over one cut width short, held
+    // only by a sliver thinner than a tab (N7-P1-2).
+    `${w.ends} so close to ${w.its} start that the ${cut} cut leaves less across the gap than ` +
+    `a tab holds, so the cut frees ${w.it} like a closed shape. ` +
     `${w === ONE ? 'It is' : 'They are'} given holding tabs as closed shapes; close ` +
     `${w.it} with Tools > Join paths to edit ${w.its} tabs.`,
 };

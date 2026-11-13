@@ -31,6 +31,7 @@ import {
   type TabRampSettings,
 } from './cnc-tab-ramp';
 import { modulo, pointAtDistance, tabLoop, type TabPlan } from './cnc-tab-placement';
+import { cutFreesOpenOutline, planClearOfGap } from './cnc-open-outline-tabs';
 import { maxOf, minOf } from '../util';
 
 const EPS = 1e-9;
@@ -89,14 +90,16 @@ function tabbedLoop(
   tabs: { readonly manual: ReadonlyArray<number> | undefined; readonly count: number },
 ): TabbedLoop | null {
   const open = !toolpath.closed;
-  if (open && !bitClosesOutline(toolpath, cutWidthMm)) return null;
+  if (open && !cutFreesOpenOutline(toolpath, settings, cutWidthMm)) return null;
   const loop: Polyline = open ? { ...toolpath, closed: true } : toolpath;
   const rampSettings: TabRampSettings = {
     tabWidthMm: settings.tabWidthMm,
     tabsPerShape: tabs.count,
     toolDiameterMm: cutWidthMm,
   };
-  const plan = tabPlanForToolpath(loop, rampSettings, open ? undefined : tabs.manual);
+  const planned = tabPlanForToolpath(loop, rampSettings, open ? undefined : tabs.manual);
+  // Amendment 7: an open outline's tabs keep off its gap, where nothing is cut.
+  const plan = open && planned !== null ? planClearOfGap(loop, planned, cutWidthMm) : planned;
   if (open || plan === null) return { toolpath, loop, open, plan, rampSettings };
   const started = startingInTab(toolpath, plan);
   return { toolpath: started.loop, loop: started.loop, open, plan: started.plan, rampSettings };
@@ -133,19 +136,6 @@ function startingInTab(
     loop: { ...toolpath, points: rotated },
     plan: { ...plan, centers: plan.centers.map((center) => modulo(center - offset, perimeter)) },
   };
-}
-
-// An open outline whose ends lie closer than the cut width, around an area
-// larger than the bit's own footprint: the bit sweeps its gap, so it frees what
-// it outlines just as a closed loop does.
-function bitClosesOutline(toolpath: Polyline, cutWidthMm: number): boolean {
-  const first = toolpath.points[0];
-  const last = toolpath.points[toolpath.points.length - 1];
-  if (toolpath.points.length < 3 || first === undefined || last === undefined) return false;
-  const gapMm = Math.hypot(last.x - first.x, last.y - first.y);
-  return (
-    gapMm < cutWidthMm - EPS && Math.abs(signedAreaMm2(toolpath.points)) > cutWidthMm * cutWidthMm
-  );
 }
 
 function appendLevel(
