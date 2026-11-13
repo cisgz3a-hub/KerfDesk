@@ -12,4 +12,12 @@ export type CncTile = {
 export type TiledJob = {
   readonly tile: CncTile;
   readonly job: Job;
+  /** The registration bores this tile drills (stock and tile coordinates). */
+  readonly registrationHoles?: ReadonlyArray<TileRegistrationHole>;
+};
+
+/** One registration bore, where it sits on the stock and in the tile file. */
+export type TileRegistrationHole = {
+  readonly stock: { readonly x: number; readonly y: number };
+  readonly tile: { readonly x: number; readonly y: number };
 };

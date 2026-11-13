@@ -168,8 +168,10 @@ describe('tileJobs clipping', () => {
     if (result.kind !== 'ready') throw new Error('expected ready tiles');
     expect(result.advisories).toEqual(
       expect.arrayContaining([
-        expect.stringContaining('not a re-verified emitted maximum'),
-        expect.stringContaining('begins with a direct plunge'),
+        expect.stringContaining('Tiled V-carve ramp entries'),
+        expect.stringContaining(
+          'still start with a straight plunge below the stock top, at the plunge feed: 2 pieces of V-carve.',
+        ),
       ]),
     );
     const clipped = result.tiles
@@ -223,11 +225,11 @@ describe('tileJobs clipping', () => {
     expect(pass?.kind === 'path3d' ? pass.entryRamp : undefined).toBe(true);
   });
 
-  it('does not add a ramp advisory to an ordinary tiled contour', () => {
+  it('does not add a ramp or entry advisory to an ordinary tiled contour', () => {
     const result = tileJobs(lineJob(0, 50, 40), TILING);
     expect(result).toMatchObject({ kind: 'ready' });
     if (result.kind !== 'ready') return;
-    expect(result.advisories).toBeUndefined();
+    expect((result.advisories ?? []).filter((line) => /ramp|plunge/.test(line))).toEqual([]);
   });
 
   it('clips arc passes as sampled contour pieces per tile', () => {

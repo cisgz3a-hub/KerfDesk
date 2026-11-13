@@ -7457,6 +7457,14 @@ and lifts the command's CNC-only gate.)*
    cut width or cannot descend at coordinate precision remains disclosed in
    each affected tile's G-code header, including tabbed path3d output. Split
    fragments count separately in that tile's plunge advisory.
+   A piece that a tile edge starts gets its operation's entry (ADR-392
+   Amendment 7): a ramp entry ramps in along the piece; a helical pocket's
+   pieces ramp in at the helix's slope, descending at the plunge feed; an
+   Outside or Inside profile's pieces ramp in at 3° instead of plunging on the
+   cutter line (the layer's lead stays where the loop starts). The tiled save
+   names, by operation, the pieces that ramp in and any that still plunge
+   (V-carve detail, tabbed rings, paths too short to ramp), and how much
+   cutting the overlap strips repeat.
 3. With registration holes on, **Configure registration** starts a separate
    saved plan from the current default cutter and operation cutting values.
    Review its cutter, hole diameter, depth, depth per pass, feed, plunge and
@@ -7469,7 +7477,13 @@ and lifts the command's CNC-only gate.)*
    load; migration does not invent a registration recipe.
 4. Matching flat end mills peck to the requested depth; smaller flat end mills
    clear concentric circles at each depth step. Adjacent tiles use identical
-   stock-space centers in the overlap strip. Registration joins clearing work
+   stock-space centers in the overlap strip. Each seam's two bores go where the
+   strip is clear of every part and cut and on the stock (its margin at the
+   seam's ends included), as far apart as fits (ADR-392 Amendment 7). A seam
+   with no clear spot gets no bore and the save names it; a seam with one gets
+   one bore and a warning that it does not square the stock. Preview draws the
+   planned bores in purple and lists them; the save lists them by tile, and
+   each tile file's header names its bores. Registration joins clearing work
    before profiles **within each tile**. This does not establish global
    order across separately run indexed files: earlier files may already have
    completed profiles. Cutter suitability and workholding remain operator

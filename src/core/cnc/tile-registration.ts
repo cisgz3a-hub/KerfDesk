@@ -9,38 +9,40 @@ import { coolantFields } from './coolant-fields';
 import { parkFields } from './motion-polish';
 import type { ResolvedTileRegistration } from './tile-registration-plan';
 import { tileRegistrationPasses } from './tile-registration-passes';
+import { TILE_REGISTRATION_LAYER_ID } from './tile-registration-placement';
 
 /** @deprecated Legacy nominal depth; emitted holes use the saved registration plan. */
 export const REGISTRATION_HOLE_DEPTH_MM = 3;
 
-const REGISTRATION_HOLE_EDGE_FRACTIONS = [0.25, 0.75];
+// At most two bores per seam (tile-registration-placement.ts).
+const REGISTRATION_HOLES_PER_SEAM = 2;
 
 /** Exact maximum over this regular grid, before any bore passes are allocated. */
 export function maximumRegistrationHolesPerTile(grid: EffectiveCncTileGrid): number {
   const horizontalSeams = Math.min(2, grid.work.columns - 1);
   const verticalSeams = Math.min(2, grid.work.rows - 1);
-  return REGISTRATION_HOLE_EDGE_FRACTIONS.length * (horizontalSeams + verticalSeams);
+  return REGISTRATION_HOLES_PER_SEAM * (horizontalSeams + verticalSeams);
 }
 
 /**
- * Build the registration drill group for one tile from the same effective
- * grid that placed its clipping rectangle.
+ * Build the registration drill group for one tile from the bores its seams
+ * share (stock coordinates, placed by placeTileRegistrationHoles so they miss
+ * every part, every cut and the board edge).
  */
 export function registrationGroupForTile(
   tile: CncTile,
-  grid: EffectiveCncTileGrid,
+  centers: ReadonlyArray<Vec2>,
   registration: ResolvedTileRegistration,
   machine: CncMachineConfig,
   device: DeviceProfile,
 ): CncGroup | null {
-  const centers = seamHoleCenters(tile, grid);
   if (centers.length === 0) return null;
   const { tool, settings } = registration;
   const isPeck = settings.holeDiameterMm === tool.diameterMm;
   const maxFeed = cncMaxFeedMmPerMin(device, machine.params);
   return {
     kind: 'cnc',
-    layerId: 'tile-registration',
+    layerId: TILE_REGISTRATION_LAYER_ID,
     color: '#7c3aed',
     cutType: isPeck ? 'drill' : 'pocket',
     toolId: tool.id,
@@ -70,23 +72,4 @@ export function registrationGroupForTile(
       ),
     ),
   };
-}
-
-function seamHoleCenters(tile: CncTile, grid: EffectiveCncTileGrid): ReadonlyArray<Vec2> {
-  const { rect } = tile;
-  const halfOverlapMm = grid.geometry.overlapMm / 2;
-  const centers: Vec2[] = [];
-  for (const fraction of REGISTRATION_HOLE_EDGE_FRACTIONS) {
-    const y = rect.minY + (rect.maxY - rect.minY) * fraction;
-    if (tile.col < grid.work.columns - 1) {
-      centers.push({ x: rect.maxX - halfOverlapMm, y });
-    }
-    if (tile.col > 0) centers.push({ x: rect.minX + halfOverlapMm, y });
-    const x = rect.minX + (rect.maxX - rect.minX) * fraction;
-    if (tile.row < grid.work.rows - 1) {
-      centers.push({ x, y: rect.maxY - halfOverlapMm });
-    }
-    if (tile.row > 0) centers.push({ x, y: rect.minY + halfOverlapMm });
-  }
-  return centers;
 }
