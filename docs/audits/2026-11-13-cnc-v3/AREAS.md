@@ -34,6 +34,7 @@ Finding IDs are `N<area>-P<n>-<k>`. Severity follows [METHOD.md §3](../2026-10-
 | N5 | `cnc-machine-run` | the program on the GRBL simulator with the kinematic clock (#1863): bit-change holds and multi-tool, park, Z-zero and probing, Abort mid-cut, resume or restart from a line, rapids into uncut stock, the ETA against simulated time | Simulated controllers only. Each job runs to completion and is interrupted at chosen points; position, spindle and stock state are checked after each event |
 | N6 | `cnc-review-truth` | Job Review warnings and ETA, the material and bit catalogue (feeds, speeds, chip load), output precision, CNC rotary and wrap | Every warning traced to the condition it claims; catalogue feeds checked against chip-load arithmetic; each CNC rotary job compared with its flat twin |
 | N7 | `cnc-fix-verify` | every N1–N6 fix and the maintainer's three decisions (#1878, #1884, #1885, #1889, #1891–#1895, #1897, #1898) | Added 2026-11-13 at the maintainer's choice ("Start both cards, then verify"). The earlier auditors' and refuters' own repros re-run on main, byte comparisons against the trees before each fix, and new probes for regressions. |
+| N8 | `n7-fix-verify` | #1901, #1903, #1904 | N7-P1-1, N7-P1-2, N7-P2-1, N7-P3-1, N7-P3-2 | Added 2026-11-14 at the maintainer's choice ("Verify N7 fixes + CNC P3 sweep"). N7's repros on main, byte comparisons against the tree before each fix, gap sweeps on both bits, and relief surfaces × bits on two stock models. |
 
 ## Rules
 
@@ -47,4 +48,4 @@ Finding IDs are `N<area>-P<n>-<k>`. Severity follows [METHOD.md §3](../2026-10-
 
 J1's G-code oracle can be reused as a second reader: `../2026-11-11-cnc-v2/evidence/oracle.ts.txt`. An auditor and its refuter must not both rely on it.
 
-**Status:** DONE 2026-11-14. N1–N7 ledgered; see the [round result](LEDGER.md#round-result-2026-11-13).
+**Status:** N1–N8 ledgered (2026-11-14); see the [round result](LEDGER.md#round-result-2026-11-13). The CNC P3 sweep is running.
