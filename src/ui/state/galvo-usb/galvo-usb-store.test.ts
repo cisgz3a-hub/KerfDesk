@@ -33,6 +33,7 @@ import { galvoTiming } from './galvo-usb-run';
 import { GALVO_FRAME_FIRST } from './galvo-usb-messages';
 import { resetGalvoUsbStoreForTests, useGalvoUsbStore, type GalvoUsbJob } from './galvo-usb-store';
 import type { GalvoUsbAdapter } from './galvo-usb-types';
+import { activeLinkMachineWork, resetLinkMachineWorkForTests } from '../link-machine-work';
 
 const DEVICE = GENERIC_JCZ_GALVO_PROFILES[0] as DeviceProfile;
 
@@ -81,6 +82,7 @@ beforeEach(() => {
   galvoTiming.pollMs = 0;
   galvoTiming.sleep = () => new Promise((resolve) => setTimeout(resolve, 0));
   resetGalvoUsbStoreForTests();
+  resetLinkMachineWorkForTests();
 });
 
 afterEach(() => {
@@ -160,8 +162,11 @@ describe('galvo USB store', () => {
     const started = state().start(job());
     await vi.waitFor(() => expect(sim.isRunning).toBe(true));
     await vi.waitFor(() => expect(state().listState).toBe('running'));
+    // The app-wide guards (Ctrl+., close, Update) see the galvo job.
+    expect(activeLinkMachineWork()).toMatchObject({ controller: 'Galvo', activity: 'running' });
     await state().pause();
     expect(state().phase).toBe('paused');
+    expect(activeLinkMachineWork()?.activity).toBe('paused');
     expect(sim.sent(LMC_STOP_LIST)).toHaveLength(1);
     expect(sim.isPaused).toBe(true);
     await state().resume();
@@ -174,6 +179,7 @@ describe('galvo USB store', () => {
     expect(sim.isRunning).toBe(false);
     expect(state().phase).toBe('idle');
     expect(state().message).toContain('Stop Execute acknowledged');
+    expect(activeLinkMachineWork()).toBeNull();
     expect(sim.sent(LMC_EXECUTE_LIST).length).toBeGreaterThanOrEqual(2);
   });
 

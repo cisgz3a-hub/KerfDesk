@@ -99,7 +99,7 @@ read for this decision:
 
 5. **A separate USB link and store.** The driver stays `transport: 'file-only'` for the line store,
    with a separate `galvoUsb` capability object (`JCZ_GALVO_USB_CAPABILITIES`). The galvo store
-   (`ui/state/jcz-usb/`) drives ADR-702's `UsbLinkSession` through `LmcLink`: one exchange at a
+   (`ui/state/galvo-usb/`) drives ADR-702's `UsbLinkSession` through `LmcLink`: one exchange at a
    time; a reply deadline of 2 s; Write Cor Line and list packets unread, as MeerK40t sends them.
    Connect shows the browser's or desktop's device chooser for 9588:9899 and runs `init_laser` with
    MeerK40t's defaults, sending the optional `.cor` table chosen for that connection. The table

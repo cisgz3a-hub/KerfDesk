@@ -14,7 +14,12 @@ import { isActiveJob } from './laser-store-helpers';
 /** Every controller-link store, in the order the bar picks one. Each must
  *  report its work here (link-machine-work.test.ts checks the stores); the
  *  K40 link was missed once (code quality audit C2 D4-P1-1). */
-export const LINK_MACHINE_SOURCES = ['moshi-usb', 'lihuiyu-usb', 'ruida-network'] as const;
+export const LINK_MACHINE_SOURCES = [
+  'moshi-usb',
+  'lihuiyu-usb',
+  'galvo-usb',
+  'ruida-network',
+] as const;
 
 export type LinkMachineSource = (typeof LINK_MACHINE_SOURCES)[number];
 

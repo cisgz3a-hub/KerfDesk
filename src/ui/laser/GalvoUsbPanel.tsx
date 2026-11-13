@@ -8,7 +8,7 @@ import { selectControllerDriver } from '../../core/controllers';
 import type { PlatformAdapter } from '../../platform/types';
 import { usePlatform } from '../app/platform-context';
 import { useStore } from '../state';
-import type { GalvoUsbAdapter } from '../state/jcz-usb/galvo-usb-types';
+import type { GalvoUsbAdapter } from '../state/galvo-usb/galvo-usb-types';
 
 const GalvoUsbDetails = lazy(() => import('../jcz-usb/GalvoUsbDetails'));
 

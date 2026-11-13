@@ -7,10 +7,10 @@
 import { useState } from 'react';
 import { readCorFile, type LmcCorrectionTable } from '../../core/controllers/jcz/lmc-cor-file';
 import { useStore } from '../state';
-import { prepareGalvoUsbJob } from '../state/jcz-usb/galvo-usb-job';
-import { GALVO_NOT_QUALIFIED, galvoListStateText } from '../state/jcz-usb/galvo-usb-messages';
-import { useGalvoUsbStore, type GalvoUsbState } from '../state/jcz-usb/galvo-usb-store';
-import type { GalvoUsbAdapter } from '../state/jcz-usb/galvo-usb-types';
+import { prepareGalvoUsbJob } from '../state/galvo-usb/galvo-usb-job';
+import { GALVO_NOT_QUALIFIED, galvoListStateText } from '../state/galvo-usb/galvo-usb-messages';
+import { useGalvoUsbStore, type GalvoUsbState } from '../state/galvo-usb/galvo-usb-store';
+import type { GalvoUsbAdapter } from '../state/galvo-usb/galvo-usb-types';
 
 export default function GalvoUsbDetails({
   adapter,

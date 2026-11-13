@@ -23,6 +23,11 @@ import { errorMessage } from '../../../core/util/error-message';
 import { GALVO_FRAME_FIRST, galvoStopOutcome } from './galvo-usb-messages';
 import { runGalvoProgram, type GalvoLive } from './galvo-usb-run';
 import type { GalvoUsbAdapter, GalvoUsbSession } from './galvo-usb-types';
+import {
+  reportLinkMachineStatus,
+  reportLinkMachineWork,
+  type LinkMachineWork,
+} from '../link-machine-work';
 
 export type GalvoUsbPhase =
   | 'disconnected'
@@ -236,3 +241,32 @@ export function resetGalvoUsbStoreForTests(): void {
   live = null;
   useGalvoUsbStore.setState({ ...DISCONNECTED, message: '', tone: 'info' });
 }
+
+// Active work is reported where the always-mounted guards (Ctrl+., the Live
+// Motion bar, close and update, project replacement) can see it without
+// loading this store (link-machine-work.ts; ADR-705 Amendment 3).
+const ACTIVE_WORK: Partial<Record<GalvoUsbPhase, LinkMachineWork['activity']>> = {
+  framing: 'framing',
+  running: 'running',
+  paused: 'paused',
+  stopping: 'stopping',
+};
+
+useGalvoUsbStore.subscribe((state) => {
+  const activity = ACTIVE_WORK[state.phase];
+  reportLinkMachineStatus('galvo-usb', {
+    connected: state.phase !== 'disconnected' && state.phase !== 'connecting',
+    framed: state.framed !== null,
+  });
+  reportLinkMachineWork(
+    'galvo-usb',
+    activity === undefined
+      ? null
+      : {
+          controller: 'Galvo',
+          activity,
+          advisories: state.advisories,
+          abort: () => useGalvoUsbStore.getState().abort(),
+        },
+  );
+});

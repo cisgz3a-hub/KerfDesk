@@ -2,7 +2,7 @@
 // takes binary list packets over USB, not G-code lines, so for the line-based
 // controller store the transport stays FILE-ONLY and every serial control is
 // off, as for Ruida. A galvo has no job file either: Save refuses it, and the
-// work runs over the separate USB link and store (ui/state/jcz-usb), which
+// work runs over the separate USB link and store (ui/state/galvo-usb), which
 // offer only what JCZ_GALVO_USB_CAPABILITIES lists. Simulator-tested only;
 // NOT qualified on a real board.
 
