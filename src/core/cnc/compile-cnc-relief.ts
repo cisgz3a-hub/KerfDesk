@@ -29,6 +29,7 @@ import {
   type ReliefRoughingLadder,
 } from '../relief/relief-roughing';
 import { reliefRoughingReach, type ReliefRoughingReach } from '../relief/relief-roughing-reach';
+import { reliefNextToolRadiusMm } from '../relief/relief-next-tool-radius';
 import type { Heightmap } from '../relief/heightmap';
 import { reliefRoughingMotion } from '../relief/relief-roughing-motion';
 import { ReliefLevelArrayMaterializationError } from '../relief/relief-roughing-level-materialization';
@@ -288,12 +289,14 @@ function appendReliefPasses(
     cutterRadiusMm: tool.diameterMm / 2,
     ...(settings.rampEntryDeg === undefined ? {} : { rampAngleDeg: settings.rampEntryDeg }),
   });
+  const nextRadius = reliefNextToolRadiusMm(nextTool, settings.depthPerPassMm);
   // W6-P2-2: sweep the moves just planned to find what this bit could not reach.
   const reach = reliefRoughingReach(result.map, motion, tool, {
     depthPerPassMm: settings.depthPerPassMm,
     allowanceMm: reliefAllowanceMm(settings.finishAllowanceMm),
-    minWidthMm: nextTool.diameterMm / 2,
-    nextToolRadiusMm: nextTool.diameterMm / 2,
+    // N2-P2-1: a narrowing bit by its radius one Depth per pass up its tip.
+    minWidthMm: nextRadius,
+    nextToolRadiusMm: nextRadius,
   });
   for (const pass of motion) {
     if (pass.kind === 'contour') {

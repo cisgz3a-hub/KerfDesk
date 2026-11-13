@@ -1,3 +1,4 @@
+import { DEFAULT_RELIEF_SCALLOP_MM } from '../../core/relief';
 import type { CncLayerSettings, Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { NumberField, Row, selectStyle } from './CncLayerPrimitives';
@@ -84,7 +85,9 @@ function RestFinishingControls({
             layer={layer}
             label="Rest scallop"
             unit="mm"
-            value={settings.reliefRestScallopMm ?? settings.reliefScallopMm ?? 0.05}
+            value={
+              settings.reliefRestScallopMm ?? settings.reliefScallopMm ?? DEFAULT_RELIEF_SCALLOP_MM
+            }
             positiveOnly
             step={0.01}
             title="Requested scallop for the rest cutter; use the independent rest cutting stage for its feeds and spindle."

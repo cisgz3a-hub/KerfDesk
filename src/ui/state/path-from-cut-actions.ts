@@ -6,7 +6,6 @@
 import { toSceneCoords } from '../../core/devices';
 import { prepareOutputSnapshot } from '../../io/gcode/prepare-output-snapshot';
 import { renderVariableText } from '../text/render-variable-text';
-import { exportProjectSelection } from '../app/export-artwork-svg';
 import type { CutPathsArtwork } from '../../core/job/cut-paths-artwork';
 import { cutPathsArtwork } from '../../core/job/cut-paths-artwork';
 import { IDENTITY_TRANSFORM, type ImportedSvg } from '../../core/scene';
@@ -33,7 +32,11 @@ export function pathFromCutActions(set: Setter): PathFromCutActions {
       if (captured === undefined) return;
       const source = captured;
       const ids = selectedObjectIds(source);
-      const project = exportProjectSelection(source.project, ids.length === 0 ? undefined : ids);
+      // Compile the whole project and let the output scope pick the selection, as
+      // Start does: kerf and lead sides are judged among the whole scene before the
+      // scope (ADR-486 Amd 3, ADR-626 Amd 1), so a hole selected alone keeps its
+      // kerf inside (tools audit T1, T27-P2-1).
+      const project = source.project;
       try {
         const prepared = await prepareOutputSnapshot(project, {
           clock: () => new Date(),

@@ -14,6 +14,7 @@ import type { CncPass, CncPath3dPass } from '../job';
 import { finishingStepDown } from '../relief/relief-finishing-step-down';
 import { reliefObjectToHeightmap } from '../relief/relief-object-to-heightmap';
 import { reliefRoughingReach } from '../relief/relief-roughing-reach';
+import { reliefNextToolRadiusMm } from '../relief/relief-next-tool-radius';
 import type { CncLayerSettings, CncTool, ReliefObject } from '../scene';
 import { cncSettingsForStage } from './cnc-stage-settings';
 import { reliefMachineSpaceGeometry } from './relief-machine-space';
@@ -38,21 +39,28 @@ export function restStepDown(
   tools: { readonly rest: CncTool; readonly finishing: CncTool },
 ): RestStepDown {
   const space = reliefMachineSpaceGeometry(relief);
+  const stepMm = cncSettingsForStage(settings, 'relief-rest-finish', tools.rest).depthPerPassMm;
+  // N2-P2-2 (ADR-421 Amendment 4): the band beside a wall is the finishing
+  // ball's own fillet, so a rest bit narrower than it rides in it, and the
+  // grid follows the smaller bit: one cell of slack on a grid an eighth of the
+  // finishing ball hid the 1.9 mm a 1/4" ball left for a 1/16" one.
+  const restRadius = reliefNextToolRadiusMm(tools.rest, stepMm);
+  const finishingRadius = reliefNextToolRadiusMm(tools.finishing, stepMm);
   const grid = reliefObjectToHeightmap(relief, {
     targetWidthMm: relief.targetWidthMm,
     reliefDepthMm: relief.reliefDepthMm,
     targetScaleX: space.targetScaleX,
     targetScaleY: space.targetScaleY,
-    mmPerCell: tools.finishing.diameterMm / REACH_CELL_TOOL_FRACTION,
+    mmPerCell: (2 * Math.min(finishingRadius, restRadius)) / REACH_CELL_TOOL_FRACTION,
     sampling: 'exact-mesh',
   });
   if (grid.kind === 'error') return { passes: [], levels: 0, unchecked: true };
-  const stepMm = cncSettingsForStage(settings, 'relief-rest-finish', tools.rest).depthPerPassMm;
   const reach = reliefRoughingReach(grid.heightmap, finishingPasses, tools.finishing, {
     depthPerPassMm: stepMm,
     allowanceMm: 0,
-    minWidthMm: tools.rest.diameterMm / 2,
-    nextToolRadiusMm: tools.rest.diameterMm / 2,
+    minWidthMm: restRadius,
+    nextToolRadiusMm: restRadius,
+    nextIsSmall: restRadius < finishingRadius,
   });
   if (reach.kind === 'unchecked') return { passes: [], levels: 0, unchecked: true };
   const stepped = finishingStepDown(restRows, reach.reach, tools.rest, stepMm);
