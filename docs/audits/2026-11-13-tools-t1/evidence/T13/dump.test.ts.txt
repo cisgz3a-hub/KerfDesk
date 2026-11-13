@@ -1,0 +1,16 @@
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type Project, type RasterImage } from '../t13-main/src/core/scene';
+import { prepareOutput } from '../t13-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t13-main/src/io/gcode/emit-gcode';
+it('dump', () => {
+  const base = createProject();
+  const layer = { ...createLayer({ id: 'img', color: '#808080', name: 'Image', mode: 'image' }), power: 80, minPower: 0, speed: 3000 };
+  const l = new Uint8Array(4 * 2); l.set([0, 255, 128, 0, 255, 255, 0, 64]);
+  const image = { kind: 'raster-image', id: 'x', source: 'x.png', dataUrl: 'data:image/png;base64,iVBORw0KGgo=', pixelWidth: 4, pixelHeight: 2,
+    bounds: { minX: 10, minY: 10, maxX: 14, maxY: 12 }, transform: IDENTITY_TRANSFORM, color: '#808080', dither: 'grayscale', linesPerMm: 1,
+    lumaBase64: Buffer.from(l).toString('base64') } as RasterImage;
+  const p: Project = { ...base, scene: { ...base.scene, objects: [image], layers: [layer], groups: [] } };
+  const r = prepareOutput(p);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t13/dump.log', r.ok ? emitPreparedGcode(r).gcode : JSON.stringify(r).slice(0, 2000));
+});

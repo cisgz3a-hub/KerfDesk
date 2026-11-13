@@ -1,0 +1,32 @@
+import { readFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { IDENTITY_TRANSFORM, type RasterImage, type SceneObject } from '../t13-main/src/core/scene';
+import { textToPolylines } from '../t13-main/src/core/text';
+import { burnedSegments, compare, gcodeOf, imageLayer, logger, maskLayer, mkImage, project, rect, xf, type P } from './t16-common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t16/t16e.log');
+
+it('E: real Dancing Script text as an image mask vs the same text Fill', async () => {
+  const bytes = readFileSync('C:/Users/stolk/kd-t1/t13-main/src/ui/text/fonts/DancingScript-Regular.ttf');
+  const rendered = await textToPolylines({ fontBuffer: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), content: 'Wedding', sizeMm: 40, alignment: 'left', lineHeight: 1.4, letterSpacing: 0, color: '#000000' });
+  const transform = { ...IDENTITY_TRANSFORM, x: 20, y: 20 };
+  const text = { kind: 'text', id: 'T', content: 'Wedding', fontKey: 'dancing-script-regular', sizeMm: 40, alignment: 'left', lineHeight: 1.4, letterSpacing: 0, color: '#000000', bounds: { ...rendered.bounds }, transform, paths: rendered.paths } as unknown as SceneObject;
+  const local: P[][] = rendered.paths.flatMap((p) => p.polylines.filter((l) => l.closed !== false).map((l) => l.points.map((q) => ({ x: q.x, y: q.y }))));
+  const scene = local.map((c) => c.map((q) => xf(q, transform)));
+  const b = rendered.bounds;
+  out(`text bounds ${JSON.stringify(b)}; contours ${local.length}`);
+  const box = { x: 20 + b.minX - 2, y: 20 + b.minY - 2, w: b.maxX - b.minX + 4, h: b.maxY - b.minY + 4 };
+  const image = { ...mkImage('R', Math.round(box.w * 2), Math.round(box.h * 2), box), imageMaskId: 'T' } as RasterImage;
+  const region = { x0: box.x - 2, y0: box.y - 2, x1: box.x + box.w + 2, y1: box.y + box.h + 2 };
+  const imgQuad = rect(box.x, box.y, box.x + box.w, box.y + box.h);
+  const gMask = gcodeOf(project([image, text], [imageLayer(), maskLayer(false)]));
+  const sm = burnedSegments(gMask);
+  const mEo = compare(sm, 0.204, imgQuad, scene, 'evenodd', region);
+  const mNz = compare(sm, 0.204, imgQuad, scene, 'nonzero', region);
+  out(`MASK: burn ${mEo.burnMm2} mm2; vs even-odd oracle ${mEo.oracleMm2} (missFar ${mEo.missFarMm2}, leakFar ${mEo.leakFarMm2}); vs non-zero oracle ${mNz.oracleMm2} (missFar ${mNz.missFarMm2} mm2, max miss ${mNz.maxMissMm} mm at ${JSON.stringify(mNz.farMissAt)})`);
+  const gFill = gcodeOf(project([text], [maskLayer(true, 'fill', { hatchSpacingMm: 0.2, hatchAngleDeg: 0, fillOverscanMm: 0 } as never)]));
+  const sf = burnedSegments(gFill);
+  const fEo = compare(sf, 0.204, rect(0, 0, 400, 400), scene, 'evenodd', region);
+  const fNz = compare(sf, 0.204, rect(0, 0, 400, 400), scene, 'nonzero', region);
+  out(`FILL of same text: burn ${fEo.burnMm2} mm2; vs even-odd oracle ${fEo.oracleMm2} (leakFar ${fEo.leakFarMm2}); vs non-zero oracle ${fNz.oracleMm2} (missFar ${fNz.missFarMm2}, leakFar ${fNz.leakFarMm2})`);
+});

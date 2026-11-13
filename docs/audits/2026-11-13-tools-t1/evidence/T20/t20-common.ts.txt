@@ -1,0 +1,130 @@
+// T20 shared helpers: fixtures, export capture, G-code cell decoder.
+import { writeFileSync } from 'node:fs';
+import { vi } from 'vitest';
+import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../t13-main/src/core/devices';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type Layer, type Project, type RasterImage, type SceneObject, type Transform } from '../t13-main/src/core/scene';
+import { prepareOutput } from '../t13-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t13-main/src/io/gcode/emit-gcode';
+import { handleSaveProcessedBitmap } from '../t13-main/src/ui/app/save-processed-bitmap';
+import type { PlatformAdapter, SaveTarget, FileSaveRequest } from '../t13-main/src/platform/types';
+
+export type P = { x: number; y: number };
+export const DEV = DEFAULT_DEVICE_PROFILE;
+export function logger(path: string): (s: string) => void {
+  const lines: string[] = [];
+  return (s: string) => { lines.push(s); writeFileSync(path, lines.join('\n')); };
+}
+export const b64 = (u: Uint8Array) => Buffer.from(u).toString('base64');
+
+/** Smooth diagonal gradient with a dark disc, W x H. */
+export function gradientLuma(W: number, H: number): Uint8Array {
+  const l = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    let v = Math.round(255 * (x + y) / (W + H - 2));
+    const dx = x - W * 0.3, dy = y - H * 0.6; if (dx * dx + dy * dy < (W * 0.15) ** 2) v = 20;
+    l[y * W + x] = v;
+  }
+  return l;
+}
+
+export function mkImage(id: string, W: number, H: number, box: { x: number; y: number; w: number; h: number }, transform: Transform = IDENTITY_TRANSFORM, extra: Partial<RasterImage> = {}, luma?: Uint8Array): RasterImage {
+  const l = luma ?? gradientLuma(W, H);
+  return {
+    kind: 'raster-image', id, source: `C:\\photos\\${id}.png`, dataUrl: 'data:image/png;base64,iVBORw0KGgo=', pixelWidth: W, pixelHeight: H,
+    bounds: { minX: box.x, minY: box.y, maxX: box.x + box.w, maxY: box.y + box.h }, transform, color: '#808080',
+    dither: 'threshold', linesPerMm: 5, lumaBase64: b64(l), ...extra,
+  } as RasterImage;
+}
+export function imageLayer(extra: Partial<Layer> = {}): Layer {
+  return { ...createLayer({ id: 'img', color: '#808080', name: 'Photo', mode: 'image' }), power: 80, minPower: 0, speed: 3000, linesPerMm: 5,
+    ditherAlgorithm: 'floyd-steinberg', dotWidthCorrectionMm: 0, ...extra } as Layer;
+}
+export function project(objects: SceneObject[], layers: Layer[], device: DeviceProfile = DEV): Project {
+  const base = createProject(device);
+  return { ...base, device, scene: { ...base.scene, objects, layers, groups: [] } } as Project;
+}
+export function gcodeOf(p: Project): string {
+  const r = prepareOutput(p);
+  if (!r.ok) return `NOT OK ${JSON.stringify(r).slice(0, 800)}`;
+  return emitPreparedGcode(r).gcode;
+}
+
+export type Exported = { width: number; height: number; rgba: Uint8ClampedArray; toasts: Array<[string, string | undefined]>; request?: FileSaveRequest; written?: unknown };
+export async function exportOf(p: Project, id = 'R', target?: Partial<SaveTarget> | null, pickThrows?: Error): Promise<Exported> {
+  const out: Exported = { width: 0, height: 0, rgba: new Uint8ClampedArray(0), toasts: [] };
+  const platform = {
+    pickFileForSave: async (req: FileSaveRequest) => {
+      out.request = req;
+      if (pickThrows) throw pickThrows;
+      if (target === null) return null;
+      return { displayName: 'out.png', write: async (d: unknown) => { out.written = d; }, ...(target ?? {}) } as SaveTarget;
+    },
+  } as unknown as PlatformAdapter;
+  await handleSaveProcessedBitmap({
+    platform, project: p, selectedObjectId: id,
+    pushToast: (m, v) => { out.toasts.push([m, v]); },
+    encodePng: vi.fn(async (rgba, w, h) => { out.rgba = rgba; out.width = w; out.height = h; return new Blob(['png'], { type: 'image/png' }); }),
+  });
+  return out;
+}
+
+export type Seg = { a: P; b: P; s: number };
+/** Every powered G1 move, in scene coordinates (front-left origin: scene y = bedH - machine y). */
+export function burnedSegments(g: string, bedH = DEV.bedHeight): Seg[] {
+  const out: Seg[] = [];
+  let x = 0, y = 0, S = 0, mode = 0, laserOn = false;
+  for (const raw of g.split('\n')) {
+    const line = raw.replace(/;.*$/, '').trim(); if (!line) continue;
+    if (/\bM[34]\b/.test(line)) laserOn = true;
+    if (/\bM5\b/.test(line)) laserOn = false;
+    const m = line.match(/^G0?([0-3])(?![0-9])/); if (m) mode = Number(m[1]);
+    const nx = line.match(/X(-?[\d.]+)/), ny = line.match(/Y(-?[\d.]+)/), ns = line.match(/S(-?[\d.]+)/);
+    if (ns) S = Number(ns[1]);
+    const x1 = nx ? Number(nx[1]) : x; const y1 = ny ? Number(ny[1]) : y;
+    if (mode === 1 && S > 0 && laserOn && (nx || ny)) out.push({ a: { x, y: bedH - y }, b: { x: x1, y: bedH - y1 }, s: S });
+    x = x1; y = y1;
+  }
+  return out;
+}
+
+/** Decode horizontal powered segments to a W x H cell grid over a scene AABB (row 0 = min scene y). */
+export function cellsFromSegments(segs: Seg[], box: { minX: number; minY: number; maxX: number; maxY: number }, W: number, H: number): { s: Float64Array; stray: number } {
+  const s = new Float64Array(W * H);
+  const px = (box.maxX - box.minX) / W, py = (box.maxY - box.minY) / H;
+  let stray = 0;
+  for (const seg of segs) {
+    if (Math.abs(seg.a.y - seg.b.y) > 1e-6) { stray++; continue; }
+    const j = Math.floor((seg.a.y - box.minY) / py);
+    if (j < 0 || j >= H) { stray++; continue; }
+    const x0 = Math.min(seg.a.x, seg.b.x), x1 = Math.max(seg.a.x, seg.b.x);
+    for (let i = 0; i < W; i++) {
+      const cx = box.minX + (i + 0.5) * px;
+      if (cx > x0 && cx < x1) s[j * W + i] = Math.max(s[j * W + i]!, seg.s);
+    }
+  }
+  return { s, stray };
+}
+
+export function xf(p: P, t: Transform): P {
+  let x = p.x * t.scaleX, y = p.y * t.scaleY;
+  if (t.mirrorX) x = -x; if (t.mirrorY) y = -y;
+  const r = (t.rotationDeg * Math.PI) / 180;
+  return { x: x * Math.cos(r) - y * Math.sin(r) + t.x, y: x * Math.sin(r) + y * Math.cos(r) + t.y };
+}
+
+/** Exported grey (R channel) per pixel. */
+export const greys = (rgba: Uint8ClampedArray) => Array.from({ length: rgba.length / 4 }, (_, i) => rgba[i * 4]!);
+export function flipRows(a: ArrayLike<number>, W: number, H: number): number[] { const o: number[] = []; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) o.push(a[(H - 1 - y) * W + x]!); return o; }
+export function flipCols(a: ArrayLike<number>, W: number, H: number): number[] { const o: number[] = []; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) o.push(a[y * W + (W - 1 - x)]!); return o; }
+/** Count of cells where burned-ness (grey<255 vs S>0) differs; and max |grey - predicted| over cells. */
+export function diff(exportGrey: ArrayLike<number>, gcodeS: ArrayLike<number>, sMaxG: number): { onOffDiff: number; maxGreyErr: number; burnedExport: number; burnedGcode: number } {
+  let onOffDiff = 0, maxGreyErr = 0, be = 0, bg = 0;
+  for (let i = 0; i < exportGrey.length; i++) {
+    const e = exportGrey[i]!, s = gcodeS[i]!;
+    const pred = 255 - Math.round((255 * s) / sMaxG);
+    if (e < 255) be++; if (s > 0) bg++;
+    if ((e < 255) !== (s > 0)) onOffDiff++;
+    maxGreyErr = Math.max(maxGreyErr, Math.abs(e - pred));
+  }
+  return { onOffDiff, maxGreyErr, burnedExport: be, burnedGcode: bg };
+}

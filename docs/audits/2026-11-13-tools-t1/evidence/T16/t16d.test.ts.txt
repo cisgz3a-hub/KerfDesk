@@ -1,0 +1,29 @@
+import { it } from 'vitest';
+import { IDENTITY_TRANSFORM, type RasterImage, type Transform } from '../t13-main/src/core/scene';
+import { burnedSegments, circle, compare, gcodeOf, imageLayer, logger, maskLayer, mkImage, mkMask, project, xf } from './t16-common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t16/t16d.log');
+const T = (t: Partial<Transform>): Transform => ({ ...IDENTITY_TRANSFORM, ...t });
+
+// Realistic: 150 DPI source (0.1693 mm/px), 30 x 30 mm (177 px), 10 lines/mm, circle mask r 12.
+it('D: rotated / angled scan mask edge at realistic resolutions', () => {
+  const REGION = { x0: 0, y0: 0, x1: 50, y1: 50 };
+  const c0 = circle(25.03, 24.97, 12);
+  for (const [dpi, lpm] of [[150, 10], [100, 10], [254, 10], [300, 5]] as const) {
+    const px = Math.round((30 / 25.4) * dpi);
+    for (const v of [
+      { name: 'upright', t: T({ x: 25, y: 25 }), extra: {} },
+      { name: 'rotated 20', t: T({ x: 25, y: 25, rotationDeg: 20 }), extra: {} },
+      { name: 'rotated 90', t: T({ x: 25, y: 25, rotationDeg: 90 }), extra: {} },
+      { name: 'upright scan 45', t: T({ x: 25, y: 25 }), extra: { imageScanAngleDeg: 45 } },
+    ]) {
+      const image = { ...mkImage('R', px, px, { x: -15, y: -15, w: 30, h: 30 }, v.t, { linesPerMm: lpm }), imageMaskId: 'M' } as RasterImage;
+      const g = gcodeOf(project([image, mkMask('M', [c0])], [imageLayer({ linesPerMm: lpm, ...v.extra } as never), maskLayer(false)]));
+      const segs = burnedSegments(g);
+      const quad = [{ x: -15, y: -15 }, { x: 15, y: -15 }, { x: 15, y: 15 }, { x: -15, y: 15 }].map((p) => xf(p, v.t));
+      // ribbon widened 0.002 mm to absorb 3-decimal G-code rounding
+      const r = compare(segs.map((s) => s), 1 / lpm + 0.004, quad, [c0], 'evenodd', REGION, 0.02);
+      out(`${dpi} dpi (${(25.4 / dpi).toFixed(3)} mm/px) @ ${lpm} l/mm ${v.name}: leak ${r.leakMm2} mm2 (max ${r.maxLeakMm} mm), miss ${r.missMm2} mm2 (max ${r.maxMissMm} mm), burn ${r.burnMm2} vs oracle ${r.oracleMm2}`);
+    }
+  }
+});

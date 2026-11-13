@@ -1,0 +1,66 @@
+// T20c: on a rear-left device (no machine flip) every remaining setting, plus 3D Sliced stacks and multi-angle scans.
+import { it } from 'vitest';
+import { type Layer, type RasterImage } from '../t13-main/src/core/scene';
+import { DEV, burnedSegments, cellsFromSegments, diff, exportOf, gcodeOf, greys, imageLayer, logger, mkImage, project, type Seg } from './t20-common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t20/t20c.log');
+const W = 40, H = 20, BOX = { x: 10, y: 10, w: 8, h: 4 };
+const RL = { ...DEV, origin: 'rear-left' } as typeof DEV;
+const unflip = (segs: Seg[]) => segs.map((s) => ({ ...s, a: { x: s.a.x, y: RL.bedHeight - s.a.y }, b: { x: s.b.x, y: RL.bedHeight - s.b.y } }));
+const box = { minX: BOX.x, minY: BOX.y, maxX: BOX.x + BOX.w, maxY: BOX.y + BOX.h };
+
+async function run(name: string, layer: Partial<Layer>, image: Partial<RasterImage> = {}): Promise<void> {
+  const p = project([mkImage('R', W, H, BOX, undefined, image)], [imageLayer(layer)], RL);
+  const e = await exportOf(p);
+  const g = gcodeOf(p);
+  if (g.startsWith('NOT OK')) { out(`${name}: ${g}`); return; }
+  const segs = unflip(burnedSegments(g, RL.bedHeight));
+  const { s, stray } = cellsFromSegments(segs, box, e.width, e.height);
+  const sMaxG = ((layer.power ?? 80) / 100) * RL.maxPowerS;
+  out(`${name}: export ${e.width}x${e.height} stray(non-horizontal) ${stray} ${JSON.stringify(diff(greys(e.rgba), Array.from(s), sMaxG))}`);
+}
+
+it('rear-left parity per setting', async () => {
+  await run('floyd plain', {});
+  await run('floyd sharpen 100/0.4', {}, { sharpenAmount: 100, sharpenRadius: 0.4 } as never);
+  await run('floyd brightness/contrast/gamma', {}, { brightness: 20, contrast: 30, gamma: 1.6 } as never);
+  await run('floyd tone curve', { photoToneCurve: { label: 'wood', points: [{ input: 0, output: 0 }, { input: 50, output: 30 }, { input: 100, output: 100 }] } } as never);
+  await run('grayscale tone curve min 15', { ditherAlgorithm: 'grayscale', minPower: 15, photoToneCurve: { label: 'wood', points: [{ input: 0, output: 0 }, { input: 50, output: 30 }, { input: 100, output: 100 }] } } as never);
+  await run('stucki negative 2.5 l/mm resample', { ditherAlgorithm: 'stucki', negativeImage: true, linesPerMm: 2.5 } as never);
+  await run('object override power 50 (powerScale)', {}, { powerScale: 50 } as never);
+  await run('jarvis 7.3 l/mm', { ditherAlgorithm: 'jarvis', linesPerMm: 7.3 } as never);
+});
+
+it('3D Sliced: export level vs number of passes burning each cell', async () => {
+  const p = project([mkImage('R', W, H, BOX)], [imageLayer({ ditherAlgorithm: '3d-sliced', passes: 4 } as never)], RL);
+  const e = await exportOf(p);
+  const g = gcodeOf(p);
+  // split G-code into passes by counting how many times each cell is covered
+  const segs = unflip(burnedSegments(g, RL.bedHeight));
+  const count = new Float64Array(W * H);
+  const px = BOX.w / W, py = BOX.h / H;
+  for (const sg of segs) {
+    const j = Math.floor((sg.a.y - BOX.y) / py); if (j < 0 || j >= H) continue;
+    const x0 = Math.min(sg.a.x, sg.b.x), x1 = Math.max(sg.a.x, sg.b.x);
+    for (let i = 0; i < W; i++) { const cx = BOX.x + (i + 0.5) * px; if (cx > x0 && cx < x1) count[j * W + i]! += 1; }
+  }
+  const eg = greys(e.rgba);
+  let mism = 0; const pairs = new Map<string, number>();
+  for (let k = 0; k < W * H; k++) {
+    const expectLevel = Math.round((255 - eg[k]!) / 255 * 4);
+    if (expectLevel !== count[k]) mism++;
+    const key = `${eg[k]}->${count[k]}`; pairs.set(key, (pairs.get(key) ?? 0) + 1);
+  }
+  out(`3d-sliced 4 passes: cells where export level != passes burning: ${mism}; grey->passes ${JSON.stringify([...pairs])}`);
+});
+
+it('cross-hatch / scan angle: export shows one grid', async () => {
+  for (const extra of [{ imageCrossHatch: true }, { imageScanAngleDeg: 45 }, { imageScanAngleDeg: 90 }]) {
+    const p = project([mkImage('R', W, H, BOX)], [imageLayer({ ditherAlgorithm: 'floyd-steinberg', ...extra } as never)], RL);
+    const e = await exportOf(p);
+    const g = gcodeOf(p);
+    const segs = burnedSegments(g, RL.bedHeight);
+    const nonH = segs.filter((s) => Math.abs(s.a.y - s.b.y) > 1e-6).length;
+    out(`${JSON.stringify(extra)}: export ${e.width}x${e.height}; G-code powered segs ${segs.length} of which non-horizontal ${nonH}; toast ${JSON.stringify(e.toasts)}`);
+  }
+});
