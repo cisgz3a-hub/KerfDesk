@@ -67,18 +67,36 @@ describe('tabRampedPoints (ADR-258)', () => {
     expect(falls).toBe(settings.tabsPerShape);
   });
 
-  it('keeps a small contour cutting instead of dropping its deep pass', () => {
-    // Perimeter 20 mm against 4 windows of 6 + 3.175 mm: the windows more than
-    // cover the loop. The split model returned NO pieces here and the deep pass
-    // was skipped entirely (cnc-tabs.ts AUDIT A5) — a hole that never cut
-    // through. The rise model still returns a usable path.
-    const tiny: Polyline = {
+  it('gives a contour too short for the tabs set as many as still cut through', () => {
+    // Perimeter 20 mm against 4 windows of 6 + 3.175 mm: they would swallow the
+    // loop (J1-P1-1). Two fit, so the loop still reaches the cut depth between
+    // them (ADR-258 Amendment 5).
+    const small: Polyline = {
       closed: true,
       points: [
         { x: 0, y: 0 },
         { x: 5, y: 0 },
         { x: 5, y: 5 },
         { x: 0, y: 5 },
+      ],
+    };
+    const points = tabRampedPoints(small, CUT_Z, TAB_TOP_Z, settings);
+    expect(points?.some((p) => p.z === CUT_Z)).toBe(true);
+    const rises = (points ?? []).filter((p, i) => i > 0 && p.z > (points?.[i - 1]?.z ?? p.z));
+    expect(rises).toHaveLength(2);
+  });
+
+  it('keeps a contour too short for one tab riding the tab top, not dropping its pass', () => {
+    // Perimeter 8 mm against one 9.175 mm window. The split model returned NO
+    // pieces here and the deep pass was skipped entirely (cnc-tabs.ts AUDIT A5).
+    // The rise model still returns a usable path.
+    const tiny: Polyline = {
+      closed: true,
+      points: [
+        { x: 0, y: 0 },
+        { x: 2, y: 0 },
+        { x: 2, y: 2 },
+        { x: 0, y: 2 },
       ],
     };
     const points = tabRampedPoints(tiny, CUT_Z, TAB_TOP_Z, settings);

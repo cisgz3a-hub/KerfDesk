@@ -68,6 +68,33 @@ export type CncStrategyFallback = {
   readonly reason: string;
 };
 
+/**
+ * ADR-258 Amendment 5: a loop whose holding tabs are not the ones set.
+ *   - never-through: too short for even one tab, so it rides the tab top and
+ *     is never cut free;
+ *   - fewer-tabs: cut with fewer tabs than set, so that it still cuts through;
+ *   - narrow-bridge: a tab whose window turns so far that the bridge left is
+ *     under half the set width;
+ *   - closed-gap: an open outline whose ends the bit sweeps together, tabbed
+ *     as the closed shape it cuts free.
+ */
+export type CncTabHoldShape = {
+  readonly layerId: string;
+  readonly layerName: string;
+  readonly kind: 'never-through' | 'fewer-tabs' | 'narrow-bridge' | 'closed-gap';
+  readonly role: 'part' | 'hole';
+  /** The drawn shape's width and height, mm. */
+  readonly widthMm: number;
+  readonly heightMm: number;
+  readonly tabsSet: number;
+  readonly tabsCut: number;
+  readonly tabWidthMm: number;
+  /** The cut width at full depth. */
+  readonly cutWidthMm: number;
+  /** The narrowest bridge left, mm (narrow-bridge only). */
+  readonly bridgeMm?: number;
+};
+
 /** Structured-clone-safe CNC evidence retained with the exact compiled Job. */
 export type CncCompilationSidecar = {
   readonly vcarveOperations: ReadonlyArray<CncVCarveCompilationEvidence>;
@@ -85,4 +112,6 @@ export type CncCompilationSidecar = {
   readonly mergedStackedCopies?: ReadonlyArray<CncStackedCopyMerge>;
   /** Absent when no operation fell back, and on jobs from before S8-P2-1. */
   readonly strategyFallbacks?: ReadonlyArray<CncStrategyFallback>;
+  /** Absent when every loop has the tabs set, and on jobs from before ADR-258 Amendment 5. */
+  readonly tabHoldShapes?: ReadonlyArray<CncTabHoldShape>;
 };

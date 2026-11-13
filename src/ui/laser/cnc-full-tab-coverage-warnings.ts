@@ -16,9 +16,12 @@
 //
 // This is an advisory, not a gate (ADR-206: warn, don't block) — the compiler
 // already keeps the cut safe; this explains WHY the part will not come free.
-// Limitation: a layer where only SOME shapes are fully covered still has deep
-// passes from the others and is not flagged here — those shapes still keep
-// their bridges, the advisory just stays quiet.
+// ADR-258 Amendment 5 (J1-P1-1): a layer where only SOME shapes are fully
+// covered still has deep passes from the others, so the per-layer check below
+// stays quiet for it. The compiler now names each such shape, and each loop it
+// gave fewer or narrowed tabs (cnc-tab-hold-warnings.ts); a layer it names a
+// never-through shape on is left to that line. The per-layer check remains
+// for a job compiled before that evidence existed.
 
 import { compileCncJob, isProfileCutType, passNeedsTabs, tabTopZMm } from '../../core/cnc';
 import { settingsWithStockTabGate } from '../../core/cnc/cnc-tabs';
@@ -33,6 +36,7 @@ import {
   type Project,
 } from '../../core/scene';
 import { formatMm } from './job-review/job-review-format';
+import { cncTabHoldWarnings, layersWithNeverThroughLoops } from './cnc-tab-hold-warnings';
 
 const Z_EPS = 1e-9;
 
@@ -54,8 +58,10 @@ export function detectCncFullTabCoverageWarnings(
   if (candidates.length === 0) return [];
 
   const job = compiledJob ?? compileCncJob(project.scene, project.device, machine);
-  const warnings: string[] = [];
+  const named = layersWithNeverThroughLoops(job);
+  const warnings: string[] = [...cncTabHoldWarnings(job)];
   for (const layer of candidates) {
+    if (named.has(layer.id)) continue;
     const settings = tabSettings(layer);
     const tabTop = tabTopZMm(settings.depthMm, settings.tabHeightMm);
     const passZs = job.groups

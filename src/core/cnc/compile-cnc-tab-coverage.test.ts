@@ -20,21 +20,29 @@ import { compileCncJob } from './compile-cnc-job';
 // Z-rise model achieves it by riding the whole loop at the tab top — nothing is
 // skipped, nothing is dropped, and no material below the tab top is removed.
 // These tests therefore still assert the safety property, not the mechanism.
+//
+// ADR-258 Amendment 5: a loop too short for the tabs set now gets as many as
+// still let it cut through, so only a loop too short for even ONE window rides
+// the tab top, and it does so once, on the tab-top level (J1-P3-1).
 
 const dev = DEFAULT_DEVICE_PROFILE;
 const config = DEFAULT_CNC_MACHINE_CONFIG; // 1/8 in bit (3.175 mm)
 
-// 10 mm square: outside-profile toolpath perimeter ≈ 50 mm with the default
-// bit. 6 tabs × (6 mm tab + 3.175 mm bit) ≈ 55 mm of windows — full coverage.
+// 10 mm square: outside-profile toolpath perimeter ≈ 52.7 mm with the default
+// bit. One 50 mm tab + the 3.175 mm bit is a 53.2 mm window — full coverage.
 const FULL_COVERAGE_TABS: Partial<CncLayerSettings> = {
   cutType: 'profile-outside',
   depthMm: 6,
   depthPerPassMm: 2,
   tabsEnabled: true,
   tabHeightMm: 2,
-  tabWidthMm: 6,
+  tabWidthMm: 50,
   tabsPerShape: 6,
 };
+
+// 6 tabs × (6 mm tab + 3.175 mm bit) ≈ 55 mm of windows swallowed the same
+// square before Amendment 5; five of them fit.
+const TOO_MANY_TABS: Partial<CncLayerSettings> = { ...FULL_COVERAGE_TABS, tabWidthMm: 6 };
 
 function squareObject(id: string, color: string, size: number, at = 50): ImportedSvg {
   return {
@@ -69,6 +77,15 @@ function tabbedLayer(cnc: Partial<CncLayerSettings>): Layer {
   };
 }
 
+function compiledPasses(cnc: Partial<CncLayerSettings>, size: number) {
+  const job = compileCncJob(
+    { objects: [squareObject('part', '#ff0000', size)], layers: [tabbedLayer(cnc)] },
+    dev,
+    config,
+  );
+  return job.groups.flatMap((group) => (group.kind === 'cnc' ? group.passes : []));
+}
+
 function compiledPassZs(cnc: Partial<CncLayerSettings>, size: number): ReadonlyArray<number> {
   const job = compileCncJob(
     { objects: [squareObject('part', '#ff0000', size)], layers: [tabbedLayer(cnc)] },
@@ -99,6 +116,22 @@ describe('compileCncJob full-perimeter tab coverage', () => {
     expect(zs).toContain(-4);
     // …but nothing may cut below it — the deep pass is skipped, not unsplit.
     expect(zs.every((zMm) => zMm >= -4 - 1e-9)).toBe(true);
+  });
+
+  it('cuts a fully covered loop once at the tab top, not once per level below it', () => {
+    // Levels -2 and the -4 tab top cut the loop; -6 would only lap the tab top.
+    expect(compiledPasses(FULL_COVERAGE_TABS, 10)).toHaveLength(2);
+  });
+
+  it('gives a loop too short for the tabs set as many as still let it cut through', () => {
+    const zs = compiledPassZs(TOO_MANY_TABS, 10);
+    expect(zs).toContain(-6);
+    const deepest = compiledPasses(TOO_MANY_TABS, 10).at(-1);
+    if (deepest?.kind !== 'path3d') throw new Error('expected a tabbed deep pass');
+    const rises = deepest.points.filter(
+      (point, index) => index > 0 && point.z > (deepest.points[index - 1]?.z ?? point.z),
+    );
+    expect(rises).toHaveLength(5);
   });
 
   it('keeps cutting the deep tabbed passes when the shape is large enough', () => {

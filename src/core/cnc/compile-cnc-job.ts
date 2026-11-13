@@ -36,6 +36,7 @@ import type {
   CncProfileOpenPaths,
   CncStackedCopyMerge,
   CncStrategyFallback,
+  CncTabHoldShape,
 } from '../job/cnc-compilation-sidecar-types';
 import { cncOpenContourOmissions } from './cnc-open-contour-omissions';
 import { cncProfileOpenPaths } from './cnc-profile-outline-join';
@@ -165,6 +166,7 @@ function compileCncSnapshot(
   const keptPartOperations: KeptPartCutOperation[] = [];
   const mergedStackedCopies: CncStackedCopyMerge[] = [];
   const strategyFallbacks: CncStrategyFallback[] = [];
+  const tabHoldShapes: CncTabHoldShape[] = [];
   const sourceObjects = scene.objects;
   const allSourceObjects = [...sourceObjects, ...(scene.outputDependencies ?? [])];
   const runs = artworkOperationRuns(scene);
@@ -196,6 +198,7 @@ function compileCncSnapshot(
     mergedStackedCopies.push(...operation.stackedCopyMerges);
     offsetLadderDiagnostics.push(...operation.offsetLadderDiagnostics);
     strategyFallbacks.push(...operation.strategyFallbacks);
+    tabHoldShapes.push(...operation.tabHoldShapes);
     if (operation.stepoverOperation !== undefined) {
       stepoverOperations.push(operation.stepoverOperation);
     }
@@ -215,6 +218,7 @@ function compileCncSnapshot(
     // that reach a part another operation keeps.
     { profileOpenPaths, keptPartCuts: cncKeptPartCuts(keptPartOperations, leadWalls.walls) },
     strategyFallbacks,
+    tabHoldShapes,
   );
   return {
     kind: 'compiled',
@@ -298,6 +302,7 @@ function compileCncOperation(
       ? { stepoverOperation: { layerId: layer.id, stepoverPercent: settings.stepoverPercent } }
       : {}),
     strategyFallbacks: vectorGroups.strategyFallbacks,
+    tabHoldShapes: vectorGroups.tabHoldShapes,
   };
 }
 
@@ -320,6 +325,7 @@ function compileVectorOperationGroups(
       offsetLadderDiagnostics: [],
       stepoverUsed: false,
       strategyFallbacks: [],
+      tabHoldShapes: [],
     };
   }
   const inlay = compiledInlayGroups(layer, settings, polylines, device, config, leadWalls);
@@ -353,6 +359,7 @@ function compileVectorOperationGroups(
       offsetLadderDiagnostics,
       stepoverUsed: secondary.stepoverUsed || compiledGroup.stepoverUsed,
       strategyFallbacks: [],
+      tabHoldShapes: [],
     };
   }
   const tagged = tagFinishedGroup(
@@ -371,6 +378,11 @@ function compileVectorOperationGroups(
     offsetLadderDiagnostics,
     stepoverUsed: secondary.stepoverUsed || compiledGroup.stepoverUsed,
     strategyFallbacks: strategyFallbacksForLayer(layer.id, compiledGroup.strategyFallback),
+    tabHoldShapes: (compiledGroup.tabHolds ?? []).map((finding) => ({
+      layerId: layer.id,
+      layerName: layer.name,
+      ...finding,
+    })),
   };
 }
 
@@ -389,6 +401,7 @@ function inlayOperationGroups(
     }),
     stepoverUsed: inlay.stepoverUsed,
     strategyFallbacks: [],
+    tabHoldShapes: [],
   };
 }
 

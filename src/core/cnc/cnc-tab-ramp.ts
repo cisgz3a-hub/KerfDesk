@@ -19,10 +19,21 @@
 // sends a pure-vertical segment at the plunge feed
 // (cnc-grbl-strategy.ts appendPath3dCutMoves).
 //
+// Where the windows go is cnc-tab-placement.ts (ADR-258 Amendment 5).
+//
 // Pure: no clock, no randomness, no I/O.
 
 import type { Vec3 } from '../geometry/vec3';
 import type { Polyline, Vec2 } from '../scene';
+import {
+  automaticTabPlan,
+  manualTabPlan,
+  modulo,
+  pointAtDistance,
+  tabLoop,
+  type TabLoop,
+  type TabPlan,
+} from './cnc-tab-placement';
 
 export type TabRampSettings = {
   readonly tabWidthMm: number;
@@ -33,14 +44,39 @@ export type TabRampSettings = {
 const EPS = 1e-9;
 
 /**
+ * Where the tabs of `toolpath` go, or null when tabs cannot apply: an open or
+ * degenerate loop, or a non-positive tab window.
+ *
+ * `manualCenters` are normalized perimeter positions in [0, 1) (ADR-156
+ * anchors); absent, automatic tabs are spaced evenly and kept off corners
+ * (ADR-258 Amendment 5).
+ */
+export function tabPlanForToolpath(
+  toolpath: Polyline,
+  settings: TabRampSettings,
+  manualCenters?: ReadonlyArray<number>,
+): TabPlan | null {
+  if (!toolpath.closed) return null;
+  const loop = tabLoop(toolpath.points);
+  if (loop === null) return null;
+  // The skip length adds one tool diameter so the PHYSICAL bridge is the
+  // requested width after the bit eats a radius from each side — same
+  // convention as the split model it replaces (cnc-tabs.ts).
+  const cutWidthMm = Math.max(0, settings.toolDiameterMm);
+  const windowMm = Math.max(0, settings.tabWidthMm) + cutWidthMm;
+  if (!(windowMm > EPS)) return null;
+  return manualCenters === undefined
+    ? automaticTabPlan(loop, settings.tabsPerShape, windowMm, cutWidthMm)
+    : manualTabPlan(loop, manualCenters, windowMm, cutWidthMm);
+}
+
+/**
  * Walk `toolpath` at `cutZMm`, rising to `tabTopZMm` across each tab window.
  *
  * Returns null when tabs cannot apply — an open or degenerate loop, a
- * non-positive tab window, or a tab top that is not above the cutting depth.
- * The caller then keeps its ordinary contour pass.
- *
- * `manualCenters` are normalized perimeter positions in [0, 1) (ADR-156 anchors);
- * absent, tab centers are spaced evenly the way `automaticTabAnchorPoints` does.
+ * non-positive tab window, no tab at all, or a tab top that is not above the
+ * cutting depth. The caller then keeps its ordinary contour pass. A caller that
+ * already planned the loop passes `plan`, so every level cuts the same tabs.
  */
 export function tabRampedPoints(
   toolpath: Polyline,
@@ -48,46 +84,77 @@ export function tabRampedPoints(
   tabTopZMm: number,
   settings: TabRampSettings,
   manualCenters?: ReadonlyArray<number>,
+  plan: TabPlan | null = tabPlanForToolpath(toolpath, settings, manualCenters),
 ): ReadonlyArray<Vec3> | null {
-  if (!toolpath.closed) return null;
   // The rise must be a real lift: an equal or lower tab top would emit a
   // zero-length or downward "tab", which is not a tab at all.
-  if (!(tabTopZMm > cutZMm + EPS)) return null;
-  const points = closedLoopPoints(toolpath.points);
-  if (points.length < 3) return null;
-  const cumulative = cumulativeDistances(points);
-  const perimeter = cumulative[cumulative.length - 1] ?? 0;
-  if (!(perimeter > EPS)) return null;
-  // The skip length adds one tool diameter so the PHYSICAL bridge is the
-  // requested width after the bit eats a radius from each side — same
-  // convention as the split model it replaces (cnc-tabs.ts).
-  const windowMm = Math.max(0, settings.tabWidthMm) + Math.max(0, settings.toolDiameterMm);
-  if (!(windowMm > EPS)) return null;
-  const windows = tabWindows(perimeter, windowMm, settings.tabsPerShape, manualCenters);
+  if (!(tabTopZMm > cutZMm + EPS) || plan === null || !toolpath.closed) return null;
+  const loop = tabLoop(toolpath.points);
+  if (loop === null) return null;
+  const windows = tabWindows(plan, loop.perimeter);
   if (windows.length === 0) return null;
+  const stops = orderedStops(loop.cumulative, windows, loop.perimeter);
+  return walkWithTabRises(loop, stops, windows, cutZMm, tabTopZMm);
+}
 
-  const stops = orderedStops(cumulative, windows, perimeter);
-  return walkWithTabRises(points, cumulative, perimeter, stops, windows, cutZMm, tabTopZMm);
+/**
+ * An open outline the bit closes, tabbed as the loop it makes (ADR-258
+ * Amendment 5): `loop` is the outline marked closed. It is still cut from its
+ * first point to its last, rising across each window it meets; the gap between
+ * its ends, which the bit sweeps anyway, is never fed.
+ */
+export function tabRampedOpenPoints(
+  loop: Polyline,
+  cutZMm: number,
+  tabTopZMm: number,
+  plan: TabPlan,
+): ReadonlyArray<Vec3> | null {
+  if (!(tabTopZMm > cutZMm + EPS)) return null;
+  const measured = tabLoop(loop.points);
+  if (measured === null) return null;
+  const windows = tabWindows(plan, measured.perimeter);
+  if (windows.length === 0) return null;
+  // closedLoopPoints drops a last point that repeats the first, so then the
+  // outline runs the whole perimeter.
+  const repeatsFirst = measured.points.length < loop.points.length;
+  const endMm = repeatsFirst
+    ? measured.perimeter
+    : (measured.cumulative[measured.points.length - 1] as number);
+  const stops = orderedStops(measured.cumulative, windows, measured.perimeter).filter(
+    (stop) => stop < endMm - EPS,
+  );
+  const zAt = (from: number, to: number): number =>
+    inAnyWindow(from + (to - from) / 2, windows) ? tabTopZMm : cutZMm;
+  const out: Vec3[] = [];
+  let previousZ: number | null = null;
+  stops.forEach((stop, index) => {
+    const spanZ = zAt(stop, stops[index + 1] ?? endMm);
+    const xy = pointAtDistance(measured, stop);
+    if (previousZ !== null && Math.abs(spanZ - previousZ) > EPS) {
+      out.push({ x: xy.x, y: xy.y, z: previousZ });
+    }
+    out.push({ x: xy.x, y: xy.y, z: spanZ });
+    previousZ = spanZ;
+  });
+  const end = loop.points[loop.points.length - 1] as Vec2;
+  out.push({ x: end.x, y: end.y, z: previousZ ?? cutZMm });
+  return out;
 }
 
 /**
  * The XY centre of every tab `tabRampedPoints` cuts on `toolpath` for the same
- * `tabsPerShape` and `manualCenters`. Empty for an open or degenerate loop.
+ * settings and `manualCenters`. Empty for an open or degenerate loop, and for a
+ * loop too short for any tab, which rides the tab top whole.
  */
 export function tabCenterPoints(
   toolpath: Polyline,
-  tabsPerShape: number,
+  settings: TabRampSettings,
   manualCenters?: ReadonlyArray<number>,
 ): ReadonlyArray<Vec2> {
-  if (!toolpath.closed) return [];
-  const points = closedLoopPoints(toolpath.points);
-  if (points.length < 3) return [];
-  const cumulative = cumulativeDistances(points);
-  const perimeter = cumulative[cumulative.length - 1] ?? 0;
-  if (!(perimeter > EPS)) return [];
-  return tabCenters(perimeter, tabsPerShape, manualCenters).map((center) =>
-    pointAtDistance(points, cumulative, perimeter, center),
-  );
+  const plan = tabPlanForToolpath(toolpath, settings, manualCenters);
+  const loop = tabLoop(toolpath.points);
+  if (plan === null || loop === null) return [];
+  return plan.centers.map((center) => pointAtDistance(loop, center));
 }
 
 /**
@@ -104,15 +171,12 @@ export function tabFractionsNear(
   reachMm: number,
 ): ReadonlyArray<number> {
   if (!target.closed) return [];
-  const points = closedLoopPoints(target.points);
-  if (points.length < 3) return [];
-  const cumulative = cumulativeDistances(points);
-  const perimeter = cumulative[cumulative.length - 1] ?? 0;
-  if (!(perimeter > EPS)) return [];
+  const loop = tabLoop(target.points);
+  if (loop === null) return [];
   const fractions: number[] = [];
   for (const anchor of anchors) {
-    const nearest = nearestOnLoop(points, anchor);
-    if (nearest.distance <= reachMm + EPS) fractions.push(nearest.at / perimeter);
+    const nearest = nearestOnLoop(loop.points, anchor);
+    if (nearest.distance <= reachMm + EPS) fractions.push(nearest.at / loop.perimeter);
   }
   return fractions;
 }
@@ -160,40 +224,14 @@ type TabWindow = { readonly start: number; readonly end: number };
 
 // Windows in arc-length space, each normalized into [0, perimeter). A window may
 // wrap past the seam (start > end); membership handles that.
-function tabWindows(
-  perimeter: number,
-  windowMm: number,
-  tabsPerShape: number,
-  manualCenters?: ReadonlyArray<number>,
-): ReadonlyArray<TabWindow> {
-  const half = windowMm / 2;
-  const centers = tabCenters(perimeter, tabsPerShape, manualCenters);
+function tabWindows(plan: TabPlan, perimeter: number): ReadonlyArray<TabWindow> {
   // Modulo endpoints cannot distinguish a full turn from an empty interval.
-  if (centers.length > 0 && windowMm >= perimeter - EPS) {
-    return [{ start: 0, end: perimeter }];
-  }
-  return centers.map((center) => ({
+  if (plan.coversLoop) return [{ start: 0, end: perimeter }];
+  const half = plan.windowMm / 2;
+  return plan.centers.map((center) => ({
     start: modulo(center - half, perimeter),
     end: modulo(center + half, perimeter),
   }));
-}
-
-function tabCenters(
-  perimeter: number,
-  tabsPerShape: number,
-  manualCenters?: ReadonlyArray<number>,
-): ReadonlyArray<number> {
-  if (manualCenters !== undefined) {
-    return manualCenters
-      .filter((fraction) => Number.isFinite(fraction))
-      .map((fraction) => modulo(fraction, 1) * perimeter);
-  }
-  const count = Math.max(1, Math.floor(tabsPerShape));
-  const centers: number[] = [];
-  for (let index = 0; index < count; index += 1) {
-    centers.push(((index + 0.5) * perimeter) / count);
-  }
-  return centers;
 }
 
 function inAnyWindow(distance: number, windows: ReadonlyArray<TabWindow>): boolean {
@@ -231,9 +269,7 @@ function orderedStops(
 // span's Z changes — that same-XY pair is what the emitter turns into a vertical
 // plunge-feed move, giving a rectangular tab wall.
 function walkWithTabRises(
-  points: ReadonlyArray<Vec2>,
-  cumulative: ReadonlyArray<number>,
-  perimeter: number,
+  loop: TabLoop,
   stops: ReadonlyArray<number>,
   windows: ReadonlyArray<TabWindow>,
   cutZMm: number,
@@ -241,7 +277,7 @@ function walkWithTabRises(
 ): ReadonlyArray<Vec3> {
   const zForSpan = (index: number): number => {
     const from = stops[index] as number;
-    const to = index + 1 < stops.length ? (stops[index + 1] as number) : perimeter;
+    const to = index + 1 < stops.length ? (stops[index + 1] as number) : loop.perimeter;
     const midpoint = from + (to - from) / 2;
     return inAnyWindow(midpoint, windows) ? tabTopZMm : cutZMm;
   };
@@ -250,7 +286,7 @@ function walkWithTabRises(
   let previousZ = zForSpan(stops.length - 1);
   for (let index = 0; index < stops.length; index += 1) {
     const distance = stops[index] as number;
-    const xy = pointAtDistance(points, cumulative, perimeter, distance);
+    const xy = pointAtDistance(loop, distance);
     const spanZ = zForSpan(index);
     if (Math.abs(spanZ - previousZ) > EPS) out.push({ x: xy.x, y: xy.y, z: previousZ });
     out.push({ x: xy.x, y: xy.y, z: spanZ });
@@ -258,55 +294,7 @@ function walkWithTabRises(
   }
   // The closing travel belongs to the last span. Any seam Z transition was
   // already emitted as the same-XY pair at the beginning of the loop.
-  const seam = pointAtDistance(points, cumulative, perimeter, stops[0] as number);
+  const seam = pointAtDistance(loop, stops[0] as number);
   out.push({ x: seam.x, y: seam.y, z: previousZ });
   return out;
-}
-
-// Drop a trailing vertex that repeats the first: callers hand us rings both with
-// and without the explicit closing point.
-function closedLoopPoints(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
-  if (points.length < 2) return points;
-  const first = points[0] as Vec2;
-  const last = points[points.length - 1] as Vec2;
-  const repeatsFirst = Math.abs(first.x - last.x) <= EPS && Math.abs(first.y - last.y) <= EPS;
-  return repeatsFirst ? points.slice(0, -1) : points;
-}
-
-// Cumulative arc length around the closed ring; the final entry is the perimeter
-// (back to the seam).
-function cumulativeDistances(points: ReadonlyArray<Vec2>): ReadonlyArray<number> {
-  const out: number[] = [0];
-  for (let index = 1; index <= points.length; index += 1) {
-    const previous = points[index - 1] as Vec2;
-    const current = points[index % points.length] as Vec2;
-    const step = Math.hypot(current.x - previous.x, current.y - previous.y);
-    out.push((out[index - 1] as number) + step);
-  }
-  return out;
-}
-
-function pointAtDistance(
-  points: ReadonlyArray<Vec2>,
-  cumulative: ReadonlyArray<number>,
-  perimeter: number,
-  distance: number,
-): Vec2 {
-  const target = modulo(distance, perimeter);
-  for (let index = 1; index < cumulative.length; index += 1) {
-    const from = cumulative[index - 1] as number;
-    const to = cumulative[index] as number;
-    if (target > to + EPS) continue;
-    const span = to - from;
-    const ratio = span <= EPS ? 0 : (target - from) / span;
-    const a = points[index - 1] as Vec2;
-    const b = points[index % points.length] as Vec2;
-    return { x: a.x + (b.x - a.x) * ratio, y: a.y + (b.y - a.y) * ratio };
-  }
-  return points[0] as Vec2;
-}
-
-function modulo(value: number, divisor: number): number {
-  if (!(divisor > 0)) return 0;
-  return ((value % divisor) + divisor) % divisor;
 }

@@ -8,19 +8,10 @@ import {
 } from '../scene';
 import type { CncPass } from '../job';
 import type { CncStrategyFallback } from '../job/cnc-compilation-sidecar-types';
-import {
-  depthsWithTabTopPass,
-  passNeedsTabs,
-  settingsWithStockTabGate,
-  tabTopZMm,
-} from './cnc-tabs';
-import { tabRampedPoints } from './cnc-tab-ramp';
+import { settingsWithStockTabGate } from './cnc-tabs';
+import { contourMajorPasses, type CncTabHoldFinding } from './cnc-tabbed-contour-passes';
 import { cncLayoutCutWidths } from './layout-cut-widths';
-import {
-  contourPassFromPolyline,
-  isProfileCutType,
-  sourceRegionMajorDepthPasses,
-} from './compile-cnc-helpers';
+import { isProfileCutType, sourceRegionMajorDepthPasses } from './compile-cnc-helpers';
 import { orderInnerFirst } from './profile-ordering';
 import {
   pocketToolpathsForSettingsWithEvidence,
@@ -42,7 +33,11 @@ import {
   specializedPassesForLayer,
   type SpecializedLayerPasses,
 } from './compile-cnc-special-passes';
-import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-manual-tab-mapping';
+import {
+  manualTabCentersForToolpaths,
+  splitLoopTabCounts,
+  type CollectedCncContour,
+} from './cnc-manual-tab-mapping';
 import type { VCarveLadder } from './vcarve-plan';
 import { cncSettingsForStage, cncStageRecipe } from './cnc-stage-settings';
 import { preserveProfileFinishStages } from './profile-finishing-stage';
@@ -60,6 +55,8 @@ export type CncLayerPassesResult = {
   readonly rampedEntry: boolean;
   // Set when the layer cuts another strategy than it asks for (S8-P2-1).
   readonly strategyFallback?: Omit<CncStrategyFallback, 'layerId'>;
+  // Loops whose holding tabs are not the ones set (ADR-258 Amendment 5).
+  readonly tabHolds?: ReadonlyArray<CncTabHoldFinding>;
 };
 
 export function passesForCncLayerWithEvidence(
@@ -107,7 +104,7 @@ export function passesForCncLayerWithEvidence(
     return { ...uncut, passes: [], rampedEntry: false };
   }
 
-  const passes = passesForDepths(
+  const { passes, tabHolds } = passesForDepths(
     polylines,
     contours,
     toolpaths,
@@ -124,6 +121,7 @@ export function passesForCncLayerWithEvidence(
   return {
     ...raw,
     ...adaptiveFallback,
+    ...(tabHolds.length === 0 ? {} : { tabHolds }),
     passes:
       settings.rampEntryDeg === undefined || settings.rampEntryDeg <= 0
         ? passes
@@ -246,7 +244,10 @@ function passesForDepths(
   handedness: FrameHandedness,
   sourceContours: ReadonlyArray<CollectedCncContour>,
   finishingSettings?: CncLayerSettings,
-): ReadonlyArray<CncPass> {
+): {
+  readonly passes: ReadonlyArray<CncPass>;
+  readonly tabHolds: ReadonlyArray<CncTabHoldFinding>;
+} {
   const helicalPasses = helicalPocketPassesBySourceRegion(
     settings,
     sourcePolylines,
@@ -254,31 +255,49 @@ function passesForDepths(
     depths,
   );
   if (helicalPasses !== null) {
-    return pocketPassLinks(helicalPasses, sourcePolylines, settings, wallDiameterMm);
+    return untabbed(pocketPassLinks(helicalPasses, sourcePolylines, settings, wallDiameterMm));
   }
 
   if (allowanceMm > 0) {
-    return profilePassesWithFinishAllowance(
-      contours,
-      settings,
-      wallDiameterMm,
-      toolpaths,
-      handedness,
-      sourceContours,
-      (part, tabCenters) => contourMajorPasses(part, depths, settings, wallDiameterMm, tabCenters),
-      finishingSettings,
+    return untabbed(
+      profilePassesWithFinishAllowance(
+        contours,
+        settings,
+        wallDiameterMm,
+        toolpaths,
+        handedness,
+        sourceContours,
+        (part, tabCenters) =>
+          contourMajorPasses(part, depths, settings, wallDiameterMm, tabCenters).passes,
+        finishingSettings,
+      ),
     );
   }
   const manualTabCenters = manualTabCentersForToolpaths(toolpaths, sourceContours);
   if (settings.cutType === 'pocket') {
-    return pocketPassLinks(
-      sourceRegionMajorDepthPasses(sourcePolylines, toolpaths, depths),
-      sourcePolylines,
-      settings,
-      wallDiameterMm,
+    return untabbed(
+      pocketPassLinks(
+        sourceRegionMajorDepthPasses(sourcePolylines, toolpaths, depths),
+        sourcePolylines,
+        settings,
+        wallDiameterMm,
+      ),
     );
   }
-  return contourMajorPasses(toolpaths, depths, settings, wallDiameterMm, manualTabCenters);
+  return contourMajorPasses(
+    toolpaths,
+    depths,
+    settings,
+    wallDiameterMm,
+    manualTabCenters,
+    settings.tabsEnabled
+      ? splitLoopTabCounts(toolpaths, sourceContours, settings.tabsPerShape)
+      : new Map(),
+  );
+}
+
+function untabbed(passes: ReadonlyArray<CncPass>) {
+  return { passes, tabHolds: [] };
 }
 
 // ADR-218: select the surviving edge of a traced double-line ring before
@@ -350,69 +369,4 @@ export function xyToolpathsForCutTypeWithEvidence(
 
 function completeToolpaths(toolpaths: ReadonlyArray<Polyline>): CncLayerToolpathsResult {
   return { toolpaths, offsetFailed: false, passLimited: false, stepoverUsed: false };
-}
-
-function contourMajorPasses(
-  toolpaths: ReadonlyArray<Polyline>,
-  depths: ReadonlyArray<number>,
-  settings: CncLayerSettings,
-  toolDiameterMm: number,
-  manualTabCenters: ReadonlyMap<Polyline, ReadonlyArray<number>> = new Map(),
-): CncPass[] {
-  const wantsTabs = settings.tabsEnabled && isProfileCutType(settings.cutType);
-  const tabbedDepths = wantsTabs ? depthsWithTabTopPass(depths, settings) : depths;
-  const passes: CncPass[] = [];
-  for (const toolpath of toolpaths) {
-    const ladder = wantsTabs && toolpath.closed ? tabbedDepths : depths;
-    for (const zMm of ladder) {
-      if (passNeedsTabsForContour(wantsTabs, toolpath, zMm, settings)) {
-        appendTabbedPasses(
-          passes,
-          toolpath,
-          zMm,
-          settings,
-          toolDiameterMm,
-          manualTabCenters.get(toolpath),
-        );
-      } else {
-        passes.push(contourPassFromPolyline(toolpath, zMm));
-      }
-    }
-  }
-  return passes;
-}
-
-function passNeedsTabsForContour(
-  wantsTabs: boolean,
-  toolpath: Polyline,
-  zMm: number,
-  settings: CncLayerSettings,
-): boolean {
-  return wantsTabs && toolpath.closed && passNeedsTabs(zMm, settings.depthMm, settings.tabHeightMm);
-}
-
-function appendTabbedPasses(
-  passes: CncPass[],
-  toolpath: Polyline,
-  zMm: number,
-  settings: CncLayerSettings,
-  toolDiameterMm: number,
-  manualCenters?: ReadonlyArray<number>,
-): void {
-  const points = tabRampedPoints(
-    toolpath,
-    zMm,
-    tabTopZMm(settings.depthMm, settings.tabHeightMm),
-    {
-      tabWidthMm: settings.tabWidthMm,
-      tabsPerShape: settings.tabsPerShape,
-      toolDiameterMm,
-    },
-    manualCenters,
-  );
-  if (points === null || points.length < 2) {
-    passes.push(contourPassFromPolyline(toolpath, zMm));
-    return;
-  }
-  passes.push({ kind: 'path3d', points, closed: false });
 }

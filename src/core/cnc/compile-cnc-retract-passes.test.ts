@@ -61,8 +61,11 @@ function group(cnc: Partial<CncLayerSettings>): CncGroup {
   return compiled;
 }
 
-// A safe-Z retract sitting immediately before the deeper (-3.000) plunge.
-const LIFT_BEFORE_DEEPER = /\nG0 Z[\d.]+\nG1 Z-3\.000 F/;
+// A safe-Z retract sitting immediately before a deeper pass. Since ADR-258
+// Amendment 5 a tabbed pass starts in the middle of a tab, so it may replunge
+// to the tab top (-1) and ride it before stepping down to its own depth.
+const LIFT_BEFORE_DEEPER =
+  /\nG0 Z[\d.]+\nG1 Z-(?:1\.500|3\.000) F|\nG0 Z[\d.]+\nG1 Z-1\.000 F\d+\n(?:G1 [^\n]*Z-1\.000[^\n]*\n)*G1 [^\n]*Z-(?:1\.500|3\.000)/;
 
 describe('retract between passes (ADR-253)', () => {
   it('resolves onto the compiled group: profile ON by default, pocket off, opt-out off', () => {

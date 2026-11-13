@@ -14,6 +14,7 @@ import {
   type Polyline,
 } from '../scene';
 import type { CollectedCncContour } from './cnc-manual-tab-mapping';
+import type { CncTabHoldFinding } from './cnc-tabbed-contour-passes';
 import { cncSettingsForStage } from './cnc-stage-settings';
 import { passesForCncLayerWithEvidence } from './compile-cnc-layer-passes';
 import { cncGroupForPasses } from './compile-cnc-pass-group';
@@ -30,6 +31,7 @@ export type CompiledLayerGroup = {
   readonly passLimited: boolean;
   readonly stepoverUsed: boolean;
   readonly strategyFallback?: Omit<CncStrategyFallback, 'layerId'>;
+  readonly tabHolds?: ReadonlyArray<CncTabHoldFinding>;
 };
 
 export function cncGroupForLayerResolvedWithEvidence(
@@ -95,6 +97,7 @@ export function cncGroupForLayerResolvedWithEvidence(
     passLimited: result.passLimited,
     stepoverUsed: result.stepoverUsed,
     ...(result.strategyFallback === undefined ? {} : { strategyFallback: result.strategyFallback }),
+    ...(result.tabHolds === undefined ? {} : { tabHolds: result.tabHolds }),
   };
 }
 
