@@ -27,21 +27,22 @@ export function collectLayerPolylines(
 }
 
 /**
- * The planner's view of a layer's contours. A V-carve layer resolves each text
- * object's own glyphs with non-zero fill first (ADR-286). A tapered inlay uses
- * the same filled V-bit source. Every other cut type reads the raw pool. The rule is
- * applied, so the compiler, the H.7 clearing stage and the design-time notes
- * cannot disagree about where the material is.
+ * The planner's view of a layer's contours. Every cut type that clears a
+ * closed region (V-carve, pocket and both inlay pairs) resolves each text
+ * object's own glyphs with non-zero fill first (ADR-286 and its Amendment 1),
+ * so a script join is cut rather than left standing as an island. Profiles,
+ * engraves and drills read the raw pool: they follow each contour. The rule is
+ * applied here, so the compiler, the H.7 clearing stage and the design-time
+ * notes cannot disagree about where the material is.
  */
 export function layerPolylinesFromContours(
   layer: Layer,
   contours: ReadonlyArray<CollectedCncContour>,
 ): ReadonlyArray<Polyline> {
-  const settings = layer.cnc;
-  const resolvesFilledVBitSource =
-    settings?.cutType === 'v-carve' ||
-    (settings?.cutType === 'inlay-pair' && settings.taperedInlay !== undefined);
-  if (!resolvesFilledVBitSource) return contours.map((contour) => contour.polyline);
+  const cutType = layer.cnc?.cutType;
+  const clearsClosedRegion =
+    cutType === 'v-carve' || cutType === 'pocket' || cutType === 'inlay-pair';
+  if (!clearsClosedRegion) return contours.map((contour) => contour.polyline);
   return mergeTextObjectContours(contours);
 }
 

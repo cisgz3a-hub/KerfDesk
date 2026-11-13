@@ -23,6 +23,7 @@ import {
 } from '../../core/scene';
 // Deep import: core/cnc's barrel is a ratcheted over-cap legacy barrel.
 import { reliefMachineSpaceGeometry } from '../../core/cnc/relief-machine-space';
+import { MAX_RASTER_STEPOVER_PERCENT } from '../../core/cnc/pocket-paths';
 import { maxOf, minOf } from '../../core/util';
 import { uniqueValues } from '../../core/util/unique';
 
@@ -72,7 +73,11 @@ function stepoverPlanningWarnings(
   operations: ReadonlyArray<CncStepoverOperation>,
 ): ReadonlyArray<string> {
   return operations.flatMap(({ layerId, stepoverPercent }) =>
-    stepoverWarning(layerNameFor(project, layerId), stepoverPercent),
+    stepoverWarning(
+      layerNameFor(project, layerId),
+      stepoverPercent,
+      isRasterPocket(project, layerId),
+    ),
   );
 }
 
@@ -368,12 +373,27 @@ function sourceReliefScallopWarnings(project: Project): ReadonlyArray<string> {
   });
 }
 
-function stepoverWarning(layerName: string, stepoverPercent: number): ReadonlyArray<string> {
+function stepoverWarning(
+  layerName: string,
+  stepoverPercent: number,
+  rasterPocket: boolean,
+): ReadonlyArray<string> {
   if (
     stepoverPercent >= RECOMMENDED_STEPOVER_MIN_PERCENT &&
     stepoverPercent <= RECOMMENDED_STEPOVER_MAX_PERCENT
   ) {
     return [];
+  }
+  // ADR-105 Amendment 1: raster rows further apart than the cut would leave
+  // strips standing, so the planner spaces them at most one cut width apart.
+  if (rasterPocket && stepoverPercent > MAX_RASTER_STEPOVER_PERCENT) {
+    return [
+      `Stored Stepover on layer "${layerName}" is ${format(stepoverPercent)}%, outside the ` +
+        `${RECOMMENDED_STEPOVER_MIN_PERCENT}-${RECOMMENDED_STEPOVER_MAX_PERCENT}% recommended range. ` +
+        `Raster rows further apart than the bit cuts would leave strips of stock standing, so the ` +
+        `planner spaces them ${MAX_RASTER_STEPOVER_PERCENT}% apart. Check the route density in ` +
+        'Preview before running.',
+    ];
   }
   return [
     `Stored Stepover on layer "${layerName}" is ${format(stepoverPercent)}%, outside the ` +
@@ -397,6 +417,14 @@ function scallopWarning(
     `That target is outside the minor-sagitta cusp domain. The established planner retains the stored value, limits the cusp calculation to the ${ball.label} radius, and uses ${format(
       rowSpacingMm,
     )} mm row spacing. Check the finishing preview before running.`
+  );
+}
+
+function isRasterPocket(project: Project, layerId: string): boolean {
+  const settings = project.scene.layers.find((layer) => layer.id === layerId)?.cnc;
+  return (
+    settings?.cutType === 'pocket' &&
+    (settings.pocketStrategy === 'raster-x' || settings.pocketStrategy === 'raster-y')
   );
 }
 

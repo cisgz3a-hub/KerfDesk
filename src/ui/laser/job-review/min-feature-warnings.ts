@@ -21,6 +21,9 @@ import { formatCount, formatMm } from './job-review-format';
 /** Extra positions listed after the narrowest one. */
 const EXTRA_SITES_SHOWN = 2;
 const SUB_HUNDREDTH_MM = 0.005;
+/** Floating-point slack when telling an area exactly the bit's width from a
+ * narrower one (ADR-433 Amendment 6). */
+const TIE_SLACK_MM = 1e-6;
 
 const WIDTH_SOURCE_NOTES: Readonly<Record<MinFeatureReport['widthSource'], string>> = {
   'kerf-offset': ' (twice its Kerf Offset)',
@@ -80,8 +83,12 @@ function grammar(count: number): Grammar {
     : { it: 'them', verb: (_one, many) => `they ${many}` };
 }
 
-function widthConsequence(report: MinFeatureReport, count: number): string {
+function widthConsequence(report: MinFeatureReport, count: number, tie: boolean): string {
   const g = grammar(count);
+  // Every area is as wide as the bit: the bit would fit, but the planner's
+  // path, inset by exactly the radius, shrinks to a line there and is dropped.
+  if (tie && (report.cutType === 'pocket' || report.cutType === 'profile-inside'))
+    return `no tool path enters ${g.it}, so ${g.verb('stays uncut', 'stay uncut')}`;
   if (report.machine === 'laser') return g.verb('burns away or breaks', 'burn away or break');
   if (report.cutType === 'profile-on-path') return g.verb('is cut away', 'are cut away');
   if (report.cutType === 'inlay-pair')
@@ -106,9 +113,13 @@ function widthWarning(report: MinFeatureReport, options: MinFeatureWarningOption
     report.machine === 'laser'
       ? plural(findings.count, 'part', 'parts')
       : plural(findings.count, 'area', 'areas');
+  // ADR-433 Amendment 6: a CNC area exactly as wide as the bit is reported
+  // too, and "narrower than" would be false for it.
+  const tie = (findings.minWidthMm ?? 0) > report.request.thresholdMm - TIE_SLACK_MM;
+  const relation = tie ? 'no wider than' : 'narrower than';
   return (
-    `Layer "${report.layerName}": ${counted} narrower than ${cutterText(report)} — ` +
-    `${widthConsequence(report, findings.count)}; ${sitesText(findings, options)}`
+    `Layer "${report.layerName}": ${counted} ${relation} ${cutterText(report)} — ` +
+    `${widthConsequence(report, findings.count, tie)}; ${sitesText(findings, options)}`
   );
 }
 

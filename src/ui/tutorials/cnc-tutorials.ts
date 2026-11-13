@@ -53,7 +53,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Identify the area to clear',
         instruction:
-          'Select a closed shape and choose Pocket (clear inside). To keep an island, use one compound outline with an inner hole, for example by subtracting an inner shape from an outer rectangle. Two separately drawn shapes do not automatically share one pocket operation.',
+          'Select a closed shape and choose Pocket (clear inside). To keep an island, use one compound outline with an inner hole, for example by subtracting an inner shape from an outer rectangle. Two separately drawn shapes do not automatically share one pocket operation. Pockets take no holding tabs: cut to the stock bottom, an island comes free, so leave a holding floor under it.',
         focus: 'Pocket (clear inside)',
         result: 'The planned route clears the interior instead of making only an outline cut.',
       },

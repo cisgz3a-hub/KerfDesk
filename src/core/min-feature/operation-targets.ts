@@ -49,6 +49,12 @@ import { appendAll } from '../util';
  * 3 mm plywood or acrylic is 0.1 to 0.2 mm. */
 export const DEFAULT_LASER_KERF_MM = 0.15;
 
+/** How much wider than a CNC cut an area may be and still get no path: half
+ * the 0.001 mm G-code grid. The pocket planner insets by exactly the bit
+ * radius, so an area the bit's width wide collapses to a line it drops, while
+ * one 0.001 mm wider is cut (CNC audit v3 N3r-P2-2, ADR-433 Amendment 6). */
+export const CNC_WIDTH_TIE_MM = 0.0005;
+
 export type MinFeatureWidthSource = 'kerf-offset' | 'spot-size' | 'default-kerf' | 'tool';
 
 /** 'declared': the operation is set up to cut through (always so for CNC
@@ -241,8 +247,14 @@ function cncTarget(
     toolName: tool.name,
     ...(wallDiameterMm < tool.diameterMm ? { cutDepthMm: settings.depthMm } : {}),
     // A bit drops a closed shape it cannot enter whole, however small, so no
-    // such shape is a speck (ADR-433 Amendment 3).
-    request: { thresholdMm: wallDiameterMm, ...sides, wholeShapes: true },
+    // such shape is a speck (ADR-433 Amendment 3). An area exactly as wide as
+    // the cut insets to a zero-width line the planner drops (Amendment 6).
+    request: {
+      thresholdMm: wallDiameterMm,
+      ...sides,
+      wholeShapes: true,
+      widthTieMm: CNC_WIDTH_TIE_MM,
+    },
     paths,
   };
 }
