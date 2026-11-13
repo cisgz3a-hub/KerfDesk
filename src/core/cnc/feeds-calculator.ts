@@ -38,10 +38,16 @@ export type FeedsCalculatorResult =
   | FeedsCalculatorOk
   | { readonly kind: 'error'; readonly reason: string };
 
-// Diameter bands (mm): ≤1.5, ≤3.175 (1/8"), ≤6.35 (1/4"), larger.
-const BAND_LIMITS_MM = [1.5, 3.175, 6.35] as const;
+// The chart's diameters (mm): 1.5, 3.175 (1/8"), 6.35 (1/4") and 12.7 (1/2").
+// Each chart value is the chip load for a bit of that diameter. Between two
+// of them the chip load is interpolated, so it is continuous in diameter
+// (ADR-233 Amendment 2, CNC audit FS-5): stepped bands gave a 3.18 mm bit the
+// 1/4" value, 2.5x the 1/8" one. Below 1.5 mm it scales with the diameter, as
+// the per-diameter guide does (about 0.025 x D in wood); above 12.7 mm it holds.
+const CHART_DIAMETERS_MM = [1.5, 3.175, 6.35, 12.7] as const;
+const CHIPLOAD_DECIMALS = 1e5;
 
-// mm/tooth per band, conservative starting values.
+// mm/tooth at each chart diameter, conservative starting values.
 const CHIPLOAD_CHART: Readonly<
   Record<CncMaterialFamily, readonly [number, number, number, number]>
 > = {
@@ -79,11 +85,21 @@ const DEPTH_STEPS_PER_MM = Math.round(1 / ROUND_DEPTH_TO_MM);
 
 export function chiploadFor(material: ChiploadMaterial, bitDiameterMm: number): number {
   const chart = CHIPLOAD_CHART[cncMaterialFamilyFor(material)];
-  for (let band = 0; band < BAND_LIMITS_MM.length; band += 1) {
-    const limit = BAND_LIMITS_MM[band];
-    if (limit !== undefined && bitDiameterMm <= limit) return chart[band] ?? 0;
+  const [smallest] = CHART_DIAMETERS_MM;
+  if (bitDiameterMm <= smallest) return rounded((chart[0] * Math.max(0, bitDiameterMm)) / smallest);
+  for (let index = 1; index < CHART_DIAMETERS_MM.length; index += 1) {
+    const upper = CHART_DIAMETERS_MM[index] ?? smallest;
+    if (bitDiameterMm > upper) continue;
+    const lower = CHART_DIAMETERS_MM[index - 1] ?? smallest;
+    const from = chart[index - 1] ?? 0;
+    const to = chart[index] ?? from;
+    return rounded(from + ((to - from) * (bitDiameterMm - lower)) / (upper - lower));
   }
   return chart[3];
+}
+
+function rounded(chiploadMm: number): number {
+  return Math.round(chiploadMm * CHIPLOAD_DECIMALS) / CHIPLOAD_DECIMALS;
 }
 
 export function calculateFeeds(input: FeedsCalculatorInput): FeedsCalculatorResult {

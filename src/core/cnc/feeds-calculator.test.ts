@@ -26,11 +26,36 @@ describe('isChiploadMaterialKey', () => {
 });
 
 describe('chiploadFor', () => {
-  it('selects the diameter band, inclusive at the boundary', () => {
-    expect(chiploadFor('hardwood', 1.0)).toBe(0.02);
+  it('gives each chart diameter its own value', () => {
+    expect(chiploadFor('hardwood', 1.5)).toBe(0.02);
     expect(chiploadFor('hardwood', 3.175)).toBe(0.04);
     expect(chiploadFor('hardwood', 6.35)).toBe(0.1);
-    expect(chiploadFor('hardwood', 12)).toBe(0.15);
+    expect(chiploadFor('hardwood', 12.7)).toBe(0.15);
+    expect(chiploadFor('hardwood', 20)).toBe(0.15);
+  });
+
+  // CNC audit FS-5 (ADR-233 Amd 2): main stepped at band edges, so 3.175 gave
+  // 0.04 and 3.18 gave 0.1 in hardwood; 1/16" took the 1/8" value; a 0.5 mm
+  // bit took 0.03 in softwood, 2.4x the 0.025 x D guide.
+  it('is continuous in diameter', () => {
+    expect(chiploadFor('hardwood', 3.18)).toBeCloseTo(0.04009, 5);
+    expect(chiploadFor('hardwood', 4.7625)).toBeCloseTo(0.07, 5);
+    expect(chiploadFor('plywood-mdf', 1.588)).toBeCloseTo(0.03158, 5);
+    expect(chiploadFor('softwood', 0.5)).toBeCloseTo(0.01, 5);
+    expect(chiploadFor('softwood', 0.5)).toBeLessThanOrEqual(0.025 * 0.5);
+    for (const material of [
+      'softwood',
+      'hardwood',
+      'plywood-mdf',
+      'acrylic',
+      'aluminum',
+    ] as const) {
+      for (let d = 0.2; d < 14; d += 0.01) {
+        const step = chiploadFor(material, d + 0.01) - chiploadFor(material, d);
+        expect(step, `${material} at ${d.toFixed(2)} mm`).toBeGreaterThanOrEqual(-1e-9);
+        expect(step, `${material} at ${d.toFixed(2)} mm`).toBeLessThan(0.002);
+      }
+    }
   });
 
   it('uses the material-family chart for a named wood species', () => {
