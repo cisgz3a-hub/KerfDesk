@@ -61,6 +61,7 @@ async function seedReview(
     const scene = (await import(scenePath)) as {
       createProject: () => object;
       createLayer: (args: { id: string; color: string }) => object;
+      IDENTITY_TRANSFORM: object;
       DEFAULT_CNC_MACHINE_CONFIG: { params: object };
       DEFAULT_CNC_LAYER_SETTINGS: object;
     };
@@ -88,8 +89,34 @@ async function seedReview(
         ...scene.DEFAULT_CNC_MACHINE_CONFIG,
         params: { ...scene.DEFAULT_CNC_MACHINE_CONFIG.params, spindleMaxRpm: ceiling },
       },
+      // Machine-limit warnings read only layers with artwork: an empty layer
+      // sends no S word (ADR-233 Amendment 1).
       scene: {
-        objects: [],
+        objects: [
+          {
+            kind: 'imported-svg',
+            id: 'part',
+            source: 'part.svg',
+            bounds: { minX: 50, minY: 50, maxX: 90, maxY: 90 },
+            transform: scene.IDENTITY_TRANSFORM,
+            paths: [
+              {
+                color: '#ff0000',
+                polylines: [
+                  {
+                    closed: true,
+                    points: [
+                      { x: 50, y: 50 },
+                      { x: 90, y: 50 },
+                      { x: 90, y: 90 },
+                      { x: 50, y: 90 },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
         layers: [
           {
             ...scene.createLayer({ id: 'cnc', color: '#ff0000' }),
