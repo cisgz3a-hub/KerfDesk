@@ -7,6 +7,7 @@ import type { CncTaperedInlaySettings } from '../scene/cnc-tapered-inlay';
 import { inlayBorder, inlayBounds, mirrorInlayContours } from './tapered-inlay-geometry';
 import {
   taperedInlaySettingsIssue,
+  taperedInlaySlope,
   taperedInlayToolIssue,
   taperedInlayWallStartDepth,
 } from './tapered-inlay-settings';
@@ -56,7 +57,7 @@ export function planTaperedInlayPair(
       directionX,
     ),
     plugWallStartDepthMm: taperedInlayWallStartDepth(settings, tool.tipAngleDeg ?? 90),
-    findings: inlayFindings(settings),
+    findings: inlayFindings(settings, tool.tipAngleDeg ?? 90),
   };
 }
 
@@ -80,7 +81,10 @@ function validClosed(contour: Polyline): boolean {
   );
 }
 
-function inlayFindings(settings: CncTaperedInlaySettings): ReadonlyArray<string> {
+function inlayFindings(
+  settings: CncTaperedInlaySettings,
+  includedAngleDeg: number,
+): ReadonlyArray<string> {
   const findings = [
     'Tapered inlay clearances are geometric estimates; material fit, glue and cutter deflection need a matched trial.',
   ];
@@ -90,7 +94,35 @@ function inlayFindings(settings: CncTaperedInlaySettings): ReadonlyArray<string>
     );
   if (settings.glueGapMm === 0)
     findings.push('The nominal axial glue gap is zero. No glue-space qualification is recorded.');
+  const seam = fitSeamFinding(settings, includedAngleDeg);
+  if (seam !== null) findings.push(seam);
   return findings;
+}
+
+// CNC audit v2 J1-P3-2 (ADR-258 Amendment 8): the plug closes its radial fit gap
+// by sinking fit / tan(half angle) past engagement. When that is deeper than the
+// glue gap, the plug bottoms out first and the walls never meet: a seam is left
+// round the inlay, which no other line said.
+function fitSeamFinding(
+  settings: CncTaperedInlaySettings,
+  includedAngleDeg: number,
+): string | null {
+  const slope = taperedInlaySlope(includedAngleDeg);
+  if (!(slope > 0)) return null;
+  const closesAtMm = settings.fitClearanceMm / slope;
+  if (closesAtMm <= settings.glueGapMm + 1e-6) return null;
+  const seamMm = settings.fitClearanceMm - settings.glueGapMm * slope;
+  return (
+    `The ${mm(settings.fitClearanceMm)} mm radial fit gap closes only after the plug sinks ` +
+    `${mm(closesAtMm)} mm, deeper than the ${mm(settings.glueGapMm)} mm glue gap: the plug ` +
+    `bottoms out first and leaves about a ${mm(seamMm)} mm seam round the inlay. Raise the glue ` +
+    `gap to at least ${mm(closesAtMm)} mm, or lower the radial fit gap to ` +
+    `${mm(settings.glueGapMm * slope)} mm.`
+  );
+}
+
+function mm(value: number): string {
+  return String(Math.round(value * 1000) / 1000);
 }
 
 function failure(reason: string, offsetFailed = false): TaperedInlayPairPlan {

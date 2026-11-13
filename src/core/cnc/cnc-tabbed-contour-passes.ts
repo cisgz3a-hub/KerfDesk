@@ -31,7 +31,7 @@ import {
   type TabRampSettings,
 } from './cnc-tab-ramp';
 import { modulo, pointAtDistance, tabLoop, type TabPlan } from './cnc-tab-placement';
-import { cutFreesOpenOutline, planClearOfGap } from './cnc-open-outline-tabs';
+import { cutFreesOpenOutline } from './cnc-open-outline-tabs';
 import { maxOf, minOf } from '../util';
 
 const EPS = 1e-9;
@@ -97,9 +97,8 @@ function tabbedLoop(
     tabsPerShape: tabs.count,
     toolDiameterMm: cutWidthMm,
   };
-  const planned = tabPlanForToolpath(loop, rampSettings, open ? undefined : tabs.manual);
-  // Amendment 7: an open outline's tabs keep off its gap, where nothing is cut.
-  const plan = open && planned !== null ? planClearOfGap(loop, planned, cutWidthMm) : planned;
+  // Amendment 8: an open outline keeps the closed loop's corner-avoiding plan.
+  const plan = tabPlanForToolpath(loop, rampSettings, open ? undefined : tabs.manual);
   if (open || plan === null) return { toolpath, loop, open, plan, rampSettings };
   const started = startingInTab(toolpath, plan);
   return { toolpath: started.loop, loop: started.loop, open, plan: started.plan, rampSettings };
@@ -215,6 +214,7 @@ function loopFacts(
     tabsCut: plan.coversLoop ? 0 : plan.centers.length,
     tabWidthMm: settings.tabWidthMm,
     cutWidthMm,
+    ...(tabbed.open ? { openOutline: true as const } : {}),
   };
 }
 
