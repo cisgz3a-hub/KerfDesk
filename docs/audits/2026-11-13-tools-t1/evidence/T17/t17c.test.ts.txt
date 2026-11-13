@@ -1,0 +1,77 @@
+import { it, vi } from 'vitest';
+import type { RasterImage } from '../t13-main/src/core/scene';
+import { serializeProject } from '../t13-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t13-main/src/io/project/deserialize-project';
+import { useStore } from '../t13-main/src/ui/state/store';
+import { resetStore } from '../t13-main/src/ui/state/test-helpers';
+import { drawRasterImage } from '../t13-main/src/ui/workspace/draw-raster';
+import { cropMaskedRasterImage } from '../t13-main/src/ui/raster/crop-image';
+import { applyImageMaskToLuma } from '../t13-main/src/core/raster';
+import { burnedSegments, circle, encode, gcodeOf, imageLayer, logger, maskLayer, mkImage, mkMask, patternLuma, project, b64 } from './t17-common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t17/t17c.log');
+const st = () => useStore.getState();
+const c0 = circle(20.05, 19.95, 7.3);
+
+it('C1: store crop, Undo, Redo, save/reopen, mask object afterwards, fields kept', async () => {
+  resetStore();
+  const img = { ...mkImage('R', 40, 40, { x: 10, y: 10, w: 20, h: 20 }, undefined, { traceSourceId: 'TS1' }), imageMaskId: 'M' } as RasterImage;
+  const p0 = project([img, mkMask('M', [c0])], [imageLayer(), maskLayer()]);
+  st().setProject(p0);
+  const before = JSON.stringify(st().project);
+  const gBefore = gcodeOf(st().project);
+  const cropped = await cropMaskedRasterImage(img, st().project.scene.objects[1]!, encode);
+  st().cropImage('R', cropped);
+  const after = JSON.stringify(st().project);
+  const gAfter = gcodeOf(st().project);
+  const r = st().project.scene.objects.find((o) => o.id === 'R') as RasterImage;
+  out(`C1 after crop: objects ${st().project.scene.objects.map((o) => o.id).join(',')}; imageMaskId=${r.imageMaskId}; imageClip paths ${r.imageClip?.length}; traceSourceId=${r.traceSourceId}; editorDocument kept=${r.editorDocument !== undefined}; dataUrl=${r.dataUrl?.slice(0, 30)}; undo depth ${st().undoStack.length}; selected ${st().selectedObjectId}`);
+  st().undo();
+  out(`C1 undo exact: ${JSON.stringify(st().project) === before}; gcode equal ${gcodeOf(st().project) === gBefore}`);
+  st().redo();
+  out(`C1 redo exact: ${JSON.stringify(st().project) === after}; gcode equal ${gcodeOf(st().project) === gAfter}`);
+  const back = deserializeProject(serializeProject(st().project));
+  if (back.kind !== 'ok') { out(`C1 reopen failed ${JSON.stringify(back).slice(0, 400)}`); return; }
+  const rb = back.project.scene.objects.find((o) => o.id === 'R') as RasterImage;
+  out(`C1 reopen: imageClip kept ${rb.imageClip !== undefined}; gcode identical ${gcodeOf(back.project) === gAfter}`);
+  // crop result is independent of the mask now: move the mask, gcode unchanged?
+  st().setProject({ ...st().project, scene: { ...st().project.scene, objects: st().project.scene.objects.map((o) => (o.id === 'M' ? { ...o, transform: { ...o.transform, x: 3 } } : o)) } });
+  out(`C1 move mask +3 mm after crop: gcode unchanged ${gcodeOf(st().project) === gAfter}`);
+  // move the cropped image: clip moves with it
+  st().setProject({ ...st().project, scene: { ...st().project.scene, objects: st().project.scene.objects.map((o) => (o.id === 'R' ? { ...o, transform: { ...o.transform, x: 5 } } : o)) } });
+  const segs = burnedSegments(gcodeOf(st().project));
+  out(`C1 move cropped image +5 mm: leftmost burn ${Math.min(...segs.map((s) => Math.min(s.a.x, s.b.x))).toFixed(2)} (was circle left 12.75 -> expect ~17.75)`);
+});
+
+it('C2: canvas after crop clips to the mask shape', async () => {
+  const img = { ...mkImage('R', 40, 40, { x: 10, y: 10, w: 20, h: 20 }), imageMaskId: 'M' } as RasterImage;
+  const cropped = await cropMaskedRasterImage(img, mkMask('M', [c0]), encode);
+  class ReadyImage { complete = true; naturalWidth = 29; naturalHeight = 29; src = ''; onload: unknown = null; onerror: unknown = null; }
+  vi.stubGlobal('Image', ReadyImage);
+  let clips = 0, draws = 0;
+  const ctx = new Proxy({} as Record<string, unknown>, { get: (t, k) => { if (k === 'clip') return () => { clips++; }; if (k === 'drawImage') return () => { draws++; }; if (k in t) return t[k as string]; return () => undefined; }, set: (t, k, v) => { t[k as string] = v; return true; } }) as unknown as CanvasRenderingContext2D;
+  try { drawRasterImage(ctx, { ...cropped, dataUrl: 'data:image/png;base64,AAAA' }, { scale: 1, offsetX: 0, offsetY: 0 } as never); } catch (e) { out(`C2 draw threw ${(e as Error).message}`); }
+  out(`C2 canvas: clip() calls ${clips}, drawImage ${draws}`);
+});
+
+it.skip('C3: latency and memory of the synchronous parts on large images', async () => {
+  for (const [W, H] of [[2048, 1024], [6000, 4000], [8000, 6000]] as const) {
+    const luma = patternLuma(W, H);
+    const lumaB64 = b64(luma);
+    const img = { ...mkImage('R', W, H, { x: 0, y: 0, w: 200, h: 150 }, undefined, {}, new Uint8Array(1)), lumaBase64: lumaB64, imageMaskId: 'M' } as RasterImage;
+    const mask = mkMask('M', [circle(100, 75, 60, 50, 720)]);
+    // probe alone (synchronous; runs before the first await)
+    const t0 = performance.now();
+    applyImageMaskToLuma({ image: img, maskObject: mask, luma: new Uint8Array(W * H), width: W, height: H });
+    const tProbe = performance.now() - t0;
+    const t1 = performance.now();
+    const bin = atob(lumaB64); const u = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    const tDecode = performance.now() - t1;
+    const heap0 = process.memoryUsage();
+    const t2 = performance.now();
+    const cropped = await cropMaskedRasterImage(img, mask, encode);
+    const tAll = performance.now() - t2;
+    const heap1 = process.memoryUsage();
+    out(`C3 ${W}x${H} (${((W * H) / 1e6).toFixed(1)} MP): mask probe ${tProbe.toFixed(0)} ms; atob+Uint8Array.from decode ${tDecode.toFixed(0)} ms (len ${u.length}); whole crop (stub encoder) ${tAll.toFixed(0)} ms -> ${cropped.pixelWidth}x${cropped.pixelHeight}; rss ${(heap0.rss / 1e6).toFixed(0)} -> ${(heap1.rss / 1e6).toFixed(0)} MB`);
+  }
+});

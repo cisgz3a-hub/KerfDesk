@@ -1,0 +1,73 @@
+import { it } from 'vitest';
+import type { Layer, RasterImage, SceneObject, Transform } from '../t13-main/src/core/scene';
+import { cropMaskedRasterImage } from '../t13-main/src/ui/raster/crop-image';
+import { burnedSegments, circle, diffMaps, encode, gcodeOf, imageLayer, logger, maskLayer, mkImage, mkMask, patternLuma, project, rect, rowYs, sMap, T, xf, type P } from './t17-common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t17/t17a.log');
+const REGION = { x0: 0, y0: 0, x1: 50, y1: 50 };
+
+type Case = { name: string; image: RasterImage; mask: SceneObject; local: P[][]; layer?: Partial<Layer> };
+
+async function run(c: Case): Promise<void> {
+  const masked = { ...c.image, imageMaskId: c.mask.id } as RasterImage;
+  const layer = imageLayer(c.layer);
+  const pitch = 1 / (layer.linesPerMm ?? 5);
+  const before = gcodeOf(project([masked, c.mask], [layer, maskLayer()]));
+  let cropped: RasterImage;
+  try {
+    cropped = await cropMaskedRasterImage(masked, c.mask, encode);
+  } catch (e) {
+    out(`${c.name}: CROP THREW "${(e as Error).message}"; before segs ${burnedSegments(before).length}`);
+    return;
+  }
+  const after = gcodeOf(project([cropped, c.mask], [layer, maskLayer()]));
+  if (before.startsWith('NOT OK') || after.startsWith('NOT OK')) { out(`${c.name}: ${before.slice(0, 200)} | ${after.slice(0, 300)}`); return; }
+  const sb = burnedSegments(before), sa = burnedSegments(after);
+  const sMax = Math.max(...sb.map((s) => s.s), ...sa.map((s) => s.s));
+  const maskScene = c.local.map((cn) => cn.map((pt) => xf(pt, c.mask.transform)));
+  const d = diffMaps(sMap(sb, pitch, REGION), sMap(sa, pitch, REGION), maskScene, 2 * pitch, sMax);
+  const yb = rowYs(sb), ya = rowYs(sa);
+  const shared = ya.filter((y) => yb.includes(y)).length;
+  const shift = ya.length && yb.length ? Math.min(...yb.map((y) => Math.abs(y - ya[0]!))) : NaN;
+  out(`${c.name}: px ${c.image.pixelWidth}x${c.image.pixelHeight} -> ${cropped.pixelWidth}x${cropped.pixelHeight}; bounds ${JSON.stringify(cropped.bounds)}; segs ${sb.length} -> ${sa.length}; sMax ${sMax}\n   rows before ${yb.length} after ${ya.length}, shared ${shared}, first-after-row offset to nearest before row ${shift.toFixed?.(3)}\n   ${JSON.stringify(d)}`);
+}
+
+it('A: burned cells before vs after Crop', async () => {
+  const BOX = { x: 10, y: 10, w: 20, h: 20 };
+  const circ = circle(20.05, 19.95, 7.3);
+  const cases: Case[] = [];
+  // aligned grid: 10 px/mm source, 10 lines/mm
+  cases.push({ name: 'A01 aligned 200px/20mm, 10 l/mm, grayscale, circle', image: mkImage('R', 200, 200, BOX), mask: mkMask('M', [circ]), local: [circ], layer: { linesPerMm: 10 } });
+  cases.push({ name: 'A02 aligned 200px/20mm, 10 l/mm, grayscale, rect sub-pixel edges', image: mkImage('R', 200, 200, BOX), mask: mkMask('M', [rect(14.13, 12.37, 25.31, 27.77)]), local: [rect(14.13, 12.37, 25.31, 27.77)], layer: { linesPerMm: 10 } });
+  // coarse source, finer lines
+  cases.push({ name: 'A03 40px/20mm (0.5mm px), 5 l/mm, grayscale, circle', image: mkImage('R', 40, 40, BOX), mask: mkMask('M', [circ]), local: [circ] });
+  cases.push({ name: 'A04 40px/20mm, 5 l/mm, grayscale, rect sub-pixel', image: mkImage('R', 40, 40, BOX), mask: mkMask('M', [rect(14.13, 12.37, 25.31, 27.77)]), local: [rect(14.13, 12.37, 25.31, 27.77)] });
+  cases.push({ name: 'A05 40px/20mm, 5 l/mm, threshold, circle', image: mkImage('R', 40, 40, BOX), mask: mkMask('M', [circ]), local: [circ], layer: { ditherAlgorithm: 'threshold' } });
+  cases.push({ name: 'A06 40px/20mm, 5 l/mm, floyd-steinberg, circle', image: mkImage('R', 40, 40, BOX), mask: mkMask('M', [circ]), local: [circ], layer: { ditherAlgorithm: 'floyd-steinberg' } });
+  cases.push({ name: 'A07 aligned 200px, 10 l/mm, floyd-steinberg, rect', image: mkImage('R', 200, 200, BOX), mask: mkMask('M', [rect(14.13, 12.37, 25.31, 27.77)]), local: [rect(14.13, 12.37, 25.31, 27.77)], layer: { linesPerMm: 10, ditherAlgorithm: 'floyd-steinberg' } });
+  // Negative with flat light photo
+  const flat = patternLuma(40, 40, 'flat', 200);
+  cases.push({ name: 'A08 NEGATIVE flat 200, 40px, 5 l/mm, grayscale, circle', image: mkImage('R', 40, 40, BOX, undefined, {}, flat), mask: mkMask('M', [circ]), local: [circ], layer: { negativeImage: true } });
+  cases.push({ name: 'A09 NEGATIVE flat 200, 40px, 5 l/mm, threshold, circle', image: mkImage('R', 40, 40, BOX, undefined, {}, flat), mask: mkMask('M', [circ]), local: [circ], layer: { negativeImage: true, ditherAlgorithm: 'threshold' } });
+  cases.push({ name: 'A10 NEGATIVE pattern, 40px, 5 l/mm, grayscale, circle', image: mkImage('R', 40, 40, BOX), mask: mkMask('M', [circ]), local: [circ], layer: { negativeImage: true } });
+  const flat200 = patternLuma(200, 200, 'flat', 200);
+  cases.push({ name: 'A11 NEGATIVE flat 200, aligned 200px, 10 l/mm, grayscale, circle', image: mkImage('R', 200, 200, BOX, undefined, {}, flat200), mask: mkMask('M', [circ]), local: [circ], layer: { negativeImage: true, linesPerMm: 10 } });
+  // transforms
+  const ctr = { x: -10, y: -10, w: 20, h: 20 };
+  cases.push({ name: 'A12 image rotated 30, 40px, circle', image: mkImage('R', 40, 40, ctr, T({ x: 20, y: 20, rotationDeg: 30 })), mask: mkMask('M', [circ]), local: [circ] });
+  cases.push({ name: 'A13 image mirrorX, 40px, circle', image: mkImage('R', 40, 40, ctr, T({ x: 20, y: 20, mirrorX: true })), mask: mkMask('M', [circ]), local: [circ] });
+  cases.push({ name: 'A14 image scale 1.5x0.8, 40px, circle', image: mkImage('R', 40, 40, ctr, T({ x: 20, y: 20, scaleX: 1.5, scaleY: 0.8 })), mask: mkMask('M', [circ]), local: [circ] });
+  cases.push({ name: 'A15 image mirrorY + rotated 90, 200px, 10 l/mm, circle', image: mkImage('R', 200, 200, ctr, T({ x: 20, y: 20, mirrorY: true, rotationDeg: 90 })), mask: mkMask('M', [circ]), local: [circ], layer: { linesPerMm: 10 } });
+  const rr = rect(-6.1, -4.2, 6.1, 4.2);
+  cases.push({ name: 'A16 mask rect rotated 30 (not axis-aligned), 40px', image: mkImage('R', 40, 40, BOX), mask: mkMask('M', [rr], T({ x: 20, y: 20, rotationDeg: 30 })), local: [rr] });
+  const uc = circle(0, 0, 5);
+  cases.push({ name: 'A17 mask circle scale 1.6x0.7, 40px', image: mkImage('R', 40, 40, BOX), mask: mkMask('M', [uc], T({ x: 20, y: 20, scaleX: 1.6, scaleY: 0.7 })), local: [uc] });
+  cases.push({ name: 'A18 mask partly outside, 40px', image: mkImage('R', 40, 40, BOX), mask: mkMask('M', [rect(24.1, 15.1, 40.3, 25.3)]), local: [rect(24.1, 15.1, 40.3, 25.3)] });
+  // tiny mask between pixel centres (pixel centres at 10.25, 10.75 ...)
+  cases.push({ name: 'A19 tiny mask between pixel centres (0.3x0.3 at 20.3..20.6)', image: mkImage('R', 40, 40, BOX), mask: mkMask('M', [rect(20.3, 20.3, 20.6, 20.6)]), local: [rect(20.3, 20.3, 20.6, 20.6)] });
+  cases.push({ name: 'A20 mask entirely outside', image: mkImage('R', 40, 40, BOX), mask: mkMask('M', [rect(35, 35, 45, 45)]), local: [rect(35, 35, 45, 45)] });
+  cases.push({ name: 'A21 40px, bidirectional + overscan 3, circle', image: mkImage('R', 40, 40, BOX), mask: mkMask('M', [circ]), local: [circ], layer: { imageBidirectional: true, imageOverscanMm: 3 } });
+  cases.push({ name: 'A22 40px, scan angle 45, circle', image: mkImage('R', 40, 40, BOX), mask: mkMask('M', [circ]), local: [circ], layer: { imageScanAngleDeg: 45 } });
+  cases.push({ name: 'A23 aligned 200px, 10 l/mm, pass-through, circle', image: mkImage('R', 200, 200, BOX), mask: mkMask('M', [circ]), local: [circ], layer: { linesPerMm: 10, passThrough: true } });
+  for (const c of cases) await run(c);
+});

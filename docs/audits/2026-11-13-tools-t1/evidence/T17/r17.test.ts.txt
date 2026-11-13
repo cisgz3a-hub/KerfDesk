@@ -1,0 +1,178 @@
+// T17 refuter: isolate the whitening effect of Crop on the compiled burn grid.
+// Method: compile through the real compileRasterGroupsForLayer (not G-code) and compare
+//   A = live mask, B = real cropMaskedRasterImage result,
+//   C = control: B with its luma replaced by the UN-whitened source crop (same crop box, same clip).
+// B vs C share one burn grid, so every difference is caused by the whitening alone.
+import { it } from 'vitest';
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../t13-main/src/core/devices';
+import { compileRasterGroupsForLayer } from '../t13-main/src/core/job/compile-job-raster';
+import type { VectorRaster } from '../t13-main/src/core/raster';
+import { createLayer, IDENTITY_TRANSFORM, type Layer, type RasterImage, type SceneObject } from '../t13-main/src/core/scene';
+import { cropMaskedRasterImage } from '../t13-main/src/ui/raster/crop-image';
+import { lumaToBase64 } from '../t13-main/src/ui/raster/luma-bitmap';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t17r/r17.log';
+if (!process.env.R17_ONLY) writeFileSync(LOG, '');
+const log = (s: string) => { appendFileSync(LOG, s + '\n'); };
+
+const DEV: DeviceProfile = { ...DEFAULT_DEVICE_PROFILE, origin: 'rear-left' };
+type P = { x: number; y: number };
+
+function poly(cx: number, cy: number, r: number, n = 2880): P[] {
+  return Array.from({ length: n }, (_, i) => {
+    const a = 0.0137 + (i / n) * 2 * Math.PI;
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  });
+}
+function maskObj(contours: P[][]): SceneObject {
+  const all = contours.flat();
+  return {
+    kind: 'shape', id: 'mask', color: '#000000', transform: IDENTITY_TRANSFORM,
+    spec: { kind: 'polyline', points: contours[0], closed: true },
+    bounds: { minX: Math.min(...all.map((p) => p.x)), minY: Math.min(...all.map((p) => p.y)), maxX: Math.max(...all.map((p) => p.x)), maxY: Math.max(...all.map((p) => p.y)) },
+    paths: [{ color: '#000000', polylines: contours.map((points) => ({ points, closed: true })) }],
+  } as unknown as SceneObject;
+}
+function image(px: number, sizeMm: number, luma: Uint8Array, extra: Partial<RasterImage> = {}): RasterImage {
+  return {
+    kind: 'raster-image', id: 'img', source: 'img.png', dataUrl: 'data:image/png;base64,x',
+    pixelWidth: px, pixelHeight: px, bounds: { minX: 0, minY: 0, maxX: sizeMm, maxY: sizeMm },
+    transform: { ...IDENTITY_TRANSFORM, x: 50, y: 50 }, color: '#808080', operationIds: ['op'],
+    dither: 'grayscale', linesPerMm: 10, lumaBase64: lumaToBase64(luma), imageMaskId: 'mask', ...extra,
+  } as RasterImage;
+}
+function layer(extra: Partial<Layer>): Layer {
+  return { ...createLayer({ id: 'op', color: '#808080', mode: 'image' }), power: 100, minPower: 0, linesPerMm: 10,
+    ditherAlgorithm: 'grayscale', dotWidthCorrectionMm: 0, ...extra } as Layer;
+}
+const encode = (r: VectorRaster) => ({ dataUrl: 'data:image/png;base64,baked', lumaBase64: lumaToBase64(r.luma) });
+
+type Grid = { w: number; h: number; x0: number; y0: number; cw: number; ch: number; s: Float64Array };
+function grid(img: RasterImage, mask: SceneObject | null, ly: Layer): Grid {
+  const { groups } = compileRasterGroupsForLayer([img], ly, DEV, { sceneObjects: mask ? [img, mask] : [img] });
+  const g = groups[0]!;
+  const w = g.pixelWidth, h = g.pixelHeight;
+  let s: Float64Array;
+  if (g.sValues.length === w * h) s = Float64Array.from(g.sValues);
+  else { s = new Float64Array(w * h); for (let y = 0; y < h; y++) s.set(g.rowProvider!(y), y * w); }
+  // scene frame: image local bounds + translation (identity rotation, rear-left = no row flip)
+  const b = img.bounds;
+  return { w, h, x0: b.minX + img.transform.x, y0: b.minY + img.transform.y, cw: (b.maxX - b.minX) / w, ch: (b.maxY - b.minY) / h, s };
+}
+const centre = (g: Grid, i: number, j: number): P => ({ x: g.x0 + (i + 0.5) * g.cw, y: g.y0 + (j + 0.5) * g.ch });
+
+/** Control: same crop box as the real bake, but source pixels NOT whitened. */
+function control(src: RasterImage, baked: RasterImage, srcLuma: Uint8Array): RasterImage {
+  const pm = (src.bounds.maxX - src.bounds.minX) / src.pixelWidth;
+  const x0 = Math.round((baked.bounds.minX - src.bounds.minX) / pm), y0 = Math.round((baked.bounds.minY - src.bounds.minY) / pm);
+  const w = baked.pixelWidth, h = baked.pixelHeight;
+  const out = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) out[y * w + x] = srcLuma[(y0 + y) * src.pixelWidth + x0 + x]!;
+  return { ...baked, lumaBase64: lumaToBase64(out) };
+}
+
+type Case = { name: string; dpi?: number; px?: number; sizeMm: number; luma: number; ly: Partial<Layer>; img?: Partial<RasterImage>;
+  cx: number; cy: number; r: number; rIn?: number };
+
+async function run(c: Case) {
+  const px = c.px ?? Math.round((c.sizeMm / 25.4) * c.dpi!);
+  const pitch = c.sizeMm / px;
+  const srcLuma = new Uint8Array(px * px).fill(c.luma);
+  const contours = [poly(c.cx, c.cy, c.r), ...(c.rIn ? [poly(c.cx, c.cy, c.rIn)] : [])];
+  const mask = maskObj(contours);
+  const src = image(px, c.sizeMm, srcLuma, c.img);
+  const ly = layer(c.ly);
+  const baked = await cropMaskedRasterImage(src, mask, encode);
+  const ctl = control(src, baked, srcLuma);
+  const A = grid(src, mask, ly), B = grid(baked, null, ly), C = grid(ctl, null, ly);
+  // signed distance inside the mask (positive = inside) for a circle or ring
+  const d = (p: P) => { const rr = Math.hypot(p.x - c.cx, p.y - c.cy); return c.rIn ? Math.min(c.r - rr, rr - c.rIn) : c.r - rr; };
+  const perim = 2 * Math.PI * (c.r + (c.rIn ?? 0));
+  const sFull = 1000;
+  const bands = [0, 0.05, 0.1, 0.2, 0.3, 0.5, 1e9];
+  const stat = (g: Grid) => {
+    const n = new Array(bands.length - 1).fill(0), sum = [...n], full = [...n];
+    let tot = 0, on = 0, outside = 0;
+    for (let j = 0; j < g.h; j++) for (let i = 0; i < g.w; i++) {
+      const v = g.s[j * g.w + i]!; const dd = d(centre(g, i, j));
+      tot += v * g.cw * g.ch; if (v > 0) on += g.cw * g.ch;
+      if (dd < 0) { if (v > 0) outside++; continue; }
+      const k = bands.findIndex((b, q) => dd >= b && dd < bands[q + 1]!);
+      n[k]++; sum[k] += v; if (v >= sFull * 0.999) full[k]++;
+    }
+    return { n, mean: sum.map((s2, k) => (n[k] ? s2 / n[k] : NaN)), full: full.map((f, k) => (n[k] ? f / n[k] : NaN)), tot, on, outside };
+  };
+  const a = stat(A), b = stat(B), cc = stat(C);
+  // B vs C on the same grid
+  let diff = 0, maxD = 0, sumDiff = 0, sumAbs = 0, maxCellDelta = 0;
+  for (let j = 0; j < B.h; j++) for (let i = 0; i < B.w; i++) {
+    const k = j * B.w + i; const dv = B.s[k]! - C.s[k]!;
+    if (dv !== 0) { diff++; maxD = Math.max(maxD, d(centre(B, i, j))); sumDiff += dv; sumAbs += Math.abs(dv); maxCellDelta = Math.max(maxCellDelta, Math.abs(dv)); }
+  }
+  const cellA = B.cw * B.ch;
+  const f = (x: number, k = 3) => (Number.isFinite(x) ? x.toFixed(k) : '-');
+  log(`\n## ${c.name}`);
+  log(`source px ${px} (pitch ${f(pitch, 4)} mm, half ${f(pitch / 2, 4)}), burn cell ${f(B.cw, 4)} mm; crop ${baked.pixelWidth}x${baked.pixelHeight}`);
+  log(`B vs C (whitening only, same grid): cells differing ${diff}; deepest differing cell centre ${f(maxD)} mm inside edge; max |dS| ${maxCellDelta}; sum dS ${f(sumDiff, 0)}; equiv full-power width ${f((sumDiff * cellA) / sFull / perim, 4)} mm (|.| ${f((sumAbs * cellA) / sFull / perim, 4)})`);
+  log(`band(mm)     | n A/B | mean S  A / B / C        | full-power frac A / B / C`);
+  for (let k = 0; k < bands.length - 1; k++) {
+    log(`${f(bands[k]!, 2)}-${bands[k + 1]! > 100 ? 'in ' : f(bands[k + 1]!, 2)} | ${a.n[k]}/${b.n[k]} | ${f(a.mean[k]!, 1)} / ${f(b.mean[k]!, 1)} / ${f(cc.mean[k]!, 1)} | ${f(a.full[k]!)} / ${f(b.full[k]!)} / ${f(cc.full[k]!)}`);
+  }
+  log(`energy sum S*mm2: A ${f(a.tot, 1)} B ${f(b.tot, 1)} C ${f(cc.tot, 1)}; (B-A)/S1000/perimeter = ${f((b.tot - a.tot) / sFull / perim, 4)} mm; (C-A) ${f((cc.tot - a.tot) / sFull / perim, 4)} mm`);
+  log(`burning area mm2: A ${f(a.on)} B ${f(b.on)} C ${f(cc.on)}; cells burning outside mask A ${a.outside} B ${b.outside} C ${cc.outside}`);
+}
+
+const circ = { sizeMm: 30, cx: 65.0131, cy: 64.9873, r: 12 };
+const cases: Case[] = [
+  { name: '300 dpi, 10 l/mm, Negative Grayscale, luma 200', dpi: 300, luma: 200, ly: { negativeImage: true }, ...circ },
+  { name: '300 dpi, 10 l/mm, positive Grayscale, luma 60', dpi: 300, luma: 60, ly: {}, ...circ },
+  { name: '300 dpi, 10 l/mm, Negative Floyd, luma 200', dpi: 300, luma: 200, ly: { negativeImage: true, ditherAlgorithm: 'floyd-steinberg' }, ...circ },
+  { name: '300 dpi, 10 l/mm, Negative Threshold, luma 200', dpi: 300, luma: 200, ly: { negativeImage: true, ditherAlgorithm: 'threshold' }, ...circ },
+  { name: '300 dpi, 20 l/mm, Negative Grayscale, luma 200', dpi: 300, luma: 200, ly: { negativeImage: true, linesPerMm: 20 }, img: { linesPerMm: 20 }, ...circ },
+  { name: '96 dpi, 10 l/mm, Negative Grayscale, luma 200', dpi: 96, luma: 200, ly: { negativeImage: true }, ...circ },
+  { name: '96 dpi, 10 l/mm, positive Grayscale, luma 60', dpi: 96, luma: 60, ly: {}, ...circ },
+  { name: '96 dpi, 10 l/mm, Negative Threshold, luma 200', dpi: 96, luma: 200, ly: { negativeImage: true, ditherAlgorithm: 'threshold' }, ...circ },
+  { name: '600 dpi, 10 l/mm, Negative Grayscale, luma 200', dpi: 600, luma: 200, ly: { negativeImage: true }, ...circ },
+  { name: 'ALIGNED 254 dpi (=10 px/mm), 10 l/mm, Negative Grayscale, luma 200', dpi: 254, luma: 200, ly: { negativeImage: true }, ...circ },
+  { name: 'ALIGNED 254 dpi + sharpen 100%/r1 (ADR-671), positive Grayscale, luma 128', dpi: 254, luma: 128, ly: {}, img: { sharpenAmount: 100, sharpenRadius: 1 }, ...circ },
+  { name: 'ALIGNED 254 dpi + sharpen 100%/r1, Negative Grayscale, luma 200', dpi: 254, luma: 200, ly: { negativeImage: true }, img: { sharpenAmount: 100, sharpenRadius: 1 }, ...circ },
+  { name: '300 dpi + sharpen 60%/r1.5, positive Grayscale, luma 128', dpi: 300, luma: 128, ly: {}, img: { sharpenAmount: 60, sharpenRadius: 1.5 }, ...circ },
+  { name: 'RING 0.4 mm, 300 dpi, black, Threshold, 10 l/mm', dpi: 300, luma: 0, ly: { ditherAlgorithm: 'threshold' }, sizeMm: 20, cx: 60.0131, cy: 59.9873, r: 6.4, rIn: 6.0 },
+  { name: 'RING 0.4 mm, 96 dpi, black, Threshold, 10 l/mm', dpi: 96, luma: 0, ly: { ditherAlgorithm: 'threshold' }, sizeMm: 20, cx: 60.0131, cy: 59.9873, r: 6.4, rIn: 6.0 },
+  { name: 'RING 0.4 mm, 0.5 mm px (50.8 dpi), black, Threshold, 10 l/mm', px: 40, luma: 0, ly: { ditherAlgorithm: 'threshold' }, sizeMm: 20, cx: 60.0131, cy: 59.9873, r: 6.4, rIn: 6.0 },
+  { name: 'RING 0.2 mm, 300 dpi, black, Threshold, 10 l/mm', dpi: 300, luma: 0, ly: { ditherAlgorithm: 'threshold' }, sizeMm: 20, cx: 60.0131, cy: 59.9873, r: 6.2, rIn: 6.0 },
+  { name: 'RING 0.4 mm, 300 dpi, black, Grayscale, 10 l/mm', dpi: 300, luma: 0, ly: {}, sizeMm: 20, cx: 60.0131, cy: 59.9873, r: 6.4, rIn: 6.0 },
+  { name: 'RECIPE sharpen 30%/r0.7, ALIGNED 254 dpi, positive Grayscale, luma 128', dpi: 254, luma: 128, ly: {}, img: { sharpenAmount: 30, sharpenRadius: 0.7 }, ...circ },
+  { name: 'RECIPE sharpen 30%/r0.7, 300 dpi, positive Grayscale, luma 128', dpi: 300, luma: 128, ly: {}, img: { sharpenAmount: 30, sharpenRadius: 0.7 }, ...circ },
+  { name: 'RECIPE sharpen 30%/r0.7, 300 dpi, positive Jarvis, luma 200', dpi: 300, luma: 200, ly: { ditherAlgorithm: 'jarvis' }, img: { sharpenAmount: 30, sharpenRadius: 0.7 }, ...circ },
+];
+const only = process.env.R17_ONLY;
+
+it('T17 refuter edge band', async () => {
+  for (const c of cases) if (!only || c.name.startsWith(only)) await run(c);
+}, 600000);
+
+import { applyTransform } from '../t13-main/src/core/scene';
+it('rotated 30 deg: whitening effect B vs C (same grid)', async () => {
+  if (process.env.R17_ONLY !== 'ROT') return;
+  for (const [dpi, luma, ly, extra] of [
+    [300, 200, { negativeImage: true }, {}], [96, 200, { negativeImage: true }, {}], [96, 60, {}, {}],
+    [300, 128, {}, { sharpenAmount: 100, sharpenRadius: 1 }],
+  ] as const) {
+    const px = Math.round((30 / 25.4) * dpi);
+    const srcLuma = new Uint8Array(px * px).fill(luma);
+    const t = { ...IDENTITY_TRANSFORM, x: 50, y: 50, rotationDeg: 30 };
+    const c = applyTransform({ x: 15.0131, y: 14.9873 }, t);
+    const mask = maskObj([poly(c.x, c.y, 12)]);
+    const src = image(px, 30, srcLuma, { transform: t, ...extra });
+    const lyr = layer(ly);
+    const baked = await cropMaskedRasterImage(src, mask, encode);
+    const ctl = control(src, baked, srcLuma);
+    const A = grid(src, mask, lyr), B = grid(baked, null, lyr), C = grid(ctl, null, lyr);
+    let diff = 0, sum = 0; const sa = A.s.reduce((x, y) => x + y, 0) * A.cw * A.ch;
+    for (let k = 0; k < B.s.length; k++) { const dv = B.s[k]! - C.s[k]!; if (dv) { diff++; sum += dv; } }
+    const sb = B.s.reduce((x, y) => x + y, 0) * B.cw * B.ch, sc = C.s.reduce((x, y) => x + y, 0) * C.cw * C.ch;
+    log(`ROT30 ${dpi} dpi luma ${luma} ${JSON.stringify(ly)} ${JSON.stringify(extra)}: B vs C cells differing ${diff}, sum dS ${sum}, equiv width ${(sum * B.cw * B.ch / 1000 / (2 * Math.PI * 12)).toFixed(4)} mm; energy A ${sa.toFixed(0)} B ${sb.toFixed(0)} C ${sc.toFixed(0)} -> (B-A) equiv ${((sb - sa) / 1000 / (2 * Math.PI * 12)).toFixed(4)} mm`);
+  }
+}, 600000);
