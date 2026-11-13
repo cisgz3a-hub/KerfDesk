@@ -5,127 +5,17 @@
 // |p - xy(t)|² ≤ R²; a flat end mill takes the lower end of z(t) there, and a
 // ball minimises the convex z(t) + R - sqrt(R² - d(t)²) by golden-section
 // search. Arcs are refused, so no arc approximation hides anything.
-import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import { toMachineCoords } from '../../core/devices';
 import { kernelForTool } from '../../core/sim';
-import {
-  createLayer,
-  createProject,
-  DEFAULT_CNC_LAYER_SETTINGS,
-  DEFAULT_CNC_MACHINE_CONFIG,
-  IDENTITY_TRANSFORM,
-  type CncLayerSettings,
-  type CncTool,
-  type Layer,
-  type Polyline,
-  type Project,
-  type ReliefObject,
-  type SceneObject,
-} from '../../core/scene';
-
-/** A height-map relief from depth below the top (≥ 0) at relief-local (x, y). */
-export function stockRelief(options: {
-  readonly w: number;
-  readonly h: number;
-  readonly px: number;
-  readonly maxDepth: number;
-  readonly at: readonly [number, number];
-  readonly layer: string;
-  readonly depth: (x: number, y: number) => number;
-}): ReliefObject {
-  const width = Math.round(options.w / options.px);
-  const height = Math.round(options.h / options.px);
-  const samplesU16: number[] = [];
-  for (let j = 0; j < height; j += 1)
-    for (let i = 0; i < width; i += 1) {
-      const d = options.depth((i + 0.5) * options.px, (j + 0.5) * options.px);
-      const clamped = Math.min(options.maxDepth, Math.max(0, d));
-      samplesU16.push(Math.round(((options.maxDepth - clamped) / options.maxDepth) * 65535));
-    }
-  const [x, y] = options.at;
-  return {
-    kind: 'relief',
-    id: 'rel',
-    source: 'rel.png',
-    color: '#a0522d',
-    reliefSource: testReliefHeightfield({
-      width,
-      height,
-      physicalWidthMm: options.w,
-      physicalHeightMm: options.h,
-      maxDepthMm: options.maxDepth,
-      samplesU16,
-    }),
-    targetWidthMm: options.w,
-    reliefDepthMm: options.maxDepth,
-    bounds: { minX: x, minY: y, maxX: x + options.w, maxY: y + options.h },
-    transform: { ...IDENTITY_TRANSFORM, x, y },
-    operationIds: [options.layer],
-  } as ReliefObject;
-}
-
-export function circleLoop(cx: number, cy: number, r: number, n = 120): Polyline {
-  const points = Array.from({ length: n }, (_, i) => ({
-    x: cx + r * Math.cos((2 * Math.PI * i) / n),
-    y: cy + r * Math.sin((2 * Math.PI * i) / n),
-  }));
-  return { closed: true, points };
-}
-
-export function squareLoop(x: number, y: number, w: number): Polyline {
-  const points = [
-    { x, y },
-    { x: x + w, y },
-    { x: x + w, y: y + w },
-    { x, y: y + w },
-  ];
-  return { closed: true, points };
-}
-
-export function vectorObject(layer: string, polylines: ReadonlyArray<Polyline>): SceneObject {
-  const xs = polylines.flatMap((line) => line.points.map((p) => p.x));
-  const ys = polylines.flatMap((line) => line.points.map((p) => p.y));
-  return {
-    kind: 'imported-svg',
-    id: 'vec',
-    source: 'vec.svg',
-    operationIds: [layer],
-    bounds: {
-      minX: Math.min(...xs),
-      minY: Math.min(...ys),
-      maxX: Math.max(...xs),
-      maxY: Math.max(...ys),
-    },
-    transform: IDENTITY_TRANSFORM,
-    paths: [{ color: '#000000', polylines }],
-  } as SceneObject;
-}
-
-export function cncLayer(id: string, cnc: Partial<CncLayerSettings>): Layer {
-  return {
-    ...createLayer({ id, color: id === 'r' ? '#a0522d' : '#000000', name: id }),
-    output: true,
-    cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, ...cnc },
-  };
-}
-
-export function stockProject(
-  objects: ReadonlyArray<SceneObject>,
-  layers: ReadonlyArray<Layer>,
-  stockMm: number,
-  extraTools: ReadonlyArray<CncTool> = [],
-): Project {
-  const base = createProject();
-  return {
-    ...base,
-    machine: {
-      ...DEFAULT_CNC_MACHINE_CONFIG,
-      tools: [...DEFAULT_CNC_MACHINE_CONFIG.tools, ...extraTools],
-      stock: { ...DEFAULT_CNC_MACHINE_CONFIG.stock, thicknessMm: stockMm },
-    },
-    scene: { ...base.scene, objects, artworkOrder: objects.map((o) => o.id), layers },
-  } as Project;
-}
+import type { CncTool, Polyline, Project } from '../../core/scene';
+export {
+  circleLoop,
+  cncLayer,
+  squareLoop,
+  stockProject,
+  stockRelief,
+  vectorObject,
+} from './relief-gcode-scenes.test-support';
 
 export type SimMove = {
   readonly layer: string;
@@ -137,7 +27,8 @@ export type SimMove = {
   readonly x1: number;
   readonly y1: number;
   readonly z1: number;
-  // Most stock this move took off any one cell, and off the cells on its centre line.
+  // Most stock this move took off any one cell; and the most its pass (the feed
+  // moves since the last rapid) has taken in all off a cell on its centre line.
   readonly maxRem: number;
   readonly centreRem: number;
   readonly vol: number;
@@ -159,30 +50,56 @@ export function simulateStock(project: Project, gcode: string, G = 0.05, margin 
     (project.machine?.kind === 'cnc' ? project.machine.tools : []).map((t) => [t.id, t]),
   );
   const lines = gcode.split(/\r?\n/);
-  const bounds = programBounds(lines);
-  const X0 = bounds.minX - margin;
-  const Y0 = bounds.minY - margin;
-  const NX = Math.ceil((bounds.maxX - X0 + margin) / G) + 1;
-  const NY = Math.ceil((bounds.maxY - Y0 + margin) / G) + 1;
-  const grid: Grid = { top: new Float64Array(NX * NY), X0, Y0, NX, NY, G };
+  const grid = newGrid(programBounds(lines), G, margin);
   const moves: SimMove[] = [];
   const head: Head = { x: 0, y: 0, z: 1e3, mode: 0, tool: '', layer: '' };
   for (const line of lines) {
     const to = readLine(line, head);
     if (to === null) continue;
-    const tool = tools.get(head.tool);
-    if (tool !== undefined && Math.min(head.z, to.z) < 1e-4) {
-      const cut = cutMove(tool, head, to, grid);
-      if (head.mode === 1 || cut.vol > 1e-4) moves.push(simMove(head, to, cut));
-    }
+    const move = feedMove(tools.get(head.tool), head, to, grid);
+    if (move !== null) moves.push(move);
     Object.assign(head, to);
   }
   const at = (x: number, y: number): number => {
-    const gx = Math.round((x - X0) / G);
-    const gy = Math.round((y - Y0) / G);
-    return gx < 0 || gy < 0 || gx >= NX || gy >= NY ? 0 : (grid.top[gy * NX + gx] ?? 0);
+    const gx = Math.round((x - grid.X0) / G);
+    const gy = Math.round((y - grid.Y0) / G);
+    return gx < 0 || gy < 0 || gx >= grid.NX || gy >= grid.NY
+      ? 0
+      : (grid.top[gy * grid.NX + gx] ?? 0);
   };
   return { moves, at };
+}
+
+function newGrid(
+  bounds: { minX: number; minY: number; maxX: number; maxY: number },
+  G: number,
+  margin: number,
+): Grid {
+  const X0 = bounds.minX - margin;
+  const Y0 = bounds.minY - margin;
+  const NX = Math.ceil((bounds.maxX - X0 + margin) / G) + 1;
+  const NY = Math.ceil((bounds.maxY - Y0 + margin) / G) + 1;
+  return {
+    top: new Float64Array(NX * NY),
+    passOf: new Int32Array(NX * NY).fill(-1),
+    passRem: new Float32Array(NX * NY),
+    pass: { id: 0 },
+    X0,
+    Y0,
+    NX,
+    NY,
+    G,
+  };
+}
+
+// Cut one move into the grid; a rapid, or a move clear of the stock, ends the
+// pass. Returns the move's record when it cut, or when it was a feed move.
+function feedMove(tool: CncTool | undefined, head: Head, to: Point3, grid: Grid): SimMove | null {
+  const inStock = Math.min(head.z, to.z) < 1e-4;
+  if (head.mode === 0 || !inStock) grid.pass.id += 1;
+  if (tool === undefined || !inStock) return null;
+  const cut = cutMove(tool, head, to, grid);
+  return head.mode === 1 || cut.vol > 1e-4 ? simMove(head, to, cut) : null;
 }
 
 type Head = { x: number; y: number; z: number; mode: number; tool: string; layer: string };
@@ -248,6 +165,13 @@ function programBounds(lines: ReadonlyArray<string>) {
 
 type Grid = {
   readonly top: Float64Array;
+  // CNC audit v3 N7: the load "under the tip per pass" is what one pass (the
+  // feed moves between rapids) takes off a cell in all, not what one of its
+  // moves takes: a row descending a slope cuts the same cell over several
+  // short moves. Each cell keeps the pass that last cut it and its total.
+  readonly passOf: Int32Array;
+  readonly passRem: Float32Array;
+  readonly pass: { id: number };
   readonly X0: number;
   readonly Y0: number;
   readonly NX: number;
@@ -286,7 +210,13 @@ function cutMove(
       vol += rem * G * G;
       maxRem = Math.max(maxRem, rem);
       const t = ee < 1e-12 ? 0 : Math.max(0, Math.min(1, (qx * ex + qy * ey) / ee));
-      if (Math.hypot(qx - t * ex, qy - t * ey) <= G * 0.75) centreRem = Math.max(centreRem, rem);
+      if (grid.passOf[i] !== grid.pass.id) {
+        grid.passOf[i] = grid.pass.id;
+        grid.passRem[i] = 0;
+      }
+      grid.passRem[i] = (grid.passRem[i] ?? 0) + rem;
+      if (Math.hypot(qx - t * ex, qy - t * ey) <= G * 0.75)
+        centreRem = Math.max(centreRem, grid.passRem[i] ?? rem);
       top[i] = bottom;
     }
   return { maxRem, centreRem, vol };

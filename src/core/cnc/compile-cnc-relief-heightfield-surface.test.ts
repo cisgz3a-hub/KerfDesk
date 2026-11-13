@@ -15,6 +15,7 @@ import {
   type Scene,
 } from '../scene';
 import { compileCncJob } from './compile-cnc-job';
+import { withoutStepDown } from '../relief/relief-step-down.test-support';
 
 const COLOR = '#a0522d';
 const WIDTH_MM = 30;
@@ -82,7 +83,11 @@ function finishingPoints(relief: ReliefObject) {
   const job = compileCncJob(scene, DEFAULT_DEVICE_PROFILE, DEFAULT_CNC_MACHINE_CONFIG);
   const group = job.groups.find((g) => g.kind === 'cnc' && g.cutType === 'relief-finish');
   if (group?.kind !== 'cnc') throw new Error('no relief-finish group');
-  return group.passes.flatMap((pass) => (pass.kind === 'path3d' ? [pass.points] : []));
+  // The finishing rows: step-down levels over roughed terraces (ADR-421
+  // Amendment 5) ride above the surface on purpose.
+  return withoutStepDown(group.passes).flatMap((pass) =>
+    pass.kind === 'path3d' ? [pass.points] : [],
+  );
 }
 
 // The ball tip's distance above the ball-on-plane height, read along every

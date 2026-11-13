@@ -16,6 +16,7 @@ import {
   type Scene,
 } from '../scene';
 import { compileCncJob } from './compile-cnc-job';
+import { withoutStepDown } from '../relief/relief-step-down.test-support';
 
 const COLOR = '#a0522d';
 const WIDTH_MM = 30;
@@ -132,7 +133,9 @@ describe('an STL relief is finished against its own triangles (ADR-580)', () => 
         local.y <= HEIGHT_MM - margin
       );
     };
-    for (const pass of group.passes) {
+    // The finishing rows: step-down levels over roughed terraces (ADR-421
+    // Amendment 5) ride above the surface on purpose.
+    for (const pass of withoutStepDown(group.passes)) {
       if (pass.kind !== 'path3d') continue;
       pass.points.forEach((from, index) => {
         const to = pass.points[index + 1];
