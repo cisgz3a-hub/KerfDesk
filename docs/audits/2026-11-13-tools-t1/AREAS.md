@@ -64,9 +64,9 @@ Run order puts tools that make or change burns first, then new tools, then the r
 | T23 | Trace | Trace Image | `tools.trace-image` | ledgered: P3 2 |
 | T24 | Trace | Re-trace Original | `tools.retrace-original` | ledgered: P1 3 (fix session proposed), P3 2 |
 | T25 | Trace | Multi-File Trace | `tools.multi-file-trace` | ledgered: P2 2 (fix session proposed), P3 5 |
-| T26 | Vector | Convert to Path | `tools.convert-to-path` | |
-| T27 | Vector | Generate Path From Cut | `tools.generate-path-from-cut` | |
-| T28 | Vector | Weld | `tools.weld` | |
+| T26 | Vector | Convert to Path | `tools.convert-to-path` | ledgered: P1 1 + P2 1 fixed (#1875), P2 1 (fix session proposed), P3 5 |
+| T27 | Vector | Generate Path From Cut | `tools.generate-path-from-cut` | ledgered: P2 1 fixed (#1877), P3 2 |
+| T28 | Vector | Weld | `tools.weld` | ledgered: P1 1 + P2 2 (fix session proposed), P3 7 |
 | T29 | Vector | Union Silhouette | `tools.union-silhouette` | |
 | T30 | Vector | Join Paths | `tools.join-paths` | |
 | T31 | Vector | Resize Joint Openings | `tools.resize-joints` | |

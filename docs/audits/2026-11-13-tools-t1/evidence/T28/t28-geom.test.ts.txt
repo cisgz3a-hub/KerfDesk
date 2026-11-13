@@ -1,0 +1,207 @@
+// @vitest-environment jsdom
+// T28 Weld: welded geometry vs an independent scanline oracle built from each
+// source's own decoded burn; transforms, text, self-crossing, nested, many, degenerate.
+import { beforeEach, it } from 'vitest';
+import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type TextObject,
+  type Transform,
+} from '../t26-main/src/core/scene';
+import { createRectangle } from '../t26-main/src/core/shapes/primitives/create-rectangle';
+import { createEllipse } from '../t26-main/src/core/shapes/primitives/create-ellipse';
+import { textToPolylines } from '../t26-main/src/core/text';
+import { prepareOutput } from '../t26-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t26-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t26-main/src/ui/state/store';
+import { resetStore } from '../t26-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t26-main/src/ui/state/toast-store';
+import { litMoves, totalLen, type LitMove } from './decode';
+import { compareRegions, loops, perimeter, type Group } from './oracle';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t28/t28-geom.log';
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync(LOG, log.join('\n'));
+};
+beforeEach(() => {
+  resetStore();
+  useToastStore.setState({ toasts: [] } as never);
+});
+const st = () => useStore.getState();
+const f3 = (n: number) => n.toFixed(3);
+const toasts = () => useToastStore.getState().toasts.map((t) => t.message);
+
+function font(file: string): ArrayBuffer {
+  const b = readFileSync(`C:/Users/stolk/kd-t1/t26-main/src/ui/text/fonts/${file}`);
+  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+}
+
+export function lineLayer(id = 'L', extra: Partial<Layer> = {}): Layer {
+  return { ...createLayer({ id, color: '#000000', name: id, mode: 'line' }), speed: 1000, power: 80, ...extra } as Layer;
+}
+export function fillLayer(id = 'F', extra: Partial<Layer> = {}): Layer {
+  return { ...createLayer({ id, color: '#000000', name: id, mode: 'fill' }), speed: 3000, power: 30, hatchSpacingMm: 0.1, ...extra } as Layer;
+}
+export function proj(objects: SceneObject[], layers: Layer[]): Project {
+  const base = createProject();
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers, groups: [] } };
+}
+export function setProject(project: Project, selected: string[]): void {
+  useStore.setState({ project, selectedObjectId: selected[0] ?? null, additionalSelectedIds: new Set(selected.slice(1)), undoStack: [], redoStack: [], dirty: false });
+}
+export function burn(project: Project) {
+  const prepared = prepareOutput(project);
+  if (!prepared.ok) return { ok: false, gcode: '', moves: [] as LitMove[], why: JSON.stringify(prepared.preflight).slice(0, 300) };
+  const g = emitPreparedGcode(prepared).gcode;
+  return { ok: true, gcode: g, moves: litMoves(g, project.device), why: '' };
+}
+const rect = (id: string, w: number, h: number, t: Partial<Transform> = {}, extra: Record<string, unknown> = {}) =>
+  ({ ...createRectangle({ id, color: '#000000', spec: { widthMm: w, heightMm: h, cornerRadiusMm: 0 }, transform: { ...IDENTITY_TRANSFORM, ...t } }), operationIds: ['L'], ...extra }) as SceneObject;
+const circ = (id: string, d: number, t: Partial<Transform> = {}, extra: Record<string, unknown> = {}) =>
+  ({ ...createEllipse({ id, color: '#000000', spec: { widthMm: d, heightMm: d }, transform: { ...IDENTITY_TRANSFORM, ...t } }), operationIds: ['L'], ...extra }) as SceneObject;
+const ngon = (cx: number, cy: number, r: number, n = 720) => Array.from({ length: n }, (_, i) => ({ x: cx + r * Math.cos((2 * Math.PI * i) / n), y: cy + r * Math.sin((2 * Math.PI * i) / n) }));
+const svg = (id: string, polys: { x: number; y: number }[][], extra: Record<string, unknown> = {}, pathExtra: Record<string, unknown> = {}): ImportedSvg =>
+  ({
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+    transform: IDENTITY_TRANSFORM,
+    operationIds: ['L'],
+    paths: [{ color: '#000000', ...pathExtra, polylines: polys.map((points) => ({ closed: true, points })) }],
+    ...extra,
+  }) as ImportedSvg;
+
+/** Oracle: each source burned alone, decoded, filled under its own rule, then unioned. */
+function oracleGroups(objs: SceneObject[], layers: Layer[], ruleOf: (o: SceneObject) => 'evenodd' | 'nonzero'): Group[] {
+  return objs.map((o) => ({ contours: loops(burn(proj([o], layers)).moves), rule: ruleOf(o) }));
+}
+const defaultRule = (o: SceneObject): 'evenodd' | 'nonzero' =>
+  o.kind === 'text' ? 'nonzero' : 'paths' in o && o.paths[0]?.fillRule === 'nonzero' ? 'nonzero' : 'evenodd';
+
+function runCase(name: string, objs: SceneObject[], analytic?: { area?: number; perim?: number }, layers: Layer[] = [lineLayer()]) {
+  const p0 = proj(objs, layers);
+  setProject(p0, objs.map((o) => o.id));
+  const t0 = performance.now();
+  st().weldSelection();
+  const ms = performance.now() - t0;
+  const p1 = st().project;
+  const changed = p1 !== p0;
+  const after = burn(p1);
+  const actualContours = loops(after.moves);
+  const oracle = oracleGroups(objs, layers, defaultRule);
+  const cmp = compareRegions(oracle, [{ contours: actualContours, rule: 'evenodd' }]);
+  const cmpNZ = compareRegions(oracle, [{ contours: actualContours, rule: 'nonzero' }]);
+  const res = p1.scene.objects.filter((o) => o.id.startsWith('welded'));
+  out(
+    `${name}: changed ${changed} in ${ms.toFixed(0)} ms; objects ${p0.scene.objects.length}->${p1.scene.objects.length}; welded contours ${actualContours.length}; ` +
+      `oracle area ${f3(cmp.oracle)} actual(evenodd) ${f3(cmp.actual)} actual(nonzero) ${f3(cmpNZ.actual)} xor ${f3(cmp.xor)}; ` +
+      `lit after ${f3(totalLen(after.moves))} perim ${f3(perimeter(actualContours))}` +
+      (analytic?.area !== undefined ? `; analytic area ${f3(analytic.area)}` : '') +
+      (analytic?.perim !== undefined ? ` analytic perim ${f3(analytic.perim)}` : '') +
+      `; welded objs ${res.length}; toasts ${JSON.stringify(toasts())}`,
+  );
+  return { p0, p1, cmp, after };
+}
+
+it.skip('G1 overlapping/touching/nested/transforms', () => {
+  runCase('a two rects offset (10,5)', [rect('A', 20, 10, { x: 10, y: 10 }), rect('B', 20, 10, { x: 20, y: 15 })], { area: 350, perim: 90 });
+  const lens = 200 * Math.acos(0.5) - 5 * Math.sqrt(300);
+  runCase('b two circles d20 10 apart', [circ('A', 20, { x: 10, y: 10 }), circ('B', 20, { x: 20, y: 10 })], { area: 2 * Math.PI * 100 - lens, perim: 2 * (2 * Math.PI - 2 * Math.acos(0.5)) * 10 });
+  runCase('c touching rects edge', [rect('A', 20, 10, { x: 10, y: 10 }), rect('B', 20, 10, { x: 30, y: 10 })], { area: 400, perim: 100 });
+  runCase('c2 touching rects corner only', [rect('A', 20, 10, { x: 10, y: 10 }), rect('B', 20, 10, { x: 30, y: 20 })], { area: 400, perim: 120 });
+  runCase('c3 gap 0.0005 mm', [rect('A', 20, 10, { x: 10, y: 10 }), rect('B', 20, 10, { x: 30.0005, y: 10 })], { area: 400 });
+  // ring (svg even-odd donut) with a bar through the hole
+  let barArea = 0;
+  const N = 200000;
+  for (let i = 0; i < N; i++) {
+    const y = -2 + (4 * (i + 0.5)) / N;
+    const xin = Math.sqrt(100 - y * y);
+    const xout = Math.sqrt(400 - y * y);
+    barArea += (2 * xin + 2 * (25 - xout)) * (4 / N);
+  }
+  const ring = svg('RING', [ngon(50, 50, 20), ngon(50, 50, 10)]);
+  const bar = svg('BAR', [[{ x: 25, y: 48 }, { x: 75, y: 48 }, { x: 75, y: 52 }, { x: 25, y: 52 }]]);
+  runCase('d ring + bar across hole', [ring, bar], { area: Math.PI * 300 + barArea });
+  runCase('e small circle inside big (absorbed)', [circ('A', 40, { x: 10, y: 10 }), circ('B', 10, { x: 25, y: 25 })], { area: Math.PI * 400 });
+  runCase('e2 island inside ring hole (kept)', [ring, circ('I', 8, { x: 46, y: 46 }), bar], {});
+  runCase('f rotated/mirrored/non-uniform', [
+    rect('A', 20, 10, { x: 40, y: 40, rotationDeg: 30, scaleX: 2, scaleY: 0.5 }),
+    rect('B', 20, 10, { x: 45, y: 35, rotationDeg: -25, mirrorX: true, scaleX: 1.5, scaleY: 1.2 }),
+    circ('C', 10, { x: 38, y: 38, mirrorY: true, scaleX: 3, scaleY: 1 }),
+  ]);
+  runCase('g disjoint + overlapping pair', [rect('A', 20, 10, { x: 10, y: 10 }), rect('B', 20, 10, { x: 20, y: 15 }), circ('C', 10, { x: 80, y: 80 })], { area: 350 + 25 * Math.PI });
+  runCase('h identical duplicates', [rect('A', 20, 10, { x: 10, y: 10 }), rect('B', 20, 10, { x: 10, y: 10 })], { area: 200 });
+});
+
+it.skip('G2 self-crossing and fill rules', () => {
+  const star = (cx: number, cy: number, r: number) => [0, 2, 4, 1, 3].map((k) => ({ x: cx + r * Math.sin((2 * Math.PI * k) / 5), y: cy - r * Math.cos((2 * Math.PI * k) / 5) }));
+  const tab = rect('T', 4, 4, { x: 48, y: 28 });
+  runCase('i pentagram even-odd + rect at tip', [svg('S', [star(50, 50, 20)]), tab]);
+  runCase('i2 pentagram nonzero + rect at tip', [svg('S', [star(50, 50, 20)], {}, { fillRule: 'nonzero' }), tab]);
+  // figure-eight self-crossing contour
+  const eight = [{ x: 10, y: 10 }, { x: 30, y: 30 }, { x: 30, y: 10 }, { x: 10, y: 30 }];
+  runCase('j bowtie + overlapping rect', [svg('E', [eight]), rect('R', 5, 5, { x: 8, y: 18 })]);
+  // two overlapping contours in ONE svg path (even-odd: overlap is a hole) + rect elsewhere overlapping
+  runCase('k one path two overlapping squares (evenodd hole) + rect', [
+    svg('O', [[{ x: 10, y: 10 }, { x: 30, y: 10 }, { x: 30, y: 30 }, { x: 10, y: 30 }], [{ x: 20, y: 20 }, { x: 40, y: 20 }, { x: 40, y: 40 }, { x: 20, y: 40 }]]),
+    rect('R', 4, 4, { x: 38, y: 38 }),
+  ]);
+});
+
+async function text(id: string, content: string, fontKey: string, fontFile: string, sizeMm: number, t: Partial<Transform>, weldOverlaps: boolean): Promise<TextObject> {
+  const r = await textToPolylines({ content, sizeMm, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000', fontBuffer: font(fontFile) });
+  return {
+    kind: 'text',
+    id,
+    content,
+    fontKey,
+    sizeMm,
+    alignment: 'left',
+    lineHeight: 1.2,
+    letterSpacing: 0,
+    color: '#000000',
+    weldOverlaps,
+    bounds: r.bounds,
+    transform: { ...IDENTITY_TRANSFORM, ...t },
+    paths: r.paths.map((p) => ({ ...p, operationIds: ['L'] })),
+  } as unknown as TextObject;
+}
+
+it('G3 text', async () => {
+  const roboto = await text('TX', 'OAB8', 'roboto-regular', 'Roboto-Regular.ttf', 20, { x: 20, y: 20 }, true);
+  out(`text bounds ${JSON.stringify(roboto.bounds)}`);
+  const under = rect('U', 70, 3, { x: 18, y: 20 + roboto.bounds.maxY - 1.5 });
+  runCase('l Roboto OAB8 + underline bar', [roboto, under]);
+  for (const [key, file] of [['pacifico', 'Pacifico-Regular.ttf'], ['great-vibes', 'GreatVibes-Regular.ttf'], ['alex-brush', 'AlexBrush-Regular.ttf']] as const) {
+    const s = await text('SC', 'Wedding Love', key, file, 15, { x: 10, y: 10, rotationDeg: 12, mirrorX: true }, false);
+    runCase(`m script ${key} unwelded alone, rotated+mirrored`, [s]);
+    // Fill burn before vs after
+    const fl = [fillLayer('L')];
+    const p0 = proj([s], fl);
+    setProject(p0, ['SC']);
+    const b0 = burn(p0);
+    st().weldSelection();
+    const b1 = burn(st().project);
+    out(`m   Fill hatch lit before ${f3(totalLen(b0.moves))} after ${f3(totalLen(b1.moves))} (x0.1 = area ${f3(totalLen(b0.moves) * 0.1)} / ${f3(totalLen(b1.moves) * 0.1)})`);
+  }
+});
+
+it.skip('G4 many and degenerate', () => {
+  const many: SceneObject[] = [];
+  for (let i = 0; i < 300; i++) many.push(circ(`C${i}`, 6, { x: 10 + (i % 30) * 4, y: 10 + Math.floor(i / 30) * 4 }));
+  runCase('n 300 overlapping circles grid', many);
+  runCase('o zero-height rect + rect', [rect('Z', 20, 0, { x: 10, y: 15 }), rect('A', 20, 10, { x: 10, y: 10 })], { area: 200 });
+  runCase('o2 zero-area svg sliver + rect', [svg('Z', [[{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 25, y: 0 }]]), rect('A', 20, 10, { x: 10, y: -5 })], { area: 200 });
+  runCase('o3 tiny 0.01 mm squares overlapping', [rect('A', 0.01, 0.01, { x: 10, y: 10 }), rect('B', 0.01, 0.01, { x: 10.005, y: 10.005 })], { area: 0.000175 });
+  runCase('o4 huge 1000 mm rects', [rect('A', 1000, 500, { x: 0, y: 0 }), rect('B', 1000, 500, { x: 500, y: 250 })], { area: 1000000 - 125000 });
+});

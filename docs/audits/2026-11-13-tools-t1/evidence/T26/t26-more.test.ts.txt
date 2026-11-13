@@ -1,0 +1,294 @@
+// @vitest-environment jsdom
+// T26 Convert to Path: variable text, scale after convert, native arcs, tabs on curves,
+// registration jig, locked/group, metadata carried or dropped.
+import { beforeEach, it } from 'vitest';
+import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  createRegistrationLayer,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  DEFAULT_PROJECT_VARIABLE_DATA,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type TextObject,
+  type Transform,
+} from '../t26-main/src/core/scene';
+import { createRectangle } from '../t26-main/src/core/shapes/primitives/create-rectangle';
+import { createEllipse } from '../t26-main/src/core/shapes/primitives/create-ellipse';
+import { createRegistrationBox } from '../t26-main/src/core/shapes';
+import { registrationJigCopyId } from '../t26-main/src/core/scene/registration-jig-artwork';
+import { registrationJigCompilationRuns } from '../t26-main/src/core/job/registration-jig-compilation-runs';
+import { findRegistrationBoxes } from '../t26-main/src/core/scene/registration-layer';
+import { cncTabAnchorPosition } from '../t26-main/src/core/cnc/cnc-tab-anchors';
+import { textToPolylines } from '../t26-main/src/core/text';
+import { prepareOutput } from '../t26-main/src/io/gcode/prepare-output';
+import { prepareOutputSnapshot, type VariableTextRenderer } from '../t26-main/src/io/gcode/prepare-output-snapshot';
+import { emitPreparedGcode } from '../t26-main/src/io/gcode/emit-gcode';
+import { litSamples } from '../t26-main/src/io/gcode/laser-lit-samples.test-support';
+import { useStore } from '../t26-main/src/ui/state/store';
+import { resetStore } from '../t26-main/src/ui/state/test-helpers';
+import { selectionHasUnlockedVectorObject } from '../t26-main/src/ui/commands/selection-command-state';
+import { litMoves, totalLen, bbox, type LitMove } from './decode';
+
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t26/t26-more.log', log.join('\n'));
+};
+beforeEach(() => resetStore());
+const st = () => useStore.getState();
+const f3 = (n: number) => n.toFixed(3);
+
+const roboto = (() => {
+  const bytes = readFileSync('C:/Users/stolk/kd-t1/t26-main/src/ui/text/fonts/Roboto-Regular.ttf');
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+})();
+const renderer: VariableTextRenderer = ({ text, content }) =>
+  textToPolylines({
+    content,
+    sizeMm: text.sizeMm,
+    alignment: text.alignment,
+    lineHeight: text.lineHeight,
+    letterSpacing: text.letterSpacing,
+    color: text.color,
+    fontBuffer: roboto,
+  });
+
+function lineLayer(extra: Partial<Layer> = {}): Layer {
+  return { ...createLayer({ id: 'L', color: '#000000', name: 'L', mode: 'line' }), speed: 1234, power: 37, ...extra } as Layer;
+}
+function setProject(project: Project, selected: string[]): void {
+  useStore.setState({
+    project,
+    selectedObjectId: selected[0] ?? null,
+    additionalSelectedIds: new Set(selected.slice(1)),
+    undoStack: [],
+    redoStack: [],
+    dirty: false,
+  });
+}
+function proj(objects: SceneObject[], layers: Layer[], extra: Partial<Project> = {}): Project {
+  const base = createProject();
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers, groups: [] }, ...extra };
+}
+function burn(project: Project) {
+  const prepared = prepareOutput(project);
+  if (!prepared.ok) return { ok: false, gcode: '', moves: [] as LitMove[], why: JSON.stringify(prepared.preflight).slice(0, 400) };
+  const g = emitPreparedGcode(prepared).gcode;
+  return { ok: true, gcode: g, moves: litMoves(g, project.device), why: '' };
+}
+
+it('A. variable text: what burns before and after Convert to Path', async () => {
+  const template = 'SN {{serial:4}}';
+  const base: TextObject = {
+    kind: 'text',
+    id: 'VT',
+    content: template,
+    variableTemplate: { tokens: [{ kind: 'literal', value: 'SN ' }, { kind: 'serial', prefix: '', width: 4 }] },
+    fontKey: 'roboto-regular',
+    sizeMm: 10,
+    alignment: 'left',
+    lineHeight: 1.4,
+    letterSpacing: 0,
+    color: '#000000',
+    bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+    transform: { ...IDENTITY_TRANSFORM, x: 50, y: 50 },
+    paths: [],
+  } as TextObject;
+  // The design view stores the rendered template source (as build-text-object does).
+  const src = await renderer({ text: base, content: template, project: createProject() });
+  const text = { ...base, bounds: src.bounds, paths: src.paths } as TextObject;
+  const p0 = proj([text], [lineLayer()], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 42 } });
+  setProject(p0, ['VT']);
+  const snap = async (p: Project) => {
+    const prepared = await prepareOutputSnapshot(p, { clock: () => new Date(0), renderVariableText: renderer });
+    if (!prepared.ok) return { len: NaN, b: null as unknown, moves: [] as LitMove[] };
+    const g = emitPreparedGcode(prepared).gcode;
+    const moves = litMoves(g, p.device);
+    return { len: totalLen(moves), b: bbox(moves), moves };
+  };
+  const before = await snap(p0);
+  out(`menu enabled on variable text: ${selectionHasUnlockedVectorObject(p0, ['VT'])}`);
+  st().convertSelectionToPath();
+  const p1 = st().project;
+  const conv = p1.scene.objects[0]!;
+  const after = await snap(p1);
+  // Oracles: render of the evaluated value and of the template, placed the same way.
+  const valueRender = await renderer({ text: base, content: 'SN 0042', project: p0 });
+  const templLen = src.paths.flatMap((p) => p.polylines).reduce((n, l) => {
+    let s = 0;
+    const pts = l.closed ? [...l.points, l.points[0]!] : l.points;
+    for (let i = 1; i < pts.length; i++) s += Math.hypot(pts[i]!.x - pts[i - 1]!.x, pts[i]!.y - pts[i - 1]!.y);
+    return n + s;
+  }, 0);
+  const valueLen = valueRender.paths.flatMap((p) => p.polylines).reduce((n, l) => {
+    let s = 0;
+    const pts = l.closed ? [...l.points, l.points[0]!] : l.points;
+    for (let i = 1; i < pts.length; i++) s += Math.hypot(pts[i]!.x - pts[i - 1]!.x, pts[i]!.y - pts[i - 1]!.y);
+    return n + s;
+  }, 0);
+  out(`A variable text serial 42: before lit ${f3(before.len)} mm bbox ${JSON.stringify(before.b)}`);
+  out(`A after convert: kind ${conv.kind} source "${'source' in conv ? conv.source : ''}" lit ${f3(after.len)} mm bbox ${JSON.stringify(after.b)}`);
+  out(`A oracle: outline length of "SN 0042" = ${f3(valueLen)} mm; of "${template}" = ${f3(templLen)} mm`);
+  out(`A toasts: ${JSON.stringify((await import('../t26-main/src/ui/state/toast-store')).useToastStore.getState().toasts.map((t) => t.message))}`);
+});
+
+it('B. scale after convert: faceting vs the analytic circle', () => {
+  for (const factor of [10, 20]) {
+    const make = () => createEllipse({ id: 'E', color: '#000000', spec: { widthMm: 10, heightMm: 10 }, transform: { ...IDENTITY_TRANSFORM, x: 20, y: 20 } });
+    // unconverted, scaled
+    const e = make();
+    const scaled = { ...e, transform: { ...e.transform, scaleX: factor, scaleY: factor } };
+    const b0 = burn(proj([scaled], [lineLayer()]));
+    // converted then scaled
+    setProject(proj([make()], [lineLayer()]), ['E']);
+    st().convertSelectionToPath();
+    const c = st().project.scene.objects[0] as ImportedSvg;
+    const cScaled = { ...c, transform: { ...c.transform, x: 20 - 20 * factor + 20 * factor, scaleX: factor, scaleY: factor } };
+    // keep the centre: the converted object is in world coords centred (25,25); scale about origin then shift
+    const centre = { x: 25 * factor, y: 25 * factor };
+    const shifted = { ...cScaled, transform: { ...cScaled.transform, x: 20 + 5 * factor - centre.x, y: 20 + 5 * factor - centre.y } };
+    const b1 = burn(proj([shifted], [lineLayer()]));
+    const r = 5 * factor;
+    const cx = 20 + 5 * factor;
+    const cy = 20 + 5 * factor;
+    const dev = (moves: LitMove[]) => {
+      let worst = 0;
+      for (const m of moves)
+        for (let k = 0; k <= 20; k++) {
+          const x = m.from.x + ((m.to.x - m.from.x) * k) / 20;
+          const y = m.from.y + ((m.to.y - m.from.y) * k) / 20;
+          worst = Math.max(worst, Math.abs(Math.hypot(x - cx, y - cy) - r));
+        }
+      return worst;
+    };
+    out(`B circle d10 scaled x${factor} (r ${r}): unconverted moves ${b0.moves.length} max radial dev ${f3(dev(b0.moves))} mm; converted-then-scaled moves ${b1.moves.length} max radial dev ${f3(dev(b1.moves))} mm (ok ${b0.ok}/${b1.ok} ${b1.why})`);
+    out(`B   converted path points ${c.paths[0]!.polylines[0]!.points.length}, curves kept: ${c.paths[0]!.curves !== undefined}`);
+  }
+});
+
+it('C. native arcs device: G2/G3 before and after', () => {
+  for (const kind of ['ellipse', 'rectR5'] as const) {
+    const obj = kind === 'ellipse'
+      ? createEllipse({ id: 'E', color: '#000000', spec: { widthMm: 40, heightMm: 40 }, transform: { ...IDENTITY_TRANSFORM, x: 50, y: 50 } })
+      : createRectangle({ id: 'E', color: '#000000', spec: { widthMm: 40, heightMm: 25, cornerRadiusMm: 5 }, transform: { ...IDENTITY_TRANSFORM, x: 50, y: 50 } });
+    const base = proj([obj], [lineLayer()]);
+    const p0 = { ...base, device: { ...base.device, controllerKind: 'grbl-v1.1' as const, laserArcMoves: 'on' as const } };
+    setProject(p0, ['E']);
+    const b0 = burn(p0);
+    st().convertSelectionToPath();
+    const b1 = burn(st().project);
+    const count = (g: string, re: RegExp) => g.split('\n').filter((l) => re.test(l)).length;
+    const s0 = litSamples(b0.gcode, p0.device);
+    const s1 = litSamples(b1.gcode, p0.device);
+    out(`C ${kind}: before G2/G3 ${count(b0.gcode, /^G[23]\b|\bG[23] /)} G1 ${count(b0.gcode, /^G1\b/)} lines ${b0.gcode.split('\n').length}; after G2/G3 ${count(b1.gcode, /^G[23]\b|\bG[23] /)} G1 ${count(b1.gcode, /^G1\b/)} lines ${b1.gcode.split('\n').length}; samples ${s0.length}/${s1.length}`);
+  }
+});
+
+it('D. tabs on a rounded rectangle, rotated + mirrored + non-uniform', () => {
+  const t: Transform = { ...IDENTITY_TRANSFORM, x: 150, y: 120, rotationDeg: 35, mirrorX: true, scaleX: 2.5, scaleY: 0.8 };
+  const anchors = [0.03, 0.2, 0.55, 0.81].map((pathT) => ({ layerColor: '#000000', pathIndex: 0, polylineIndex: 0, pathT }));
+  const obj = { ...createRectangle({ id: 'R', color: '#000000', spec: { widthMm: 40, heightMm: 25, cornerRadiusMm: 5 }, transform: t }), laserTabAnchors: anchors, cncTabAnchors: anchors };
+  const layer = lineLayer({ tabsEnabled: true, tabSizeMm: 2, tabsPerShape: 4 } as Partial<Layer>);
+  const p0 = proj([obj], [layer]);
+  setProject(p0, ['R']);
+  const b0 = burn(p0);
+  st().convertSelectionToPath();
+  const c = st().project.scene.objects[0]!;
+  const b1 = burn(st().project);
+  const pos0 = anchors.map((a) => cncTabAnchorPosition(obj, a));
+  const pos1 = ((c as ImportedSvg).cncTabAnchors ?? []).map((a) => cncTabAnchorPosition(c, a));
+  const shift = pos0.map((p, i) => (p && pos1[i] ? Math.hypot(p.x - pos1[i]!.x, p.y - pos1[i]!.y) : NaN));
+  // gaps in the decoded burn: chain breaks
+  const gaps = (moves: LitMove[]) => {
+    const res: string[] = [];
+    for (let i = 1; i < moves.length; i++) {
+      const d = Math.hypot(moves[i]!.from.x - moves[i - 1]!.to.x, moves[i]!.from.y - moves[i - 1]!.to.y);
+      if (d > 1e-3) res.push(`(${f3(moves[i - 1]!.to.x)},${f3(moves[i - 1]!.to.y)})`);
+    }
+    return res.join(' ');
+  };
+  out(`D tab anchor shift after convert (mm): ${shift.map(f3).join(', ')}`);
+  out(`D lit before ${f3(totalLen(b0.moves))} after ${f3(totalLen(b1.moves))}; gaps before ${gaps(b0.moves)}; after ${gaps(b1.moves)}`);
+  // auto tabs (no anchors)
+  const auto = createRectangle({ id: 'R', color: '#000000', spec: { widthMm: 40, heightMm: 25, cornerRadiusMm: 5 }, transform: t });
+  const pa = proj([auto], [layer]);
+  setProject(pa, ['R']);
+  const a0 = burn(pa);
+  st().convertSelectionToPath();
+  const a1 = burn(st().project);
+  out(`D auto tabs: lit before ${f3(totalLen(a0.moves))} after ${f3(totalLen(a1.moves))}; gaps before ${gaps(a0.moves)}; after ${gaps(a1.moves)}`);
+});
+
+it('E. registration jig: Select All then Convert to Path', () => {
+  const BOX_A = '379754e4-b1f1-45b1-853d-75a769147a71';
+  const BOX_B = '389754e4-b1f1-45b1-853d-75a769147a72';
+  const SOURCE = 'd9c94761-4f55-4e18-b166-3dbb322a789a';
+  const boxes = [BOX_A, BOX_B].map((id, index) => createRegistrationBox({ id, widthMm: 60, heightMm: 60, x: 10 + index * 80, y: 10 }));
+  const source = { ...createEllipse({ id: SOURCE, color: '#000000', spec: { widthMm: 20, heightMm: 20 }, transform: { ...IDENTITY_TRANSFORM, x: 30, y: 30 } }), operationIds: ['art'] };
+  const copy = { ...source, id: registrationJigCopyId(SOURCE, BOX_B), transform: { ...source.transform, x: 110 } };
+  const engrave = { ...createRectangle({ id: 'ENG', color: '#000000', spec: { widthMm: 8, heightMm: 8, cornerRadiusMm: 0 }, transform: { ...IDENTITY_TRANSFORM, x: 36, y: 36 } }), operationIds: ['eng'] };
+  const engCopy = { ...engrave, id: registrationJigCopyId('ENG', BOX_B), transform: { ...engrave.transform, x: 116 } };
+  const layers = [
+    { ...createRegistrationLayer(), output: false },
+    { ...createLayer({ id: 'eng', color: '#000000', name: 'eng', mode: 'line' }), speed: 1111, power: 10 } as Layer,
+    { ...createLayer({ id: 'art', color: '#000000', name: 'art', mode: 'line' }), speed: 2222, power: 90 } as Layer,
+  ];
+  const p0 = proj([...boxes, source, copy, engrave, engCopy], layers);
+  const all = p0.scene.objects.map((o) => o.id);
+  setProject(p0, all);
+  const order = (p: Project) => burn(p).moves.reduce<string[]>((acc, m) => {
+    const tag = `F${m.f}@x${m.from.x < 85 ? 'A' : 'B'}`;
+    if (acc.at(-1) !== tag) acc.push(tag);
+    return acc;
+  }, []);
+  const runs0 = registrationJigCompilationRuns(p0.scene)?.length ?? 0;
+  const o0 = order(p0);
+  st().convertSelectionToPath();
+  const p1 = st().project;
+  out(`E boxes before ${findRegistrationBoxes(p0.scene).length} after ${findRegistrationBoxes(p1.scene).length}; jig runs before ${runs0} after ${registrationJigCompilationRuns(p1.scene)?.length ?? 0}`);
+  out(`E burn order before: ${o0.join(' > ')}`);
+  out(`E burn order after:  ${order(p1).join(' > ')}`);
+  out(`E kinds after: ${p1.scene.objects.map((o) => `${o.id.slice(0, 6)}:${o.kind}`).join(' ')}`);
+});
+
+it('F. locked, groups, metadata', () => {
+  const locked = { ...createEllipse({ id: 'LK', color: '#000000', spec: { widthMm: 10, heightMm: 10 }, transform: { ...IDENTITY_TRANSFORM, x: 10, y: 10 } }), locked: true };
+  const free = {
+    ...createRectangle({ id: 'FR', color: '#000000', spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 2 }, transform: { ...IDENTITY_TRANSFORM, x: 40, y: 10, rotationDeg: 20 } }),
+    name: 'Label',
+    powerScale: 55,
+    operationOverride: { byOperation: { L: { power: 12, speed: 777 } } },
+    registrationJig: { objectId: 'FR', boxId: 'X', ancestors: [] },
+  };
+  const svg: ImportedSvg = {
+    kind: 'imported-svg',
+    id: 'SV',
+    source: 'lib.svg',
+    bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+    transform: { ...IDENTITY_TRANSFORM, x: 70, y: 10 },
+    libraryProvenance: { schemaVersion: 1, assetId: 'a', title: 'T', sourceName: 'S', licenseId: 'CC-BY-4.0', creator: 'C' },
+    svgImport: { id: 'frag', source: 'lib.svg', transform: IDENTITY_TRANSFORM },
+    paths: [{ color: '#ffffff', whiteInk: 'kept', polylines: [{ closed: true, points: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }] }] }],
+  };
+  const layers = [lineLayer(), { ...createLayer({ id: 'W', color: '#ffffff', name: 'W', mode: 'fill' }) } as Layer];
+  const p0 = { ...proj([locked, free, svg], layers), scene: { ...proj([locked, free, svg], layers).scene, groups: [{ id: 'G', name: 'grp', objectIds: ['LK', 'FR'] }] } } as Project;
+  setProject(p0, ['LK', 'FR', 'SV']);
+  const b0 = burn(p0);
+  st().convertSelectionToPath();
+  const p1 = st().project;
+  const b1 = burn(p1);
+  const after = Object.fromEntries(p1.scene.objects.map((o) => [o.id, o]));
+  out(`F locked kind after ${after.LK!.kind} (unchanged object: ${after.LK === locked})`);
+  const fr = after.FR as ImportedSvg;
+  out(`F FR kind ${fr.kind} name ${fr.name} powerScale ${fr.powerScale} override ${JSON.stringify(fr.operationOverride)} registrationJig ${JSON.stringify(fr.registrationJig)}`);
+  const sv = after.SV as ImportedSvg;
+  out(`F SV libraryProvenance ${JSON.stringify(sv.libraryProvenance)} svgImport ${JSON.stringify(sv.svgImport)} whiteInk ${sv.paths[0]!.whiteInk}`);
+  out(`F groups after ${JSON.stringify(p1.scene.groups)}`);
+  out(`F burn lit before ${f3(totalLen(b0.moves))} (${[...new Set(b0.moves.map((m) => `F${m.f}S${m.s}`))]}) after ${f3(totalLen(b1.moves))} (${[...new Set(b1.moves.map((m) => `F${m.f}S${m.s}`))]})`);
+  out(`F undo depth ${st().undoStack.length}`);
+});

@@ -1,0 +1,58 @@
+// Refuter's own G-code reader (not the auditor's decode.ts). Absolute G90 assumed, with G91
+// tracked. A "lit" move is G1/G2/G3 with the laser on (M3/M4 active) and S > 0. Arcs are
+// measured by their chord only, which is enough for the comparisons made here.
+export type Seg = { x0: number; y0: number; x1: number; y1: number; f: number; s: number };
+
+export function readGcode(gcode: string): Seg[] {
+  let x = 0, y = 0, f = 0, s = 0, motion = 0, on = false, rel = false;
+  const segs: Seg[] = [];
+  for (const raw of gcode.split(/\r?\n/)) {
+    const line = raw.replace(/\(.*?\)/g, '').replace(/;.*$/, '').trim().toUpperCase();
+    if (line === '') continue;
+    const words = [...line.matchAll(/([A-Z])\s*(-?\d*\.?\d+)/g)].map((m) => [m[1], Number(m[2])] as const);
+    let nx = x, ny = y, moved = false;
+    for (const [w, v] of words) {
+      if (w === 'G') {
+        if (v === 0 || v === 1 || v === 2 || v === 3) motion = v;
+        else if (v === 90) rel = false;
+        else if (v === 91) rel = true;
+      } else if (w === 'M') {
+        if (v === 3 || v === 4) on = true;
+        else if (v === 5) on = false;
+      } else if (w === 'X') { nx = rel ? x + v : v; moved = true; }
+      else if (w === 'Y') { ny = rel ? y + v : v; moved = true; }
+      else if (w === 'F') f = v;
+      else if (w === 'S') s = v;
+    }
+    if (moved) {
+      if (motion !== 0 && on && s > 0 && (nx !== x || ny !== y)) segs.push({ x0: x, y0: y, x1: nx, y1: ny, f, s });
+      x = nx; y = ny;
+    }
+  }
+  return segs;
+}
+
+export const litLength = (segs: Seg[]) => segs.reduce((a, g) => a + Math.hypot(g.x1 - g.x0, g.y1 - g.y0), 0);
+export function extent(segs: Seg[]) {
+  const xs = segs.flatMap((g) => [g.x0, g.x1]);
+  const ys = segs.flatMap((g) => [g.y0, g.y1]);
+  return xs.length === 0 ? null : { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+}
+/** Order of (feed, region) runs: consecutive lit segments with the same tag collapse. */
+export function runOrder(segs: Seg[], region: (x: number) => string): string[] {
+  const out: string[] = [];
+  for (const g of segs) {
+    const tag = `F${g.f}@${region((g.x0 + g.x1) / 2)}`;
+    if (out.at(-1) !== tag) out.push(tag);
+  }
+  return out;
+}
+/** A cheap fingerprint of the lit moves, rounded to 1 µm. */
+export function fingerprint(segs: Seg[]): string {
+  let h = 2166136261;
+  for (const g of segs) {
+    const t = `${g.x0.toFixed(3)},${g.y0.toFixed(3)},${g.x1.toFixed(3)},${g.y1.toFixed(3)},${g.s}`;
+    for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 16777619) >>> 0;
+  }
+  return `${segs.length}:${h.toString(16)}`;
+}

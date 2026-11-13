@@ -1,0 +1,112 @@
+// @vitest-environment jsdom
+// T28-P2-3 refuter: can a locked object reach the Weld selection through the real UI paths,
+// and what does the real dialog do then?
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, it, vi } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  findRegistrationBoxes,
+  IDENTITY_TRANSFORM,
+  type Layer,
+  type SceneObject,
+} from '../t26-main/src/core/scene';
+import { createRectangle } from '../t26-main/src/core/shapes/primitives/create-rectangle';
+import { setActiveEdition } from '../t26-main/src/ui/licensing/edition';
+import { useStore } from '../t26-main/src/ui/state';
+import { resetStore } from '../t26-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t26-main/src/ui/state/toast-store';
+import { BooleanDialogHost } from '../t26-main/src/ui/commands/BooleanDialogHost';
+import { openBooleanDialog, useBooleanDialogStore } from '../t26-main/src/ui/commands/boolean-dialog-store';
+import { selectionCanWeld } from '../t26-main/src/ui/commands/selection-command-state';
+import {
+  changeJigDraft,
+  commitJigEditorSession,
+  createJigEditorSession,
+} from '../t26-main/src/ui/workspace/registration-jig/jig-editor-session';
+
+const lines: string[] = [];
+const out = (s: string) => {
+  lines.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t28r/r28-dialog.log', lines.join('\n'));
+};
+let host: HTMLDivElement, root: Root;
+beforeEach(() => {
+  resetStore();
+  useBooleanDialogStore.setState({ session: null });
+  useToastStore.setState({ toasts: [] } as never);
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  host = document.createElement('div');
+  document.body.appendChild(host);
+  root = createRoot(host);
+});
+afterEach(async () => {
+  await act(async () => root.unmount());
+  host.remove();
+  vi.unstubAllGlobals();
+  setActiveEdition(null);
+});
+const st = () => useStore.getState();
+const sel = () => [st().selectedObjectId, ...st().additionalSelectedIds].filter((x): x is string => x !== null);
+const rect = (id: string, x: number, y: number, ops: string[], color = '#ff0000') =>
+  ({ ...createRectangle({ id, color, spec: { widthMm: 12, heightMm: 8, cornerRadiusMm: 0 }, transform: { ...IDENTITY_TRANSFORM, x, y } }), operationIds: ops }) as SceneObject;
+const button = (label: string) => [...document.querySelectorAll('button')].find((b) => b.textContent === label);
+const status = () => document.querySelector('[role="status"]')?.textContent ?? '';
+
+it('ordinary routes keep locked objects out of the selection', () => {
+  const art = { ...createLayer({ id: 'art', color: '#ff0000', name: 'art', mode: 'line' }) } as Layer;
+  const p = { ...createProject(), scene: { objects: [rect('a', 0, 0, ['art']), rect('b', 6, 3, ['art']), { ...rect('c', 40, 0, ['art']), locked: true }], layers: [art], groups: [{ id: 'g', name: 'G', objectIds: ['b', 'c'] }] } };
+  useStore.setState({ project: p, selectedObjectId: null, additionalSelectedIds: new Set() });
+  st().selectAllObjects();
+  out(`Select All: ${JSON.stringify(sel())}`);
+  st().selectObjects(['c']);
+  out(`selectObjects([c]): ${JSON.stringify(sel())}`);
+  st().selectObjects(['b']);
+  out(`selectObjects([b]) with group {b,c}: ${JSON.stringify(sel())}`);
+  st().selectObjects(['a', 'b']);
+  st().lockSelection();
+  out(`lockSelection keeps selection: ${JSON.stringify(sel())}`);
+  st().undo();
+  out(`after Undo of the lock: ${JSON.stringify(sel())}`);
+});
+
+it('jig editor save locks a selected outline and keeps it selected; then the Weld dialog', async () => {
+  const art = { ...createLayer({ id: 'art', color: '#ff0000', name: 'art', mode: 'line' }) } as Layer;
+  useStore.setState({ project: { ...createProject(), scene: { objects: [], layers: [art], groups: [] } }, selectedObjectId: null, additionalSelectedIds: new Set() });
+  // first jig save: outlines arrive locked
+  let session = createJigEditorSession(st() as never);
+  const dp = session.draft.project;
+  session = changeJigDraft(session, { project: { ...dp, scene: { ...dp.scene, objects: [...dp.scene.objects, rect('a', 100, 100, ['art']), rect('b', 106, 103, ['art'])] } } });
+  const first = commitJigEditorSession(st() as never, session);
+  if (first.kind !== 'saved') throw new Error(first.reason);
+  useStore.setState(first.change as never);
+  const boxIds = findRegistrationBoxes(st().project.scene).map((b) => b.id);
+  out(`first save: boxes ${boxIds.length} locked ${findRegistrationBoxes(st().project.scene).map((b) => b.locked === true).join(',')}`);
+  // operator unlocks everything, selects all, then reopens Edit jig and saves
+  st().unlockAllObjects();
+  st().selectAllObjects();
+  out(`after Unlock All + Select All: ${JSON.stringify(sel())}`);
+  const again = commitJigEditorSession(st() as never, createJigEditorSession(st() as never));
+  if (again.kind !== 'saved') throw new Error(again.reason);
+  useStore.setState(again.change as never);
+  const project = st().project;
+  const lockedSelected = sel().filter((id) => project.scene.objects.find((o) => o.id === id)?.locked === true);
+  out(`after second jig save: selection ${JSON.stringify(sel())}; locked yet selected ${JSON.stringify(lockedSelected)}`);
+  out(`menu Weld enabled: ${selectionCanWeld(project, sel())}`);
+  await act(async () => {
+    root.render(<BooleanDialogHost />);
+    openBooleanDialog('weld');
+  });
+  await act(async () => new Promise((r) => setTimeout(r, 400)));
+  const apply = button('Apply');
+  out(`dialog status "${status()}"; Apply disabled ${apply?.disabled}; text ${JSON.stringify((host.textContent ?? '').slice(0, 300))}`);
+  await act(async () => apply?.click());
+  await act(async () => new Promise((r) => setTimeout(r, 150)));
+  out(`after Apply: project changed ${st().project !== project}; dialog open ${useBooleanDialogStore.getState().session !== null}; toasts ${JSON.stringify(useToastStore.getState().toasts.map((t) => t.message))}; status "${status()}"`);
+  // same selection, the Delete key path (selection-delete-action.ts)
+  const { deleteSelection } = await import('../t26-main/src/ui/commands/selection-delete-action');
+  deleteSelection();
+  out(`Delete with the locked outline selected: boxes ${findRegistrationBoxes(st().project.scene).length} (was ${boxIds.length})`);
+});

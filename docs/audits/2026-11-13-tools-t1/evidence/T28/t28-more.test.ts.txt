@@ -1,0 +1,157 @@
+// @vitest-environment jsdom
+// T28 follow-ups: variable text with a real overlap; same-operation shapes of different colours
+// reached through the real store actions (Assign to operation, operation colour change).
+import { beforeEach, it } from 'vitest';
+import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  DEFAULT_PROJECT_VARIABLE_DATA,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type TextObject,
+  type Transform,
+} from '../t26-main/src/core/scene';
+import { createRectangle } from '../t26-main/src/core/shapes/primitives/create-rectangle';
+import { textToPolylines } from '../t26-main/src/core/text';
+import { prepareOutput } from '../t26-main/src/io/gcode/prepare-output';
+import { prepareOutputSnapshot, type VariableTextRenderer } from '../t26-main/src/io/gcode/prepare-output-snapshot';
+import { emitPreparedGcode } from '../t26-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t26-main/src/ui/state/store';
+import { resetStore } from '../t26-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t26-main/src/ui/state/toast-store';
+import { describeWeldChange } from '../t26-main/src/core/geometry/vector-path-weld-change';
+import { litMoves, totalLen, bbox, type LitMove } from './decode';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t28/t28-more.log';
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync(LOG, log.join('\n'));
+};
+beforeEach(() => {
+  resetStore();
+  useToastStore.setState({ toasts: [] } as never);
+});
+const st = () => useStore.getState();
+const f3 = (n: number) => n.toFixed(3);
+const toasts = () => useToastStore.getState().toasts.map((t) => t.message);
+const roboto = (() => {
+  const b = readFileSync('C:/Users/stolk/kd-t1/t26-main/src/ui/text/fonts/Roboto-Regular.ttf');
+  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+})();
+const renderer: VariableTextRenderer = ({ text, content }) =>
+  textToPolylines({ content, sizeMm: text.sizeMm, alignment: text.alignment, lineHeight: text.lineHeight, letterSpacing: text.letterSpacing, color: text.color, fontBuffer: roboto });
+const layer = (id: string, color: string, speed: number, power: number) =>
+  ({ ...createLayer({ id, color, name: id, mode: 'line' }), speed, power }) as Layer;
+function proj(objects: SceneObject[], layers: Layer[], extra: Partial<Project> = {}): Project {
+  const base = createProject();
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers, groups: [] }, ...extra };
+}
+function setProject(project: Project, selected: string[]): void {
+  useStore.setState({ project, selectedObjectId: selected[0] ?? null, additionalSelectedIds: new Set(selected.slice(1)), undoStack: [], redoStack: [], dirty: false });
+}
+const rect = (id: string, color: string, w: number, h: number, t: Partial<Transform>, extra: Record<string, unknown> = {}) =>
+  ({ ...createRectangle({ id, color, spec: { widthMm: w, heightMm: h, cornerRadiusMm: 0 }, transform: { ...IDENTITY_TRANSFORM, ...t } }), ...extra }) as SceneObject;
+function burn(project: Project) {
+  const prepared = prepareOutput(project);
+  if (!prepared.ok) return { moves: [] as LitMove[] };
+  return { moves: litMoves(emitPreparedGcode(prepared).gcode, project.device) };
+}
+
+it.skip('A2. variable text with a bar that crosses the S', async () => {
+  const template = 'SN {{serial:4}}';
+  const base = {
+    kind: 'text', id: 'VT', content: template,
+    variableTemplate: { tokens: [{ kind: 'literal', value: 'SN ' }, { kind: 'serial', prefix: '', width: 4 }] },
+    fontKey: 'roboto-regular', sizeMm: 10, alignment: 'left', lineHeight: 1.4, letterSpacing: 0, color: '#000000', weldOverlaps: true,
+    bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 }, transform: { ...IDENTITY_TRANSFORM, x: 50, y: 50 }, paths: [], operationIds: ['L'],
+  } as unknown as TextObject;
+  const src = await renderer({ text: base, content: template, project: createProject() });
+  const text = { ...base, bounds: src.bounds, paths: src.paths } as TextObject;
+  const bar = rect('BAR', '#000000', 8, 1.5, { x: 48, y: 53.5 }, { operationIds: ['L'] });
+  const L = layer('L', '#000000', 1234, 37);
+  const p0 = proj([text, bar], [L], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 42 } });
+  setProject(p0, ['VT', 'BAR']);
+  const snap = async (p: Project) => {
+    const prepared = await prepareOutputSnapshot(p, { clock: () => new Date(0), renderVariableText: renderer });
+    if (!prepared.ok) return { len: NaN, b: null as unknown };
+    const moves = litMoves(emitPreparedGcode(prepared).gcode, p.device);
+    return { len: totalLen(moves), b: bbox(moves) };
+  };
+  const before = await snap(p0);
+  st().weldSelection();
+  const p1 = st().project;
+  const after = await snap(p1);
+  const after43 = await snap({ ...p1, variables: { ...p1.variables, serialValue: 43 } });
+  const before43 = await snap({ ...p0, variables: { ...p0.variables, serialValue: 43 } });
+  out(`A2 objects after: ${p1.scene.objects.map((o) => `${o.id}:${o.kind}${'source' in o ? `(${o.source})` : ''}`).join(', ')}`);
+  out(`A2 before (serial 42) lit ${f3(before.len)} bbox ${JSON.stringify(before.b)}`);
+  out(`A2 after  (serial 42) lit ${f3(after.len)} bbox ${JSON.stringify(after.b)}`);
+  out(`A2 serial 43: before-weld lit ${f3(before43.len)}; after-weld lit ${f3(after43.len)} (after-weld changes with record: ${Math.abs(after43.len - after.len) > 1e-6})`);
+  const value = await renderer({ text: base, content: 'SN 0042', project: p0 });
+  out(`A2 oracle: "SN 0042" rendered x extent ${f3(value.bounds.maxX - value.bounds.minX)} mm -> burn should end near x ${f3(50 + value.bounds.maxX)}; template x extent ${f3(src.bounds.maxX - src.bounds.minX)} -> x ${f3(50 + src.bounds.maxX)}`);
+  out(`A2 toasts ${JSON.stringify(toasts())}`);
+});
+
+it.skip('E. same operation, different colours via real store actions', () => {
+  const L1 = layer('L1', '#000000', 1000, 80);
+  const L2 = layer('L2', '#ff0000', 500, 40);
+  const A = rect('A', '#000000', 20, 10, { x: 10, y: 10 }, { operationIds: ['L1'] });
+  const B = rect('B', '#ff0000', 20, 10, { x: 20, y: 15 }, { operationIds: ['L2'] });
+  // 1) user assigns B to operation L1 (Operations panel "assign selection")
+  const p0 = proj([A, B], [L1, L2]);
+  setProject(p0, ['B']);
+  st().assignSelectionToLayer('L1');
+  const pa = st().project;
+  const Ba = pa.scene.objects.find((o) => o.id === 'B') as ImportedSvg;
+  out(`E1 after assign B->L1: B operationIds ${JSON.stringify(Ba.operationIds)} B colour ${Ba.paths[0]?.color}; layers ${pa.scene.layers.map((l) => l.id).join(',')}`);
+  const b0 = burn(pa);
+  useStore.setState({ selectedObjectId: 'A', additionalSelectedIds: new Set(['B']) });
+  st().weldSelection();
+  const pb = st().project;
+  out(`E1 weld A+B (both on L1, same settings): changed ${pb !== pa}; objects ${pb.scene.objects.map((o) => o.id).join(',')}; lit ${f3(totalLen(b0.moves))} -> ${f3(totalLen(burn(pb).moves))} (union perimeter oracle 90); toasts ${JSON.stringify(toasts())}`);
+  // 2) user recolours operation L1, then draws a new shape in it (new shape takes the new colour)
+  const p2 = proj([A], [L1]);
+  setProject(p2, []);
+  st().setLayerColor('L1', '#0000ff');
+  const pc = st().project;
+  const Aafter = pc.scene.objects[0] as ImportedSvg;
+  out(`E2 after recolour L1 -> #0000ff: L1 colour ${pc.scene.layers[0]?.color}; A colour stays ${Aafter.paths[0]?.color}`);
+  const N = rect('N', '#0000ff', 20, 10, { x: 20, y: 15 }, { operationIds: ['L1'] });
+  const pd = { ...pc, scene: { ...pc.scene, objects: [...pc.scene.objects, N] } };
+  setProject(pd, ['A', 'N']);
+  useToastStore.setState({ toasts: [] } as never);
+  st().weldSelection();
+  out(`E2 weld A (#000000) + N (#0000ff), both L1: changed ${st().project !== pd}; toasts ${JSON.stringify(toasts())}`);
+  // 3) the same check the Weld dialog runs
+  const sources = pd.scene.objects as ImportedSvg[];
+  void sources;
+  void describeWeldChange;
+});
+
+it('E3. partial weld when one same-operation shape has another colour (Fill)', () => {
+  const F = { ...createLayer({ id: 'F', color: '#000000', name: 'F', mode: 'fill' }), speed: 3000, power: 30, hatchSpacingMm: 0.1 } as Layer;
+  const A = rect('A', '#000000', 20, 10, { x: 10, y: 10 }, { operationIds: ['F'] });
+  const C = rect('C', '#000000', 20, 10, { x: 20, y: 15 }, { operationIds: ['F'] });
+  const B = rect('B', '#ff0000', 10, 10, { x: 25, y: 5 }, { operationIds: ['F'] });
+  const p0 = proj([A, B, C], [F]);
+  setProject(p0, ['A', 'B', 'C']);
+  const b0 = burn(p0);
+  st().weldSelection();
+  const p1 = st().project;
+  const b1 = burn(p1);
+  const w = p1.scene.objects[0] as ImportedSvg;
+  // union oracle: A [10,30]x[10,20], C [20,40]x[15,25], B [25,35]x[5,15]
+  const N = 2000;
+  let area = 0;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    const x = 10 + (30 * (i + 0.5)) / N; const y = 5 + (20 * (j + 0.5)) / N;
+    if ((x <= 30 && y >= 10 && y <= 20) || (x >= 20 && y >= 15) || (x >= 25 && x <= 35 && y <= 15)) area += (30 / N) * (20 / N);
+  }
+  out(`E3 welded paths ${w.paths.length} (${w.paths.map((p) => p.color).join(',')}); Fill hatch before ${f3(totalLen(b0.moves))} after ${f3(totalLen(b1.moves))} -> area ${f3(totalLen(b1.moves) * 0.1)} mm2; union oracle ${f3(area)} mm2; toasts ${JSON.stringify(toasts())}`);
+});
