@@ -108,11 +108,11 @@ function PickRow(props: {
           <label
             key={column}
             className={`lf-photo-test-card__square${checked ? ' is-picked' : ''}`}
-            title="Pick this square as the best burn"
           >
             <input
               type="radio"
               name="photo-test-square"
+              title="Pick this square as the best burn"
               aria-label={`${formatUpTo2Decimals(power)}% power at ${speedText} mm/min`}
               checked={checked}
               onChange={() => props.onChange({ row, column })}
