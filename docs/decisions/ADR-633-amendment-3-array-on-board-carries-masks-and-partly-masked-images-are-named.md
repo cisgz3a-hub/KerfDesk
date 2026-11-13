@@ -6,6 +6,10 @@ confirmed by the auditor, an independent refuter and the coordinator
 (`docs/audits/2026-10-27-rolling-v5/J9-fix-output.md`). Frame (ADR-565), Start, output policy and
 licences are unchanged. No guard is added (ADR-228). | **Date:** 2026-10-28
 
+**Amended by [ADR-480 Amendment 6](ADR-480-amendment-6-the-mask-is-the-fill-region-and-the-bake-keeps-real-pixels.md):** Decision 3 measures the
+mask region compile uses, which is now the Fill region of the mask object (each path by its own
+fill rule, the paths unioned), not every contour read even-odd.
+
 ### Context
 
 Amendment 2 said Duplicate, Copy and Paste, Array, Copy along path and nesting "already copy a

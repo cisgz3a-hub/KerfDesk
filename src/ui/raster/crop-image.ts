@@ -1,10 +1,13 @@
+import { intersectClosedPolylinesChecked } from '../../core/geometry/polygon-intersection';
 import {
-  applyImageMaskToLuma,
   hasClosedImageMaskGeometry,
+  MIN_RASTER_LINES_PER_MM,
   type VectorRaster,
 } from '../../core/raster';
+import { closedImageClipContours } from '../../core/raster/image-mask';
 import { bakedImageMaskClip } from '../../core/raster/image-mask-clip';
-import type { Bounds, RasterImage, SceneObject } from '../../core/scene';
+import { SHARPEN_RADIUS_MAX } from '../../core/raster/luma-sharpen';
+import type { Bounds, ColoredPath, Polyline, RasterImage, SceneObject } from '../../core/scene';
 import {
   hydratePagedRasterImage,
   type PagedRasterAssetReader,
@@ -26,8 +29,15 @@ type PixelCrop = {
 
 type BitmapEncoder = (raster: VectorRaster) => BitmapFields | Promise<BitmapFields>;
 
-const MASKED_PIXEL = 0;
 const UNMASKED_PIXEL = 255;
+// The bake keeps real pixels at the mask edge and lets the owned clip alone
+// decide what burns (ADR-480 Amendment 6). Compile sharpens the burn grid
+// before the clip, so the crop keeps a margin of real pixels around the
+// mask at least three sigmas of the widest sharpen radius, plus one cell, at
+// the coarsest recommended line interval: no burn cell inside the mask then
+// reads a pixel the crop removed, under any sharpening or resampling.
+const SHARPEN_KERNEL_SIGMAS = 3;
+const BAKE_MARGIN_MM = (SHARPEN_KERNEL_SIGMAS * SHARPEN_RADIUS_MAX + 1) / MIN_RASTER_LINES_PER_MM;
 
 export async function cropMaskedRasterImage(
   image: RasterImage,
@@ -38,33 +48,26 @@ export async function cropMaskedRasterImage(
   const width = Math.max(1, Math.floor(image.pixelWidth));
   const height = Math.max(1, Math.floor(image.pixelHeight));
   assertUsableMask(image, maskObject);
-  const maskProbe = applyImageMaskToLuma({
-    image,
-    maskObject,
-    luma: new Uint8Array(width * height).fill(MASKED_PIXEL),
-    width,
-    height,
-  });
-  const crop = maskedPixelBounds(maskProbe, width, height);
+  // The mask's shape stays as the image's own clip, applied where the live
+  // mask was (ADR-480 Amendment 1). The clip is in the image's local frame,
+  // which a crop keeps. It is the only thing that hides pixels: whitening
+  // them in the bitmap moved the edge onto the source grid and gave sharpened
+  // edges a rim (ADR-480 Amendment 6).
+  const imageClip = bakedImageMaskClip(image, maskObject);
+  if (imageClip === null) {
+    throw new Error('Could not keep the mask shape with the image.');
+  }
+  const crop = clipPixelBox(image, imageClip, width, height);
   if (crop === null) {
     throw new Error('Image mask does not overlap the selected image.');
   }
   const source = await hydratePagedRasterImage(image, repository);
   const sourceLuma = await readCropLuma(source, width, height);
-  const maskedLuma = applyImageMaskToLuma({ image, maskObject, luma: sourceLuma, width, height });
-  const croppedLuma = cropLuma(maskedLuma, width, crop);
   const croppedRaster = {
     width: crop.maxX - crop.minX,
     height: crop.maxY - crop.minY,
-    luma: croppedLuma,
+    luma: cropLuma(sourceLuma, width, crop),
   };
-  // The white outside the mask would burn under Negative, so the mask's shape
-  // stays as the image's own clip, applied where the live mask was (ADR-480
-  // Amendment 1). The clip is in the image's local frame, which a crop keeps.
-  const imageClip = bakedImageMaskClip(image, maskObject);
-  if (imageClip === null) {
-    throw new Error('Could not keep the mask shape with the image.');
-  }
   const fields = await encode(croppedRaster);
   const { imageMaskId: _imageMaskId, editorDocument: _editorDocument, ...unmasked } = source;
   return {
@@ -90,22 +93,70 @@ function assertUsableMask(
   }
 }
 
-function maskedPixelBounds(luma: Uint8Array, width: number, height: number): PixelCrop | null {
-  let minX = width;
-  let minY = height;
-  let maxX = -1;
-  let maxY = -1;
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      if (luma[y * width + x] === UNMASKED_PIXEL) continue;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
+/**
+ * The source pixels the clip touches inside the image, grown by the bake
+ * margin and kept within the image; null when the clip and the image share
+ * no area. Measured on the clip's geometry, not on pixel centres, so a mask
+ * smaller than one pixel still crops to the pixels it covers.
+ */
+function clipPixelBox(
+  image: RasterImage,
+  imageClip: ReadonlyArray<ColoredPath>,
+  width: number,
+  height: number,
+): PixelCrop | null {
+  const b = image.bounds;
+  const widthMm = b.maxX - b.minX;
+  const heightMm = b.maxY - b.minY;
+  if (!(widthMm > 0 && heightMm > 0)) return null;
+  const clip: Polyline[] = closedImageClipContours(imageClip).map((points) => ({
+    points: [...points],
+    closed: true,
+  }));
+  const frame: Polyline = {
+    points: [
+      { x: b.minX, y: b.minY },
+      { x: b.maxX, y: b.minY },
+      { x: b.maxX, y: b.maxY },
+      { x: b.minX, y: b.maxY },
+    ],
+    closed: true,
+  };
+  const overlap = intersectClosedPolylinesChecked(clip, [frame]);
+  const box = pointBox(overlap.kind === 'ok' ? overlap.value : clip);
+  if (box === null || !(box.maxX > box.minX && box.maxY > box.minY)) return null;
+  const pitchX = widthMm / width;
+  const pitchY = heightMm / height;
+  // The margin is measured where the burn grid is: in scene millimetres.
+  const marginX = Math.ceil(
+    BAKE_MARGIN_MM / Math.max(Number.EPSILON, pitchX * Math.abs(image.transform.scaleX)),
+  );
+  const marginY = Math.ceil(
+    BAKE_MARGIN_MM / Math.max(Number.EPSILON, pitchY * Math.abs(image.transform.scaleY)),
+  );
+  const crop = {
+    minX: Math.max(0, Math.floor((box.minX - b.minX) / pitchX) - marginX),
+    minY: Math.max(0, Math.floor((box.minY - b.minY) / pitchY) - marginY),
+    maxX: Math.min(width, Math.ceil((box.maxX - b.minX) / pitchX) + marginX),
+    maxY: Math.min(height, Math.ceil((box.maxY - b.minY) / pitchY) + marginY),
+  };
+  return crop.maxX > crop.minX && crop.maxY > crop.minY ? crop : null;
+}
+
+function pointBox(contours: ReadonlyArray<Polyline>): Bounds | null {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const contour of contours) {
+    for (const point of contour.points) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
     }
   }
-  if (maxX < minX || maxY < minY) return null;
-  return { minX, minY, maxX: maxX + 1, maxY: maxY + 1 };
+  return Number.isFinite(minX) ? { minX, minY, maxX, maxY } : null;
 }
 
 function cropLuma(source: Uint8Array, sourceWidth: number, crop: PixelCrop): Uint8Array {

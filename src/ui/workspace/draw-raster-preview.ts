@@ -326,7 +326,13 @@ function maskCacheKey(maskObject: SceneObject | null): string {
     paths:
       maskObject.kind === 'raster-image' || maskObject.kind === 'relief'
         ? []
-        : maskObject.paths.map((path) => ({ color: path.color, polylines: path.polylines })),
+        : // The fill rule decides the region the mask keeps (ADR-480 Amendment 6).
+          maskObject.paths.map((path) => ({
+            color: path.color,
+            fillRule: path.fillRule,
+            polylines: path.polylines,
+          })),
+    kind: maskObject.kind,
   });
 }
 

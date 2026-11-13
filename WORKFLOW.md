@@ -818,7 +818,12 @@ the linked artwork.
 5. **Tools → Image → Flatten Image Mask** bakes the mask into the selected image and crops it, as
    **Crop Image** does, then deletes the mask shape. The shape stays when it is locked or another
    image or path text uses it; the notice says which. Both keep the mask's outline as the image's
-   own clip, so the area outside it never burns, Negative included (ADR-480 Amendment 1).
+   own clip, so the area outside it never burns, Negative included (ADR-480 Amendment 1). The crop
+   keeps the real pixels the mask covers plus a 2 mm margin, and whitens none of them: the clip
+   alone hides what does not burn, so the edge burns as it did through the live mask, sharpening
+   included (ADR-480 Amendment 6). A mask, live or baked, keeps the area **Fill** fills for the
+   same shape: text and `nonzero` paths by winding, and an object's separate paths together. The
+   canvas shows a photo clipped to its live mask, as it does after Crop.
 6. Each tool is one undo step and adds none when nothing changes. None operates a machine.
 
 ### F-A6f. Trim Shapes, Cut Shapes, Warp and Deform, Copy Along Path (ADR-498)

@@ -223,7 +223,9 @@ describe('photo layers through project persistence and lifecycle', () => {
         lumaBase64: btoa(String.fromCharCode(...raster.luma)),
       }),
     );
-    expect(cropped.pixelWidth).toBe(1);
+    // The 2 mm bake margin keeps every real pixel of this small image
+    // (ADR-480 Amendment 6); the retained layers still no longer apply.
+    expect(cropped.pixelWidth).toBe(currentImage().pixelWidth);
     expect(cropped).not.toHaveProperty('editorDocument');
     expect(cropped).not.toHaveProperty('imageMaskId');
   });

@@ -68,13 +68,14 @@ describe('cropMaskedRasterImage', () => {
     });
     const encoder = vi.fn(encode);
     const cropped = await cropMaskedRasterImage(input, mask, encoder);
-    expect([cropped.pixelWidth, cropped.pixelHeight]).toEqual([1024, 1024]);
-    expect(cropped.bounds).toEqual({ minX: 512, minY: 0, maxX: 1536, maxY: 1024 });
+    // 1 mm pixels: the 2 mm bake margin is 2 pixels each side.
+    expect([cropped.pixelWidth, cropped.pixelHeight]).toEqual([1028, 1024]);
+    expect(cropped.bounds).toEqual({ minX: 510, minY: 0, maxX: 1538, maxY: 1024 });
     const output = encoder.mock.calls[0]?.[0].luma;
     expect(output).toBeDefined();
     for (let y = 0; y < height; y += 1) {
-      expect(output?.subarray(y * 1024, (y + 1) * 1024)).toEqual(
-        luma.subarray(y * width + 512, y * width + 1536),
+      expect(output?.subarray(y * 1028, (y + 1) * 1028)).toEqual(
+        luma.subarray(y * width + 510, y * width + 1538),
       );
     }
     expect(input.imageMaskId).toBe('mask-1');
@@ -93,7 +94,8 @@ describe('cropMaskedRasterImage', () => {
         .spyOn(imageLoader, 'loadImageAsRawData')
         .mockResolvedValue({ width: 4, height: 2, data: rgba });
       const cropped = await cropMaskedRasterImage(input, maskAt(1, 2), encode);
-      expect(decode(cropped.lumaBase64 ?? '')).toEqual([20, 30, 60, 70]);
+      // The bake margin keeps every pixel of this small image, unwhitened.
+      expect(decode(cropped.lumaBase64 ?? '')).toEqual([10, 20, 30, 40, 50, 60, 70, 80]);
       expect(loader).toHaveBeenCalledOnce();
     },
   );
@@ -121,8 +123,8 @@ describe('cropMaskedRasterImage', () => {
 
     const cropped = await cropMaskedRasterImage(input, maskAt(1, 2), encode);
 
-    expect(cropped).toMatchObject({ pixelWidth: 2, pixelHeight: 2 });
-    expect(decode(cropped.lumaBase64 ?? '')).toEqual([100, 100, 100, 100]);
+    expect(cropped).toMatchObject({ pixelWidth: 4, pixelHeight: 2 });
+    expect(decode(cropped.lumaBase64 ?? '')).toEqual(new Array(8).fill(100));
   });
 
   it('rejects an embedded source with inconsistent dimensions instead of misregistering the crop', async () => {
@@ -137,30 +139,56 @@ describe('cropMaskedRasterImage', () => {
     );
   });
 
-  it('bakes the image mask into source pixels and shrinks bounds to the covered pixels', async () => {
+  it('crops to the pixels the mask covers plus the bake margin and whitens none of them', async () => {
+    // 12 x 2 pixels over 12 x 2 mm; the mask covers x 5..7 mm. The 2 mm
+    // margin keeps pixels 3..9 (ADR-480 Amendment 6), real tone included.
+    const luma = Uint8Array.from({ length: 24 }, (_, index) => 10 + index);
+    const input = raster({
+      pixelWidth: 12,
+      bounds: { minX: 0, minY: 0, maxX: 12, maxY: 2 },
+      lumaBase64: lumaToBase64(luma),
+    });
     const encoder = vi.fn(encode);
 
-    const cropped = await cropMaskedRasterImage(raster(), maskAt(1, 2), encoder);
+    const cropped = await cropMaskedRasterImage(input, maskAt(5, 2), encoder);
 
     expect(cropped).toMatchObject({
       id: 'image-1',
       source: 'photo.png',
-      dataUrl: 'data:image/png;base64,2x2',
-      pixelWidth: 2,
+      dataUrl: 'data:image/png;base64,6x2',
+      pixelWidth: 6,
       pixelHeight: 2,
-      bounds: { minX: 1, minY: 0, maxX: 3, maxY: 2 },
+      bounds: { minX: 3, minY: 0, maxX: 9, maxY: 2 },
       transform: IDENTITY_TRANSFORM,
       color: '#808080',
       dither: 'threshold',
       linesPerMm: 1,
     });
     expect(cropped.imageMaskId).toBeUndefined();
-    expect(decode(cropped.lumaBase64 ?? '')).toEqual([20, 30, 60, 70]);
-    expect(encoder).toHaveBeenCalledWith({
-      width: 2,
-      height: 2,
-      luma: new Uint8Array([20, 30, 60, 70]),
+    const expected = [...luma.subarray(3, 9), ...luma.subarray(15, 21)];
+    expect(decode(cropped.lumaBase64 ?? '')).toEqual(expected);
+    expect(encoder).toHaveBeenCalledWith({ width: 6, height: 2, luma: Uint8Array.from(expected) });
+  });
+
+  it('crops a mask smaller than one pixel to the pixels it covers (T17-P3-2)', async () => {
+    // A 0.3 mm square between pixel centres used to be refused as "does not
+    // overlap", although the live mask burns there.
+    const input = raster({
+      pixelWidth: 40,
+      pixelHeight: 40,
+      bounds: { minX: 0, minY: 0, maxX: 20, maxY: 20 },
+      lumaBase64: lumaToBase64(new Uint8Array(1600).fill(0)),
     });
+    const mask = createRectangle({
+      id: 'mask-1',
+      color: '#000000',
+      spec: { widthMm: 0.3, heightMm: 0.3, cornerRadiusMm: 0 },
+      transform: { ...IDENTITY_TRANSFORM, x: 10.3, y: 10.3 },
+    });
+    const cropped = await cropMaskedRasterImage(input, mask, encode);
+    expect(cropped.pixelWidth).toBeGreaterThan(0);
+    expect(cropped.bounds.minX).toBeLessThanOrEqual(10.3 - 2);
+    expect(cropped.bounds.maxX).toBeGreaterThanOrEqual(10.6 + 2);
   });
 
   it('rejects a mask that does not overlap the selected image', async () => {

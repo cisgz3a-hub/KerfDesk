@@ -369,7 +369,9 @@ function drawObjects(
     ctx.setLineDash(isRegistrationBox(obj) ? [8, 5] : []);
     if (drawPlacedVector(ctx, vector, display, view, onRasterBitmapReady, thin)) simplified = true;
     ctx.setLineDash([]);
-    if (onCanvas) drawObjectBitmap(ctx, obj, layerByColor, view, onRasterBitmapReady);
+    if (onCanvas) {
+      drawObjectBitmap(ctx, obj, project.scene.objects, layerByColor, view, onRasterBitmapReady);
+    }
     drawObjectSelectionOverlay(ctx, obj, view, {
       isVisible,
       selectedId,
@@ -394,6 +396,7 @@ function drawObjects(
 function drawObjectBitmap(
   ctx: CanvasRenderingContext2D,
   obj: SceneObject,
+  objects: ReadonlyArray<SceneObject>,
   layerByColor: Map<string, Layer>,
   view: ViewTransform,
   onRasterBitmapReady: (() => void) | undefined,
@@ -402,8 +405,11 @@ function drawObjectBitmap(
   // polyline strokes. Hidden layers also hide bitmaps; orphan colors
   // stay visible so artwork never silently disappears.
   if (obj.kind === 'raster-image') {
+    const maskId = obj.imageMaskId;
     drawRasterImage(ctx, obj, view, {
       adjustments: burnedImageAdjustments(obj, layerByColor),
+      // The canvas clips a live mask like a baked one (ADR-480 Amendment 6).
+      ...(maskId === undefined ? {} : { maskObject: objects.find((o) => o.id === maskId) ?? null }),
       ...(onRasterBitmapReady === undefined ? {} : { onBitmapReady: onRasterBitmapReady }),
     });
   }

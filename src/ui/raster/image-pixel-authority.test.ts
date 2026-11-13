@@ -204,17 +204,15 @@ describe('authoritative pixels after editing a paged image', () => {
       lumaBase64: lumaToBase64(luma),
     }));
     const cropped = await cropMaskedRasterImage(original, mask, encoded, pages);
-    expect(encoded).toHaveBeenCalledWith({
-      width: 2,
-      height: 2,
-      luma: Uint8Array.of(20, 30, 60, 70),
-    });
+    // The 2 mm bake margin keeps every real pixel of this 4 x 2 mm image
+    // (ADR-480 Amendment 6); nothing is whitened.
+    expect(encoded).toHaveBeenCalledWith({ width: 4, height: 2, luma: SOURCE_LUMA });
     expect(cropped).not.toHaveProperty('imageAsset');
     expect(cropped).not.toHaveProperty('imageMaskId');
     expect(cropped).toMatchObject({
-      pixelWidth: 2,
+      pixelWidth: 4,
       pixelHeight: 2,
-      bounds: { minX: 1, minY: 0, maxX: 3, maxY: 2 },
+      bounds: { minX: 0, minY: 0, maxX: 4, maxY: 2 },
     });
     expect(pages.acquireReadLease).toHaveBeenCalledOnce();
     expect(pages.releaseReadLease).toHaveBeenCalledWith(
@@ -223,7 +221,7 @@ describe('authoritative pixels after editing a paged image', () => {
     useStore.getState().setProject(projectWith(original));
     useStore.getState().cropImage(original.id, cropped);
     expect(roundTrip(useStore.getState().project).scene.objects[0]).toMatchObject({
-      lumaBase64: lumaToBase64(Uint8Array.of(20, 30, 60, 70)),
+      lumaBase64: lumaToBase64(SOURCE_LUMA),
     });
     expect(await hydratePagedRasterImage(currentImage(), pages)).toBe(currentImage());
     useStore.getState().undo();

@@ -16,8 +16,15 @@ import {
   type PartialCellGrid,
 } from '../../core/grid';
 import type { LumaAdjustments } from '../../core/raster';
-import { closedImageClipContours } from '../../core/raster/image-mask';
-import type { AABB, Layer, RasterImage, Transform as ObjTransform } from '../../core/scene';
+import { closedImageClipContours, closedMaskContours } from '../../core/raster/image-mask';
+import type { MaskContours } from '../../core/raster/mask-scanline';
+import type {
+  AABB,
+  Layer,
+  RasterImage,
+  SceneObject,
+  Transform as ObjTransform,
+} from '../../core/scene';
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
 import {
   adjustedRasterDisplay,
@@ -110,6 +117,8 @@ export type DrawRasterImageOptions = {
   readonly onBitmapReady?: () => void;
   /** The adjustments that reach the burn; defaults to the object's own. */
   readonly adjustments?: LumaAdjustments;
+  /** The scene object the image's live mask names (`imageMaskId`), if any. */
+  readonly maskObject?: SceneObject | null;
 };
 
 export function drawRasterImage(
@@ -120,6 +129,7 @@ export function drawRasterImage(
     readonly bounds: AABB;
     readonly transform: ObjTransform;
     readonly imageClip?: RasterImage['imageClip'];
+    readonly imageMaskId?: string;
     readonly brightness?: number;
     readonly contrast?: number;
     readonly gamma?: number;
@@ -144,7 +154,19 @@ export function drawRasterImage(
     obj.transform,
     view,
     obj.imageClip,
+    liveMaskRegion(obj.imageMaskId, options.maskObject),
   );
+}
+
+// A live mask hides what it does not burn, as a baked one does (ADR-480
+// Amendment 1 D3, Amendment 6): the canvas clips to the region compile keeps.
+function liveMaskRegion(
+  maskId: string | undefined,
+  maskObject: SceneObject | null | undefined,
+): MaskContours | undefined {
+  if (maskId === undefined || maskObject == null || maskObject.id !== maskId) return undefined;
+  const region = closedMaskContours(maskObject);
+  return region.length === 0 ? undefined : region;
 }
 
 // An adjusted image draws the grey tone that burns (ADR-359); an unadjusted
@@ -208,11 +230,14 @@ export function drawBitmapAtTransform(
   transform: ObjTransform,
   view: ViewTransform,
   imageClip?: RasterImage['imageClip'],
+  sceneClip?: MaskContours,
 ): void {
   const t = transform;
   const w = bounds.maxX - bounds.minX;
   const h = bounds.maxY - bounds.minY;
   ctx.save();
+  // The live mask is in scene space, so it clips before the image transform.
+  if (sceneClip !== undefined) clipContours(ctx, sceneClip, view);
   ctx.translate(view.offsetX + t.x * view.scale, view.offsetY + t.y * view.scale);
   ctx.rotate(t.rotationDeg * DEG_TO_RAD);
   const sx = (t.mirrorX ? -1 : 1) * t.scaleX * view.scale;
@@ -228,12 +253,24 @@ function clipRasterImage(
   ctx: CanvasRenderingContext2D,
   paths: NonNullable<RasterImage['imageClip']>,
 ): void {
+  clipContours(ctx, closedImageClipContours(paths), IDENTITY_VIEW);
+}
+
+const IDENTITY_VIEW: ViewTransform = { offsetX: 0, offsetY: 0, scale: 1 };
+
+function clipContours(
+  ctx: CanvasRenderingContext2D,
+  contours: MaskContours,
+  view: ViewTransform,
+): void {
   ctx.beginPath();
-  for (const contour of closedImageClipContours(paths)) {
+  for (const contour of contours) {
     const start = contour[0];
     if (start === undefined) continue;
-    ctx.moveTo(start.x, start.y);
-    for (const point of contour.slice(1)) ctx.lineTo(point.x, point.y);
+    ctx.moveTo(view.offsetX + start.x * view.scale, view.offsetY + start.y * view.scale);
+    for (const point of contour.slice(1)) {
+      ctx.lineTo(view.offsetX + point.x * view.scale, view.offsetY + point.y * view.scale);
+    }
     ctx.closePath();
   }
   ctx.clip('evenodd');
