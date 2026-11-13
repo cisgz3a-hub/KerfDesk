@@ -137,10 +137,7 @@ Plan: [AREAS.md](AREAS.md). Severity follows C2:
 
 **Fixed on main:** #1831, #1832, #1833 and #1836 (E1 and E2), on top of C2's #1808, #1827, #1828 and #1829.
 
-**Open:**
-- E5-P1-1 (one constant: `ELLIPSE_WRAP_SNAP` 1.55e-3 → 1.568e-3 turn), routed to the EPS/AI import session;
-- the P3s (17) and D3-P3-7 (simulators without motion time) for a sweep;
-- the maintainer question in E5-P3-2.
+**Open:** nothing. E5-P1-1 was fixed by #1847 (ADR-700 Amd 6), and every P3 by the sweep below.
 
 **E4 (re-check of E3's fixes, added 2026-11-13).** #1840 and #1841 hold, with no collateral change. #1839 fixed the common formats but not 1–3 decimals, so the DXF whole-turn rule has now needed three passes (#1820, #1832, #1839). A fourth pass should come with a test that sweeps start angles and print formats, not single cases.
 
@@ -151,3 +148,31 @@ Plan: [AREAS.md](AREAS.md). Severity follows C2:
 - D7-P2-3 (runner capacity) is unchanged: only a quarter of main commits got a CI verdict in this window.
 
 **Structural direction.** One shared numeric rule per geometric question (a whole turn, a full ellipse), with tolerances sized for printed decimals rather than for floating-point noise; and order-sensitive output (piece order, rotary direction) measured by a test that counts reversals, not only travel.
+
+## P3 sweep (2026-11-13)
+
+The maintainer chose a P3 sweep after E5 and decided E5-P3-2: "Yes, close it". Each P3 went to the session that wrote the code; all five sweep PRs merged with CI green.
+
+| P3 | Resolution |
+|---|---|
+| E1-P3-1 PostScript near-straight rule | **fixed by #1859** (ADR-700 Amd 7): the threshold and the rounding agree |
+| E1-P3-2 `.rd` advisory names the cause | **fixed by #1833** (confirmed in #1857) |
+| E1-P3-3 large EPS refused as "may loop forever" | **fixed by #1859**: the worker reader has more than 10× headroom for the 1.9 M-point file; the refusals now say "too large to import, or it never finishes" and "may be too large for this computer". The security bound is unchanged |
+| E2-P3-1 K40 home/jog Abort | **fixed by #1836** |
+| E2-P3-2 a new link store can skip the shared steps | **fixed by #1862** (ADR-705 Amd 7): one contract every link store meets |
+| E2-P3-3 third preflight copy, K40 duplicate key, no K40 air note | **fixed by #1862** |
+| E2-P3-4 stale "two link routes" comments | **fixed by #1862** |
+| E3-P3-1 `main-is-green` late and mislabelled | **fixed by #1861** (ADR-710 Amd 1): each red workflow names its own commit, a 100-run look-back, and `fixes-main` documented as owner-only. The runner-queue delay is kept, with the reason in the ADR |
+| E3-P3-2 camera guard counts GC against the camera | **fixed by #1861** (ADR-598 Amd 8): a GC sample counts for the last script sample's area |
+| E3-P3-3 Z-rotary first Start refused | **fixed by #1840** (ADR-695 Amd 5) |
+| E4-P3-1 near-full arcs close | **by design**; the bridge bound is in ADR-700 (#1859) |
+| E4-P3-2 `.rd` edge pieces start against the rotary | **documented** in ADR-127 Amd 9 (#1857): the approach stays inside the part's Y extent so it never passes the machine's Y travel; tests pin it to at most 2 edge starts |
+| E4-P3-3 roller travel and ETA | **fixed by #1857**: the sweep is kept only within 5 % of path order's travel (4×2 grid 137.7 → 135.0 s). Roller jobs remain 37–56 % longer than under Amd 7, stated in the ADR |
+| E4-P3-4 Frame exemption and keyless reuse unpinned | **fixed by #1863**: mutants Z1, Z2 and K2 are killed |
+| E5-P3-1 coarse files that close | **documented** in ADR-700 (#1859); the text is identical to a 2-decimal printing |
+| E5-P3-2 `−3.14 → 3.14` stays open | **fixed by #1859** per the maintainer's decision; `−3.1 → 3.1` (1 decimal) stays open as written |
+| E5-P3-3 very large angles | **documented** in ADR-700 (#1859) |
+| C2 D3-P3-7 simulators lack motion time, arcs, write failure | **fixed by #1863**: an opt-in kinematic clock, G2/G3 motion and a `failWrites` hook, with three Abort tests that each fail without their feature |
+| C2 D7 Playwright `globalTimeout` | **fixed by #1861**: CI-only, 55 min and 15 min, below the job limits |
+
+**Maintainer actions still owed:** add `main-is-green` to ruleset 19573147 and create the `fixes-main` label; D7-P2-3 (runner capacity).
