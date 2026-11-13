@@ -1,9 +1,14 @@
-// The Moshi USB, Ruida network and K40 USB jobs compile as Save and G-code Start do
+// The Moshi USB, Ruida network, K40 USB and galvo USB jobs compile as Save and G-code Start do
 // (ADR-705 Amendment 4, code quality audit C2 D2-P1-1 and D2-P2-1): with the
 // canvas output scope, and carrying the shared job warnings G-code shows.
 import { describe, expect, it } from 'vitest';
 import { LHY_STEPS_PER_MM } from '../../core/controllers/lihuiyu/lhy-motion-plan';
-import { DEFAULT_DEVICE_PROFILE, type ControllerKind } from '../../core/devices';
+import {
+  DEFAULT_DEVICE_PROFILE,
+  type ControllerKind,
+  type DeviceProfile,
+} from '../../core/devices';
+import { GENERIC_JCZ_GALVO_PROFILES } from '../../core/devices/galvo-profiles';
 import { K40_M2_NANO_PROFILE } from '../../core/devices/lihuiyu-profiles';
 import {
   createLayer,
@@ -18,6 +23,7 @@ import {
 import { prepareOutput } from '../../io/gcode';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { linkJobRequest } from './link-job-request';
+import { prepareGalvoUsbJob } from './galvo-usb/galvo-usb-job';
 import { prepareLihuiyuUsbJob } from './lihuiyu-usb/lihuiyu-usb-job';
 import { prepareMoshiUsbJob } from './moshi-usb/moshi-usb-job';
 import { prepareRuidaNetworkJob } from './ruida-network/ruida-network-job';
@@ -166,6 +172,41 @@ describe('K40 USB job', () => {
     expect(expected.length).toBeGreaterThan(0);
     const request = linkJobRequest(p, ABSOLUTE);
     const result = await prepareLihuiyuUsbJob(request, HOMED);
+    if (!result.ok) throw new Error(result.messages.join(' '));
+    for (const warning of expected) expect(result.job.advisories).toContain(warning);
+    expect(result.job.completed).toBe(request.completed);
+  });
+});
+
+// The galvo joins the shared request (ADR-704, ADR-705 Amendment 7). The
+// 200 mm lens field holds the test shapes; its axes may be swapped, so the
+// job's width is read as its larger extent across the field.
+const asGalvo = (p: Project): Project => ({
+  ...createProject(GENERIC_JCZ_GALVO_PROFILES[2] as DeviceProfile),
+  scene: p.scene,
+});
+const GALVO_UNITS_PER_MM = 65535 / 200;
+
+describe('Galvo USB job', () => {
+  it('burns only the selected artwork when Selected artwork only is on', async () => {
+    const p = asGalvo(twoSquares('jcz-lmc'));
+    const whole = await prepareGalvoUsbJob(linkJobRequest(p, ABSOLUTE));
+    const scoped = await prepareGalvoUsbJob(linkJobRequest(p, ABSOLUTE, SELECTED_A));
+    if (!whole.ok || !scoped.ok) throw new Error('expected both jobs to compile');
+    const spanMm = (job: typeof whole.job) => {
+      const f = job.program.footprint;
+      return Math.max(f.maxGx - f.minGx, f.maxGy - f.minGy) / GALVO_UNITS_PER_MM;
+    };
+    expect(spanMm(whole.job)).toBeCloseTo(100, 0);
+    expect(spanMm(scoped.job)).toBeCloseTo(20, 0);
+  });
+
+  it('carries the job warnings G-code shows and the variable advance', async () => {
+    const p = asGalvo(kerfSideCase('jcz-lmc'));
+    const expected = gcodeJobWarnings(p);
+    expect(expected.length).toBeGreaterThan(0);
+    const request = linkJobRequest(p, ABSOLUTE);
+    const result = await prepareGalvoUsbJob(request);
     if (!result.ok) throw new Error(result.messages.join(' '));
     for (const warning of expected) expect(result.job.advisories).toContain(warning);
     expect(result.job.completed).toBe(request.completed);

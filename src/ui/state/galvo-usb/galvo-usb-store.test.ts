@@ -34,10 +34,11 @@ import { GALVO_FRAME_FIRST } from './galvo-usb-messages';
 import { resetGalvoUsbStoreForTests, useGalvoUsbStore, type GalvoUsbJob } from './galvo-usb-store';
 import type { GalvoUsbAdapter } from './galvo-usb-types';
 import { activeLinkMachineWork, resetLinkMachineWorkForTests } from '../link-machine-work';
+import { testLinkJobOutcome } from '../link-job-outcome-test-helpers';
 
 const DEVICE = GENERIC_JCZ_GALVO_PROFILES[0] as DeviceProfile;
 
-function job(x = 0): GalvoUsbJob {
+function job(x = 0, completed: () => void = () => undefined): GalvoUsbJob {
   const group: CutGroup = {
     kind: 'cut',
     layerId: 'L1',
@@ -61,7 +62,7 @@ function job(x = 0): GalvoUsbJob {
   if (!encoded.ok) throw new Error('refused');
   const frame = encodeLmcFrameJob(encoded.program.footprint, DEVICE.galvo!, DEVICE.bedWidth);
   if (frame === null) throw new Error('no frame');
-  return { program: encoded.program, frame, advisories: ['a warning'] };
+  return { program: encoded.program, frame, ...testLinkJobOutcome(['a warning'], completed) };
 }
 
 function adapterFor(sim: JczLmcSimulator): GalvoUsbAdapter {
@@ -133,10 +134,14 @@ describe('galvo USB store', () => {
 
   it('runs the framed job: the board marks exactly the encoded program, then closes its outputs', async () => {
     const sim = await connected();
-    await state().frame(job());
-    await state().start(job());
+    const completed = vi.fn();
+    await state().frame(job(0, completed));
+    // A Frame never runs the "After completed job" variable advance.
+    expect(completed).not.toHaveBeenCalled();
+    await state().start(job(0, completed));
     expect(state().phase).toBe('idle');
     expect(state().message).toContain('Job finished');
+    expect(completed).toHaveBeenCalledTimes(1);
     const marked = sim.completed[1]?.ops.filter((op) => op.op === 'mark') ?? [];
     expect(marked).toHaveLength(2);
     expect(sim.sent(LMC_FIBER_SET_MO).map((command) => command.params[0])).toContain(1);
@@ -157,9 +162,10 @@ describe('galvo USB store', () => {
 
   it('pauses, resumes and aborts a running job', async () => {
     const sim = await connected();
+    const completed = vi.fn();
     await state().frame(job());
     sim.setRunReads(1_000_000);
-    const started = state().start(job());
+    const started = state().start(job(0, completed));
     await vi.waitFor(() => expect(sim.isRunning).toBe(true));
     await vi.waitFor(() => expect(state().listState).toBe('running'));
     // The app-wide guards (Ctrl+., close, Update) see the galvo job.
@@ -180,6 +186,8 @@ describe('galvo USB store', () => {
     expect(state().phase).toBe('idle');
     expect(state().message).toContain('Stop Execute acknowledged');
     expect(activeLinkMachineWork()).toBeNull();
+    // An aborted job never advances the variables.
+    expect(completed).not.toHaveBeenCalled();
     expect(sim.sent(LMC_EXECUTE_LIST).length).toBeGreaterThanOrEqual(2);
   });
 

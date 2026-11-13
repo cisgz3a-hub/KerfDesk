@@ -23,11 +23,9 @@ import { errorMessage } from '../../../core/util/error-message';
 import { GALVO_FRAME_FIRST, galvoStopOutcome } from './galvo-usb-messages';
 import { runGalvoProgram, type GalvoLive } from './galvo-usb-run';
 import type { GalvoUsbAdapter, GalvoUsbSession } from './galvo-usb-types';
-import {
-  reportLinkMachineStatus,
-  reportLinkMachineWork,
-  type LinkMachineWork,
-} from '../link-machine-work';
+import type { LinkJobOutcome } from '../link-job-outcome';
+import type { LinkMachineWork } from '../link-machine-work';
+import { connectLinkStore } from '../link-store-connection';
 
 export type GalvoUsbPhase =
   | 'disconnected'
@@ -38,11 +36,12 @@ export type GalvoUsbPhase =
   | 'paused'
   | 'stopping';
 
-/** A compiled job: the program Start sends and the red-light Frame of it. */
-export type GalvoUsbJob = {
+/** A compiled job: the program Start sends, the red-light Frame of it, and
+ *  the shared link outcome (its warnings and the "After completed job"
+ *  variable advance; ADR-705 Amendment 7). */
+export type GalvoUsbJob = LinkJobOutcome & {
   readonly program: LmcProgram;
   readonly frame: LmcFrameProgram;
-  readonly advisories: ReadonlyArray<string>;
 };
 
 export type GalvoUsbState = {
@@ -244,7 +243,7 @@ export function resetGalvoUsbStoreForTests(): void {
 
 // Active work is reported where the always-mounted guards (Ctrl+., the Live
 // Motion bar, close and update, project replacement) can see it without
-// loading this store (link-machine-work.ts; ADR-705 Amendment 3).
+// loading this store (link-store-connection.ts; ADR-705 Amendments 3 and 7).
 const ACTIVE_WORK: Partial<Record<GalvoUsbPhase, LinkMachineWork['activity']>> = {
   framing: 'framing',
   running: 'running',
@@ -252,21 +251,4 @@ const ACTIVE_WORK: Partial<Record<GalvoUsbPhase, LinkMachineWork['activity']>> =
   stopping: 'stopping',
 };
 
-useGalvoUsbStore.subscribe((state) => {
-  const activity = ACTIVE_WORK[state.phase];
-  reportLinkMachineStatus('galvo-usb', {
-    connected: state.phase !== 'disconnected' && state.phase !== 'connecting',
-    framed: state.framed !== null,
-  });
-  reportLinkMachineWork(
-    'galvo-usb',
-    activity === undefined
-      ? null
-      : {
-          controller: 'Galvo',
-          activity,
-          advisories: state.advisories,
-          abort: () => useGalvoUsbStore.getState().abort(),
-        },
-  );
-});
+connectLinkStore('galvo-usb', useGalvoUsbStore, { controller: 'Galvo', activeWork: ACTIVE_WORK });

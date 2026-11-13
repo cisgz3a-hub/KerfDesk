@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { readCorFile, type LmcCorrectionTable } from '../../core/controllers/jcz/lmc-cor-file';
-import { useStore } from '../state';
+import { currentLinkJobRequest } from '../state/link-job-request';
 import { prepareGalvoUsbJob } from '../state/galvo-usb/galvo-usb-job';
 import { GALVO_NOT_QUALIFIED, galvoListStateText } from '../state/galvo-usb/galvo-usb-messages';
 import { useGalvoUsbStore, type GalvoUsbState } from '../state/galvo-usb/galvo-usb-store';
@@ -105,8 +105,7 @@ function GalvoJobControls({ galvo }: { readonly galvo: GalvoUsbState }): JSX.Ele
   const idle = galvo.phase === 'idle';
   const active = galvo.phase === 'framing' || galvo.phase === 'running' || galvo.phase === 'paused';
   const withJob = async (action: 'frame' | 'start'): Promise<void> => {
-    const { project, jobPlacement } = useStore.getState();
-    const prepared = await prepareGalvoUsbJob(project, jobPlacement);
+    const prepared = await prepareGalvoUsbJob(currentLinkJobRequest());
     if (!prepared.ok) {
       setCompileError(prepared.messages.join(' '));
       return;

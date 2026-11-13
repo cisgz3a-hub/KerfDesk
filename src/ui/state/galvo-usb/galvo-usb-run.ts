@@ -144,4 +144,7 @@ async function finished(
           tone: closed ? 'info' : 'warning',
         },
   );
+  // "After completed job" variable advance, only for a job the board finished
+  // (an aborted or failed run never gets here; ADR-705 Amendment 7).
+  if (kind === 'job') job.completed();
 }
