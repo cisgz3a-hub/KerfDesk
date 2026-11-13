@@ -132,8 +132,8 @@ describe('registration bores miss parts cut with the default lead-in (N7-P1-1)',
     expect(advisories.some((line) => line.includes('clear of every part'))).toBe(false);
     const listing = advisories.find((line) => line.startsWith('Registration holes'));
     if (listing !== undefined) {
-      expect(listing).toContain('outside every outline the toolpaths go round');
-      expect(listing).toContain('open outline is not known as a part');
+      expect(listing).toContain('outside every outline the toolpaths go round or nearly close');
+      expect(listing).toContain('A hole inside any other open outline is named in its own warning');
     }
   });
 });

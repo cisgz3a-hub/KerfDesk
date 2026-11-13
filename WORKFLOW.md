@@ -7487,8 +7487,11 @@ and lifts the command's CNC-only gate.)*
    stock-space centers in the overlap strip. Each seam's two bores go where the
    strip is clear of every toolpath, outside every outline a cut goes round
    (whatever its lead, tabs or ramp), and on the stock (its margin at the
-   seam's ends included), as far apart as fits (ADR-392 Amendments 7 and 8). A
-   part drawn as an open outline is not known as a part. A seam
+   seam's ends included), as far apart as fits (ADR-392 Amendments 7 and 8). An
+   open outline whose ends lie closer than the tab compiler's limit (the bit
+   plus what a tab holds) is kept clear like a part; a bore inside any other
+   open outline is named, with the outline's layer, size and gap (Amendment 9).
+   A seam
    with no clear spot gets no bore and the save names it; a seam with one gets
    one bore and a warning that it does not square the stock. Preview draws the
    planned bores in purple and lists them; the save lists them by tile, and

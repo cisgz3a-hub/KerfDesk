@@ -88,21 +88,24 @@ describe('QuickNestDialog', () => {
           boardAvailable
           onCancel={vi.fn()}
           onApply={onApply}
-          cncSpacing={{ bitDiameterMm: 3.175, spacingMm: 4.2 }}
+          cncSpacing={{ bitDiameterMm: 3.175, leadReachMm: 1.5875, spacingMm: 5.8 }}
         />,
       ),
     );
     const spacing = Array.from(host.querySelectorAll('label'))
       .find((label) => label.textContent?.includes('Part spacing'))!
       .querySelector('input')!;
-    expect(spacing.value).toBe('4.2');
+    expect(spacing.value).toBe('5.8');
     expect(host.textContent).not.toContain('can cut into the next');
     await act(async () => {
       spacing.value = '2';
       Simulate.change(spacing);
     });
-    expect(host.textContent).toContain('Closer than the 3.175 mm bit plus 1 mm');
-    expect(host.textContent).toContain('Use at least 4.2 mm.');
+    expect(host.textContent).toContain(
+      'Closer than the 3.175 mm bit and its 1.59 mm lead plus 1 mm',
+    );
+    expect(host.textContent).toContain('or plunge on its cut line where no lead fits');
+    expect(host.textContent).toContain('Use at least 5.8 mm.');
     await act(async () => Simulate.submit(host!.querySelector('form')!));
     expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ padding: 2 }));
   });

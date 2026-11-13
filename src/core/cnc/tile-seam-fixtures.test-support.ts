@@ -115,10 +115,11 @@ export function circleOutline(cx: number, cy: number, diameter: number, segments
   });
 }
 
-/** Compile closed outlines (scene mm) on one CNC layer. */
+/** Compile outlines (scene mm) on one CNC layer; closed unless  is false. */
 export function compiledOutlines(
   outlines: ReadonlyArray<ReadonlyArray<Point>>,
   cnc: Partial<CncLayerSettings>,
+  closed = true,
 ): Job {
   const all = outlines.flat();
   const object: ImportedSvg = {
@@ -135,7 +136,7 @@ export function compiledOutlines(
     paths: [
       {
         color: '#2563eb',
-        polylines: outlines.map((points) => ({ closed: true, points: [...points] })),
+        polylines: outlines.map((points) => ({ closed, points: [...points] })),
       },
     ],
   };
