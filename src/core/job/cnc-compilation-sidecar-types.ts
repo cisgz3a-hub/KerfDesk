@@ -6,6 +6,18 @@ import type {
   CncVCarveCompilationEvidence,
 } from './job';
 
+/**
+ * ADR-233 Amd 1: present on a CNC group only when the operation asked for more
+ * RPM than the machine's Spindle maximum. S is capped and the group's feed and
+ * plunge are scaled by the same ratio so the chip load holds; these are the
+ * values the operation asked for.
+ */
+export type CncSpindleCap = {
+  readonly requestedRpm: number;
+  readonly requestedFeedMmPerMin: number;
+  readonly requestedPlungeMmPerMin: number;
+};
+
 /** Exact count from the canonical contours consumed by a closed-only operation. */
 export type CncOpenContourOmission = {
   readonly layerId: string;
