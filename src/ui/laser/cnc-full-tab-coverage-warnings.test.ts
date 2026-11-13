@@ -9,17 +9,19 @@ import {
   type ImportedSvg,
   type Project,
 } from '../../core/scene';
+import { compileCncJob } from '../../core/cnc';
 import { detectCncFullTabCoverageWarnings } from './cnc-full-tab-coverage-warnings';
 
-// 10 mm square: outside-profile toolpath perimeter ≈ 50 mm with the default
-// 3.175 mm bit. 6 tabs × (6 mm + bit) ≈ 55 mm of windows — full coverage.
+// 10 mm square: outside-profile toolpath perimeter ≈ 52.7 mm with the default
+// 3.175 mm bit. One 50 mm tab + the bit is a 53.2 mm window — full coverage
+// (ADR-258 Amendment 5 fits fewer tabs where six 6 mm ones would not).
 const FULL_COVERAGE_TABS: Partial<CncLayerSettings> = {
   cutType: 'profile-outside',
   depthMm: 6,
   depthPerPassMm: 2,
   tabsEnabled: true,
   tabHeightMm: 2,
-  tabWidthMm: 6,
+  tabWidthMm: 50,
   tabsPerShape: 6,
 };
 
@@ -65,6 +67,33 @@ describe('detectCncFullTabCoverageWarnings', () => {
   it('warns when the tab windows cover the whole perimeter (part never cut through)', () => {
     const warnings = detectCncFullTabCoverageWarnings(cncProject(FULL_COVERAGE_TABS, 10));
 
+    expect(warnings).toEqual([
+      'Layer "Operation": 1 part (10 × 10 mm) is too small for even one 50 mm tab beside the ' +
+        '3.2 mm cut, so it stops at the tab top and is NOT cut through. Use narrower tabs or a ' +
+        'smaller bit, or cut it on a layer with Tabs off.',
+    ]);
+  });
+
+  it('names a small hole that stops at the tab top beside a larger shape (J1-P1-1)', () => {
+    const project = cncProject(FULL_COVERAGE_TABS, 10);
+    const plate = squareObject('plate', '#ff0000', 200, 0);
+    const warnings = detectCncFullTabCoverageWarnings({
+      ...project,
+      scene: { ...project.scene, objects: [plate, ...project.scene.objects] },
+    });
+
+    expect(warnings.some((warning) => warning.includes('1 hole (10 × 10 mm)'))).toBe(true);
+    expect(warnings.some((warning) => warning.includes('NOT cut through'))).toBe(true);
+  });
+
+  it('keeps the per-layer advisory for a job compiled without per-shape evidence', () => {
+    const project = cncProject(FULL_COVERAGE_TABS, 10);
+    const job = compileCncJob(project.scene, project.device, DEFAULT_CNC_MACHINE_CONFIG);
+    const { tabHoldShapes: _dropped, ...legacy } = job.cncCompilation ?? {
+      vcarveOperations: [],
+    };
+    const warnings = detectCncFullTabCoverageWarnings(project, { ...job, cncCompilation: legacy });
+
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('Layer L1');
     expect(warnings[0]).toContain('(tab width + bit diameter × 6 tabs)');
@@ -78,6 +107,7 @@ describe('detectCncFullTabCoverageWarnings', () => {
     const cnc = {
       ...FULL_COVERAGE_TABS,
       toolId: 'vb-60',
+      tabWidthMm: 60,
       depthMm: 3,
       depthPerPassMm: 1.5,
       tabHeightMm: 1,
@@ -85,7 +115,7 @@ describe('detectCncFullTabCoverageWarnings', () => {
     const warnings = detectCncFullTabCoverageWarnings(cncProject(cnc, 10));
 
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain("(tab width + the bit's 3.5 mm cut width × 6 tabs)");
+    expect(warnings[0]).toContain('beside the 3.5 mm cut');
   });
 
   it('is silent when the shape is large enough to keep burnable arcs between tabs', () => {

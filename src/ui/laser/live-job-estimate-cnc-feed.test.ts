@@ -97,9 +97,11 @@ describe('CNC time estimates read CNC Max feed (ADR-416 Decision 4)', () => {
     if (countdown.kind !== 'ok') throw new Error(countdown.reason);
 
     // Before the fix both read 99.36 s (1m 39s): rapids ran at the laser's 6000.
-    expect(live).toMatchObject({ kind: 'estimated', label: '2m 41s' });
+    expect(live).toMatchObject({ kind: 'estimated', label: '2m 42s' });
     if (live.kind !== 'estimated') return;
-    expect(live.totalSeconds).toBeCloseTo(161.26, 1);
+    // 161.26 s until ADR-258 Amendment 5: each tabbed square now enters in
+    // the middle of a tab at the tab top and steps down at the tab wall.
+    expect(live.totalSeconds).toBeCloseTo(161.88, 1);
     expect(live.totalSeconds).toBeCloseTo(countdown.plan.totalSeconds, 6);
     expect(buildPreparedJobMetrics(job).duration.totalSeconds).toBeCloseTo(live.totalSeconds, 6);
   });

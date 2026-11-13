@@ -42,7 +42,7 @@ export function CncTabFields(props: {
             min={0.2}
             max={20}
             step={0.2}
-            title="Material left under each tab, measured up from the cut floor."
+            title="Material left under each tab: measured up from the stock bottom when Stock thickness is set, from the cut floor while it is the default. A tab as thick as the stock is cut half the stock thick."
             onCommit={(tabHeightMm) => onCommit({ tabHeightMm })}
           />
           <NumberField
@@ -53,7 +53,7 @@ export function CncTabFields(props: {
             min={0.5}
             max={30}
             step={0.5}
-            title="Length of each tab along the cut path."
+            title="Length of each tab along the cut path. Tabs are kept off corners, and a shape too small for them all gets fewer."
             onCommit={(tabWidthMm) => onCommit({ tabWidthMm })}
           />
           <NumberField

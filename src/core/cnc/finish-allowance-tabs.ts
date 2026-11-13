@@ -11,7 +11,7 @@
 // Pure: no clock, no randomness, no I/O.
 
 import type { Polyline, Vec2 } from '../scene';
-import { tabCenterPoints, tabFractionsNear } from './cnc-tab-ramp';
+import { tabCenterPoints, tabFractionsNear, type TabRampSettings } from './cnc-tab-ramp';
 
 /**
  * Tab centres, as perimeter fractions, for each roughing ring that runs beside a
@@ -23,13 +23,13 @@ import { tabCenterPoints, tabFractionsNear } from './cnc-tab-ramp';
 export function roughingTabCentersBesideFinishTabs(
   finishToolpaths: ReadonlyArray<Polyline>,
   roughToolpaths: ReadonlyArray<Polyline>,
-  tabsPerShape: number,
+  tabs: TabRampSettings,
   finishManualCenters: ReadonlyMap<Polyline, ReadonlyArray<number>>,
   roughManualCenters: ReadonlyMap<Polyline, ReadonlyArray<number>>,
   cutWidthMm: number,
 ): ReadonlyMap<Polyline, ReadonlyArray<number>> {
   const anchors: Vec2[] = finishToolpaths.flatMap((toolpath) =>
-    tabCenterPoints(toolpath, tabsPerShape, finishManualCenters.get(toolpath)),
+    tabCenterPoints(toolpath, tabs, finishManualCenters.get(toolpath)),
   );
   const centers = new Map(roughManualCenters);
   for (const toolpath of roughToolpaths) {

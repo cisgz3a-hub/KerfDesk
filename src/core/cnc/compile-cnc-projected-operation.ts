@@ -49,5 +49,6 @@ export function compileCncProjectedOperation(
     reliefPlans: projected.plans,
     offsetLadderDiagnostics: [],
     strategyFallbacks: [],
+    tabHoldShapes: [],
   };
 }
