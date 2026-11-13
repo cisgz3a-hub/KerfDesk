@@ -1,0 +1,206 @@
+// T21a: Save Original Image — byte identity per route, cross-format density/alpha,
+// failure paths, names. Real saveOriginalImage / readRasterSourceFile /
+// densityFromBytes / rasterImportGeometry; browser codec stubbed where needed.
+import { afterEach, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { deflateSync, crc32 } from 'node:zlib';
+import { IDENTITY_TRANSFORM, type RasterImage } from '../t13-main/src/core/scene';
+import type { PlatformAdapter } from '../t13-main/src/platform/types';
+import { saveOriginalImage, type OriginalImageFormat } from '../t13-main/src/ui/app/save-original-image';
+import { readRasterSourceFile } from '../t13-main/src/ui/import/paged-raster-source';
+import { densityFromBytes } from '../t13-main/src/ui/common/image-density';
+import { rasterImportGeometry } from '../t13-main/src/ui/common/image-import';
+import { readFileAsDataUrl } from '../t13-main/src/ui/trace/image-loader';
+import { webAdapter } from '../t13-main/src/platform/web/web-adapter';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t21/t21a.log';
+writeFileSync(LOG, '');
+const log = (...a: unknown[]) => appendFileSync(LOG, a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ') + '\n');
+const sha = (b: Uint8Array) => createHash('sha256').update(b).digest('hex').slice(0, 16);
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+function chunk(type: string, data: Uint8Array): Uint8Array {
+  const out = new Uint8Array(12 + data.length);
+  const v = new DataView(out.buffer);
+  v.setUint32(0, data.length);
+  out.set(new TextEncoder().encode(type), 4);
+  out.set(data, 8);
+  v.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
+  return out;
+}
+function png(w: number, h: number, dpi: number | null): Uint8Array {
+  const ihdr = new Uint8Array(13);
+  const v = new DataView(ihdr.buffer);
+  v.setUint32(0, w); v.setUint32(4, h); ihdr[8] = 8; ihdr[9] = 6;
+  const raw = new Uint8Array(h * (1 + w * 4));
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const o = y * (1 + w * 4) + 1 + x * 4; raw[o] = 200; raw[o + 1] = 30; raw[o + 2] = 30; raw[o + 3] = x < w / 2 ? 0 : 255; }
+  const parts = [Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr)];
+  if (dpi !== null) {
+    const p = new Uint8Array(9); const pv = new DataView(p.buffer);
+    const ppm = Math.round(dpi / 0.0254); pv.setUint32(0, ppm); pv.setUint32(4, ppm); p[8] = 1;
+    parts.push(chunk('pHYs', p));
+  }
+  parts.push(chunk('IDAT', deflateSync(raw)), chunk('IEND', new Uint8Array()));
+  const total = parts.reduce((s, p) => s + p.length, 0);
+  const out = new Uint8Array(total); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+}
+// JPEG header only (SOI, JFIF 300 dpi, EXIF Orientation 6, EOI) – byte identity path never decodes.
+function jpeg300Orient6(): Uint8Array {
+  const jfif = [0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x01, 0x01, 0x2c, 0x01, 0x2c, 0x00, 0x00];
+  const tiff = [0x4d, 0x4d, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x08, 0x00, 0x01, 0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+  const exifBody = [0x45, 0x78, 0x69, 0x66, 0x00, 0x00, ...tiff];
+  const app1 = [0xff, 0xe1, (exifBody.length + 2) >> 8, (exifBody.length + 2) & 0xff, ...exifBody];
+  return Uint8Array.from([0xff, 0xd8, ...jfif, ...app1, 0xff, 0xd9]);
+}
+
+function img(over: Partial<RasterImage>): RasterImage {
+  return {
+    kind: 'raster-image', id: 'i', source: 'photo.png', pixelWidth: 1000, pixelHeight: 500,
+    bounds: { minX: 0, minY: 0, maxX: 100, maxY: 50 }, transform: IDENTITY_TRANSFORM,
+    color: '#808080', dither: 'floyd-steinberg', linesPerMm: 10, ...over,
+  } as RasterImage;
+}
+function capture() {
+  const written: Blob[] = [];
+  const picked: unknown[] = [];
+  const platform = {
+    pickFileForSave: vi.fn(async (o: unknown) => { picked.push(o); return { displayName: 'out', write: async (b: Blob) => { written.push(b); } }; }),
+  } as unknown as PlatformAdapter;
+  const toasts: string[] = [];
+  return { platform, written, picked, toasts, pushToast: (m: string, v?: string) => toasts.push(`${v}:${m}`) };
+}
+function bytesOf(b: Blob): Promise<Uint8Array> { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(new Uint8Array(r.result as ArrayBuffer)); r.onerror = () => rej(r.error); r.readAsArrayBuffer(b); }); }
+
+it('A same-format byte identity via the import dataUrl route', async () => {
+  const cases: Array<[string, Uint8Array, string, OriginalImageFormat]> = [
+    ['photo.png', png(40, 20, 300), 'image/png', 'png'],
+    ['photo.jpg', jpeg300Orient6(), 'image/jpeg', 'jpeg'],
+  ];
+  for (const [name, bytes, type, fmt] of cases) {
+    const file = new File([bytes], name, { type });
+    const dataUrl = await readFileAsDataUrl(file); // exactly what importImageFile stores
+    const c = capture();
+    await saveOriginalImage({ platform: c.platform, image: img({ source: name, dataUrl }), format: fmt, pushToast: c.pushToast });
+    const out = await bytesOf(c.written[0]!);
+    log('A', name, fmt, 'in', sha(bytes), bytes.length, 'out', sha(out), out.length, 'identical', sha(bytes) === sha(out), 'picked', c.picked[0], 'toast', c.toasts);
+    expect(sha(out)).toBe(sha(bytes));
+  }
+  // SVG-embedded bitmap with XML whitespace inside base64 (kept verbatim by svg-image-hydration)
+  const p = png(8, 8, 254);
+  const b64 = Buffer.from(p).toString('base64');
+  const wrapped = `data:image/png;base64,${b64.slice(0, 20)}\n  ${b64.slice(20)}`;
+  const c = capture();
+  await saveOriginalImage({ platform: c.platform, image: img({ source: 'logo.svg', dataUrl: wrapped }), format: 'png', pushToast: c.pushToast });
+  const out = await bytesOf(c.written[0]!);
+  log('A svg-embedded whitespace base64 identical', sha(out) === sha(p), 'picked', c.picked[0]);
+});
+
+it('B paged raster source', async () => {
+  const bytes = png(64, 32, 300);
+  const repo = {
+    async *readAssetChunks() { yield bytes.subarray(0, 50); yield bytes.subarray(50); },
+    readManifest: async () => null,
+  };
+  const image = img({ imageAsset: { sourceAssetId: 's', sourceByteLength: bytes.length, sourceMimeType: 'image/png' } as never });
+  const c = capture();
+  await saveOriginalImage({ platform: c.platform, image, format: 'png', pushToast: c.pushToast, readSource: (i) => readRasterSourceFile(i, i.source, repo as never) });
+  const out = await bytesOf(c.written[0]!);
+  log('B paged identical', sha(out) === sha(bytes));
+  const short = img({ imageAsset: { sourceAssetId: 's', sourceByteLength: bytes.length + 1, sourceMimeType: 'image/png' } as never });
+  const c2 = capture();
+  await saveOriginalImage({ platform: c2.platform, image: short, format: 'png', pushToast: c2.pushToast, readSource: (i) => readRasterSourceFile(i, i.source, repo as never) });
+  log('B paged length mismatch', c2.toasts, 'picker opened', c2.picked.length);
+  // missing both
+  const c3 = capture();
+  await saveOriginalImage({ platform: c3.platform, image: img({}), format: 'png', pushToast: c3.pushToast });
+  log('B no dataUrl no asset', c3.toasts, 'picker opened', c3.picked.length);
+});
+
+function stubCodec(w: number, h: number, rgba?: Uint8ClampedArray) {
+  const calls: string[] = [];
+  vi.stubGlobal('createImageBitmap', vi.fn(async () => ({ width: w, height: h, close: () => calls.push('close') })));
+  const ctx = {
+    set fillStyle(v: string) { calls.push(`fillStyle=${v}`); },
+    fillRect: (...a: number[]) => calls.push(`fillRect(${a.join(',')})`),
+    drawImage: () => calls.push('drawImage'),
+    getImageData: (_x: number, _y: number, sw: number, sh: number) => ({ width: sw, height: sh, data: rgba ?? new Uint8ClampedArray(sw * sh * 4) }),
+  };
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as never);
+  vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (this: HTMLCanvasElement, cb: BlobCallback, type?: string, q?: unknown) {
+    calls.push(`toBlob(${type},${String(q)}) ${this.width}x${this.height}`);
+    cb(new Blob([new Uint8Array([1, 2, 3])], { type: type ?? 'image/png' }));
+  });
+  return calls;
+}
+
+it('C cross-format: BMP density and re-import size; alpha; JPEG flatten', async () => {
+  // Source imported at default 254 DPI (1000x500 px -> 100x50 mm) and at 300 DPI (84.67 mm).
+  for (const [label, dpi] of [['default-254', null], ['embedded-300', 300], ['embedded-96', 96]] as const) {
+    const W = 1000, H = 500;
+    const src = png(4, 4, dpi); // stand-in source bytes (the codec is stubbed)
+    const imported = rasterImportGeometry({ naturalWidth: W, naturalHeight: H, sampledWidth: W, sampledHeight: H, density: dpi === null ? null : { xDpi: dpi, yDpi: dpi } });
+    const calls = stubCodec(W, H);
+    const c = capture();
+    await saveOriginalImage({ platform: c.platform, image: img({ source: 'photo.png', bounds: imported.bounds }), format: 'bmp', pushToast: c.pushToast, readSource: async () => new File([src], 'photo.png', { type: 'image/png' }) });
+    const out = await bytesOf(c.written[0]!);
+    const back = densityFromBytes(out);
+    const re = rasterImportGeometry({ naturalWidth: W, naturalHeight: H, sampledWidth: W, sampledHeight: H, density: back });
+    log('C bmp', label, 'imported width mm', imported.bounds.maxX.toFixed(2), 'BMP density', back, 're-import width mm', re.bounds.maxX.toFixed(2), 'ratio', (re.bounds.maxX / imported.bounds.maxX).toFixed(3), 'first px BGR', [out[54], out[55], out[56]], 'calls', calls.join(' '));
+  }
+  // JPEG: white under transparent, quality; PNG of a JPEG: no density
+  for (const fmt of ['jpeg', 'png'] as const) {
+    const calls = stubCodec(10, 10);
+    const c = capture();
+    await saveOriginalImage({ platform: c.platform, image: img({ source: 'p.webp' }), format: fmt, pushToast: c.pushToast, readSource: async () => new File([new Uint8Array(4)], 'p', { type: fmt === 'png' ? 'image/jpeg' : 'image/png' }) });
+    log('C', fmt, 'calls', calls.join(' '), 'picked', c.picked[0]);
+  }
+});
+
+it('D mime string decides identity: octet-stream / image/jpg dataUrls are re-encoded', async () => {
+  const j = jpeg300Orient6();
+  for (const mime of ['application/octet-stream', 'image/jpg']) {
+    const calls = stubCodec(10, 10);
+    const c = capture();
+    await saveOriginalImage({ platform: c.platform, image: img({ source: 'cam.jpg', dataUrl: `data:${mime};base64,${Buffer.from(j).toString('base64')}` }), format: 'jpeg', pushToast: c.pushToast });
+    log('D', mime, 'reencoded', calls.some((x) => x.startsWith('toBlob')), calls.join(' '));
+  }
+  // What type does File get for an unknown-type input to readAsDataURL?
+  const du = await readFileAsDataUrl(new File([j], 'cam.JPG', { type: '' }));
+  log('D readAsDataURL with empty type ->', du.slice(0, 40));
+});
+
+it('E failure paths and names', async () => {
+  const bytes = png(4, 4, null);
+  const dataUrl = `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`;
+  // Cancel through the real web adapter (AbortError from showSaveFilePicker)
+  Object.defineProperty(window, 'showSaveFilePicker', { configurable: true, value: async () => { throw Object.assign(new Error('cancel'), { name: 'AbortError' }); } });
+  const toasts: string[] = [];
+  await saveOriginalImage({ platform: webAdapter, image: img({ dataUrl }), format: 'png', pushToast: (m, v) => toasts.push(`${v}:${m}`) });
+  log('E cancel toasts', toasts);
+  // Write error
+  const write = vi.fn(async () => { throw new Error('Disk full'); });
+  const platform = { pickFileForSave: async () => ({ displayName: 'x.png', write }) } as unknown as PlatformAdapter;
+  const t2: string[] = [];
+  await saveOriginalImage({ platform, image: img({ dataUrl }), format: 'png', pushToast: (m, v) => t2.push(`${v}:${m}`) });
+  log('E write error', t2);
+  // Encoder null blob
+  vi.stubGlobal('createImageBitmap', vi.fn(async () => ({ width: 2, height: 2, close: () => undefined })));
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ fillRect() {}, drawImage() {}, set fillStyle(_v: string) {} } as never);
+  vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((cb: BlobCallback) => cb(null));
+  const t3: string[] = [];
+  const c = capture();
+  await saveOriginalImage({ platform: c.platform, image: img({ dataUrl }), format: 'jpeg', pushToast: (m, v) => t3.push(`${v}:${m}`) });
+  log('E toBlob null', t3, 'picker opened', c.picked.length);
+  // Names
+  for (const source of ['dog.jpeg', 'C:\\pics\\a:b?.png', '', '.png', 'scan.tif', 'anim.gif', 'Bitmap', 'photo.JPG', 'https://x/y/pic.png?v=2', 'archive.tar.gz']) {
+    const cc = capture();
+    await saveOriginalImage({ platform: cc.platform, image: img({ source, dataUrl }), format: 'png', pushToast: cc.pushToast });
+    log('E name', JSON.stringify(source), '->', (cc.picked[0] as { suggestedName: string }).suggestedName);
+  }
+});

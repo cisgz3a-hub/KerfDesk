@@ -1,0 +1,473 @@
+// T21 refuter: independent end-to-end checks of T21-P2-1 and T21-P2-2.
+// Method differs from the auditor's: the BMP goes through the REAL default
+// encodeInBrowser (no encode stub) and is re-imported through the REAL
+// importImageFile (readImageDensity + rasterImportGeometry + toast text);
+// the bake goes through the REAL store and the REAL Flatten command action,
+// and the dialog is rendered for wording and default format.
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { writeFileSync } from "node:fs";
+import { deflateSync, inflateSync, crc32 } from 'node:zlib';
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
+
+const T = 'C:/Users/stolk/kd-t1/t13-main/src';
+const W = 1000;
+const H = 500;
+
+vi.mock('C:/Users/stolk/kd-t1/t13-main/src/ui/import/prepare-image-samples', () => ({
+  loadImageSamples: vi.fn(async () => ({
+    kind: 'embedded',
+    natural: { width: 1000, height: 500 },
+    sampled: { width: 1000, height: 500 },
+    lumaBase64: Buffer.from(new Uint8Array(1000 * 500).fill(128)).toString('base64'),
+  })),
+}));
+vi.mock('C:/Users/stolk/kd-t1/t13-main/src/ui/import/qualified-png-raster', async (orig) => ({
+  ...(await orig<Record<string, unknown>>()),
+  shouldPageBackPng: () => false,
+  shouldDecodeDimensionQualifiedPng: async () => false,
+}));
+
+import { saveOriginalImage } from 'C:/Users/stolk/kd-t1/t13-main/src/ui/app/save-original-image';
+import { importImageFile } from 'C:/Users/stolk/kd-t1/t13-main/src/ui/commands/import-image-action';
+import { useStore } from 'C:/Users/stolk/kd-t1/t13-main/src/ui/state';
+import { resetStore } from 'C:/Users/stolk/kd-t1/t13-main/src/ui/state/test-helpers';
+import { flattenImageMaskAction } from 'C:/Users/stolk/kd-t1/t13-main/src/ui/commands/image-command-actions';
+import {
+  SaveOriginalImageDialogHost,
+  useSaveOriginalImageStore,
+} from 'C:/Users/stolk/kd-t1/t13-main/src/ui/commands/SaveOriginalImageDialog';
+import { PlatformProvider } from 'C:/Users/stolk/kd-t1/t13-main/src/ui/app/platform-context';
+import {
+  createLayer,
+  createProject,
+  IDENTITY_TRANSFORM,
+  type RasterImage,
+  type SceneObject,
+} from 'C:/Users/stolk/kd-t1/t13-main/src/core/scene';
+import { createRectangle } from 'C:/Users/stolk/kd-t1/t13-main/src/core/shapes/primitives/create-rectangle';
+
+void T;
+function bytesOf(blob: Blob): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(blob);
+  });
+}
+// jsdom 25's Blob/File have no arrayBuffer(); Chromium's do. Without this,
+// readImageDensity's file.arrayBuffer() throws and is swallowed as "no density",
+// so EVERY import here would fall back to 254 DPI (a jsdom artefact).
+if (typeof (Blob.prototype as { arrayBuffer?: unknown }).arrayBuffer !== 'function') {
+  (Blob.prototype as unknown as { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer =
+    function (this: Blob) {
+      return bytesOf(this).then((b) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer);
+    };
+}
+const log: string[] = [];
+const say = (line: string): void => {
+  log.push(line);
+  console.log(line);
+};
+
+// ---------- independent byte builders / parsers ----------
+function chunk(type: string, data: Uint8Array): Buffer {
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data.length);
+  const td = Buffer.concat([Buffer.from(type, 'latin1'), Buffer.from(data)]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(td) >>> 0);
+  return Buffer.concat([len, td, crc]);
+}
+function pngRgba(w: number, h: number, rgba: Uint8Array, dpi?: number): Uint8Array {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  const raw = Buffer.alloc((w * 4 + 1) * h);
+  for (let y = 0; y < h; y += 1) {
+    raw[y * (w * 4 + 1)] = 0;
+    Buffer.from(rgba.buffer, rgba.byteOffset + y * w * 4, w * 4).copy(raw, y * (w * 4 + 1) + 1);
+  }
+  const parts = [Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr)];
+  if (dpi !== undefined) {
+    const p = Buffer.alloc(9);
+    const ppm = Math.round(dpi / 0.0254);
+    p.writeUInt32BE(ppm, 0);
+    p.writeUInt32BE(ppm, 4);
+    p[8] = 1;
+    parts.push(chunk('pHYs', p));
+  }
+  parts.push(chunk('IDAT', deflateSync(raw)), chunk('IEND', new Uint8Array()));
+  return new Uint8Array(Buffer.concat(parts));
+}
+function decodeOwnPng(bytes: Uint8Array): { w: number; h: number; rgba: Uint8Array } {
+  const b = Buffer.from(bytes);
+  let o = 8;
+  let w = 0;
+  let h = 0;
+  const idat: Buffer[] = [];
+  while (o < b.length) {
+    const len = b.readUInt32BE(o);
+    const type = b.toString('latin1', o + 4, o + 8);
+    const data = b.subarray(o + 8, o + 8 + len);
+    if (type === 'IHDR') {
+      w = data.readUInt32BE(0);
+      h = data.readUInt32BE(4);
+    }
+    if (type === 'IDAT') idat.push(data);
+    o += 12 + len;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  const rgba = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y += 1) raw.copy(rgba, y * w * 4, y * (w * 4 + 1) + 1, (y + 1) * (w * 4 + 1));
+  return { w, h, rgba };
+}
+function jfif(dpi: number): Uint8Array {
+  return Uint8Array.from([
+    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x01,
+    dpi >> 8, dpi & 0xff, dpi >> 8, dpi & 0xff, 0x00, 0x00, 0xff, 0xd9,
+  ]);
+}
+function bmpHeaderDpi(bytes: Uint8Array): { x: number; y: number; w: number; h: number } {
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  // BITMAPINFOHEADER: biWidth @18, biHeight @22, biXPelsPerMeter @38, biYPelsPerMeter @42
+  return {
+    w: v.getInt32(18, true),
+    h: v.getInt32(22, true),
+    x: v.getInt32(38, true) * 0.0254,
+    y: v.getInt32(42, true) * 0.0254,
+  };
+}
+
+// ---------- harness ----------
+type Captured = { name?: string; blob?: Blob };
+function platform(cap: Captured) {
+  return {
+    pickFileForSave: vi.fn(async (req: { suggestedName: string }) => {
+      cap.name = req.suggestedName;
+      return {
+        displayName: req.suggestedName,
+        write: async (blob: Blob) => {
+          cap.blob = blob;
+        },
+      };
+    }),
+  } as never;
+}
+
+async function importOne(
+  file: File,
+): Promise<{ object: RasterImage; toasts: string[] }> {
+  const toasts: string[] = [];
+  let object: SceneObject | null = null;
+  await importImageFile(
+    file,
+    (o) => {
+      object = o;
+      return undefined;
+    },
+    (m) => toasts.push(m),
+  );
+  if (object === null) throw new Error(`import failed: ${toasts.join(' | ')}`);
+  return { object: object as RasterImage, toasts };
+}
+
+const mm = (o: RasterImage): string => `${(o.bounds.maxX - o.bounds.minX).toFixed(2)} x ${(o.bounds.maxY - o.bounds.minY).toFixed(2)} mm`;
+
+describe('R-A: T21-P2-1 BMP density round trip through real import both ways', () => {
+  beforeEach(() => {
+    (globalThis as { createImageBitmap?: unknown }).createImageBitmap = vi.fn(async () => ({
+      width: W,
+      height: H,
+      close: vi.fn(),
+    }));
+    // Model Chromium's canvas PNG encoder: real PNG, no pHYs (T20-P3-1, known).
+    (HTMLCanvasElement.prototype as unknown as Record<string, unknown>).toBlob = function (
+      this: HTMLCanvasElement,
+      cb: (b: Blob | null) => void,
+    ) {
+      cb(new Blob([pngRgba(this.width, this.height, new Uint8Array(this.width * this.height * 4))], { type: 'image/png' }));
+    };
+  });
+
+  const cases: Array<{ label: string; file: () => File }> = [
+    { label: 'PNG, no pHYs (ADR-048 default 254)', file: () => new File([pngRgba(W, H, new Uint8Array(W * H * 4))], 'dog.png', { type: 'image/png' }) },
+    { label: 'PNG, pHYs 300 DPI', file: () => new File([pngRgba(W, H, new Uint8Array(W * H * 4), 300)], 'scan.png', { type: 'image/png' }) },
+    { label: 'JPEG, JFIF 72 DPI (typical phone/web)', file: () => new File([jfif(72)], 'phone.jpg', { type: 'image/jpeg' }) },
+    { label: 'JPEG, JFIF 96 DPI (control)', file: () => new File([jfif(96)], 'web96.jpg', { type: 'image/jpeg' }) },
+  ];
+
+  for (const c of cases) {
+    it(c.label, async () => {
+      const first = await importOne(c.file());
+      for (const format of ['bmp', 'png'] as const) {
+        const cap: Captured = {};
+        const errors: string[] = [];
+        await saveOriginalImage({
+          platform: platform(cap),
+          image: first.object,
+          format,
+          pushToast: (m, v) => {
+            if (v === 'error') errors.push(m);
+          },
+        });
+        expect(errors).toEqual([]);
+        const bytes = await bytesOf(cap.blob!);
+        const again = await importOne(new File([bytes], cap.name!, { type: cap.blob!.type }));
+        const ratio = (again.object.bounds.maxX - again.object.bounds.minX) / (first.object.bounds.maxX - first.object.bounds.minX);
+        const hdr = format === 'bmp' ? bmpHeaderDpi(bytes) : null;
+        say(
+          `[R-A] ${c.label} | import ${mm(first.object)} | save ${format} -> ${cap.name} (${bytes.length} B` +
+            (hdr ? `, header ${hdr.w}x${hdr.h} px, ${hdr.x.toFixed(2)} x ${hdr.y.toFixed(2)} DPI` : '') +
+            `) | re-import ${mm(again.object)} ratio x${ratio.toFixed(3)} | toast: ${again.toasts[0]}`,
+        );
+      }
+    });
+  }
+});
+
+// ---------- R-B: Flatten via the real store + command, then save + dialog ----------
+const RED = [220, 40, 40, 255];
+function redRgba(w: number, h: number): Uint8Array {
+  const a = new Uint8Array(w * h * 4);
+  for (let i = 0; i < w * h; i += 1) a.set(RED, i * 4);
+  return a;
+}
+const LUMA = Math.round(0.299 * 220 + 0.587 * 40 + 0.114 * 40);
+
+function installCanvasPng(): () => void {
+  const proto = HTMLCanvasElement.prototype as unknown as Record<string, unknown>;
+  const oldGet = proto.getContext;
+  const oldToBlob = proto.toBlob;
+  proto.getContext = function (this: HTMLCanvasElement & { __rgba?: Uint8ClampedArray }) {
+    const canvas = this;
+    return {
+      canvas,
+      createImageData: (w: number, h: number) => new ImageData(w, h),
+      putImageData: (img: ImageData) => {
+        canvas.__rgba = img.data;
+      },
+    };
+  };
+  proto.toBlob = function (
+    this: HTMLCanvasElement & { __rgba?: Uint8ClampedArray },
+    cb: (b: Blob | null) => void,
+  ) {
+    const rgba = this.__rgba ?? new Uint8ClampedArray(this.width * this.height * 4);
+    cb(new Blob([pngRgba(this.width, this.height, new Uint8Array(rgba.buffer))], { type: 'image/png' }));
+  };
+  return () => {
+    proto.getContext = oldGet;
+    proto.toBlob = oldToBlob;
+  };
+}
+
+function setUpMaskedImage(source: string, dataUrl: string): RasterImage {
+  const image: RasterImage = {
+    kind: 'raster-image',
+    id: 'img',
+    source,
+    dataUrl,
+    lumaBase64: Buffer.from(new Uint8Array(40 * 20).fill(LUMA)).toString('base64'),
+    pixelWidth: 40,
+    pixelHeight: 20,
+    bounds: { minX: 0, minY: 0, maxX: 40, maxY: 20 },
+    transform: IDENTITY_TRANSFORM,
+    color: '#808080',
+    dither: 'floyd-steinberg',
+    linesPerMm: 10,
+    imageMaskId: 'mask',
+  };
+  const mask = createRectangle({
+    id: 'mask',
+    color: '#000000',
+    spec: { widthMm: 20, heightMm: 10, cornerRadiusMm: 0 },
+    transform: { ...IDENTITY_TRANSFORM, x: 10, y: 5 },
+  });
+  const base = createProject();
+  useStore.getState().setProject({
+    ...base,
+    scene: {
+      objects: [image, mask],
+      layers: [
+        createLayer({ id: 'l1', color: '#808080', mode: 'image' }),
+        createLayer({ id: 'l2', color: '#000000', mode: 'line' }),
+      ],
+    },
+  });
+  return current();
+}
+function current(): RasterImage {
+  const o = useStore.getState().project.scene.objects.find((x) => x.id === 'img');
+  if (o?.kind !== 'raster-image') throw new Error('no image');
+  return o;
+}
+async function flattenNow(): Promise<string[]> {
+  const toasts: string[] = [];
+  flattenImageMaskAction(useStore.getState(), current(), (m) => toasts.push(m))();
+  await vi.waitFor(() => expect(current().imageMaskId).toBeUndefined(), { timeout: 10000 });
+  return toasts;
+}
+async function renderDialog(image: RasterImage): Promise<{ text: string; format: string; unmount: () => void }> {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const cap: Captured = {};
+  await act(async () => {
+    root.render(
+      <PlatformProvider adapter={platform(cap)}>
+        <SaveOriginalImageDialogHost />
+      </PlatformProvider>,
+    );
+  });
+  await act(async () => {
+    useSaveOriginalImageStore.getState().open(image);
+  });
+  const select = document.body.querySelector('select[aria-label="Image format"]') as HTMLSelectElement | null;
+  const body = document.body.querySelector('.lf-dialog-body')?.textContent ?? '';
+  const out = { text: body, format: select?.value ?? '(no select)' };
+  return {
+    ...out,
+    unmount: () => {
+      act(() => useSaveOriginalImageStore.getState().close());
+      act(() => root.unmount());
+      host.remove();
+    },
+  };
+}
+
+describe('R-B: T21-P2-2 after a real Flatten through the store', () => {
+  let restore: () => void = () => undefined;
+  beforeEach(() => {
+    resetStore();
+    restore = installCanvasPng();
+  });
+  afterEach(() => restore());
+
+  it('PNG original: dialog before/after, saved bytes, suggested name', async () => {
+    const original = pngRgba(40, 20, redRgba(40, 20));
+    const dataUrl = `data:image/png;base64,${Buffer.from(original).toString('base64')}`;
+    const before = setUpMaskedImage('dog.png', dataUrl);
+    const d0 = await renderDialog(before);
+    say(`[R-B png] dialog BEFORE flatten: format=${d0.format} | "${d0.text}"`);
+    d0.unmount();
+    const toasts = await flattenNow();
+    const after = current();
+    say(`[R-B png] flatten toasts: ${toasts.join(' | ')}`);
+    say(`[R-B png] after flatten: source=${after.source} dataUrl=${after.dataUrl?.slice(0, 22)}... ${after.pixelWidth}x${after.pixelHeight} px, imageClip=${after.imageClip ? 'yes' : 'no'}, editorDocument=${after.editorDocument ? 'yes' : 'no'}, imageAsset=${after.imageAsset ? 'yes' : 'no'}; undo depth=${useStore.getState().undoStack.length}`);
+    const d1 = await renderDialog(after);
+    say(`[R-B png] dialog AFTER flatten: format=${d1.format} | "${d1.text}"`);
+    d1.unmount();
+    const cap: Captured = {};
+    await saveOriginalImage({ platform: platform(cap), image: after, format: 'png', pushToast: (m) => say(`[R-B png] toast: ${m}`) });
+    const saved = await bytesOf(cap.blob!);
+    const px = decodeOwnPng(saved);
+    const centre = ((px.h >> 1) * px.w + (px.w >> 1)) * 4;
+    say(`[R-B png] Save Original -> suggested "${cap.name}", ${px.w}x${px.h} px, centre RGBA (${[...px.rgba.slice(centre, centre + 4)].join(',')}), identical to original bytes: ${Buffer.compare(Buffer.from(saved), Buffer.from(original)) === 0}; original 40x20 RGBA (${RED.join(',')}), BT.601 luma ${LUMA}`);
+    expect(cap.name).toBe('dog.png');
+  });
+
+  it('JPEG original: default format and name after flatten', async () => {
+    const jpg = jfif(72);
+    const before = setUpMaskedImage('dog.jpg', `data:image/jpeg;base64,${Buffer.from(jpg).toString('base64')}`);
+    const d0 = await renderDialog(before);
+    say(`[R-B jpg] dialog BEFORE flatten: format=${d0.format}`);
+    d0.unmount();
+    await flattenNow();
+    const after = current();
+    const d1 = await renderDialog(after);
+    say(`[R-B jpg] dialog AFTER flatten: format=${d1.format} | "${d1.text}"`);
+    d1.unmount();
+    for (const format of ['png', 'jpeg'] as const) {
+      const cap: Captured = {};
+      await saveOriginalImage({
+        platform: platform(cap),
+        image: after,
+        format,
+        pushToast: () => undefined,
+      }).catch(() => undefined);
+      say(`[R-B jpg] after flatten, format ${format}: suggested "${cap.name}"${format === 'jpeg' ? ' (re-encode path, needs createImageBitmap)' : ''}`);
+    }
+  });
+});
+
+describe('R-C: Image Studio Apply through the store', () => {
+  beforeEach(resetStore);
+  it('Apply replaces dataUrl; Save Original writes the edit under the import name', async () => {
+    const original = pngRgba(4, 2, redRgba(4, 2));
+    const edited = pngRgba(4, 2, new Uint8Array(4 * 2 * 4).fill(10));
+    const image: RasterImage = {
+      kind: 'raster-image',
+      id: 'img',
+      source: 'dog.png',
+      dataUrl: `data:image/png;base64,${Buffer.from(original).toString('base64')}`,
+      pixelWidth: 4,
+      pixelHeight: 2,
+      bounds: { minX: 0, minY: 0, maxX: 4, maxY: 2 },
+      transform: IDENTITY_TRANSFORM,
+      color: '#808080',
+      dither: 'floyd-steinberg',
+      linesPerMm: 10,
+    };
+    useStore.getState().setProject({ ...createProject(), scene: { objects: [image], layers: [createLayer({ id: 'l1', color: '#808080', mode: 'image' })] } });
+    useStore.getState().applyEditedImage('img', {
+      dataUrl: `data:image/png;base64,${Buffer.from(edited).toString('base64')}`,
+      lumaBase64: Buffer.from(new Uint8Array(8).fill(10)).toString('base64'),
+    });
+    const after = current();
+    const cap: Captured = {};
+    await saveOriginalImage({ platform: platform(cap), image: after, format: 'png', pushToast: () => undefined });
+    const saved = Buffer.from(await bytesOf(cap.blob!));
+    say(`[R-C] after Studio Apply: source=${after.source}; saved == edited bytes: ${saved.equals(Buffer.from(edited))}; saved == original bytes: ${saved.equals(Buffer.from(original))}; suggested "${cap.name}"; any field still holding the original bytes: ${JSON.stringify(after).includes(Buffer.from(original).toString('base64'))}`);
+  });
+});
+
+describe('R-D: PDF/TIFF page image (default 300 DPI) then the DEFAULT unchanged Save Original', () => {
+  it('page object bounds vs re-import of the byte-identical PNG', async () => {
+    const { pageArtworkObject } = await import('C:/Users/stolk/kd-t1/t13-main/src/ui/import/page-artwork-object');
+    (HTMLCanvasElement.prototype as unknown as Record<string, unknown>).toBlob = function (
+      this: HTMLCanvasElement,
+      cb: (b: Blob | null) => void,
+    ) {
+      cb(new Blob([pngRgba(this.width, this.height, new Uint8Array(this.width * this.height * 4))], { type: 'image/png' }));
+    };
+    const widthMm = (1000 / 300) * 25.4;
+    const heightMm = (500 / 300) * 25.4;
+    let committed: RasterImage | null = null;
+    await pageArtworkObject(
+      {
+        widthMm,
+        heightMm,
+        thumbnail: '',
+        vectorSvg: null,
+        note: '',
+        resolutionEditable: true,
+        render: async (dpi: number) => {
+          const c = document.createElement('canvas');
+          c.width = Math.round((widthMm / 25.4) * dpi);
+          c.height = Math.round((heightMm / 25.4) * dpi);
+          return c;
+        },
+      },
+      'brochure.pdf (page 1)',
+      'image',
+      300,
+      { signal: new AbortController().signal, commit: (o) => { committed = o as RasterImage; } },
+    );
+    const page = committed as unknown as RasterImage;
+    for (const format of ['png', 'bmp'] as const) {
+      const cap: Captured = {};
+      await saveOriginalImage({ platform: platform(cap), image: page, format, pushToast: () => undefined });
+      const bytes = await bytesOf(cap.blob!);
+      const again = await importOne(new File([bytes], cap.name!, { type: cap.blob!.type }));
+      const ratio = (again.object.bounds.maxX - again.object.bounds.minX) / (page.bounds.maxX - page.bounds.minX);
+      say(`[R-D] page object ${mm(page)} (${page.pixelWidth}x${page.pixelHeight} px, 300 DPI) | Save Original ${format}${format === 'png' ? ' (default, byte-identical pass-through)' : ''} -> ${cap.name} | re-import ${mm(again.object)} ratio x${ratio.toFixed(3)} | ${again.toasts[0]}`);
+    }
+  });
+});
+
+afterAll(() => writeFileSync("C:/Users/stolk/kd-t1/zz-t21r/t21r.out.txt", log.join(String.fromCharCode(10)) + String.fromCharCode(10)));
