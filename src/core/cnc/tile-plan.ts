@@ -6,7 +6,8 @@
 // tiles and re-zeros XY on the tile frame. Adjacent tiles share
 // registration holes drilled in the overlap strip at IDENTICAL stock
 // positions, so dowel pins re-index the stock physically. Those holes are
-// placed clear of every part and cut and inside the stock
+// placed clear of every toolpath, outside every outline the toolpaths go
+// round (a part, pocket or hole, whatever its lead or tabs), and on the stock
 // (tile-registration-placement.ts), and each piece a tile edge starts is
 // entered the way its operation asked (tile-clipped-entries.ts).
 

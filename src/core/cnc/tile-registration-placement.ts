@@ -5,8 +5,8 @@
 // land in a part, in any cut, or off the board: it is searched for along the
 // seam, inside the overlap strip and the stock, clear of every cut footprint
 // (the cutter's radius plus the bore's radius plus a wall) and outside every
-// closed cut loop (a part, a pocket or a hole). The two clear spots furthest
-// apart along the seam win, so the pins square the stock as well as locate it.
+// ring a cut goes round (a part, a pocket or a hole), whatever its lead, tabs
+// or ramp (ringsOf). The two clear spots furthest apart along the seam win, so the pins square the stock as well as locate it.
 // The stock margin at a seam's ends is part of the search. A seam with no
 // clear spot gets no bore and a warning that names it; it is never drilled
 // through the work.
@@ -151,7 +151,7 @@ function seamWarning(seam: RegistrationSeam): string | null {
   if (seam.holes.length === 0) {
     return (
       `No registration hole fits on ${seamName(seam)}: its overlap strip has no spot on the ` +
-      'stock clear of every part and cut, so that seam gets no hole. Register it another way, ' +
+      'stock clear of every toolpath and outside every outline, so that seam gets no hole. Register it another way, ' +
       'or widen the overlap or the stock margin.'
     );
   }
@@ -373,7 +373,7 @@ function collectObstacles(job: Job, holeRadiusMm: number): Obstacles {
 function addPassObstacles(pass: CncPass, clearMm: number, segments: Segment[], loops: Loop[]) {
   const points = cncPassXyPoints(pass);
   if (points.length === 0) return;
-  const closed = isLoop(pass);
+  const closed = pass.kind !== 'helical-contour' && pass.closed;
   const last = closed ? points.length : points.length - 1;
   for (let index = 0; index < Math.max(1, last); index += 1) {
     const a = points[index] as Vec2;
@@ -381,23 +381,57 @@ function addPassObstacles(pass: CncPass, clearMm: number, segments: Segment[], l
     segments.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, clearMm });
   }
   if (closed && points.length >= 3) loops.push(loopOf(points));
+  else for (const ring of ringsOf(points)) loops.push(loopOf(ring));
   if (pass.kind === 'helical-contour' && pass.polyline.length >= 3) {
     loops.push(loopOf(pass.polyline));
   }
 }
 
+// A closed cut encloses a part, a pocket or a hole: never a place for a bore.
+// Most closed cuts do not compile as closed passes. A profile with its default
+// lead (ADR-250) is one open path: lead in, the ring, lead out. A tabbed ring
+// rises over its tabs, and a ramped ring laps. Each still goes round its ring
+// and comes back to the ring's start vertex, so the stretch between a vertex
+// and the path's next return to it is a ring (N7-P1-1). Reading the path, not
+// a compile flag, keeps this true for any entry or tab the profile has. An open
+// cut never returns to a vertex, and a zig-zag ramp's back-and-forth encloses
+// no area, so neither adds a ring.
+function ringsOf(points: ReadonlyArray<Vec2>): ReadonlyArray<ReadonlyArray<Vec2>> {
+  const rings: Array<ReadonlyArray<Vec2>> = [];
+  let seen = new Map<string, number>();
+  for (const [index, point] of points.entries()) {
+    const key = vertexKey(point);
+    const start = seen.get(key);
+    if (start !== undefined && index - start >= MIN_RING_VERTICES) {
+      const ring = points.slice(start, index);
+      if (Math.abs(signedArea(ring)) > MIN_RING_AREA_MM2) rings.push(ring);
+      seen = new Map();
+    }
+    if (!seen.has(key)) seen.set(key, index);
+  }
+  return rings;
+}
+
+const MIN_RING_VERTICES = 3;
+const MIN_RING_AREA_MM2 = 1e-6;
+const VERTEX_KEY_DECIMALS = 6;
+
+function vertexKey(point: Vec2): string {
+  return `${point.x.toFixed(VERTEX_KEY_DECIMALS)},${point.y.toFixed(VERTEX_KEY_DECIMALS)}`;
+}
+
+function signedArea(ring: ReadonlyArray<Vec2>): number {
+  let twice = 0;
+  for (const [index, a] of ring.entries()) {
+    const b = ring[(index + 1) % ring.length] as Vec2;
+    twice += a.x * b.y - b.x * a.y;
+  }
+  return twice / 2;
+}
+
 function cutRadiusMm(group: CncGroup): number {
   const radius = group.toolDiameterMm / 2;
   return Number.isFinite(radius) && radius > 0 ? radius : 0;
-}
-
-// A closed cut encloses a part, a pocket or a hole: never a place for a bore.
-// A ramped closed ring is an open path3d that goes round its loop, so a ramp
-// counts too (a zig-zag ramp along an open path encloses next to nothing).
-function isLoop(pass: CncPass): boolean {
-  if (pass.kind === 'helical-contour') return false;
-  if (pass.closed) return true;
-  return pass.kind === 'path3d' && pass.entryRamp === true;
 }
 
 function loopOf(points: ReadonlyArray<Vec2>): Loop {

@@ -105,6 +105,51 @@ export function compiledRectangles(
   );
 }
 
+type Point = { readonly x: number; readonly y: number };
+
+/** A circle (scene mm) as a closed outline of `segments` points. */
+export function circleOutline(cx: number, cy: number, diameter: number, segments = 96): Point[] {
+  return Array.from({ length: segments }, (_, index) => {
+    const angle = (2 * Math.PI * index) / segments;
+    return { x: cx + (diameter / 2) * Math.cos(angle), y: cy + (diameter / 2) * Math.sin(angle) };
+  });
+}
+
+/** Compile closed outlines (scene mm) on one CNC layer. */
+export function compiledOutlines(
+  outlines: ReadonlyArray<ReadonlyArray<Point>>,
+  cnc: Partial<CncLayerSettings>,
+): Job {
+  const all = outlines.flat();
+  const object: ImportedSvg = {
+    kind: 'imported-svg',
+    id: 'parts',
+    source: 'parts.svg',
+    bounds: {
+      minX: Math.min(...all.map((p) => p.x)),
+      minY: Math.min(...all.map((p) => p.y)),
+      maxX: Math.max(...all.map((p) => p.x)),
+      maxY: Math.max(...all.map((p) => p.y)),
+    },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color: '#2563eb',
+        polylines: outlines.map((points) => ({ closed: true, points: [...points] })),
+      },
+    ],
+  };
+  const layer: Layer = {
+    ...createLayer({ id: LAYER_ID, color: '#2563eb' }),
+    cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, tabsEnabled: false, ...cnc },
+  };
+  return compileCncJob(
+    { objects: [object], layers: [layer] },
+    DEFAULT_DEVICE_PROFILE,
+    DEFAULT_CNC_MACHINE_CONFIG,
+  );
+}
+
 /** The XY extent of every cut in a job (machine coordinates). */
 export function jobBounds(job: Job): Rect {
   let minX = Infinity;

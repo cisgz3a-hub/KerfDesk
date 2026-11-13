@@ -7478,8 +7478,10 @@ and lifts the command's CNC-only gate.)*
 4. Matching flat end mills peck to the requested depth; smaller flat end mills
    clear concentric circles at each depth step. Adjacent tiles use identical
    stock-space centers in the overlap strip. Each seam's two bores go where the
-   strip is clear of every part and cut and on the stock (its margin at the
-   seam's ends included), as far apart as fits (ADR-392 Amendment 7). A seam
+   strip is clear of every toolpath, outside every outline a cut goes round
+   (whatever its lead, tabs or ramp), and on the stock (its margin at the
+   seam's ends included), as far apart as fits (ADR-392 Amendments 7 and 8). A
+   part drawn as an open outline is not known as a part. A seam
    with no clear spot gets no bore and the save names it; a seam with one gets
    one bore and a warning that it does not square the stock. Preview draws the
    planned bores in purple and lists them; the save lists them by tile, and
