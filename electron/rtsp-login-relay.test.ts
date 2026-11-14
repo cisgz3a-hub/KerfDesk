@@ -241,4 +241,28 @@ describe('the RTSP login relay (ADR-692 Amendment 1)', () => {
     await closed;
     relay.close();
   });
+
+  // ADR-692 Amendment 2.
+  it('serves the stream it was opened for, and nothing else', async () => {
+    const cam = await camera('basic');
+    const relay = await openRtspLoginRelay(cameraAddress(cam.port));
+    const port = Number(new URL(relay.url).port);
+    const other = new Socket();
+    sockets.push(other);
+    await new Promise<void>((resolve) => other.connect(port, '127.0.0.1', resolve));
+    const ended = new Promise<void>((resolve) => other.once('close', () => resolve()));
+    other.write('DESCRIBE rtsp://camera.invalid/stream1 RTSP/1.0\r\nCSeq: 1\r\n\r\n');
+    await ended;
+    // The camera saw nothing of it, and FFmpeg is still served.
+    expect(cam.seen.requestLines).toEqual([]);
+    const run = await ffmpeg(relay.url);
+    expect(run.replies).toEqual(['200', '200', '200', '200']);
+    expect(cam.seen.requestLines.every((line) => !line.includes('camera.invalid'))).toBe(true);
+    // And nothing else afterwards.
+    const closed = new Promise<void>((resolve) => run.socket.once('close', () => resolve()));
+    run.socket.write('DESCRIBE rtsp://camera.invalid/stream1 RTSP/1.0\r\nCSeq: 98\r\n\r\n');
+    await closed;
+    expect(cam.seen.requestLines.every((line) => !line.includes('camera.invalid'))).toBe(true);
+    relay.close();
+  });
 });
