@@ -24,7 +24,7 @@
   - The 126 PRs that change product code (about 43,000 lines) were read diff by diff in five batches.
   - The 10 PRs that change only tests or CI were read separately.
   - For the 60 docs-only PRs, every PR number their ledgers cite was checked against GitHub.
-- **Outcome:** 3 P1/P2 burn or motion defects, 3 more P2s and 3 P3s were confirmed. The PR that adds this ledger fixes 8 of them; 1 P3 stays open, along with 2 unverified leads.
+- **Outcome:** 9 defects were confirmed: 1 P1, 4 P2 and 4 P3. The PR that adds this ledger fixes all 9. Two unverified galvo leads stay open.
 
 ## Confirmed and fixed in this PR
 
@@ -38,12 +38,12 @@
 | 6 | #1745 (ADR-127 Amd 4) | P3 | The old-project rotary notice read the raw layer speed against the Max feed. The compiler caps that speed both before and after, so a layer stored above the Max feed reported a change that did not happen (for example, 1.50× for lines along X). | `min(speed, Max feed)`. Test: `old-project-rotary-feed.test.ts`. |
 | 7 | #1836 (ADR-703 Amd 2) | P3 | The K40 Rotary Setup note said "nothing runs slower than 23.5 mm/min" for every board. On A, B, B1 and B2 boards the slowest speed is about 47 mm/min (`lhySlowestMmPerSec`). The export's own dose note was already right. | The note names both figures. |
 | 8 | #1782 (O1 barcode report) | P3 | The report said "fixed in #1780", but #1780 was closed unmerged. | A status note at the top of the report. |
+| 9 | #1892 (ADR-258 Amd 6) | P3 | Production Nest wrote the stock thickness the operator typed but never marked it set (`thicknessSet`), so a typed 6.35 mm (the shipped default) still read as "never set" and the tabs kept the cut-floor rule. | ADR-258 Amendment 9 (maintainer decision "Save the mark"): typing the thickness marks the nest stock, the mark is saved with the nest, and a generated sheet carries it. Test: `production-nest-actions.test.ts` (fails on `main`). KerfDesk 1.0.32 and older refuse a project whose saved nest carries the mark. |
 
 ## Open (not changed here)
 
 | From PR | Severity | Item | Why it is open |
 | --- | --- | --- | --- |
-| #1892 (ADR-258 Amd 6) | P3 | Production Nest writes the stock thickness the operator types but never marks it set (`thicknessSet`). A typed 6.35 mm, the shipped default, therefore still reads as "never set". Other values already count as set. | The nest form starts from the project's stock, so marking every value set would also mark an untouched default. The form needs to know whether the field was edited. That is a small UI change, but it needs a decision on what counts as an edit. |
 | #1725 (ADR-704) | P2, unverified | The galvo job encoder writes no jump delay; only the red-light Frame sets one, at 1 µs. If the board keeps that register between programs, marks could start while the mirrors are still settling. | Not checked against MeerK40t's balor source (the web fetch was blocked) or on hardware. The galvo route is experimental and simulator-tested only. |
 | #1725 (ADR-704) | unverified | A list whose marks take more than 30 s would also hit the Ready limit without any pause. | It depends on how the board's Ready bit buffers lists, which has not been checked. |
 

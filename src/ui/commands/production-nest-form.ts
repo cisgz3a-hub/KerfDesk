@@ -1,4 +1,5 @@
 import type { Project } from '../../core/scene';
+import type { CncStock } from '../../core/scene/machine';
 import { cncNestSpacing } from '../../core/cnc/cnc-nest-spacing';
 import type {
   ProductionNestDefinition,
@@ -38,10 +39,15 @@ export function initialProductionStock(project: Project, id: string): Production
     kind: 'sheet',
     materialKey: stock?.materialKey ?? 'Declared material',
     thicknessMm: stock?.thicknessMm ?? 10,
+    ...thicknessMark(stock),
     widthMm: stock?.widthMm ?? project.workspace.width,
     heightMm: stock?.heightMm ?? project.workspace.height,
     grain: 'none',
   };
+}
+/** A stock already set in the project starts set (ADR-258 Amendment 9). */
+function thicknessMark(stock: CncStock | undefined): { readonly thicknessSet?: true } {
+  return stock?.thicknessSet === true ? { thicknessSet: true } : {};
 }
 export function productionSelectionPart(
   project: Project,
