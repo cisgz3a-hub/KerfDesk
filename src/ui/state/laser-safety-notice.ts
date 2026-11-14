@@ -63,7 +63,11 @@ export type LaserSafetyAction =
   | 'stream'
   // The read-only `$G` that proves a fully sent stream's missing replies were
   // lost (ADR-610 Amendment 1): the one `$` line allowed during a job.
-  | 'stream-probe';
+  | 'stream-probe'
+  // The spindle-off and coolant-off lines KerfDesk sends after its own reset,
+  // once the controller's banner showed that reset happened (CNC audit v3
+  // N5-P3-3, ADR-398 Amendment 10).
+  | 'stop-cleanup';
 
 export type LaserSafetyNotice =
   | {
@@ -460,6 +464,13 @@ export function writeFailedMessage(action: LaserSafetyAction): string {
       'buffered commands — press ABORT; use physical E-stop or power cutoff now if unsafe.'
     );
   }
+  if (action === 'stop-cleanup') {
+    return (
+      'The controller reset, which stops the job and turns the spindle, laser and coolant off, ' +
+      'but the off lines KerfDesk sends after the reset were not written. Check that the ' +
+      'spindle, laser and coolant are off; use physical E-stop or power cutoff now if unsafe.'
+    );
+  }
   if (action === 'stream-probe') {
     return (
       'KerfDesk could not ask the controller to confirm the end of the job because the serial ' +
@@ -480,6 +491,22 @@ export function writeFailedMessage(action: LaserSafetyAction): string {
 
 export function writeFailedNotice(action: LaserSafetyAction): LaserSafetyNotice {
   return { kind: 'write-failed', action, message: writeFailedMessage(action) };
+}
+
+/** The notice after a failed write. The off lines that follow KerfDesk's own
+ * reset add to the notice that says why the job stopped instead of replacing
+ * it; every other failure replaces it, as before (ADR-398 Amendment 10). */
+export function writeFailedNoticeAfter(
+  prior: LaserSafetyNotice | null,
+  action: LaserSafetyAction,
+): LaserSafetyNotice {
+  if (action !== 'stop-cleanup' || prior === null || prior.kind === 'cnc-transition-unconfirmed') {
+    return writeFailedNotice(action);
+  }
+  const cleanup = writeFailedMessage(action);
+  return prior.message.includes(cleanup)
+    ? prior
+    : { ...prior, message: `${prior.message} ${cleanup}` };
 }
 
 // error:N / ALARM:N notices live in controller-error-notice.ts (UX audit U2-P2-2).

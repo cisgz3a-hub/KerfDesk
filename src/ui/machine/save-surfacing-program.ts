@@ -14,6 +14,7 @@ import type { ToastVariant } from '../state/toast-store';
 import { pickPreparedSaveTarget } from '../app/pick-prepared-save-target';
 import { startSurfacingStream } from './surfacing-worker-client';
 import { stageSurfacingProgram, writeSurfacingFile } from './surfacing-save-write';
+import { surfacingSentRates } from './surfacing-rates';
 
 export type SurfacingInputs = {
   readonly widthMm: number;
@@ -124,28 +125,25 @@ export async function saveSurfacingProgram(options: SaveSurfacingOptions): Promi
   }
 }
 
-function surfacingParams(
+/** The params a surfacing Save emits: typed values through the machine limits. */
+export function surfacingParams(
   inputs: SurfacingInputs,
   project: Project,
   machine: CncMachineConfig,
 ): SurfacingParams {
   const tool = activeCncTool(machine);
+  const rates = surfacingSentRates(
+    inputs,
+    cncMaxFeedMmPerMin(project.device, machine.params),
+    machine.params.spindleMaxRpm,
+  );
   return {
     ...inputs,
     bitDiameterMm: tool.diameterMm,
     depthPerPassMm: inputs.depthPerPassMm ?? SURFACING_DEFAULT_DEPTH_PER_PASS_MM,
-    feedMmPerMin: Math.min(
-      inputs.feedMmPerMin ?? 2500,
-      cncMaxFeedMmPerMin(project.device, machine.params),
-    ),
-    plungeMmPerMin: Math.min(
-      inputs.plungeMmPerMin ?? 600,
-      cncMaxFeedMmPerMin(project.device, machine.params),
-    ),
-    spindleRpm: Math.min(
-      inputs.spindleRpm ?? machine.params.spindleMaxRpm,
-      machine.params.spindleMaxRpm,
-    ),
+    feedMmPerMin: rates.feedMmPerMin,
+    plungeMmPerMin: rates.plungeMmPerMin,
+    spindleRpm: rates.spindleRpm,
     spindleSpinupSec: machine.params.spindleSpinupSec,
     safeZMm: machine.params.safeZMm,
   };

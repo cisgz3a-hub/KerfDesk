@@ -107,10 +107,13 @@ export function flushResetCleanup(
   if (pending.timer !== null) clearTimeout(pending.timer);
   refs.pendingResetCleanup = null;
   const generation = refs.resetCleanupGeneration;
+  // After the reset's banner the reset itself is proven, so a failed off line
+  // says only that (ADR-398 Amendment 10); a fallback flush proves nothing.
+  const action = cause === 'reset-boundary' ? 'stop-cleanup' : 'stop';
   void (async () => {
     for (const line of pending.lines) {
       if (refs.resetCleanupGeneration !== generation) return;
-      await (pending.write ?? safeWrite)(`${line}\n`, 'stop');
+      await (pending.write ?? safeWrite)(`${line}\n`, action);
     }
   })()
     .then(

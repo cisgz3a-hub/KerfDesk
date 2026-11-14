@@ -7,6 +7,7 @@
 // before Save.
 
 import { CNC_MACHINE_CATALOG, type CncMachinePreset } from '../../../core/cnc';
+import { cncPresetZTravelPatch } from '../../../core/cnc/cnc-machine-catalog';
 import {
   DEFAULT_DEVICE_PROFILE,
   GRBL_MACHINE_PROFILE_CATALOG,
@@ -288,7 +289,12 @@ export function chooseMachineEntryActions(
     { kind: 'set-machine-kinds', machineKinds: ['cnc'] },
     {
       kind: 'edit',
-      patch: { name: preset.name, bedWidth: preset.bedWidthMm, bedHeight: preset.bedHeightMm },
+      patch: {
+        name: preset.name,
+        bedWidth: preset.bedWidthMm,
+        bedHeight: preset.bedHeightMm,
+        ...cncPresetZTravelPatch(preset, state.draft),
+      },
     },
     {
       kind: 'edit-machine',

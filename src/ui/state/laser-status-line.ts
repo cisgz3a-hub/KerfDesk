@@ -44,6 +44,7 @@ import { isProbeAlarmedToolChangeHold } from './tool-change-probe-alarm';
 import { probeTestTouchPatch } from './probe-test-touch';
 import { cancelActiveStreamerPatch } from './laser-alarm-stream-end';
 import { workZBeforeResetPatch } from './work-z-before-reset';
+import { kerfDeskOwnsHold } from './laser-pause-resume-transition';
 import {
   homeAlarmReplyWindowPatch,
   isStaleHomeAlarmReply,
@@ -199,7 +200,9 @@ function mpgJobInterruptionPatch(
 // A hold the controller entered by itself stops the machine while the host
 // keeps streaming, so nothing in the app's own state changes and the operator
 // got no record of it. One line at the transition, not per status report
-// (ADR-333). The live bar names the state while it lasts.
+// (ADR-333). The live bar names the state while it lasts. A hold KerfDesk's
+// own Pause asked for (a paused stream, a Pause or Resume in flight, or CNC
+// Pause and lift) is not one: it gets no such line (CNC audit v3 N5-P3-2).
 function controllerHoldLogPatch(
   state: LaserState,
   report: StatusReport,
@@ -207,7 +210,7 @@ function controllerHoldLogPatch(
   if (report.state !== 'Hold' && report.state !== 'Door') return {};
   const previous = state.statusReport?.state;
   if (previous === 'Hold' || previous === 'Door') return {};
-  if (!isActiveJob(state.streamer)) return {};
+  if (!isActiveJob(state.streamer) || kerfDeskOwnsHold(state)) return {};
   return {
     log: pushLog(
       state,

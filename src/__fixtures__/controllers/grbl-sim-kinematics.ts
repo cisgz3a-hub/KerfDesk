@@ -10,6 +10,13 @@
 // protocol.c mc_reset). Acceleration is not modelled: every move runs at its
 // feed from start to end. A feed hold does not pause this clock (the fixed-time
 // model's moves do not pause either).
+//
+// Won't fix for now (CNC audit v3 N5-P3-4): freezing this clock in a hold, and
+// running it with the planner model (`plannerBlocks`), would change how every
+// simulated hold settles, which the fixed-time model treats as complete at
+// once and many suites rely on. A test that needs a stop part way along a move
+// under a hold drives the clock itself, as the N5 audit harness did. The
+// spindle a safety door stopped is restored at cycle start (grbl-sim-machine.ts).
 
 import type { SimVec3 } from './grbl-sim-gcode';
 

@@ -8,6 +8,9 @@ export type CncMachinePreset = {
   // Nominal or conservative application RPM ceiling, not a measured speed.
   // A firmware S maximum is not necessarily an RPM rating.
   readonly spindleMaxRpm: number;
+  // Z travel the cited source states (CNC audit v3 N6-P3-3). Applied as
+  // unconfirmed travel so the offline Z-travel check has a value to compare.
+  readonly zTravelMm?: number;
   readonly note: string;
   // Source-described family only; even GRBL requires the listed configuration.
   readonly controllerSupport: 'grbl-family' | 'unqualified';
@@ -46,6 +49,7 @@ export const CNC_MACHINE_CATALOG: ReadonlyArray<CncMachinePreset> = [
     bedWidthMm: 300,
     bedHeightMm: 180,
     spindleMaxRpm: 10000,
+    zTravelMm: 45,
     note: `${CONFIRM} The 10,000 value is a nominal sender starter, not measured spindle RPM. The non-homing PRO and PROVer are different configurations.`,
     controllerSupport: 'grbl-family',
     controllerNote:
@@ -70,6 +74,7 @@ export const CNC_MACHINE_CATALOG: ReadonlyArray<CncMachinePreset> = [
     bedWidthMm: 400,
     bedHeightMm: 400,
     spindleMaxRpm: 9000,
+    zTravelMm: 78,
     note: `${CONFIRM} The stock 4040-PRO table specifies 9,000 RPM; upgraded spindles need their own rating and S-scale configuration.`,
     controllerSupport: 'grbl-family',
     controllerNote:
@@ -90,6 +95,7 @@ export const CNC_MACHINE_CATALOG: ReadonlyArray<CncMachinePreset> = [
     bedWidthMm: 400,
     bedHeightMm: 400,
     spindleMaxRpm: 12000,
+    zTravelMm: 75,
     note: `${CONFIRM} This preset assumes the 500 W spindle (12,000 RPM); confirm against the fitted machine. The vendor also lists a 710 W alternative.`,
     controllerSupport: 'unqualified',
     controllerNote:
@@ -243,3 +249,17 @@ export const CNC_MACHINE_CATALOG: ReadonlyArray<CncMachinePreset> = [
     ],
   },
 ];
+
+/**
+ * The device-profile patch for a preset's cited Z travel: unconfirmed, since a
+ * published travel is not a measurement of this machine. Empty when the preset
+ * cites none, or when the operator has confirmed a measured travel, which is
+ * the better value.
+ */
+export function cncPresetZTravelPatch(
+  preset: Pick<CncMachinePreset, 'zTravelMm'>,
+  current: { readonly zTravelConfirmed?: boolean },
+): { readonly zTravelMm?: number; readonly zTravelConfirmed?: boolean } {
+  if (preset.zTravelMm === undefined || current.zTravelConfirmed === true) return {};
+  return { zTravelMm: preset.zTravelMm, zTravelConfirmed: false };
+}
