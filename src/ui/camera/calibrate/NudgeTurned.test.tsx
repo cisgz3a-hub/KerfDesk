@@ -13,7 +13,14 @@ import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
 import { useLaserStore } from '../../state/laser-store';
 import { resetStore } from '../../state/test-helpers';
-import { useCameraMovedStore, type CameraMovedState } from '../helpers/moved-check';
+import {
+  checkCameraMovedInWorker,
+  rgbaView,
+  useCameraMovedStore,
+  type CameraMovedState,
+} from '../helpers/moved-check';
+import { loadViewReference, saveViewReference } from '../helpers/view-reference';
+import { viewThumbnail } from '../../../core/camera/model/view-shift';
 import { CalibrateCameraControls } from './CalibrateCameraControls';
 import { CameraCalibrationWizard } from './CameraCalibrationWizard';
 import {
@@ -151,5 +158,60 @@ describe('what a fix tells the moved check', () => {
     expect(applyNudge({ x: 2, y: 0 })).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(useCameraMovedStore.getState().state).toEqual(changed);
+  });
+});
+
+// Camera audit v2 K6-P2-2 (ADR-663 Amendment 9): a knock the moved check had
+// not measured yet, pressed Fix on, was saved as the new view. In the desktop
+// app the check's verdict landed just after the Fix, and the next picture,
+// compared with the tilted view, withdrew the warning.
+describe('a check still being compared when Fix is pressed', () => {
+  const frame = { width: 1280, height: 720, data: new Uint8ClampedArray(1280 * 720 * 4).fill(90) };
+  const kept = viewThumbnail(frame);
+
+  function pendingCheck(comparison: CameraMovedState): { readonly land: () => void } {
+    let land: () => void = () => undefined;
+    const displacementsMm = comparison.kind === 'moved' ? comparison.displacementsMm : [];
+    const worstMm = comparison.kind === 'moved' ? comparison.mm : 0;
+    const client = {
+      capture: async () => null,
+      run: () =>
+        new Promise<never>((resolve) => {
+          land = () =>
+            resolve({
+              kind: 'views',
+              comparison: { kind: 'measured', displacementsMm, worstMm },
+            } as never);
+        }),
+    };
+    void checkCameraMovedInWorker(machine, rgbaView(frame), client);
+    return { land: () => land() };
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    saveViewReference(record, kept);
+  });
+
+  it('keeps the old view and the warning when the check finds a turn', async () => {
+    const check = pendingCheck(moved(8.7, [3, 15, 4, 14]));
+    expect(applyNudge({ x: 2, y: 0 })).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    // Nothing is renewed while the check is still out.
+    expect(loadViewReference(record)?.data).toEqual(kept.data);
+    check.land();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(useCameraMovedStore.getState().state.kind).toBe('moved');
+    expect(loadViewReference(record)?.data).toEqual(kept.data);
+  });
+
+  it('renews the view once the check finds a slide the fix put right', async () => {
+    const check = pendingCheck(moved(2, [2.3, 1.8, 2.1, 2.4]));
+    expect(applyNudge({ x: 2, y: 0 })).toBe(true);
+    check.land();
+    await vi.waitFor(() =>
+      expect(useCameraMovedStore.getState().state).toEqual({ kind: 'steady' }),
+    );
+    expect(loadViewReference(record)?.data).not.toEqual(kept.data);
   });
 });

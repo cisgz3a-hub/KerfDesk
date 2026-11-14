@@ -102,6 +102,33 @@ export async function checkCameraMovedInWorker(
   view: FrameView | null,
   client: PictureClient | null = pictureClient(),
 ): Promise<CameraMovedState> {
+  checksPending += 1;
+  try {
+    return await checkInWorker(source, view, client);
+  } finally {
+    checksPending -= 1;
+    if (checksPending === 0) for (const settle of settleWaiters.splice(0)) settle();
+  }
+}
+
+// Checks still being compared. Fix a small offset waits for them before it
+// renews the view reference (ADR-663 Amendment 9, camera audit v2 K6-P2-2):
+// a check of the old view landed after the Fix and its warning was then
+// withdrawn by the next picture, compared with the tilted view saved as new.
+let checksPending = 0;
+const settleWaiters: Array<() => void> = [];
+
+/** Resolves once no camera-moved check is being compared. */
+export function movedChecksSettled(): Promise<void> {
+  if (checksPending === 0) return Promise.resolve();
+  return new Promise((resolve) => settleWaiters.push(resolve));
+}
+
+async function checkInWorker(
+  source: ActiveCameraSource,
+  view: FrameView | null,
+  client: PictureClient | null,
+): Promise<CameraMovedState> {
   const prepared = prepareCheck(source, view);
   if ('kind' in prepared) return prepared;
   if (client === null) return verdict(prepared.own, compareViews(prepared.compare));

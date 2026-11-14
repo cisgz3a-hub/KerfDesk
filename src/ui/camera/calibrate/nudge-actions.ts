@@ -32,7 +32,7 @@ import {
   captureSourceFrame,
   type ActiveCameraSource,
 } from '../frame-source';
-import { markCameraSteady, useCameraMovedStore } from '../helpers/moved-check';
+import { markCameraSteady, movedChecksSettled, useCameraMovedStore } from '../helpers/moved-check';
 import { nudgeMoveCheck, type NudgeMoveCheck } from './nudge-move-check';
 import { saveViewReference } from '../helpers/view-reference';
 import { viewThumbnail } from '../../../core/camera/model/view-shift';
@@ -175,20 +175,26 @@ export function applyNudge(offsetMm: Vec2, ringBedUnknown = false): boolean {
   const owner = useStore.getState();
   // Keep the refreshed frame itself; a second asynchronous capture could
   // belong to a camera/document selected after this Fix.
-  void refreshCameraPicture().then((outcome) => {
+  void refreshCameraPicture().then(async (outcome) => {
+    if (outcome !== 'refreshed' || check.kind === 'changed') return;
+    const still = useCameraStore.getState().overlayStill;
+    // The refreshed picture is compared with the old view first (ADR-663
+    // Amendment 9, camera audit v2 K6-P2-2): a knock the check had not
+    // measured yet must not be saved as the new view.
+    await movedChecksSettled();
     const now = useStore.getState();
     const camera = useCameraStore.getState();
     if (
-      outcome !== 'refreshed' ||
       now.projectDocumentEpoch !== owner.projectDocumentEpoch ||
       now.project.device !== owner.project.device ||
       camera.sourceState !== sourceState ||
-      camera.overlayStill === null ||
-      // A view that no longer matched keeps its warning: the fix saw the middle only.
-      check.kind === 'changed'
+      still === null ||
+      camera.overlayStill !== still ||
+      // A turn, or a view that no longer matches, keeps its warning: the fix saw the middle only.
+      nudgeMoveCheck(useCameraMovedStore.getState().state, own.calibratedAt).kind !== 'open'
     )
       return;
-    saveViewReference(nudged, viewThumbnail(camera.overlayStill));
+    saveViewReference(nudged, viewThumbnail(still));
     markCameraSteady();
   });
   return true;

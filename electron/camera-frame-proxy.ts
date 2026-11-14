@@ -190,9 +190,48 @@ function isJpeg(contentType: string): boolean {
   return /^image\/(jpeg|jpg|pjpeg)\b/i.test(contentType);
 }
 
-// A JPEG ends with its end-of-image marker, FF D9, perhaps followed by a few
-// padding bytes some cameras add.
+// A whole JPEG has its end-of-image marker, FF D9, after its picture data.
+// Some cameras pad the buffer or append data after it, so the marker need not
+// be last (camera audit v2 K6-P3-3: 15 or more bytes after it were refused
+// as a cut picture). The picture data starts at the main image's first
+// start-of-scan marker, found by walking its segments, so a thumbnail's own
+// end marker inside an earlier segment does not count. Inside the picture
+// data an FF byte is always followed by 00 or a restart marker, so the first
+// FF D9 after it is the real end.
 export function endsLikeJpeg(bytes: Uint8Array): boolean {
+  const scan = firstScanOffset(bytes);
+  if (scan === null) return endMarkerNearEnd(bytes);
+  return (
+    Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).indexOf(END_OF_IMAGE, scan) >= 0
+  );
+}
+
+const END_OF_IMAGE = Buffer.from([0xff, 0xd9]);
+
+// Where the main image's first start-of-scan segment is, or null when the
+// segments cannot be walked to one.
+function firstScanOffset(bytes: Uint8Array): number | null {
+  if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
+  let i = 2;
+  while (i + 3 < bytes.length) {
+    if (bytes[i] !== 0xff) return null;
+    const marker = bytes[i + 1] ?? 0;
+    if (marker === 0xff) {
+      i += 1; // fill byte
+      continue;
+    }
+    if (marker === 0xda) return i;
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd8)) {
+      i += 2;
+      continue;
+    }
+    i += 2 + (((bytes[i + 2] ?? 0) << 8) | (bytes[i + 3] ?? 0));
+  }
+  return null;
+}
+
+// Without a scan to walk to, a few padding bytes after the end marker.
+function endMarkerNearEnd(bytes: Uint8Array): boolean {
   for (let i = bytes.length - 2; i >= Math.max(0, bytes.length - 16); i -= 1) {
     if (bytes[i] === 0xff && bytes[i + 1] === 0xd9) return true;
   }

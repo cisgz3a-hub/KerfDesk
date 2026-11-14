@@ -29,7 +29,7 @@ export type RtspLoginRelay = {
 // FFmpeg connects at once; a relay nobody used goes away.
 const CONNECT_WITHIN_MS = 15_000;
 const MAX_HEAD_BYTES = 64 * 1024;
-// How long a new connection may take to begin, and how many may begin at once.
+// How long a new connection may take to begin, and how many may wait at once.
 const FIRST_REQUEST_WITHIN_MS = 5_000;
 const MAX_WAITING_CONNECTIONS = 8;
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -71,7 +71,7 @@ export async function openRtspLoginRelay(
   };
   const unused = setTimeout(close, CONNECT_WITHIN_MS);
   let taken = false;
-  let waiting = 0;
+  const waiting: Socket[] = [];
   const accept = (client: Socket, first: Buffer): void => {
     taken = true;
     clearTimeout(unused);
@@ -89,14 +89,16 @@ export async function openRtspLoginRelay(
     relayConnection(client, upstream, options, first);
   };
   server.on('connection', (client) => {
-    if (taken || waiting >= MAX_WAITING_CONNECTIONS) {
+    if (taken) {
       client.destroy();
       return;
     }
-    waiting += 1;
+    if (waiting.length >= MAX_WAITING_CONNECTIONS) waiting.shift()?.destroy();
+    waiting.push(client);
     sockets.push(client);
     awaitFirstRequest(client, relayBase, (first) => {
-      waiting -= 1;
+      const at = waiting.indexOf(client);
+      if (at >= 0) waiting.splice(at, 1);
       if (first === null || taken) client.destroy();
       else accept(client, first);
     });
