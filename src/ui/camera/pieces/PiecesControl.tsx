@@ -119,7 +119,7 @@ function FoundPieces(props: {
     const { fitting, runsOff } = piecesTheDesignFits(included, current, sampleNow);
     const leftOut = runsOff.map((piece) => scan.pieces.indexOf(piece) + 1);
     if (fitting.length === 0) {
-      props.onPlaced(NOTHING_FITS);
+      props.onPlaced(sampleNow?.doubt === undefined ? NOTHING_FITS : SAMPLE_DOUBTED);
       return;
     }
     const placements = piecePlacements({ pieces: fitting, design: current, sample: sampleNow });
@@ -175,6 +175,12 @@ function placedMessage(pieces: number, leftOut: ReadonlyArray<number>): string {
       : ` Left out ${leftOut.length === 1 ? 'piece' : 'pieces'} ${leftOut.join(', ')}: the design runs off ${leftOut.length === 1 ? 'it' : 'them'}.`;
   return `Placed on ${pieces} ${pieces === 1 ? 'piece' : 'pieces'}.${skipped} One Undo takes them all back. Frame traces the rectangle around all of them, not each piece.`;
 }
+
+// The design sits on a piece left out as doubtful, such as two blanks
+// touching read as one, so every other copy is placed relative to it
+// (camera audit v2 K6-P3-1).
+const SAMPLE_DOUBTED =
+  'Nothing was placed: the piece your design is on may not be one piece (see its note), so the copies would not land on the other pieces. Move the pieces apart and find them again, or move the design off the pieces to centre it on each.';
 
 const NOTHING_FITS =
   'Nothing was placed: the design runs off every ticked piece. Make it smaller or put it on one of the pieces, then place again.';

@@ -373,3 +373,32 @@ it('leaves out of Place a piece the design runs off, and says which', async () =
     'Placed on 2 pieces. Left out piece 3: the design runs off it.',
   );
 });
+
+// Camera audit v2 K6-P3-1 (ADR-442 Amendment 3).
+it('says the design sits on a doubtful piece when no copy fits from it', async () => {
+  const small = (x: number, y: number): DetectedPiece => ({
+    ...piece(x, y, 0),
+    outline: [
+      { x: x - 10, y: y - 7 },
+      { x: x + 10, y: y - 7 },
+      { x: x + 10, y: y + 7 },
+      { x: x - 10, y: y + 7 },
+    ],
+    rect: { centre: { x, y }, axisDeg: 0, length: 20, width: 14 },
+    areaMm2: 280,
+  });
+  // The design (centre 100, 60) sits on a piece flagged as two blanks touching.
+  scan.mockReturnValue([
+    { ...piece(100, 60, 0), doubt: 'larger' },
+    small(250, 200),
+    small(300, 300),
+  ]);
+  const host = await mountControl(<PiecesControl />);
+  await findPieces(host);
+  // The doubtful piece starts left out; the two small ones are ticked.
+  const boxes = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+  expect(boxes.map((box) => box.checked)).toEqual([false, true, true]);
+  await clickControl(host, 'Place selection on each piece');
+  expect(useStore.getState().project.scene.objects).toHaveLength(1);
+  expect(host.textContent).toContain('the piece your design is on may not be one piece');
+});
