@@ -1,0 +1,118 @@
+// @vitest-environment jsdom
+// T37 refuter r1: variable text / barcode reached through Select All; menu gate; notices.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import opentype from 'opentype.js';
+import {
+  createLayer, createProject, DEFAULT_PROJECT_OPTIMIZATION, DEFAULT_PROJECT_VARIABLE_DATA, IDENTITY_TRANSFORM,
+  type ImportedSvg, type Layer, type Project, type SceneObject, type TextObject,
+} from '../t36-main/src/core/scene';
+import { textToPolylines } from '../t36-main/src/core/text';
+import { prepareOutputSnapshot, type VariableTextRenderer } from '../t36-main/src/io/gcode/prepare-output-snapshot';
+import { emitPreparedGcode } from '../t36-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t36-main/src/ui/state/store';
+import { resetStore } from '../t36-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t36-main/src/ui/state/toast-store';
+import { DEFAULT_SHAPE_OPTIMIZE_OPTIONS } from '../t36-main/src/core/geometry/shape-optimize/shape-optimize-options';
+import { optimizeShapesSelection } from '../t36-main/src/ui/state/optimize-shapes-plan';
+import { selectedObjectIds } from '../t36-main/src/ui/state/scene-group-actions';
+import { optimizeShapesCommand } from '../t36-main/src/ui/commands/optimize-shapes-commands';
+import { parseVariableTemplateSource } from '../t36-main/src/core/variables';
+import { createBarcodeObject, defaultBarcodeSpec } from '../t36-main/src/core/barcode';
+import { applyTextWeld } from '../t36-main/src/ui/text/apply-text-weld';
+import { decode, fontBuf, segLen, xExtent } from './r-util';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t37r/r1.log';
+const lines: string[] = [];
+const out = (s: string) => { lines.push(s); writeFileSync(LOG, lines.join('\n')); };
+const f3 = (n: number) => n.toFixed(3);
+const st = () => useStore.getState();
+const toasts = () => useToastStore.getState().toasts.map((t) => `[${t.kind}] ${t.message}`);
+beforeEach(() => { resetStore(); useToastStore.setState({ toasts: [] } as never); });
+
+const tinos = fontBuf('Tinos-Regular.ttf');
+const render = (content: string, sizeMm: number) =>
+  textToPolylines({ fontBuffer: tinos, content, sizeMm, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000' });
+const renderer: VariableTextRenderer = async ({ text, content }) =>
+  applyTextWeld(await render(content, text.sizeMm), 'tinos-regular', text.weldOverlaps);
+
+const lineLayer = (): Layer => ({ ...createLayer({ id: 'L', color: '#000000', name: 'L', mode: 'line' }), speed: 1000, power: 50, passes: 1 } as Layer);
+function proj(objects: SceneObject[]): Project {
+  const base = createProject();
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 7 }, scene: { ...base.scene, objects, layers: [lineLayer()], groups: [] } };
+}
+async function gcodeAt(p: Project, serial: number) {
+  const prepared = await prepareOutputSnapshot({ ...p, variables: { ...p.variables, serialValue: serial } }, { clock: () => new Date(0), renderVariableText: renderer });
+  if (!prepared.ok) return { g: '', segs: [] as ReturnType<typeof decode>, why: JSON.stringify(prepared.preflight).slice(0, 300) };
+  const g = emitPreparedGcode(prepared).gcode;
+  return { g, segs: decode(g, p.device), why: '' };
+}
+const ink = (s: string, size: number) => {
+  const f = opentype.parse(tinos);
+  const bb = f.getPath(s, 0, 0, size).getBoundingBox();
+  return bb.x2 - bb.x1;
+};
+
+it('V1 variable text "LOT-{{serial:3}}" (Tinos 8 mm, weld on) via Select All with a plain rectangle', async () => {
+  const template = 'LOT-{{serial:3}}';
+  const parsed = parseVariableTemplateSource(template);
+  if (!parsed.ok) throw new Error('parse');
+  const r = applyTextWeld(await render(template, 8), 'tinos-regular', true);
+  const text: TextObject = {
+    kind: 'text', id: 'VT', content: template, fontKey: 'tinos-regular', sizeMm: 8, alignment: 'left', lineHeight: 1.2,
+    letterSpacing: 0, weldOverlaps: true, color: '#000000', variableTemplate: parsed.template, bounds: r.bounds,
+    transform: { ...IDENTITY_TRANSFORM, x: 40, y: 60 }, paths: r.paths,
+  } as TextObject;
+  // a hand-drawn-looking noisy rectangle the user actually wants to optimize
+  const pts = [] as { x: number; y: number }[];
+  for (let i = 0; i < 40; i++) pts.push({ x: i, y: 0.03 * Math.sin(i * 1.7) });
+  for (let i = 0; i < 20; i++) pts.push({ x: 40, y: i });
+  for (let i = 40; i > 0; i--) pts.push({ x: i, y: 20 + 0.03 * Math.cos(i * 1.3) });
+  for (let i = 20; i > 0; i--) pts.push({ x: 0, y: i });
+  const rect = { kind: 'imported-svg', id: 'R', source: 'r.svg', bounds: { minX: 0, minY: 0, maxX: 40, maxY: 20 }, transform: { ...IDENTITY_TRANSFORM, x: 30, y: 100 }, paths: [{ color: '#000000', polylines: [{ closed: true, points: pts }] }] } as ImportedSvg;
+  const p0 = proj([text, rect]);
+  useStore.setState({ project: p0, selectedObjectId: null, additionalSelectedIds: new Set(), undoStack: [], redoStack: [] } as never);
+  st().selectAllObjects();
+  const ids = selectedObjectIds(st());
+  const sel = optimizeShapesSelection(st().project.scene, ids);
+  const cmd = optimizeShapesCommand({ hasSelection: ids.length > 0, optimizeShapes: () => {} } as never);
+  out(`V1 Select All ids=${JSON.stringify(ids)}; optimize targets=${sel.targets.map((t) => t.id).join(',')}; command enabled=${cmd.enabled ?? JSON.stringify(cmd).slice(0, 120)}`);
+
+  const b7 = await gcodeAt(p0, 7), b8 = await gcodeAt(p0, 8);
+  const changed = st().optimizeSelectedShapes(DEFAULT_SHAPE_OPTIMIZE_OPTIONS, null);
+  const p1 = st().project;
+  const vt = p1.scene.objects.find((o) => o.id === 'VT')!;
+  const a7 = await gcodeAt(p1, 7), a8 = await gcodeAt(p1, 8);
+  const textOnly = (segs: ReturnType<typeof decode>) => segs.filter((m) => m.a.y < 90 && m.b.y < 90);
+  for (const [n, b] of [['before s7', b7], ['before s8', b8], ['after s7', a7], ['after s8', a8]] as const) {
+    const t = textOnly(b.segs);
+    const e = xExtent(t);
+    out(`  ${n}: ok=${b.why === ''} text lit ${f3(segLen(t))} mm, x ${f3(e.lo)}..${f3(e.hi)} (w ${f3(e.w)}) ${b.why}`);
+  }
+  out(`  after: changed=${changed} kind=${vt.kind} variableTemplate=${'variableTemplate' in vt ? 'kept' : 'gone'} s7 gcode === s8 gcode: ${a7.g === a8.g}; before identical: ${b7.g === b8.g}`);
+  out(`  toasts: ${JSON.stringify(toasts())}`);
+  out(`  oracle (opentype.js ink width, 8 units): "LOT-007" ${f3(ink('LOT-007', 8))}, "LOT-008" ${f3(ink('LOT-008', 8))}, template ${f3(ink(template, 8))}; ratio template/value ${f3(ink(template, 8) / ink('LOT-007', 8))}`);
+});
+
+it('V2 variable Code 128 without and with caption', async () => {
+  for (const showText of [false, true]) {
+    resetStore(); useToastStore.setState({ toasts: [] } as never);
+    const pb = parseVariableTemplateSource('A{{serial:4}}');
+    if (!pb.ok) throw new Error('parse');
+    const spec = { ...defaultBarcodeSpec('code128'), moduleMm: 0.25, showText, data: 'A{{serial:4}}', variableTemplate: pb.template };
+    const created = await createBarcodeObject({
+      id: 'B', color: '#000000', spec, value: 'A0007',
+      renderCaption: async ({ text, sizeMm }) => { const r = await textToPolylines({ fontBuffer: tinos, content: text, sizeMm, alignment: 'center', lineHeight: 1.2, color: '#000000' }); return { polylines: r.paths.flatMap((p) => p.polylines), bounds: r.bounds }; },
+      transform: { ...IDENTITY_TRANSFORM, x: 50, y: 50 },
+    });
+    if (!created.ok) throw new Error(created.message);
+    const p0 = proj([created.object]);
+    useStore.setState({ project: p0, selectedObjectId: null, additionalSelectedIds: new Set() } as never);
+    st().selectAllObjects();
+    const b7 = await gcodeAt(p0, 7), b8 = await gcodeAt(p0, 8);
+    const changed = st().optimizeSelectedShapes(DEFAULT_SHAPE_OPTIMIZE_OPTIONS, null);
+    const p1 = st().project;
+    const a7 = await gcodeAt(p1, 7), a8 = await gcodeAt(p1, 8);
+    out(`V2 showText=${showText}: changed=${changed} kind=${p1.scene.objects[0]!.kind}; before s7/s8 lit ${f3(segLen(b7.segs))}/${f3(segLen(b8.segs))} identical=${b7.g === b8.g}; after ${f3(segLen(a7.segs))}/${f3(segLen(a8.segs))} identical=${a7.g === a8.g}; toasts ${JSON.stringify(toasts())}`);
+  }
+});

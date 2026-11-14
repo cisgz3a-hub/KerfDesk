@@ -75,7 +75,7 @@ Run order puts tools that make or change burns first, then new tools, then the r
 | T34 | Vector | Rubber-Band Outline | `tools.rubber-band-outline` | ledgered: P1 1 + P2 2 (fix session proposed), P3 3 |
 | T35 | Vector | Close Path | `tools.close-paths` | ledgered: P2 3 (fix session proposed), P3 6 |
 | T36 | Vector | Reverse Direction | `tools.reverse-paths` | ledgered: clean (no P1/P2), P3 4 |
-| T37 | Vector | Optimize Shapes | `tools.optimize-shapes` | |
+| T37 | Vector | Optimize Shapes | `tools.optimize-shapes` | ledgered: P1 1 + P2 2 (fix session proposed), P3 2 |
 | T38 | Vector | Warp | `tools.warp` | |
 | T39 | Vector | Deform | `tools.deform` | |
 | T40 | Vector | Subtract | `tools.subtract` | |

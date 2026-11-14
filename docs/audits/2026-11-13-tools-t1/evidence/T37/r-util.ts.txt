@@ -1,0 +1,136 @@
+// T37 refuter helpers: own G-code decoder (machine coords -> scene via device map),
+// own scan-row fill oracle, own shoelace areas. Independent of the auditor's decode.ts.
+import { readFileSync } from 'node:fs';
+import { toSceneCoords, type DeviceProfile } from '../t36-main/src/core/devices';
+
+export type P = { x: number; y: number };
+export type Seg = { a: P; b: P; s: number };
+
+export function fontBuf(name: string): ArrayBuffer {
+  const b = readFileSync(`C:/Users/stolk/kd-t1/t36-main/src/ui/text/fonts/${name}`);
+  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+}
+
+/** Lit feed moves (G1 with the beam on and S>0). Handles modal G/S/F and M3/M4/M5. */
+export function decode(gcode: string, device: DeviceProfile): Seg[] {
+  const out: Seg[] = [];
+  let pos = { x: 0, y: 0 };
+  let mode = 0;
+  let s = 0;
+  let on = false;
+  for (const raw of gcode.split(/\r?\n/)) {
+    const line = raw.split(';')[0]!.replace(/\([^)]*\)/g, '').trim().toUpperCase();
+    if (line === '') continue;
+    const tokens = line.match(/[A-Z][-+]?[0-9]*\.?[0-9]+/g) ?? [];
+    let nx = pos.x;
+    let ny = pos.y;
+    let moved = false;
+    for (const t of tokens) {
+      const k = t[0]!;
+      const v = Number(t.slice(1));
+      if (k === 'G' && [0, 1, 2, 3].includes(v)) mode = v;
+      else if (k === 'M' && (v === 3 || v === 4)) on = true;
+      else if (k === 'M' && v === 5) on = false;
+      else if (k === 'S') s = v;
+      else if (k === 'X') { nx = v; moved = true; }
+      else if (k === 'Y') { ny = v; moved = true; }
+    }
+    if (moved) {
+      if (mode === 2 || mode === 3) throw new Error('arc move in output: ' + line);
+      if (mode === 1 && on && s > 0) {
+        out.push({ a: toSceneCoords(pos, device), b: toSceneCoords({ x: nx, y: ny }, device), s });
+      }
+      pos = { x: nx, y: ny };
+    }
+  }
+  return out;
+}
+
+export const segLen = (g: ReadonlyArray<Seg>) => g.reduce((t, m) => t + Math.hypot(m.b.x - m.a.x, m.b.y - m.a.y), 0);
+export function xExtent(g: ReadonlyArray<Seg>) {
+  let lo = Infinity, hi = -Infinity;
+  for (const m of g) for (const p of [m.a, m.b]) { lo = Math.min(lo, p.x); hi = Math.max(hi, p.x); }
+  return { lo, hi, w: hi - lo };
+}
+
+export function shoelace(pts: ReadonlyArray<P>): number {
+  let a = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i]!, q = pts[(i + 1) % pts.length]!;
+    a += p.x * q.y - q.x * p.y;
+  }
+  return a / 2;
+}
+
+type Iv = [number, number];
+/** Inside intervals on the horizontal line y, nonzero or even-odd winding. */
+export function rowIntervals(contours: ReadonlyArray<ReadonlyArray<P>>, y: number, rule: 'nonzero' | 'evenodd'): Iv[] {
+  const xs: { x: number; d: number }[] = [];
+  for (const c of contours) {
+    for (let i = 0; i < c.length; i++) {
+      const a = c[i]!, b = c[(i + 1) % c.length]!;
+      if (a.y <= y && b.y > y) xs.push({ x: a.x + ((y - a.y) / (b.y - a.y)) * (b.x - a.x), d: 1 });
+      else if (b.y <= y && a.y > y) xs.push({ x: a.x + ((y - a.y) / (b.y - a.y)) * (b.x - a.x), d: -1 });
+    }
+  }
+  xs.sort((p, q) => p.x - q.x);
+  const res: Iv[] = [];
+  let w = 0, n = 0;
+  for (let i = 0; i < xs.length - 1; i++) {
+    w += xs[i]!.d; n += 1;
+    const inside = rule === 'nonzero' ? w !== 0 : n % 2 === 1;
+    if (inside && xs[i + 1]!.x > xs[i]!.x) res.push([xs[i]!.x, xs[i + 1]!.x]);
+  }
+  return merge(res);
+}
+
+function merge(iv: Iv[]): Iv[] {
+  const s = [...iv].sort((a, b) => a[0] - b[0]);
+  const out: Iv[] = [];
+  for (const v of s) {
+    const last = out.at(-1);
+    if (last && v[0] <= last[1] + 1e-9) last[1] = Math.max(last[1], v[1]);
+    else out.push([v[0], v[1]]);
+  }
+  return out;
+}
+const total = (iv: Iv[]) => iv.reduce((t, v) => t + v[1] - v[0], 0);
+function minus(a: Iv[], b: Iv[]): number {
+  // length of a not covered by b
+  let lost = 0;
+  for (const [s, e] of a) {
+    let covered = 0;
+    for (const [bs, be] of b) covered += Math.max(0, Math.min(e, be) - Math.max(s, bs));
+    lost += e - s - covered;
+  }
+  return lost;
+}
+
+/**
+ * Per-row oracle: for every hatch row (y of a horizontal lit move, rounded),
+ * the expected inside intervals of the source contours under `rule`, against
+ * the burned intervals of that row. Area = length x spacing.
+ */
+export function fillAudit(burn: ReadonlyArray<Seg>, contours: ReadonlyArray<ReadonlyArray<P>>, rows: ReadonlyArray<number>, spacing: number) {
+  const byRow = new Map<string, Iv[]>();
+  for (const m of burn) {
+    if (Math.abs(m.a.y - m.b.y) > 1e-6) continue;
+    const k = m.a.y.toFixed(4);
+    const list = byRow.get(k) ?? [];
+    list.push([Math.min(m.a.x, m.b.x), Math.max(m.a.x, m.b.x)]);
+    byRow.set(k, list);
+  }
+  let burned = 0, expNZ = 0, expEO = 0, missedNZ = 0, extraNZ = 0;
+  for (const y of rows) {
+    const b = merge(byRow.get(y.toFixed(4)) ?? []);
+    const nz = rowIntervals(contours, y, 'nonzero');
+    const eo = rowIntervals(contours, y, 'evenodd');
+    burned += total(b); expNZ += total(nz); expEO += total(eo);
+    missedNZ += minus(nz, b); extraNZ += minus(b, nz);
+  }
+  return { burned: burned * spacing, expNZ: expNZ * spacing, expEO: expEO * spacing, missedNZ: missedNZ * spacing, extraNZ: extraNZ * spacing };
+}
+
+export function rowsOf(burn: ReadonlyArray<Seg>): number[] {
+  return [...new Set(burn.filter((m) => Math.abs(m.a.y - m.b.y) < 1e-6).map((m) => m.a.y.toFixed(4)))].map(Number);
+}

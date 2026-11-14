@@ -1,0 +1,76 @@
+// @vitest-environment jsdom
+// T37 refuter r2: text fill rule after Optimize, weld off AND weld on (ADR-321 default), own per-row oracle.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  createLayer, createProject, DEFAULT_PROJECT_OPTIMIZATION, IDENTITY_TRANSFORM,
+  type Layer, type Project, type SceneObject, type TextObject,
+} from '../t36-main/src/core/scene';
+import { applyTransform } from '../t36-main/src/core/scene/transform';
+import { textToPolylines } from '../t36-main/src/core/text';
+import { prepareOutput } from '../t36-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t36-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t36-main/src/ui/state/store';
+import { resetStore } from '../t36-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t36-main/src/ui/state/toast-store';
+import { DEFAULT_SHAPE_OPTIMIZE_OPTIONS } from '../t36-main/src/core/geometry/shape-optimize/shape-optimize-options';
+import { applyTextWeld } from '../t36-main/src/ui/text/apply-text-weld';
+import { resolveObjectDisplay } from '../t36-main/src/ui/workspace/object-display';
+import { decode, fillAudit, fontBuf, rowsOf } from './r-util';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t37r/r2.log';
+const lines: string[] = [];
+const out = (s: string) => { lines.push(s); writeFileSync(LOG, lines.join('\n')); };
+const f3 = (n: number) => n.toFixed(3);
+const st = () => useStore.getState();
+beforeEach(() => { resetStore(); useToastStore.setState({ toasts: [] } as never); });
+const SP = 0.05;
+const fillLayer = (): Layer => ({ ...createLayer({ id: 'L', color: '#000000', name: 'L', mode: 'fill' }), speed: 3000, power: 40, passes: 1, hatchSpacingMm: SP, hatchAngleDeg: 0 } as Layer);
+function proj(objects: SceneObject[]): Project {
+  const base = createProject();
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers: [fillLayer()], groups: [] } };
+}
+function burn(p: Project) {
+  const prepared = prepareOutput(p);
+  if (!prepared.ok) throw new Error(JSON.stringify(prepared.preflight).slice(0, 300));
+  return decode(emitPreparedGcode(prepared).gcode, p.device);
+}
+
+const cases: [string, string, string, number, number][] = [
+  ['Roboto-Regular.ttf', 'roboto-regular', 'OO', -0.35, 10],
+  ['Roboto-Regular.ttf', 'roboto-regular', 'AVATAR', -0.12, 10],
+  ['Pacifico-Regular.ttf', 'pacifico-regular', 'Wedding', 0, 15],
+  ['GreatVibes-Regular.ttf', 'great-vibes-regular', 'Emily', 0, 20],
+];
+
+it('W fill rule, weld off/on', async () => {
+  for (const [file, key, content, ls, size] of cases) {
+    for (const weld of [false, true]) {
+      resetStore(); useToastStore.setState({ toasts: [] } as never);
+      let r = await textToPolylines({ fontBuffer: fontBuf(file), content, sizeMm: size, alignment: 'left', lineHeight: 1.2, letterSpacing: ls, color: '#000000' });
+      try { r = applyTextWeld(r, key, weld); } catch (e) { out(`  weld failed ${String(e)}`); continue; }
+      const transform = { ...IDENTITY_TRANSFORM, x: 30, y: 40, rotationDeg: 0 };
+      const text = { kind: 'text', id: 'T', content, fontKey: key, sizeMm: size, alignment: 'left', lineHeight: 1.2, letterSpacing: ls, weldOverlaps: weld, color: '#000000', bounds: r.bounds, transform, paths: r.paths } as TextObject;
+      const contours = r.paths.flatMap((p) => p.polylines).filter((l) => l.closed).map((l) => l.points.map((q) => applyTransform(q, transform)));
+      const p0 = proj([text]);
+      useStore.setState({ project: p0, selectedObjectId: 'T', additionalSelectedIds: new Set() } as never);
+      const before = burn(p0);
+      st().optimizeSelectedShapes(DEFAULT_SHAPE_OPTIMIZE_OPTIONS, null);
+      const p1 = st().project;
+      const o1 = p1.scene.objects[0]!;
+      const after = burn(p1);
+      // Oracle: SOURCE glyph contours under non-zero (ADR-286: text fills non-zero)
+      const rows = [...new Set([...rowsOf(before), ...rowsOf(after)])];
+      const A = fillAudit(before, contours, rows, SP);
+      const B = fillAudit(after, contours, rows, SP);
+      let disp = '?';
+      try {
+        const layer = p1.scene.layers[0]!;
+        const d0 = resolveObjectDisplay(text as never, new Map([['#000000', layer]]), { zoom: 1, panX: 0, panY: 0, scale: 1, offsetX: 0, offsetY: 0 } as never, undefined, 'design');
+        const d1 = resolveObjectDisplay(o1 as never, new Map([['#000000', layer]]), { zoom: 1, panX: 0, panY: 0, scale: 1, offsetX: 0, offsetY: 0 } as never, undefined, 'design');
+        disp = `${d0.paths.map((p) => `${p.paint.kind}/${p.fillRule}`).join(',')} -> ${d1.paths.map((p) => `${p.paint.kind}/${p.fillRule}`).join(',')}`;
+      } catch (e) { disp = `display threw ${String(e).slice(0, 80)}`; }
+      out(`W ${content} (${file}, ls ${ls}, ${size} mm) weld=${weld}: oracle nonzero ${f3(A.expNZ)} evenodd ${f3(A.expEO)} mm2 | before burned ${f3(A.burned)} missed ${f3(A.missedNZ)} extra ${f3(A.extraNZ)} | after burned ${f3(B.burned)} missed ${f3(B.missedNZ)} extra ${f3(B.extraNZ)} | kind ${o1.kind} fillRule ${'paths' in o1 ? o1.paths.map((p) => p.fillRule ?? '-').join('/') : ''} | canvas paint ${disp}`);
+    }
+  }
+});
