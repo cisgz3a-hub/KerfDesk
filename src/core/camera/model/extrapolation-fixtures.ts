@@ -15,6 +15,25 @@ import { renderTargetScene } from '../target/target-render-fixtures';
 
 const SHEET_MM = 3;
 
+/** A 1280 × 960 webcam with a Brown lens, 400 mm up over the back edge of the bed and aimed at its centre (camera audit v2 K1). */
+export function centredWebcam(over: Partial<BrownCamera> = {}): BrownCamera {
+  return {
+    fx: 760,
+    fy: 760,
+    cx: 643,
+    cy: 478,
+    k1: -0.28,
+    k2: 0.08,
+    k3: -0.01,
+    p1: 0.0008,
+    p2: -0.0006,
+    width: 1280,
+    height: 960,
+    pose: lookAt([200, 0, -400], [200, 200, 0]),
+    ...over,
+  };
+}
+
 /** A 1280 × 720 webcam with a Brown lens, 400 mm up and 90 mm behind the bed. */
 export function brownWebcam(
   over: Partial<BrownCamera> & { readonly centreX?: number } = {},
@@ -41,6 +60,12 @@ export type TruthCalibration = {
   readonly record: CameraModelRecord;
   /** The true overlay error, worst over the bed the camera sees outside the target, mm. */
   readonly trueOffTargetMm: number;
+  /** The true overlay error at each 10 mm grid point the camera sees outside the target. */
+  readonly trueOffTarget: ReadonlyArray<{
+    readonly x: number;
+    readonly y: number;
+    readonly mm: number;
+  }>;
 };
 
 /** Calibrate `truth` on a `sheet` centred on a `bed`, as the wizard would. */
@@ -88,6 +113,7 @@ export function calibrateTruthCamera(
     },
   };
   let worst = 0;
+  const trueOffTarget: Array<{ x: number; y: number; mm: number }> = [];
   for (let y = 0; y <= bed.height; y += 10) {
     for (let x = 0; x <= bed.width; x += 10) {
       const inside =
@@ -99,8 +125,10 @@ export function calibrateTruthCamera(
         { x, y },
         SHEET_MM,
       );
-      if (error !== null) worst = Math.max(worst, error);
+      if (error === null) continue;
+      worst = Math.max(worst, error);
+      trueOffTarget.push({ x, y, mm: error });
     }
   }
-  return { record, trueOffTargetMm: worst };
+  return { record, trueOffTargetMm: worst, trueOffTarget };
 }
