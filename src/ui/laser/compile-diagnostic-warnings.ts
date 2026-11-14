@@ -67,25 +67,25 @@ function mergeClosedUpCounts(
           earlier.layerName === diagnostic.layerName),
     );
     const earlier = merged[index];
-    if (earlier?.kind === 'kerf-offset-closed-up' && diagnostic.kind === 'kerf-offset-closed-up') {
-      merged[index] = { ...earlier, count: earlier.count + diagnostic.count };
-    } else if (
-      earlier?.kind === 'kerf-offset-no-area' &&
-      diagnostic.kind === 'kerf-offset-no-area'
-    ) {
-      merged[index] = { ...earlier, count: earlier.count + diagnostic.count };
-    } else if (
-      earlier?.kind === 'kerf-offset-dropped-line' &&
-      diagnostic.kind === 'kerf-offset-dropped-line'
-    ) {
-      merged[index] = { ...earlier, parts: [...earlier.parts, ...diagnostic.parts] };
-    } else if (earlier?.kind === 'kerf-side-assumed' && diagnostic.kind === 'kerf-side-assumed') {
-      merged[index] = { ...earlier, count: earlier.count + diagnostic.count };
-    } else {
-      merged.push(diagnostic);
-    }
+    if (earlier === undefined) merged.push(diagnostic);
+    else merged[index] = mergedPair(earlier, diagnostic);
   }
   return merged;
+}
+
+// Two diagnostics the search above matched: the same kind on the same layer.
+function mergedPair(earlier: CompileDiagnostic, diagnostic: CompileDiagnostic): CompileDiagnostic {
+  if (
+    earlier.kind === 'kerf-offset-dropped-line' &&
+    diagnostic.kind === 'kerf-offset-dropped-line'
+  ) {
+    return { ...earlier, parts: [...earlier.parts, ...diagnostic.parts] };
+  }
+  // Closed-up, no-area and assumed-side counts add up.
+  if (diagnostic.kind === earlier.kind && 'count' in earlier && 'count' in diagnostic) {
+    return { ...earlier, count: earlier.count + diagnostic.count };
+  }
+  return earlier;
 }
 
 function sameClosedUpLayer(a: CompileDiagnostic, b: CompileDiagnostic): boolean {
