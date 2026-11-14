@@ -19,6 +19,8 @@ export type WriteTally = {
   readonly pastPage: string[];
   /** Written multi-page TIFFs, of which only page 1 was traced. */
   readonly firstPageOnly: string[];
+  /** Written files traced on the preview grid, each with why ("a.png (reason)"). */
+  readonly previewResolution: string[];
 };
 
 export function emptyWriteTally(): WriteTally {
@@ -29,6 +31,7 @@ export function emptyWriteTally(): WriteTally {
     format: null,
     pastPage: [],
     firstPageOnly: [],
+    previewResolution: [],
   };
 }
 
@@ -58,9 +61,12 @@ export function reportTraceBatch(
       density,
       skippedText,
       pageNotice(tally),
+      previewResolutionNotice(tally.previewResolution),
       ...[...tally.notices].map(traceNoticeMessage),
     ]),
-    skippedText === '' && tally.pastPage.length === 0 ? 'success' : 'warning',
+    skippedText === '' && tally.pastPage.length === 0 && tally.previewResolution.length === 0
+      ? 'success'
+      : 'warning',
   );
 }
 
@@ -110,6 +116,15 @@ function pageNotice(tally: WriteTally): string {
       ? ''
       : `Only page 1 was traced of ${tally.firstPageOnly.join(', ')}.`;
   return joinToastParts([past, pages]);
+}
+
+// The dialog's "this device could not trace at full resolution" is about the
+// one image on screen. A batch names each file that fell back and the error
+// its finer grid hit, so the coarser file can be found and the cause is true.
+function previewResolutionNotice(files: ReadonlyArray<string>): string {
+  if (files.length === 0) return '';
+  const one = files.length === 1;
+  return `Could not trace ${files.join('; ')} at full resolution, so ${one ? 'its trace uses' : 'their traces use'} the preview resolution.`;
 }
 
 function onlyFailures(skipped: ReadonlyArray<BatchTraceSkip>): boolean {

@@ -1,30 +1,14 @@
-// Main-thread client that drives src/ui/trace/trace-worker.ts. Wraps
-// the postMessage / onmessage protocol behind a Promise-returning API
-// so callers see the same shape as the inline traceImageToColoredPaths
-// function. Supported inline fallback uses cooperative tracing checkpoints.
+// Main-thread client that drives src/ui/trace/trace-worker.ts through
+// trace-worker-transport.ts. Callers see the same Promise shape as the inline
+// traceImageToColoredPaths function. Small images retain the supported
+// cooperative inline fallback; large images retain their recoverable
+// worker-unavailable error.
 //
-// Worker construction uses the standards-compliant
-// `new Worker(new URL('./trace-worker.ts', import.meta.url),
-// { type: 'module' })` pattern. Vite detects and code-splits the
-// worker file as its own ES-module chunk. Outside a bundler (vitest,
-// SSR, environments without Worker support) the construction throws.
-// Small images retain the existing inline fallback; large images retain their
-// recoverable worker-unavailable error.
-//
-// Reuse a healthy worker after its request completes. Superseding unfinished
-// work retires that worker: synchronous tracing cannot process a cancellation
-// message, and keeping it alive queues the newest request behind obsolete CPU
-// work (TR-020). Supersession rejects only the obsolete promise, without inline
-// fallback or relaxed retry. The replacement pays worker startup, not backlog.
-//
-// Each message, fatal callback and watchdog belongs to its specific worker.
-// Retired callbacks cannot act on a replacement. The 30s watchdog bounds
-// SILENCE: it is armed at post time, restarted on the 'started' ack, and
-// restarted again on every heartbeat the worker sends from inside the trace.
-// A worker that is merely slow keeps its budget; one that has stopped speaking
-// does not.
+// The exported traceImage / traceImageWithFallback use the default client
+// (the Trace Image dialog). createTraceWorkerClient makes another with its
+// own worker, whose requests never supersede, and are never superseded by,
+// the default client's (Multi-File Trace, ADR-431 Amendment 2026-11-14).
 
-import type { Bounds, ColoredPath } from '../../core/scene';
 import {
   type RawImageData,
   type TraceOptions,
@@ -33,235 +17,33 @@ import {
 } from '../../core/trace';
 import { resolveFrozenTraceSourceOptions } from '../../core/trace/trace-source-decisions';
 import { hasAggressivePreprocessing, relaxAggressivePreprocessing } from './trace-options';
-import type { TraceWorkerRequest, TraceWorkerResponse } from './trace-worker';
 import { createCooperativeTraceRunner } from './cooperative-trace-runner';
 import { collectTraceReports } from './trace-report-collector';
-import type { TraceReport } from '../../core/trace/trace-steps';
-import type { TraceNotice } from './trace-notices';
 import type { TraceProgress } from '../../core/trace/trace-progress';
-import { LAZY_LOAD_FAILURE_ADVICE } from '../common/lazy-load-failure';
-import { unpackTracePathsSteps } from './trace-result-transfer';
+import {
+  type ClientState,
+  type TraceRequestFlags,
+  type TraceResult,
+  TraceRequestSupersededError,
+  TraceWorkerRuntimeError,
+  createClientState,
+  ensureWorker,
+  isTraceRequestSuperseded,
+  retireWorker,
+  supersedeClient,
+  traceInWorker,
+} from './trace-worker-transport';
 
-export type TraceResult = {
-  readonly paths: ColoredPath[];
-  readonly bounds: Bounds;
-  // Pixel grid whose coordinate space `paths` and `bounds` use. This is
-  // intentionally carried with the result: preview tracing may run on a
-  // downsampled working image, so callers cannot safely infer it from the
-  // original imported raster.
-  readonly width: number;
-  readonly height: number;
-  readonly notices?: ReadonlyArray<TraceNotice>;
-  // Submit's fallback decoder can recover source metadata before any crop.
-  readonly sourceHasTransparency?: boolean;
-  // The options the first pass traced with, the whole source's binarisation
-  // decisions resolved into them. Present exactly when the request asked for
-  // freezeSourceDecisions (ADR-435).
-  readonly sourceOptions?: TraceOptions;
-  // What automatic detection chose on this grid, for display only (the
-  // automatic threshold, Line Art's route). A relaxed retry carries its own.
-  readonly report?: TraceReport;
-};
+export {
+  TraceRequestSupersededError,
+  isTraceRequestSuperseded,
+  traceWorkerFailureMessage,
+} from './trace-worker-transport';
+export type { TraceRequestFlags, TraceResult } from './trace-worker-transport';
 
-/** Per-request switches that are not trace settings. */
-export type TraceRequestFlags = {
-  // Run resolveFrozenTraceSourceOptions next to the trace (in the worker when
-  // there is one), trace with its result and return that as sourceOptions.
-  readonly freezeSourceDecisions?: boolean;
-};
-
-export class TraceRequestSupersededError extends Error {
-  override readonly name = 'TraceRequestSupersededError';
-
-  constructor() {
-    super('Trace request superseded by a newer request');
-  }
-}
-
-export function isTraceRequestSuperseded(error: unknown): boolean {
-  return error instanceof TraceRequestSupersededError;
-}
-
-type Pending = {
-  readonly worker: Worker;
-  readonly resolve: (result: TraceResult) => void;
-  readonly reject: (err: Error) => void;
-  // Restart this request's hung-worker budget. Called on the worker's
-  // 'started' ack — the moment the request stops queueing and starts
-  // computing — and on every heartbeat from inside that computation.
-  readonly restartWatchdog: () => void;
-  readonly progress: TraceProgress | undefined;
-};
-
-// Clears / restarts the single timer that bounds one in-flight request.
-type Watchdog = {
-  readonly clear: () => void;
-  readonly restart: () => void;
-};
-
-let workerInstance: Worker | null = null;
-let nextRequestId = 0;
-let latestTraceEpoch = 0;
-const pendingByRequestId = new Map<number, Pending>();
-// Requests whose result has arrived and is being unpacked in slices. Their
-// worker is idle again, so superseding one rejects it without retiring it.
-const unpackingByRequestId = new Map<number, Pending>();
+// The Trace Image dialog's client: its preview, commit and region traces.
+const defaultClient = createClientState();
 const MAX_INLINE_TRACE_PIXELS = 160_000;
-// How long a request may go without a word from its worker before that worker
-// is treated as dead. It bounds SILENCE, not work: the worker heartbeats from
-// inside the trace every 250 ms, so a dense line drawing that legitimately
-// traces for minutes keeps its budget, while a worker that has crashed,
-// wedged, or never started still fails here. It used to bound total execution,
-// which made it a size refusal in disguise — a 600px coloring-page rosette
-// grid traces in about 19 s, so a page-sized one was abandoned mid-work and
-// reported to the operator as "Trace worker timed out" (rule 7 / ADR-241).
-const TRACE_WORKER_SILENCE_MS = 30_000;
-
-class TraceWorkerRuntimeError extends Error {}
-
-// A worker whose script never loaded gets a plain `error` Event with no
-// message (measured in Chromium on a 404 module worker). Typically the window
-// still runs the previous build after an Update in another window, so the
-// hashed worker chunk is gone. An uncaught exception inside a loaded worker
-// arrives as an ErrorEvent carrying "Uncaught ...".
-export function traceWorkerFailureMessage(event: unknown): string {
-  const detail = (event as { readonly message?: unknown } | undefined)?.message;
-  if (typeof detail === 'string' && detail.length > 0) {
-    return `The tracing engine stopped unexpectedly (${detail}). Try the trace again.`;
-  }
-  return `The tracing engine could not load. ${LAZY_LOAD_FAILURE_ADVICE}`;
-}
-
-// Lazy-construct the worker. Returns null if the runtime doesn't have
-// a Worker constructor (vitest without jsdom workers, SSR) or if a
-// construction failed. Small-image callers try one fresh worker after a
-// construction failure or runtime death, then use cooperative fallback.
-// Failure never poisons later requests: each can construct a fresh worker.
-//
-// Uses the standards-compliant `new Worker(new URL('./trace-worker.ts',
-// import.meta.url), { type: 'module' })` pattern. Vite recognises this
-// and bundles the worker as a separate ES-module chunk automatically
-// — no Vite-specific `?worker` suffix required. Falls through to the
-// catch arm in non-bundler runtimes that can't resolve the worker URL.
-function ensureWorker(): Worker | null {
-  if (workerInstance !== null) return workerInstance;
-  if (typeof Worker === 'undefined') {
-    return null;
-  }
-  try {
-    const worker = new Worker(new URL('./trace-worker.ts', import.meta.url), {
-      type: 'module',
-    });
-    workerInstance = worker;
-    worker.onmessage = (event): void => handleWorkerMessage(worker, event);
-    worker.onerror = (event): void => {
-      // Worker crashed (e.g. module-resolution failure, syntax error
-      // in worker bundle). Same shape as a kind:'error' response —
-      // reject every in-flight promise so callers can fall back.
-      rejectAllPendingAndRetireWorker(
-        worker,
-        new TraceWorkerRuntimeError(traceWorkerFailureMessage(event)),
-      );
-    };
-    return worker;
-  } catch {
-    return null;
-  }
-}
-
-function handleWorkerMessage(worker: Worker, e: MessageEvent<TraceWorkerResponse>): void {
-  if (workerInstance !== worker) return;
-  const pending = pendingByRequestId.get(e.data.id);
-  if (pending === undefined || pending.worker !== worker) return;
-  if (e.data.kind === 'started' || e.data.kind === 'progress') {
-    // 'started': startup completed and this owner is about to trace this
-    // request. 'progress': it is still inside that trace. Either way the
-    // worker has just proved it is alive, which is the only thing the budget
-    // below is entitled to judge.
-    pending.restartWatchdog();
-    if (e.data.kind === 'progress' && e.data.phase !== undefined) pending.progress?.(e.data.phase);
-    return;
-  }
-  pendingByRequestId.delete(e.data.id);
-  if (e.data.kind === 'ok') {
-    settleTraceResult(e.data.id, pending, e.data);
-    return;
-  }
-  // A kind:'error' response is scoped to this request. The worker
-  // itself is still alive: retiring it here would make one bad trace
-  // poison every later large-image trace for the whole app session.
-  pending.reject(new Error(e.data.message));
-}
-
-type TraceWorkerResult = Extract<TraceWorkerResponse, { readonly kind: 'ok' }>;
-
-// A packed result is rebuilt in short slices, so a dense trace never holds the
-// UI thread for the whole result at once (trace-result-transfer.ts).
-function settleTraceResult(id: number, pending: Pending, data: TraceWorkerResult): void {
-  const resolve = (paths: ColoredPath[]): void =>
-    pending.resolve({
-      paths,
-      bounds: data.bounds,
-      width: data.width,
-      height: data.height,
-      ...(data.sourceOptions === undefined ? {} : { sourceOptions: data.sourceOptions }),
-      ...(data.report === undefined ? {} : { report: data.report }),
-    });
-  if (data.packedPaths === undefined) {
-    resolve(data.paths ?? []);
-    return;
-  }
-  unpackingByRequestId.set(id, pending);
-  const current = (): boolean => unpackingByRequestId.get(id) === pending;
-  const unpack = createCooperativeTraceRunner(() => {
-    if (!current()) throw new TraceRequestSupersededError();
-  });
-  void Promise.resolve(unpack(unpackTracePathsSteps(data.packedPaths))).then(
-    (paths) => {
-      if (!current()) return;
-      unpackingByRequestId.delete(id);
-      resolve(paths);
-    },
-    (error: unknown) => {
-      if (!current()) return;
-      unpackingByRequestId.delete(id);
-      pending.reject(error instanceof Error ? error : new Error(String(error)));
-    },
-  );
-}
-
-function rejectUnpacking(error: Error): void {
-  const pendings = Array.from(unpackingByRequestId.values());
-  unpackingByRequestId.clear();
-  for (const pending of pendings) pending.reject(error);
-}
-
-// Tear down the live worker after a fatal runtime error. All callers
-// that race the failure get their pending promises rejected. The next
-// traceImage call will try to construct a fresh worker.
-function retireWorker(worker: Worker): void {
-  workerInstance = null;
-  worker.onmessage = null;
-  worker.onerror = null;
-  worker.terminate();
-}
-
-// Reject every in-flight caller without touching the worker. Each pending's
-// reject wrapper clears its own 30s timer, so a superseded request can never
-// later terminate a worker that is busy with the request that replaced it.
-function rejectAllPending(error: Error): void {
-  const pendings = Array.from(pendingByRequestId.values());
-  pendingByRequestId.clear();
-  for (const pending of pendings) {
-    pending.reject(error);
-  }
-}
-
-function rejectAllPendingAndRetireWorker(worker: Worker, error: Error): void {
-  if (workerInstance !== worker) return;
-  retireWorker(worker);
-  rejectAllPending(error);
-}
 
 // Trace via the worker if available, otherwise through the supported
 // cooperative inline fallback. Callers don't need to branch — the same Promise
@@ -271,33 +53,42 @@ function rejectAllPendingAndRetireWorker(worker: Worker, error: Error): void {
 // death mid-flight), fall back to inline tracing for THIS call when it
 // is small enough. Without it, every commit through the dialog would
 // error-toast after a bounded inline path could have succeeded.
-export async function traceImage(
+export function traceImage(
   image: RawImageData,
   options: TraceOptions,
   signal?: AbortSignal,
   progress?: TraceProgress,
   flags: TraceRequestFlags = {},
 ): Promise<TraceResult> {
+  return traceImageWithClient(defaultClient, image, options, signal, progress, flags);
+}
+
+async function traceImageWithClient(
+  state: ClientState,
+  image: RawImageData,
+  options: TraceOptions,
+  signal: AbortSignal | undefined,
+  progress: TraceProgress | undefined,
+  flags: TraceRequestFlags,
+): Promise<TraceResult> {
   if (signal?.aborted === true) throw new TraceRequestSupersededError();
-  const epoch = ++latestTraceEpoch;
+  const epoch = ++state.latestTraceEpoch;
   const cancel = (): void => {
     // A closing preview may outlive the replacement or commit that superseded
     // it. Only its own current computation can be cancelled by this signal.
-    if (epoch !== latestTraceEpoch) return;
-    latestTraceEpoch += 1;
-    rejectUnpacking(new TraceRequestSupersededError());
-    if (workerInstance !== null && pendingByRequestId.size > 0) {
-      rejectAllPendingAndRetireWorker(workerInstance, new TraceRequestSupersededError());
-    }
+    if (epoch !== state.latestTraceEpoch) return;
+    state.latestTraceEpoch += 1;
+    supersedeClient(state);
   };
   signal?.addEventListener('abort', cancel, { once: true });
   try {
     return await traceImageForEpoch(
+      state,
       image,
       options,
       epoch,
       (phase) => {
-        if (epoch === latestTraceEpoch) progress?.(phase);
+        if (epoch === state.latestTraceEpoch) progress?.(phase);
       },
       flags,
     );
@@ -307,40 +98,39 @@ export async function traceImage(
 }
 
 async function traceImageForEpoch(
+  state: ClientState,
   image: RawImageData,
   options: TraceOptions,
   epoch: number,
   progress: TraceProgress | undefined,
   flags: TraceRequestFlags,
 ): Promise<TraceResult> {
-  rejectUnpacking(new TraceRequestSupersededError());
-  if (workerInstance !== null && pendingByRequestId.size > 0) {
-    rejectAllPendingAndRetireWorker(workerInstance, new TraceRequestSupersededError());
-  }
-  let worker = ensureWorker();
+  supersedeClient(state);
+  let worker = ensureWorker(state);
   // One fresh attempt can recover a transient constructor/module failure for
   // an image already supported by fallback. Persistent failure still computes
   // cooperatively; large-image error/retry boundaries are unchanged.
   if (worker === null && canTraceInline(image) && typeof Worker !== 'undefined') {
-    worker = ensureWorker();
+    worker = ensureWorker(state);
   }
   if (worker === null) {
-    return traceInlineIfSafe(image, options, epoch, progress, flags);
+    return traceInlineIfSafe(state, image, options, epoch, progress, flags);
   }
   try {
-    return await traceInWorker(worker, image, options, progress, flags);
+    return await traceInWorker(state, worker, image, options, progress, flags);
   } catch (err) {
-    checkTraceEpoch(epoch);
+    checkTraceEpoch(state, epoch);
     if (isTraceRequestSuperseded(err)) throw err;
-    return recoverTrace(image, options, epoch, err, progress, flags);
+    return recoverTrace(state, image, options, epoch, err, progress, flags);
   }
 }
 
-function checkTraceEpoch(epoch: number): void {
-  if (epoch !== latestTraceEpoch) throw new TraceRequestSupersededError();
+function checkTraceEpoch(state: ClientState, epoch: number): void {
+  if (epoch !== state.latestTraceEpoch) throw new TraceRequestSupersededError();
 }
 
 async function recoverTrace(
+  state: ClientState,
   image: RawImageData,
   options: TraceOptions,
   epoch: number,
@@ -354,18 +144,18 @@ async function recoverTrace(
   // forever. Small images then still have the cooperative inline route.
   let failure = error;
   if (error instanceof TraceWorkerRuntimeError) {
-    const worker = ensureWorker();
+    const worker = ensureWorker(state);
     if (worker !== null) {
       try {
-        return await traceInWorker(worker, image, options, progress, flags);
+        return await traceInWorker(state, worker, image, options, progress, flags);
       } catch (retryError) {
-        checkTraceEpoch(epoch);
+        checkTraceEpoch(state, epoch);
         if (isTraceRequestSuperseded(retryError)) throw retryError;
         failure = retryError;
       }
     }
   }
-  if (canTraceInline(image)) return traceInline(image, options, epoch, progress, flags);
+  if (canTraceInline(image)) return traceInline(state, image, options, epoch, progress, flags);
   throw failure instanceof Error ? failure : new Error(String(failure));
 }
 
@@ -377,6 +167,7 @@ export function canTraceInline(image: {
 }
 
 async function traceInlineIfSafe(
+  state: ClientState,
   image: RawImageData,
   options: TraceOptions,
   epoch: number,
@@ -388,10 +179,11 @@ async function traceInlineIfSafe(
       'Trace worker is unavailable for this large image. Reload the app and try again.',
     );
   }
-  return traceInline(image, options, epoch, progress, flags);
+  return traceInline(state, image, options, epoch, progress, flags);
 }
 
 async function traceInline(
+  state: ClientState,
   image: RawImageData,
   options: TraceOptions,
   epoch: number,
@@ -407,10 +199,10 @@ async function traceInline(
   const paths = await traceImageToColoredPaths(
     image,
     traced,
-    createCooperativeTraceRunner(() => checkTraceEpoch(epoch), reports.add),
+    createCooperativeTraceRunner(() => checkTraceEpoch(state, epoch), reports.add),
     progress,
   );
-  checkTraceEpoch(epoch);
+  checkTraceEpoch(state, epoch);
   return {
     paths,
     bounds: boundsFromColoredPaths(paths),
@@ -419,73 +211,6 @@ async function traceInline(
     ...(flags.freezeSourceDecisions === true ? { sourceOptions: traced } : {}),
     ...reports.entry(),
   };
-}
-
-// Bound one request. The budget is armed at post time so a worker that never
-// speaks again is still caught, and restarted when that owner acknowledges
-// the request. Both the request and worker identity must still be current.
-function armWatchdog(worker: Worker, id: number): Watchdog {
-  const fire = (): void => {
-    if (pendingByRequestId.get(id)?.worker !== worker) return;
-    rejectAllPendingAndRetireWorker(worker, new Error('Trace worker timed out'));
-  };
-  let timer = setTimeout(fire, TRACE_WORKER_SILENCE_MS);
-  return {
-    clear: () => {
-      clearTimeout(timer);
-    },
-    restart: () => {
-      clearTimeout(timer);
-      timer = setTimeout(fire, TRACE_WORKER_SILENCE_MS);
-    },
-  };
-}
-
-function traceInWorker(
-  worker: Worker,
-  image: RawImageData,
-  options: TraceOptions,
-  progress: TraceProgress | undefined,
-  flags: TraceRequestFlags,
-): Promise<TraceResult> {
-  return new Promise<TraceResult>((resolve, reject) => {
-    nextRequestId += 1;
-    const id = nextRequestId;
-    const watchdog = armWatchdog(worker, id);
-    pendingByRequestId.set(id, {
-      worker,
-      resolve: (result) => {
-        watchdog.clear();
-        resolve(result);
-      },
-      reject: (err) => {
-        watchdog.clear();
-        reject(err);
-      },
-      restartWatchdog: watchdog.restart,
-      progress,
-    });
-    // Keep the decoded source alive for subsequent preview changes, but move a
-    // dedicated copy into the worker. Supplying its buffer as a transferable
-    // avoids the browser making a second structured-clone copy during send.
-    const transferredData = new Uint8ClampedArray(image.data);
-    const request: TraceWorkerRequest = {
-      id,
-      image: { ...image, width: image.width, height: image.height, data: transferredData },
-      options,
-      ...(flags.freezeSourceDecisions === true ? { freezeSourceDecisions: true } : {}),
-    };
-    try {
-      worker.postMessage(request, [transferredData.buffer]);
-    } catch (err) {
-      rejectAllPendingAndRetireWorker(worker, new Error(traceWorkerSendErrorMessage(err)));
-    }
-  });
-}
-
-function traceWorkerSendErrorMessage(err: unknown): string {
-  const detail = err instanceof Error ? err.message : String(err);
-  return `Trace worker postMessage failed: ${detail}`;
 }
 
 // Higher-level wrapper used by every caller in the trace UI. Adds the
@@ -502,11 +227,54 @@ export async function traceImageWithFallback(
   progress?: TraceProgress,
   flags: TraceRequestFlags = {},
 ): Promise<TraceResult> {
+  return traceWithClientFallback(defaultClient, image, options, signal, progress, flags);
+}
+
+function traceWithClientFallback(
+  state: ClientState,
+  image: RawImageData,
+  options: TraceOptions,
+  signal: AbortSignal | undefined,
+  progress: TraceProgress | undefined,
+  flags: TraceRequestFlags,
+): Promise<TraceResult> {
   return traceWithRelaxedRetry(
-    (passOptions, passFlags) => traceImage(image, passOptions, signal, progress, passFlags),
+    (passOptions, passFlags) =>
+      traceImageWithClient(state, image, passOptions, signal, progress, passFlags),
     options,
     flags,
   );
+}
+
+/** A trace client with its own worker, which no other client's request supersedes. */
+export type TraceWorkerClient = {
+  /** As traceImageWithFallback, on this client's own worker. */
+  readonly traceImageWithFallback: (
+    image: RawImageData,
+    options: TraceOptions,
+    signal?: AbortSignal,
+  ) => Promise<TraceResult>;
+  /** Ends this client's work and terminates its worker. */
+  readonly dispose: () => void;
+};
+
+/**
+ * A separate trace client for background work (Multi-File Trace). Its requests
+ * supersede only each other, so the Trace Image dialog's preview and commit on
+ * the default client neither interrupt it nor are interrupted by it.
+ */
+export function createTraceWorkerClient(): TraceWorkerClient {
+  const state = createClientState();
+  return {
+    traceImageWithFallback: (image, options, signal) =>
+      traceWithClientFallback(state, image, options, signal, undefined, {}),
+    dispose: () => {
+      state.latestTraceEpoch += 1;
+      supersedeClient(state);
+      const worker = state.workerInstance;
+      if (worker !== null) retireWorker(state, worker);
+    },
+  };
 }
 
 /**

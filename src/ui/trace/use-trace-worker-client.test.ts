@@ -64,7 +64,7 @@ afterEach(() => {
 describe('traceImage (worker client with inline fallback)', () => {
   it('uses Vite-recognized inline worker construction for production large traces', () => {
     const source = readFileSync(
-      join(process.cwd(), 'src/ui/trace/use-trace-worker-client.ts'),
+      join(process.cwd(), 'src/ui/trace/trace-worker-transport.ts'),
       'utf8',
     );
     const compact = source.replace(/\s+/g, ' ');

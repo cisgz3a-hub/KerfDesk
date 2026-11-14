@@ -9,6 +9,7 @@ import {
   type TraceOptions,
 } from '../../core/trace';
 import type { BatchTraceJob, BatchTraceOutput, BatchTraceSkip } from '../../core/trace/batch-trace';
+import { errorMessage } from '../../core/util/error-message';
 import { tracedLayersToDxf } from '../../io/dxf/export-dxf';
 import { writeTracedDrawing } from '../../io/vector-formats/traced-drawing';
 import type { PlatformAdapter, SaveDirectoryTarget } from '../../platform/types';
@@ -48,9 +49,13 @@ import {
   traceTargetPxPerMm,
 } from '../trace/trace-commit-grid';
 import { isTraceAbort } from '../trace/trace-cancellation';
-import { isTraceRequestSuperseded, traceImageWithFallback } from '../trace/use-trace-worker-client';
+import {
+  createTraceWorkerClient,
+  isTraceRequestSuperseded,
+  type TraceWorkerClient,
+} from '../trace/use-trace-worker-client';
 import type { TraceNotice } from '../trace/trace-notices';
-import { retrySupersededTrace } from './multi-file-trace-retry';
+import { isTraceInterrupted, retrySupersededTrace } from './multi-file-trace-retry';
 
 export type MultiFileTraceFile = File;
 export type MultiFileTraceExport = BatchTraceFile & {
@@ -61,6 +66,8 @@ export type MultiFileTraceExport = BatchTraceFile & {
   readonly sourceName?: string;
   /** A multi-page TIFF's page count: only page 1 was traced. */
   readonly pageCount?: number;
+  /** Why the finer grid failed when the file was traced on the preview grid. */
+  readonly previewResolutionReason?: string;
 };
 export type MultiFileTraceBatch = {
   readonly files: ReadonlyArray<MultiFileTraceExport>;
@@ -132,6 +139,23 @@ export async function buildMultiFileTraceExports(
   deps: MultiFileTraceDeps = {},
   onExport?: (file: MultiFileTraceExport) => Promise<void>,
 ): Promise<MultiFileTraceBatch> {
+  if (deps.trace !== undefined) return buildWithTracer(files, deps, deps.trace, onExport);
+  // The batch traces on its own worker, so a Trace Image preview or commit and
+  // the batch never supersede each other (ADR-431 Amendment 2026-11-14).
+  const client = createTraceWorkerClient();
+  try {
+    return await buildWithTracer(files, deps, client, onExport);
+  } finally {
+    client.dispose();
+  }
+}
+
+async function buildWithTracer(
+  files: ReadonlyArray<MultiFileTraceFile>,
+  deps: MultiFileTraceDeps,
+  tracer: NonNullable<MultiFileTraceDeps['trace']> | TraceWorkerClient,
+  onExport: ((file: MultiFileTraceExport) => Promise<void>) | undefined,
+): Promise<MultiFileTraceBatch> {
   const signal = deps.signal;
   const context = multiFileJobContext(deps);
   const densitySources: MultiFileDensitySource[] = [];
@@ -153,25 +177,29 @@ export async function buildMultiFileTraceExports(
       return job;
     },
   }));
-  const previewResolution = new Set<number>();
+  // Each fallen-back file's index and why its finer grid failed.
+  const previewResolution = new Map<number, string>();
   // Cancellation stops the batch; any other failure is spent on the file's
-  // own fallback, then on the file itself. A trace superseded by another
-  // caller (a Trace Image preview) is retried first, then skipped.
+  // own fallback, then on the file itself. A superseded trace is retried
+  // first; a file that keeps being interrupted is skipped, never traced at the
+  // preview grid instead (ADR-431 Amendment 2026-09-27, item 1).
   const recoverable = (error: unknown): boolean =>
     signal?.aborted !== true && !isTraceAbort(error) && !isTraceRequestSuperseded(error);
+  const trace =
+    typeof tracer === 'function' ? tracer : traceWithWorkerFallback(tracer, notices, turn);
   const result = await traceImagesToVectorFiles(
     jobs,
     {
-      trace: retrySupersededTrace(deps.trace ?? traceWithWorkerFallback(notices, turn), signal),
+      trace: retrySupersededTrace(trace, signal),
       ...(signal === undefined ? {} : { signal }),
       ...(onExport === undefined ? {} : { onFile: (file) => onExport(decorate(file)) }),
       writeDxf: tracedLayersToDxf,
       // As at a dialog commit, the finer grid is an improvement, not a
       // requirement: a file whose finer decode or trace fails is traced on the
       // preview grid instead of aborting the batch. Cancellation still aborts.
-      canFallBack: recoverable,
+      canFallBack: (error) => recoverable(error) && !isTraceInterrupted(error),
       canSkip: recoverable,
-      onFallback: (index) => previewResolution.add(index),
+      onFallback: (index, error) => previewResolution.set(index, errorMessage(error)),
       writeDrawing: writeTracedDrawing,
     },
     deps.output ?? {},
@@ -185,11 +213,13 @@ export async function buildMultiFileTraceExports(
       ...(previewResolution.has(file.sourceIndex) ? (['preview-resolution'] as const) : []),
     ];
     const pageCount = pageCounts[file.sourceIndex];
+    const reason = previewResolution.get(file.sourceIndex);
     const sized = {
       ...file,
       densitySource: densitySources[file.sourceIndex] ?? 'default',
       sourceName: files[file.sourceIndex]?.name ?? file.filename,
       ...(pageCount === undefined ? {} : { pageCount }),
+      ...(reason === undefined ? {} : { previewResolutionReason: reason }),
     };
     return fileNotices.length === 0 ? sized : { ...sized, notices: fileNotices };
   }
@@ -356,7 +386,13 @@ async function writeTraceExport(
   const name = file.sourceName ?? file.filename;
   if (file.runsPastPage === true) tally.pastPage.push(name);
   if (file.pageCount !== undefined) tally.firstPageOnly.push(`${name} (${file.pageCount} pages)`);
-  for (const notice of file.notices ?? []) tally.notices.add(notice);
+  for (const notice of file.notices ?? []) {
+    // A batch names each file traced at the preview grid, and why (T25R-P2-1).
+    if (notice === 'preview-resolution') {
+      const reason = file.previewResolutionReason;
+      tally.previewResolution.push(reason === undefined ? name : `${name} (${reason})`);
+    } else tally.notices.add(notice);
+  }
 }
 
 export async function writeTraceFileWithPlatform(
@@ -418,6 +454,7 @@ function missingTraceExportWriter(): never {
 }
 
 function traceWithWorkerFallback(
+  client: TraceWorkerClient,
   notices: ReadonlyArray<TraceNotice>[],
   turn: { readonly index: number },
 ): NonNullable<MultiFileTraceDeps['trace']> {
@@ -425,7 +462,7 @@ function traceWithWorkerFallback(
   // its job's index so a cancelled save or a skipped file cannot attach a
   // warning to a different file.
   return async (image, options, signal) => {
-    const result = await traceImageWithFallback(image, options, signal);
+    const result = await client.traceImageWithFallback(image, options, signal);
     notices[turn.index] = result.notices ?? [];
     return result.paths;
   };
