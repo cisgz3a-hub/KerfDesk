@@ -31,7 +31,8 @@ export const MOSHI_ROTARY_NOTE =
 
 export const K40_ROTARY_NOTE =
   "On a K40, KerfDesk scales Y and sets each stroke's speed for the part's surface, in steps 5 % apart; a " +
-  'speed change stops the head briefly, and nothing runs slower than 23.5 mm/min. Use the Y port. This has ' +
+  "speed change stops the head briefly, and nothing runs slower than the board's slowest speed (23.5 mm/min " +
+  'on an M, M1, M2 or M3 board, about 47 mm/min on an A, B, B1 or B2). Use the Y port. This has ' +
   'not been checked on a machine yet, so run a test pattern first.';
 
 const CONTROLLER_ROTARY_NOTES: Partial<Record<string, string>> = {

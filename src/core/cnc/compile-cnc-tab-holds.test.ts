@@ -63,6 +63,22 @@ describe('J1-P1-1: small holes and parts still cut through', () => {
     expect(never[0]?.widthMm).toBeCloseTo(5, 1);
     expect(shapes.some((shape) => shape.kind === 'fewer-tabs' && shape.role === 'hole')).toBe(true);
   });
+
+  it('names the same hole when the layer leaves a finish allowance', () => {
+    // Audit of the last 200 PRs (#1889): the allowance route dropped every tab
+    // finding, so Job Review said nothing about a slug that never cut free.
+    const { job } = compiled(
+      [art([rectangle(50, 50, 80, 60), circle(70, 80, 5), circle(100, 80, 12)])],
+      { cutType: 'profile-outside', finishAllowanceMm: 0.3 },
+    );
+    const shapes = job.cncCompilation?.tabHoldShapes ?? [];
+    expect(
+      shapes.some(
+        (shape) =>
+          shape.layerId === 'L1' && shape.role === 'hole' && shape.kind === 'never-through',
+      ),
+    ).toBe(true);
+  });
 });
 
 describe('N1-P2-1: tabs keep their width off the corners', () => {

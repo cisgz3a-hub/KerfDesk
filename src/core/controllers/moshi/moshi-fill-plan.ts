@@ -63,6 +63,9 @@ function planSweep(steps: MoshiStep[], plan: FillSweepPlan, fires: boolean): voi
   push(run.burnStart, false);
   for (const span of spans) {
     push(span.start, false);
+    // A curved run (ADR-694 Amendment 1, a taper-warped row) burns through
+    // its interior points, as the G-code Fill does.
+    for (const point of span.via ?? []) push(point, fires);
     push(span.end, fires);
   }
   push(run.leadEnd, false);

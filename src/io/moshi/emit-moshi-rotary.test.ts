@@ -17,7 +17,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { prepareOutput } from '../gcode';
-import { emitPreparedMoshiJob } from './emit-moshi';
+import { emitPreparedMoshiJob, MOSHI_ORIGIN_MESSAGE } from './emit-moshi';
 
 const DIAMETER = 80;
 const CREALITY_CHUCK: RotarySetup = {
@@ -55,6 +55,7 @@ function project(rotary: RotarySetup | undefined): Project {
   const device: DeviceProfile = {
     ...DEFAULT_DEVICE_PROFILE,
     controllerKind: 'moshi',
+    origin: 'rear-left',
     ...(rotary === undefined ? {} : { rotary }),
   };
   const base = createProject(device);
@@ -101,4 +102,21 @@ describe('Moshiboard with a Y-port rotary', () => {
   it('leaves the flat-bed job at the layer speed', () => {
     for (const dose of doses(project(undefined), 1)) expect(dose).toBeCloseTo(1, 2);
   });
+});
+
+describe('Moshiboard origin', () => {
+  // Audit of the last 200 PRs (#1723): the job is in machine coordinates for
+  // the profile's origin, and the board's own frame is rear-left, so a front
+  // origin burned the design mirrored front to back with nothing refusing it.
+  it.each(['front-left', 'front-right', 'rear-right', 'center'] as const)(
+    'refuses a %s origin, as the K40 route does',
+    (origin) => {
+      const base = project(undefined);
+      const prepared = prepareOutput({ ...base, device: { ...base.device, origin } }, {});
+      expect(emitPreparedMoshiJob(prepared)).toEqual({
+        ok: false,
+        messages: [MOSHI_ORIGIN_MESSAGE],
+      });
+    },
+  );
 });
