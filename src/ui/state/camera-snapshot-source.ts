@@ -11,7 +11,7 @@ import {
   withCacheBuster,
   type ActiveCameraSource,
 } from '../camera/frame-source';
-import { cameraQueryFingerprint } from './camera-resource-identity';
+import { cameraIdentityFingerprints } from './camera-resource-identity';
 import type { CameraSourceGet, CameraSourceSet } from './camera-source-actions';
 
 // A phone answers far faster than a laser's embedded camera server.
@@ -79,9 +79,9 @@ export function makeStartSnapshotSource(
       cameraUrl: url,
       pollIntervalMs: SNAPSHOT_CAMERA_POLL_INTERVAL_MS,
     };
-    const [frame, queryFingerprint] = await Promise.all([
+    const [frame, fingerprints] = await Promise.all([
       captureSourceFrame(source),
-      cameraQueryFingerprint(url),
+      cameraIdentityFingerprints(url),
     ]);
     if (get().sourceEpoch !== epoch) return;
     if (frame === null) {
@@ -93,7 +93,7 @@ export function makeStartSnapshotSource(
     set({
       sourceState: {
         kind: 'live',
-        source: { ...source, ...(queryFingerprint === undefined ? {} : { queryFingerprint }) },
+        source: { ...source, ...fingerprints },
       },
     });
   };
