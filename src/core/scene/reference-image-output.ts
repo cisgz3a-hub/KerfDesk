@@ -4,6 +4,8 @@
 // left with Output off, so it shows without engraving until the operator turns
 // that on. An operation another object also uses keeps its Output: the capture
 // moves onto an output-off copy of it instead, so no other artwork stops.
+// ADR-570 Amendment 2 does the same for a stamp's source artwork, a whole
+// selection at once.
 
 import { createArtworkOperation } from './artwork-operation';
 import { cloneLayerSubLayers, type Layer } from './layer';
@@ -18,22 +20,42 @@ import { addLayer, replaceObject, type Scene } from './scene';
 export const CAMERA_CAPTURE_SOURCE = 'camera capture';
 
 export function withImageOutputOff(scene: Scene, imageId: string): Scene {
-  const image = scene.objects.find((object) => object.id === imageId);
-  if (image === undefined) return scene;
+  return withObjectsOutputOff(scene, [imageId]);
+}
+
+/**
+ * Keep these objects but stop them burning. An operation only they use has
+ * its Output turned off; an operation other artwork also uses is copied once,
+ * with Output off, and these objects move to the copy, so the other artwork
+ * keeps burning (ADR-570 Amendment 2 for Prepare Stamp's sources).
+ */
+export function withObjectsOutputOff(
+  scene: Scene,
+  objectIds: ReadonlyArray<string>,
+  options: { readonly copyName?: (operation: Layer) => string } = {},
+): Scene {
+  const ids = new Set(objectIds);
+  const objects = scene.objects.filter((object) => ids.has(object.id));
   const operations = scene.layers.filter((layer) =>
-    operationIdsForObject(image, scene.layers).includes(layer.id),
+    objects.some((object) => operationIdsForObject(object, scene.layers).includes(layer.id)),
   );
   if (operations.length === 0) return scene;
   let working = scene;
   const binding = new Map<string, string>();
   const turnOff = new Set<string>();
   for (const operation of operations) {
-    if (!sharedWithOtherArtwork(scene, imageId, operation)) {
+    if (!sharedWithOtherArtwork(scene, ids, operation)) {
       binding.set(operation.id, operation.id);
       turnOff.add(operation.id);
       continue;
     }
-    const created = createArtworkOperation(working, image, { subLayers: operation.subLayers });
+    const owner = objects.find((object) => sceneObjectUsesOperation(object, operation));
+    if (owner === undefined) continue;
+    const copyName = options.copyName?.(operation);
+    const created = createArtworkOperation(working, owner, {
+      subLayers: operation.subLayers,
+      ...(copyName === undefined ? {} : { name: copyName }),
+    });
     working = addLayer(working, {
       ...operation,
       id: created.operation.id,
@@ -47,12 +69,18 @@ export function withImageOutputOff(scene: Scene, imageId: string): Scene {
   const layers = working.layers.map((layer) =>
     turnOff.has(layer.id) ? { ...layer, output: false } : layer,
   );
-  const rebound = remapSceneObjectOperationBindings(image, operations, binding);
-  return replaceObject({ ...working, layers }, imageId, rebound);
+  working = { ...working, layers };
+  for (const object of objects) {
+    const used = operations.filter((operation) => sceneObjectUsesOperation(object, operation));
+    if (used.length === 0) continue;
+    const rebound = remapSceneObjectOperationBindings(object, used, binding);
+    working = replaceObject(working, object.id, rebound);
+  }
+  return working;
 }
 
-function sharedWithOtherArtwork(scene: Scene, imageId: string, operation: Layer): boolean {
+function sharedWithOtherArtwork(scene: Scene, ids: ReadonlySet<string>, operation: Layer): boolean {
   return scene.objects.some(
-    (object) => object.id !== imageId && sceneObjectUsesOperation(object, operation),
+    (object) => !ids.has(object.id) && sceneObjectUsesOperation(object, operation),
   );
 }

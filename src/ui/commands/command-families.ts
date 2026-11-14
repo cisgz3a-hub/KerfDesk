@@ -94,7 +94,7 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
           'tools.convert-to-bitmap',
           'tools',
           'Convert to Bitmap...',
-          'Select a vector first.',
+          'Select a vector first. Variable text and barcodes need Bake Variable Text.',
           ctx.convertToBitmap,
         ),
   ];
