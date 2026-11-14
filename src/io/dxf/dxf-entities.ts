@@ -11,7 +11,10 @@ import {
   type Vec2,
 } from '../../core/scene';
 import { CLOSURE_EPS_MM } from '../../core/scene/polyline-closure';
-import { closedContourEnclosesNoArea } from '../../core/geometry/zero-area-contour';
+import {
+  closedContourEnclosesNoArea,
+  retracedLineMm,
+} from '../../core/geometry/zero-area-contour';
 import { parseDecimalReal } from '../../core/util';
 import type { DxfTag } from './dxf-tags';
 import {
@@ -275,9 +278,16 @@ function withoutRepeatedSeam<T extends Vec2>(
   // An unflagged run out and back over itself only looks closed: closed, it
   // would enclose no area and Kerf Offset would drop it (ADR-486 Amendment 4).
   // Bulges are arcs these anchors do not show, so a bulged run is kept closed.
+  // One that runs back over only part of itself (a stick with a loop at its
+  // end) stays open too: closed, Kerf Offset would cut the loop and drop the
+  // stick (ADR-486 Amendment 5).
   const straight = ring.every((point) => !('bulge' in point) || point.bulge === 0);
-  if (!flaggedClosed && straight && closedContourEnclosesNoArea(ring)) return unchanged;
+  if (!flaggedClosed && straight && runsBackOverItself(ring)) return unchanged;
   return { points: ring, closed: true };
+}
+
+function runsBackOverItself(ring: ReadonlyArray<Vec2>): boolean {
+  return closedContourEnclosesNoArea(ring) || retracedLineMm(ring) > 0;
 }
 
 // Runs `build` in the entity's OCS and returns its geometry in world XY. The

@@ -1,6 +1,6 @@
 // Whole-run source parity and surviving output topology precede process-local extras.
 import type { DeviceProfile } from '../devices';
-import type { Polyline } from '../scene';
+import { artworkOperationName, type Polyline, type SceneObject } from '../scene';
 import { collectLineSourcesForLayer, type LineSegmentCollection } from './collect-line-segments';
 import type { CutSegment, CutTopologyRing, JobDiagnostic } from './job';
 import type { KerfSceneSides } from './kerf-scene-sides';
@@ -69,7 +69,7 @@ export function lineTopologyCollections(
       segments: output,
       tabSpans: tabbed.tabSpans,
       kerfDiagnostics: [
-        ...layerKerfDiagnostics(line, bucket.layer),
+        ...layerKerfDiagnostics(line, bucket.layer, sceneContourNamer(bucket.objects)),
         ...assumedSideDiagnostics(assumed.get(bucket), bucket),
       ],
       ...(tabbed.tabbedContours === undefined ? {} : { tabbedContours: tabbed.tabbedContours }),
@@ -173,6 +173,18 @@ function assumedSideDiagnostics(
     aroundName,
     kerfOffsetMm: bucket.layer.kerfOffsetMm,
   }));
+}
+
+// ADR-486 Amd 5: a scene contour key (laserLeadSourceKey) names its object as
+// the Layers panel does.
+function sceneContourNamer(
+  objects: ReadonlyArray<SceneObject>,
+): (key: string | undefined) => string {
+  const byId = new Map(objects.map((object) => [object.id, object]));
+  return (key) => {
+    const object = key === undefined ? undefined : byId.get(key.slice(0, key.lastIndexOf('#')));
+    return object === undefined ? '' : artworkOperationName(object);
+  };
 }
 
 function asContour(source: KerfSource): CutSegment {

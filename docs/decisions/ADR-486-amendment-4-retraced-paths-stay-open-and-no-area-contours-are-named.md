@@ -95,7 +95,9 @@ keeps their behaviour.
 ### Limits
 
 - A contour that encloses area only in part keeps that part, and the rest is dropped without a
-  count. An example is a retraced stick with a loop at its end.
+  count. An example is a retraced stick with a loop at its end. **Replaced by
+  [Amendment 5](ADR-486-amendment-5-kerf-names-line-it-drops-from-a-contour.md):** the dropped
+  line is now counted and named in Job Review.
 - A loop traced twice over one region has winding number 2 everywhere. It encloses nothing under
   even-odd, but its shoelace area is large, so the fast check passes it and it is not counted. No tool
   makes one.
