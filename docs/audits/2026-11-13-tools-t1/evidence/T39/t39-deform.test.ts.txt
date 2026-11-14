@@ -1,0 +1,586 @@
+// @vitest-environment jsdom
+// T39 Deform auditor: independent de Casteljau bicubic oracle, store-level Apply,
+// preview vs Apply, inheritance, tabs, folds, curves, degenerate input, decoded G-code.
+import { beforeEach, it } from 'vitest';
+import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type TextObject,
+  type Transform,
+  type RasterImage,
+} from '../t36-main/src/core/scene';
+import { createRectangle } from '../t36-main/src/core/shapes/primitives/create-rectangle';
+import { createEllipse } from '../t36-main/src/core/shapes/primitives/create-ellipse';
+import { textToPolylines } from '../t36-main/src/core/text';
+import { prepareOutput } from '../t36-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t36-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t36-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t36-main/src/io/project/deserialize-project';
+import { applyTransform } from '../t36-main/src/core/scene/transform';
+import { useStore } from '../t36-main/src/ui/state/store';
+import { resetStore } from '../t36-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t36-main/src/ui/state/toast-store';
+import { useUiStore } from '../t36-main/src/ui/state/ui-store';
+import { useWarpDeformSession } from '../t36-main/src/ui/state/warp-deform-session';
+import {
+  activeWarpDeformSession,
+  applyWarpDeformTool,
+  cancelWarpDeformTool,
+  draggedWarpDeformHandles,
+  resetWarpDeformHandles,
+  startWarpDeformTool,
+} from '../t36-main/src/ui/workspace/warp-deform-tool';
+import { warpDeformPreview } from '../t36-main/src/ui/workspace/use-warp-deform-preview';
+import { litMoves, totalLen, type LitMove, type Vec } from './decode';
+
+const log: string[] = [];
+const out = (tag: string, v: unknown) => {
+  log.push(`${tag} ${JSON.stringify(v)}`);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t39/t39.log', log.join('\n'));
+};
+const st = () => useStore.getState();
+const r3 = (n: number) => Math.round(n * 1000) / 1000;
+beforeEach(() => {
+  resetStore();
+  useUiStore.getState().resetToolMode();
+  useWarpDeformSession.getState().setSession(null);
+  useToastStore.setState({ toasts: [] } as never);
+});
+
+// ---------- independent oracle: de Casteljau on rows, then on the column ----------
+type Box = { minX: number; minY: number; maxX: number; maxY: number };
+function casteljau(p: Vec[], t: number): Vec {
+  let q = p.map((v) => ({ ...v }));
+  while (q.length > 1) {
+    const n: Vec[] = [];
+    for (let i = 1; i < q.length; i++) n.push({ x: q[i - 1]!.x + (q[i]!.x - q[i - 1]!.x) * t, y: q[i - 1]!.y + (q[i]!.y - q[i - 1]!.y) * t });
+    q = n;
+  }
+  return q[0]!;
+}
+function oracleDeform(box: Box, h: Vec[]): (p: Vec) => Vec {
+  return (p) => {
+    const u = (p.x - box.minX) / (box.maxX - box.minX);
+    const v = (p.y - box.minY) / (box.maxY - box.minY);
+    const rows = [0, 1, 2, 3].map((r) => casteljau(h.slice(r * 4, r * 4 + 4), u));
+    return casteljau(rows, v);
+  };
+}
+function segDist(p: Vec, a: Vec, b: Vec): number {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const l2 = dx * dx + dy * dy;
+  const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+function distToPoly(p: Vec, pts: ReadonlyArray<Vec>): number {
+  let best = Infinity;
+  for (let i = 1; i < pts.length; i++) best = Math.min(best, segDist(p, pts[i - 1]!, pts[i]!));
+  if (pts.length === 1) best = Math.hypot(p.x - pts[0]!.x, p.y - pts[0]!.y);
+  return best;
+}
+function densify(pts: ReadonlyArray<Vec>, step: number): Vec[] {
+  const res: Vec[] = [];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1]!, b = pts[i]!;
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / step));
+    for (let k = 0; k < n; k++) res.push({ x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n });
+  }
+  res.push(pts.at(-1)!);
+  return res;
+}
+function worldPolys(o: SceneObject): Vec[][] {
+  if (!('paths' in o)) return [];
+  return o.paths.flatMap((p) =>
+    p.polylines.map((l) => {
+      const w = l.points.map((q) => applyTransform(q, o.transform));
+      return l.closed && w.length > 0 ? [...w, w[0]!] : w;
+    }),
+  );
+}
+function hausdorff(expected: Vec[][], actual: Vec[][], step = 0.25): { fwd: number; back: number } {
+  let fwd = 0, back = 0;
+  for (const poly of expected)
+    for (const p of densify(poly, step)) {
+      let best = Infinity;
+      for (const a of actual) best = Math.min(best, distToPoly(p, a));
+      fwd = Math.max(fwd, best);
+    }
+  for (const poly of actual)
+    for (const p of densify(poly, step)) {
+      let best = Infinity;
+      for (const e of expected) best = Math.min(best, distToPoly(p, e));
+      back = Math.max(back, best);
+    }
+  return { fwd: r3(fwd), back: r3(back) };
+}
+function polyLen(p: Vec[]): number {
+  let s = 0;
+  for (let i = 1; i < p.length; i++) s += Math.hypot(p[i]!.x - p[i - 1]!.x, p[i]!.y - p[i - 1]!.y);
+  return s;
+}
+function layer(id = 'L', mode: 'line' | 'fill' = 'line', extra: Partial<Layer> = {}): Layer {
+  return { ...createLayer({ id, color: '#000000', name: id, mode }), speed: 1000, power: 40, passes: 1, ...extra } as Layer;
+}
+function load(objects: SceneObject[], selected: string[], layers: Layer[] = [layer()], groups: unknown[] = []): void {
+  const base = createProject();
+  const project: Project = {
+    ...base,
+    optimization: { ...DEFAULT_PROJECT_OPTIMIZATION },
+    scene: { ...base.scene, objects, layers, groups } as Project['scene'],
+  };
+  useStore.setState({
+    project,
+    selectedObjectId: selected[0] ?? null,
+    additionalSelectedIds: new Set(selected.slice(1)),
+    undoStack: [],
+    redoStack: [],
+    dirty: false,
+  });
+}
+function svg(id: string, polylines: { closed: boolean; points: Vec[] }[], extra: Partial<ImportedSvg> = {}): ImportedSvg {
+  const all = polylines.flatMap((p) => p.points);
+  return {
+    kind: 'imported-svg', id, source: `${id}.svg`,
+    bounds: { minX: Math.min(...all.map((p) => p.x)), minY: Math.min(...all.map((p) => p.y)), maxX: Math.max(...all.map((p) => p.x)), maxY: Math.max(...all.map((p) => p.y)) },
+    transform: IDENTITY_TRANSFORM, operationIds: ['L'],
+    paths: [{ color: '#000000', operationIds: ['L'], polylines }],
+    ...extra,
+  } as ImportedSvg;
+}
+function denseRect(id: string, x: number, y: number, w: number, h: number, step = 5, extra: Partial<ImportedSvg> = {}): ImportedSvg {
+  const corners = [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }, { x, y }];
+  return svg(id, [{ closed: true, points: densify(corners, step).slice(0, -1) }], extra);
+}
+function lastToast(): string {
+  const toasts = (useToastStore.getState() as unknown as { toasts: { message: string }[] }).toasts;
+  return toasts.at(-1)?.message ?? '';
+}
+function deform(dragged: (h: Vec[]) => Vec[]): { box: Box; handles: Vec[] } {
+  startWarpDeformTool('deform');
+  const s = activeWarpDeformSession();
+  if (s === null) throw new Error(`no session: ${lastToast()}`);
+  const handles = dragged(s.handles.map((p) => ({ ...p })));
+  useWarpDeformSession.getState().setHandles(handles);
+  return { box: { ...s.box }, handles };
+}
+const moveH = (moves: Record<number, Vec>) => (h: Vec[]) => h.map((p, i) => (moves[i] ? { x: p.x + moves[i]!.x, y: p.y + moves[i]!.y } : p));
+function burn(project: Project) {
+  const prepared = prepareOutput(project);
+  if (!prepared.ok) return { ok: false, moves: [] as LitMove[], issues: JSON.stringify(prepared.preflight).slice(0, 400) };
+  const emitted = emitPreparedGcode(prepared);
+  return { ok: true, moves: litMoves(emitted.gcode, project.device), issues: '' };
+}
+function obj(id: string): SceneObject {
+  return st().project.scene.objects.find((o) => o.id === id)!;
+}
+function selfCrossings(poly: Vec[]): number {
+  let n = 0;
+  const o = (p: Vec, q: Vec, r: Vec) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+  const inter = (a: Vec, b: Vec, c: Vec, d: Vec) => o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0;
+  for (let i = 1; i < poly.length; i++)
+    for (let j = i + 2; j < poly.length; j++) {
+      if (i === 1 && j === poly.length - 1) continue;
+      if (inter(poly[i - 1]!, poly[i]!, poly[j - 1]!, poly[j]!)) n++;
+    }
+  return n;
+}
+function shoelace(p: Vec[]): number {
+  let a = 0;
+  for (let i = 1; i < p.length; i++) a += p[i - 1]!.x * p[i]!.y - p[i]!.x * p[i - 1]!.y;
+  return a / 2;
+}
+// max turning angle (deg) along an open polyline, with the u (fraction) where it happens
+function maxTurn(p: Vec[]): number {
+  let best = 0;
+  for (let i = 1; i < p.length - 1; i++) {
+    const a = Math.atan2(p[i]!.y - p[i - 1]!.y, p[i]!.x - p[i - 1]!.x);
+    const b = Math.atan2(p[i + 1]!.y - p[i]!.y, p[i + 1]!.x - p[i]!.x);
+    let d = Math.abs(b - a);
+    if (d > Math.PI) d = 2 * Math.PI - d;
+    best = Math.max(best, (d * 180) / Math.PI);
+  }
+  return best;
+}
+
+// ---------- D1 identity ----------
+it('D1 identity, translation and affine precision', () => {
+  load([denseRect('r', 100, 100, 100, 60, 1)], ['r']);
+  const before = st().project;
+  const s0 = deform((h) => h);
+  const prev = warpDeformPreview(before, activeWarpDeformSession());
+  applyWarpDeformTool();
+  out('D1-unmoved', { box: s0.box, n: s0.handles.length, sameProject: st().project === before, previewSame: prev.project === before, toast: lastToast(), undo: st().undoStack.length });
+
+  // the 16 initial handles reproduce identity: oracle check of the evenly spaced grid
+  const idOracle = oracleDeform(s0.box, s0.handles);
+  let idErr = 0;
+  for (const p of worldPolys(before.scene.objects[0]!)[0]!) { const q = idOracle(p); idErr = Math.max(idErr, Math.hypot(q.x - p.x, q.y - p.y)); }
+
+  // tiny nudge of an interior handle
+  load([denseRect('r', 100, 100, 100, 60, 1)], ['r']);
+  const b2 = st().project;
+  deform(moveH({ 5: { x: 1e-6, y: 0 } }));
+  applyWarpDeformTool();
+  const pts = worldPolys(obj('r'))[0]!;
+  const src = worldPolys(b2.scene.objects[0]!)[0]!;
+  let maxd = 0;
+  for (let i = 0; i < Math.min(src.length, pts.length); i++) maxd = Math.max(maxd, Math.hypot(pts[i]!.x - src[i]!.x, pts[i]!.y - src[i]!.y));
+  out('D1-nudge', { oracleIdentityErr: idErr, nPts: pts.length, nSrc: src.length, maxMoveMm: maxd, toast: lastToast() });
+
+  // pure translation of all 16 handles: every point must move exactly by (10, 5)
+  load([denseRect('r', 100, 100, 100, 60, 1)], ['r']);
+  const b3 = st().project;
+  deform((h) => h.map((p) => ({ x: p.x + 10, y: p.y + 5 })));
+  applyWarpDeformTool();
+  const t3 = worldPolys(obj('r'))[0]!;
+  const s3 = worldPolys(b3.scene.objects[0]!)[0]!;
+  let terr = 0;
+  for (let i = 0; i < s3.length; i++) terr = Math.max(terr, Math.hypot(t3[i]!.x - s3[i]!.x - 10, t3[i]!.y - s3[i]!.y - 5));
+  out('D1-translate', { nSrc: s3.length, nOut: t3.length, maxErrMm: terr });
+
+  // affine (shear + scale) grid: straight lines must stay straight, nothing split
+  load([denseRect('r', 100, 100, 100, 60, 100)], ['r']);
+  const b4 = st().project;
+  const aff = (p: Vec) => ({ x: 100 + (p.x - 100) * 1.3 + (p.y - 100) * 0.4, y: 100 + (p.y - 100) * 0.8 + (p.x - 100) * 0.1 });
+  const s4 = deform((h) => h.map(aff));
+  applyWarpDeformTool();
+  const t4 = worldPolys(obj('r'))[0]!;
+  const want4 = worldPolys(b4.scene.objects[0]!)[0]!.map(aff);
+  out('D1-affine', { nSrc: want4.length, nOut: t4.length, hausdorff: hausdorff([want4], [t4]), box: s4.box });
+});
+
+// ---------- D2 single interior handle, continuity across cell borders, G-code ----------
+it('D2 interior handle drag', () => {
+  const lines: { closed: boolean; points: Vec[] }[] = [];
+  for (const y of [112, 120, 130, 140, 148]) lines.push({ closed: false, points: [{ x: 100, y }, { x: 200, y }] });
+  for (const x of [110, 133.333, 150, 166.667, 190]) lines.push({ closed: false, points: [{ x, y: 100 }, { x, y: 160 }] });
+  const grid = svg('g', lines);
+  load([denseRect('r', 100, 100, 100, 60, 100), grid], ['r', 'g']);
+  const before = st().project;
+  const g0 = burn(before);
+  const { box, handles } = deform(moveH({ 5: { x: 20, y: 15 } }));
+  const preview = warpDeformPreview(before, activeWarpDeformSession());
+  applyWarpDeformTool();
+  const oracle = oracleDeform(box, handles);
+  const truthR = densify(worldPolys(before.scene.objects[0]!)[0]!, 0.02).map(oracle);
+  const actR = worldPolys(obj('r'));
+  const truthG = worldPolys(before.scene.objects[1]!).map((p) => densify(p, 0.02).map(oracle));
+  const actG = worldPolys(obj('g'));
+  const perLine = truthG.map((t, i) => ({ hd: hausdorff([t], [actG[i]!], 0.1), n: actG[i]!.length, maxTurnDeg: r3(maxTurn(actG[i]!)), truthMaxTurnDeg: r3(maxTurn(densify(worldPolys(before.scene.objects[1]!)[i]!, 1).map(oracle))) }));
+  const handleArtMove = (() => { const p0 = { x: 133.3333333, y: 120 }; const q = oracle(p0); return r3(Math.hypot(q.x - p0.x, q.y - p0.y)); })();
+  const gAfter = burn(st().project);
+  const truthLenAll = [truthR, ...truthG].reduce((s, p) => s + polyLen(p), 0);
+  const litPts = gAfter.moves.flatMap((m) => [m.from, m.to]);
+  const allTruth = [truthR, ...truthG];
+  const litMax = Math.max(...litPts.map((p) => Math.min(...allTruth.map((t) => distToPoly(p, t)))));
+  const prevR = preview.project.scene.objects.find((o) => o.id === 'r')!;
+  const prevG = preview.project.scene.objects.find((o) => o.id === 'g')!;
+  out('D2', {
+    box, rect: { hd: hausdorff([truthR], actR, 0.1), n: actR[0]!.length },
+    perLine, handleDraggedMm: 25, artAtHandleMovedMm: handleArtMove,
+    previewEqualsApply: JSON.stringify(prevR) === JSON.stringify(obj('r')) && JSON.stringify(prevG) === JSON.stringify(obj('g')),
+    litBefore: r3(totalLen(g0.moves)), litAfter: r3(totalLen(gAfter.moves)), oracleLen: r3(truthLenAll), litMaxOffOracleMm: r3(litMax),
+    toast: lastToast(), undo: st().undoStack.map((u: { label?: string }) => u.label ?? '?'),
+  });
+  const applied = st().project;
+  st().undo();
+  const undoneSame = st().project.scene.objects[0] === before.scene.objects[0] && st().project.scene.objects[1] === before.scene.objects[1];
+  st().redo();
+  const redoSame = st().project === applied;
+  const reopened = deserializeProject(serializeProject(st().project)) as unknown as { kind: string; project?: Project };
+  const ro = reopened.project?.scene.objects ?? [];
+  out('D2-hist', { undoneSame, redoSame, reopenKind: reopened.kind, reopenSame: ro.length === 2 && JSON.stringify(ro.map(worldPolys)) === JSON.stringify(applied.scene.objects.map(worldPolys)) });
+});
+
+// ---------- D3 edge handle, folded/crossed control grid, mirrored grid ----------
+it('D3 edge, folds, mirror', () => {
+  for (const [tag, fn] of [
+    ['edge-top', moveH({ 1: { x: 0, y: -30 } })],
+    ['fold-interior', moveH({ 5: { x: 80, y: 50 } })],
+    ['crossed-columns', (h: Vec[]) => h.map((p, i) => (i % 4 === 1 ? { x: p.x + 60, y: p.y } : i % 4 === 2 ? { x: p.x - 60, y: p.y } : p))],
+    ['mirror-y', (h: Vec[]) => h.map((p) => ({ x: p.x, y: 260 - p.y }))],
+    ['corner-inside', moveH({ 15: { x: -80, y: -50 } })],
+  ] as const) {
+    load([denseRect('r', 100, 100, 100, 60, 100)], ['r'], [layer('L', 'fill', { hatchSpacingMm: 0.5, hatchAngleDeg: 0 } as Partial<Layer>)]);
+    const before = st().project;
+    const { box, handles } = deform(fn as (h: Vec[]) => Vec[]);
+    const preview = warpDeformPreview(before, activeWarpDeformSession());
+    applyWarpDeformTool();
+    const oracle = oracleDeform(box, handles);
+    const truth = densify(worldPolys(before.scene.objects[0]!)[0]!, 0.02).map(oracle);
+    const act = worldPolys(obj('r'));
+    const g = burn(st().project);
+    // Fill area oracle: even-odd area of the outline approximated by lit length * spacing
+    out(`D3-${tag}`, {
+      nAct: act[0]?.length, hd: hausdorff([truth], act, 0.1), selfX: act[0] ? selfCrossings(act[0]) : -1,
+      signedArea: act[0] ? r3(shoelace(act[0])) : null, oracleSignedArea: r3(shoelace(truth)),
+      previewFailure: preview.failure, toast: lastToast(), burnOk: g.ok, litFill: r3(totalLen(g.moves)), fillAreaEstimate: r3(totalLen(g.moves) * 0.5), issues: g.issues,
+    });
+  }
+});
+
+// ---------- D4 curves: ellipse, enlargement, stretch-sample adversary ----------
+it('D4 curves', () => {
+  const ell = (id: string, x: number, y: number, w: number, hgt: number) => ({ ...createEllipse({ id, color: '#000000', spec: { widthMm: w, heightMm: hgt }, transform: { ...IDENTITY_TRANSFORM, x, y } }), operationIds: ['L'] }) as SceneObject;
+  const truthEllipse = (cx: number, cy: number, rx: number, ry: number, f: (p: Vec) => Vec, n = 20000) => {
+    const t: Vec[] = [];
+    for (let k = 0; k <= n; k++) { const a = (2 * Math.PI * k) / n; t.push(f({ x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) })); }
+    return t;
+  };
+  // a) ellipse 60x40 with two interior handles
+  load([ell('e', 100, 100, 60, 40)], ['e']);
+  let s = deform(moveH({ 5: { x: 15, y: -10 }, 10: { x: -12, y: 18 }, 3: { x: 10, y: 0 } }));
+  let fail = warpDeformPreview(st().project, activeWarpDeformSession()).failure;
+  applyWarpDeformTool();
+  out('D4a-ellipse', { box: s.box, fail, kind: obj('e').kind, n: worldPolys(obj('e'))[0]!.length, hd: hausdorff([truthEllipse(130, 120, 30, 20, oracleDeform(s.box, s.handles))], worldPolys(obj('e')), 0.05), toast: lastToast() });
+
+  // b) 2 mm circle enlarged ~100x by spreading the grid
+  load([ell('e', 100, 100, 2, 2)], ['e']);
+  s = deform((h) => h.map((p) => ({ x: 100 + (p.x - 100) * 100 + ((p.x - 100) * (p.y - 100)) * 30, y: 100 + (p.y - 100) * 100 })));
+  fail = warpDeformPreview(st().project, activeWarpDeformSession()).failure;
+  applyWarpDeformTool();
+  out('D4b-enlarge', { fail, n: worldPolys(obj('e'))[0]?.length, hd: fail ? null : hausdorff([truthEllipse(101, 101, 1, 1, oracleDeform(s.box, s.handles))], worldPolys(obj('e')), 0.05), toast: lastToast() });
+
+  // c) stretch peak between the 9x9 samples: a big frame plus a small circle at (u,v)=(1/3,1/3);
+  //    handle 5 dragged far so the local stretch near (1/3,1/3) is high.
+  for (const [tag, cx, cy, drag] of [
+    ['third', 100 + 300 / 3, 100 + 300 / 3, { x: 400, y: 380 }],
+    ['sixteenth', 100 + 300 / 16, 100 + 300 / 16, { x: 0, y: 0 }],
+  ] as const) {
+    load([denseRect('f', 100, 100, 300, 300, 300), ell('c', cx - 3, cy - 3, 6, 6)], ['f', 'c']);
+    s = deform(tag === 'third' ? moveH({ 5: drag }) : (h) => h.map((p, i) => (i === 0 ? { x: p.x - 1500, y: p.y - 1500 } : i === 1 || i === 4 ? { x: p.x + (i === 1 ? 900 : -400), y: p.y + (i === 4 ? 900 : -400) } : p)));
+    fail = warpDeformPreview(st().project, activeWarpDeformSession()).failure;
+    applyWarpDeformTool();
+    out(`D4c-${tag}`, { fail, n: worldPolys(obj('c'))[0]?.length, hd: fail ? null : hausdorff([truthEllipse(cx, cy, 3, 3, oracleDeform(s.box, s.handles), 40000)], worldPolys(obj('c')), 0.05), toast: lastToast() });
+  }
+});
+
+// ---------- D5 text, groups, locked, image, multiple, transforms ----------
+async function textObject(id: string, content: string, transform: Transform, extra: Partial<TextObject> = {}): Promise<TextObject> {
+  const bytes = readFileSync('C:/Users/stolk/kd-t1/t36-main/src/ui/text/fonts/Roboto-Regular.ttf');
+  const rendered = await textToPolylines({
+    fontBuffer: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+    content, sizeMm: 20, alignment: 'left', lineHeight: 1.4, color: '#000000',
+  });
+  return {
+    kind: 'text', id, content, fontKey: 'Roboto', sizeMm: 20, alignment: 'left', lineHeight: 1.4, letterSpacing: 0,
+    color: '#000000', bounds: rendered.bounds, transform, paths: rendered.paths, operationIds: ['L'], ...extra,
+  } as TextObject;
+}
+it('D5 kinds and transforms', async () => {
+  const text = await textObject('t', 'Ag8', { ...IDENTITY_TRANSFORM, x: 100, y: 100 }, { name: 'Label', powerScale: 70 } as Partial<TextObject>);
+  load([text], ['t']);
+  const before = st().project;
+  let s = deform(moveH({ 5: { x: 6, y: 4 }, 6: { x: -3, y: 5 }, 12: { x: -5, y: 3 } }));
+  applyWarpDeformTool();
+  let oracle = oracleDeform(s.box, s.handles);
+  const truth = worldPolys(before.scene.objects[0]!).map((p) => densify(p, 0.05).map(oracle));
+  const a = obj('t');
+  out('D5-text', { kind: a.kind, name: (a as { name?: string }).name, powerScale: (a as { powerScale?: number }).powerScale, hd: hausdorff(truth, worldPolys(a), 0.1), toast: lastToast() });
+
+  // image + locked + group of two + loose rect
+  const img = { kind: 'raster-image', id: 'img', source: 'img.png', dataUrl: 'data:image/png;base64,AA', pixelWidth: 2, pixelHeight: 1, bounds: { minX: 0, minY: 0, maxX: 2, maxY: 1 }, transform: { ...IDENTITY_TRANSFORM, x: 120, y: 110 }, color: '#808080', dither: 'threshold', linesPerMm: 1 } as unknown as RasterImage;
+  const gA = denseRect('ga', 100, 100, 30, 30) as SceneObject;
+  const gB = denseRect('gb', 140, 100, 30, 30) as SceneObject;
+  load([img, denseRect('lk', 180, 100, 20, 20, 5, { locked: true }), gA, gB, denseRect('r', 100, 140, 70, 20)], ['img', 'lk', 'ga', 'gb', 'r'], [layer()], [{ id: 'G', name: 'G', objectIds: ['ga', 'gb'] }]);
+  const ib = st().project;
+  s = deform(moveH({ 5: { x: 10, y: 8 }, 9: { x: -6, y: 4 } }));
+  applyWarpDeformTool();
+  oracle = oracleDeform(s.box, s.handles);
+  const hd = ['ga', 'gb', 'r'].map((id) => hausdorff([densify(worldPolys(ib.scene.objects.find((o) => o.id === id)!)[0]!, 0.05).map(oracle)], worldPolys(obj(id)), 0.1));
+  out('D5-mixed', { box: s.box, imgSame: obj('img') === ib.scene.objects[0], lockedSame: obj('lk') === ib.scene.objects[1], groupsAfter: st().project.scene.groups, hd, toast: lastToast() });
+
+  // transforms: rotated, mirrored, non-uniform
+  const t: Transform = { ...IDENTITY_TRANSFORM, x: 150, y: 120, rotationDeg: 35, mirrorX: true, scaleX: 2.5, scaleY: 0.8 };
+  load([{ ...denseRect('r', 0, 0, 30, 20, 2), transform: t }], ['r']);
+  const tb = st().project;
+  s = deform(moveH({ 6: { x: -12, y: 9 }, 13: { x: 5, y: 10 } }));
+  applyWarpDeformTool();
+  oracle = oracleDeform(s.box, s.handles);
+  const truthT = densify(worldPolys(tb.scene.objects[0]!)[0]!, 0.05).map(oracle);
+  const g0 = burn(tb), g1 = burn(st().project);
+  out('D5-transform', { transformAfter: obj('r').transform, hd: hausdorff([truthT], worldPolys(obj('r')), 0.1), litBefore: r3(totalLen(g0.moves)), litAfter: r3(totalLen(g1.moves)), oracleLen: r3(polyLen(truthT)) });
+
+  // drawn rectangle: inheritance, cancel, reset
+  const rect = createRectangle({ id: 's', color: '#000000', spec: { widthMm: 40, heightMm: 30, cornerRadiusMm: 4 }, transform: { ...IDENTITY_TRANSFORM, x: 100, y: 100 } });
+  const rich = { ...rect, name: 'Panel', operationIds: ['L'], powerScale: 55, operationOverride: { speed: 777 } } as unknown as SceneObject;
+  load([rich], ['s']);
+  const rb = st().project;
+  deform(moveH({ 5: { x: 5, y: 5 } }));
+  cancelWarpDeformTool();
+  const cancelSame = st().project === rb && st().undoStack.length === 0 && activeWarpDeformSession() === null;
+  deform(moveH({ 5: { x: 5, y: 5 } }));
+  resetWarpDeformHandles();
+  applyWarpDeformTool();
+  const resetToast = lastToast();
+  const resetSame = st().project === rb;
+  deform(moveH({ 5: { x: 5, y: 5 } }));
+  applyWarpDeformTool();
+  const ar = obj('s') as unknown as Record<string, unknown>;
+  out('D5-shape', { cancelSame, resetSame, resetToast, kind: ar.kind, lost: Object.keys(rich).filter((k) => !(k in ar)), name: ar.name, powerScale: ar.powerScale, override: ar.operationOverride, toast: lastToast(), selected: [st().selectedObjectId] });
+
+  // Shift on Deform: draggedWarpDeformHandles ignores keepParallelogram (LightBurn: Shift = symmetry)
+  const sh = draggedWarpDeformHandles('deform', { kind: 'warp-handle', index: 5, startPoint: { x: 0, y: 0 }, startHandles: Array.from({ length: 16 }, (_, i) => ({ x: i % 4, y: Math.floor(i / 4) })) }, { x: 1, y: 0 }, true);
+  out('D5-shift', { changed: sh.map((p, i) => (p.x !== i % 4 || p.y !== Math.floor(i / 4) ? i : -1)).filter((i) => i >= 0) });
+});
+
+// ---------- D6 placed tabs ----------
+it('D6 placed laser tabs follow the deform', () => {
+  const tabLayer = layer('L', 'line', { tabsEnabled: true, tabSizeMm: 2, tabsPerShape: 4 } as Partial<Layer>);
+  const fr = [12.5 / 300, 50 / 300, 125 / 300, 200 / 300, 275 / 300];
+  const r = denseRect('r', 100, 100, 100, 50, 100, {
+    laserTabAnchors: fr.map((pathT) => ({ layerColor: '#000000', pathIndex: 0, polylineIndex: 0, pathT })),
+  });
+  const placeAt = (t: number): Vec => {
+    let d = t * 300;
+    const c = [{ x: 100, y: 100 }, { x: 200, y: 100 }, { x: 200, y: 150 }, { x: 100, y: 150 }, { x: 100, y: 100 }];
+    for (let i = 1; i < c.length; i++) {
+      const L = Math.hypot(c[i]!.x - c[i - 1]!.x, c[i]!.y - c[i - 1]!.y);
+      if (d <= L) return { x: c[i - 1]!.x + ((c[i]!.x - c[i - 1]!.x) * d) / L, y: c[i - 1]!.y + ((c[i]!.y - c[i - 1]!.y) * d) / L };
+      d -= L;
+    }
+    return c[0]!;
+  };
+  const gaps = (moves: LitMove[]) => {
+    const res: Vec[] = [];
+    for (let i = 1; i < moves.length; i++) {
+      const a = moves[i - 1]!.to, b = moves[i]!.from;
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (d > 0.5 && d < 5) res.push({ x: r3((a.x + b.x) / 2), y: r3((a.y + b.y) / 2) });
+    }
+    const wa = moves.at(-1)!.to, wb = moves[0]!.from;
+    const wd = Math.hypot(wa.x - wb.x, wa.y - wb.y);
+    if (wd > 0.5 && wd < 5) res.push({ x: r3((wa.x + wb.x) / 2), y: r3((wa.y + wb.y) / 2) });
+    return res;
+  };
+  for (const [tag, fn] of [
+    ['edge-bulge', moveH({ 1: { x: 0, y: -40 }, 2: { x: 0, y: -40 }, 7: { x: 30, y: 0 } })],
+    ['interior+corner', moveH({ 5: { x: 25, y: 20 }, 15: { x: 40, y: 15 } })],
+  ] as const) {
+    load([r], ['r'], [tabLayer]);
+    const g0 = burn(st().project);
+    const { box, handles } = deform(fn as (h: Vec[]) => Vec[]);
+    applyWarpDeformTool();
+    const oracle = oracleDeform(box, handles);
+    const want = fr.map((t) => oracle(placeAt(t)));
+    const g1 = burn(st().project);
+    const got = gaps(g1.moves);
+    const err = want.map((w) => r3(Math.min(...got.map((g) => Math.hypot(g.x - w.x, g.y - w.y)))));
+    out(`D6-${tag}`, { gapsBefore: gaps(g0.moves).length, nGapsAfter: got.length, want: want.map((w) => ({ x: r3(w.x), y: r3(w.y) })), errMm: err, toast: lastToast(), issues: g1.issues });
+  }
+});
+
+// ---------- D7 degenerate input ----------
+it('D7 degenerate', () => {
+  for (const [tag, polys] of [
+    ['h-line', [{ closed: false, points: [{ x: 100, y: 120 }, { x: 200, y: 120 }] }]],
+    ['v-line', [{ closed: false, points: [{ x: 150, y: 100 }, { x: 150, y: 200 }] }]],
+    ['dot', [{ closed: false, points: [{ x: 150, y: 150 }, { x: 150, y: 150 }] }]],
+    ['tiny', [{ closed: true, points: [{ x: 150, y: 150 }, { x: 150.01, y: 150 }, { x: 150.01, y: 150.01 }] }]],
+  ] as const) {
+    load([svg('d', polys as unknown as { closed: boolean; points: Vec[] }[])], ['d']);
+    const before = st().project;
+    let box: Box, handles: Vec[];
+    try { ({ box, handles } = deform(moveH({ 5: { x: 3, y: 2 }, 10: { x: -2, y: 4 } }))); } catch (e) { out(`D7-${tag}`, { error: String(e) }); continue; }
+    const fail = warpDeformPreview(before, activeWarpDeformSession()).failure;
+    applyWarpDeformTool();
+    const oracle = oracleDeform(box, handles);
+    const truth = worldPolys(before.scene.objects[0]!).map((p) => densify(p, 0.02).map(oracle));
+    const act = worldPolys(obj('d'));
+    out(`D7-${tag}`, { box, fail, n: act[0]?.length, finite: act.flat().every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)), hd: hausdorff(truth, act, 0.05), toast: lastToast(), undo: st().undoStack.length });
+  }
+});
+
+// ---------- D8 many objects ----------
+it('D8 many objects', () => {
+  const objs: SceneObject[] = [];
+  for (let i = 0; i < 400; i++) objs.push(denseRect(`m${i}`, 100 + (i % 20) * 10, 100 + Math.floor(i / 20) * 10, 6, 6, 1));
+  load(objs, objs.map((o) => o.id));
+  const before = st().project;
+  const t0 = Date.now();
+  const s = deform(moveH({ 5: { x: 40, y: 30 }, 10: { x: -30, y: 20 }, 15: { x: 50, y: 50 } }));
+  const fail = warpDeformPreview(before, activeWarpDeformSession()).failure;
+  const tPrev = Date.now() - t0;
+  applyWarpDeformTool();
+  const tAll = Date.now() - t0;
+  const oracle = oracleDeform(s.box, s.handles);
+  let worst = 0;
+  for (const id of ['m0', 'm199', 'm399', 'm57']) {
+    const hd = hausdorff([densify(worldPolys(before.scene.objects.find((o) => o.id === id)!)[0]!, 0.05).map(oracle)], worldPolys(obj(id)), 0.1);
+    worst = Math.max(worst, hd.fwd, hd.back);
+  }
+  out('D8', { fail, tPreviewMs: tPrev, tAllMs: tAll, worstHdMm: worst, toast: lastToast() });
+});
+
+// ---------- D9 folds with interior artwork, extreme enlargement ----------
+it('D9 folds with interior content', () => {
+  const ellD = (id: string, x: number, y: number, w: number, hgt: number) => ({ ...createEllipse({ id, color: '#000000', spec: { widthMm: w, heightMm: hgt }, transform: { ...IDENTITY_TRANSFORM, x, y } }), operationIds: ['L'] }) as SceneObject;
+  const lines: { closed: boolean; points: Vec[] }[] = [];
+  for (const y of [110, 125, 130, 145]) lines.push({ closed: false, points: [{ x: 100, y }, { x: 200, y }] });
+  for (const x of [115, 133.333, 150, 180]) lines.push({ closed: false, points: [{ x, y: 100 }, { x, y: 160 }] });
+  for (const [tag, fn] of [
+    ['fold-interior', moveH({ 5: { x: 120, y: 70 } })],
+    ['crossed-columns', (h: Vec[]) => h.map((p, i) => (i % 4 === 1 ? { x: p.x + 60, y: p.y } : i % 4 === 2 ? { x: p.x - 60, y: p.y } : p))],
+    ['twist', (h: Vec[]) => h.map((p, i) => (i === 5 ? { x: p.x + 60, y: p.y + 40 } : i === 10 ? { x: p.x - 60, y: p.y - 40 } : i === 6 ? { x: p.x - 40, y: p.y + 40 } : i === 9 ? { x: p.x + 40, y: p.y - 40 } : p))],
+  ] as const) {
+    load([denseRect('r', 100, 100, 100, 60, 1), svg('g', lines), ellD('e', 130, 115, 30, 30)], ['r', 'g', 'e']);
+    const before = st().project;
+    const { box, handles } = deform(fn as (h: Vec[]) => Vec[]);
+    const fail = warpDeformPreview(before, activeWarpDeformSession()).failure;
+    applyWarpDeformTool();
+    const oracle = oracleDeform(box, handles);
+    const truthG = worldPolys(before.scene.objects[1]!).map((p) => densify(p, 0.02).map(oracle));
+    const truthE: Vec[] = [];
+    for (let k = 0; k <= 40000; k++) { const a = (2 * Math.PI * k) / 40000; truthE.push(oracle({ x: 145 + 15 * Math.cos(a), y: 130 + 15 * Math.sin(a) })); }
+    const actG = worldPolys(obj('g'));
+    out(`D9-${tag}`, {
+      fail,
+      lines: truthG.map((t, i) => hausdorff([t], [actG[i]!], 0.1)),
+      lineSelfX: actG.map((p) => selfCrossings(p)),
+      ellipse: hausdorff([truthE], worldPolys(obj('e')), 0.05), ellipseSelfX: selfCrossings(worldPolys(obj('e'))[0]!),
+      toast: lastToast(),
+    });
+  }
+});
+
+it('D10 extreme enlargement and refusal', () => {
+  for (const k of [200, 400]) {
+    const e = { ...createEllipse({ id: 'e', color: '#000000', spec: { widthMm: 2, heightMm: 2 }, transform: { ...IDENTITY_TRANSFORM, x: 100, y: 100 } }), operationIds: ['L'] } as SceneObject;
+    load([e], ['e']);
+    const before = st().project;
+    const s = deform((h) => h.map((p, i) => ({ x: 100 + (p.x - 100) * k + (i === 5 ? 0.3 * k : 0), y: 100 + (p.y - 100) * k + (i === 10 ? -0.4 * k : 0) })));
+    const fail = warpDeformPreview(before, activeWarpDeformSession()).failure;
+    applyWarpDeformTool();
+    const truth: Vec[] = [];
+    const o = oracleDeform(s.box, s.handles);
+    for (let j = 0; j <= 60000; j++) { const a = (2 * Math.PI * j) / 60000; truth.push(o({ x: 101 + Math.cos(a), y: 101 + Math.sin(a) })); }
+    out(`D10-${k}x`, { fail, same: st().project === before, n: worldPolys(obj('e'))[0]?.length, hd: fail ? null : hausdorff([truth], worldPolys(obj('e')), 0.05), toast: lastToast() });
+  }
+});
+
+it('D11 enlargement truth from the stored cubic curves', () => {
+  for (const k of [100, 200, 400]) {
+    const e = { ...createEllipse({ id: 'e', color: '#000000', spec: { widthMm: 2, heightMm: 2 }, transform: { ...IDENTITY_TRANSFORM, x: 100, y: 100 } }), operationIds: ['L'] } as SceneObject;
+    load([e], ['e']);
+    const before = st().project;
+    const s = deform((h) => h.map((p, i) => ({ x: 100 + (p.x - 100) * k + (i === 5 ? 0.3 * k : 0), y: 100 + (p.y - 100) * k + (i === 10 ? -0.4 * k : 0) })));
+    applyWarpDeformTool();
+    const o = oracleDeform(s.box, s.handles);
+    const curve = (before.scene.objects[0] as unknown as { paths: { curves: { start: Vec; segments: { kind: string; control1: Vec; control2: Vec; to: Vec }[] }[] }[] }).paths[0]!.curves[0]!;
+    const truth: Vec[] = [];
+    let cur = curve.start;
+    for (const seg of curve.segments) {
+      for (let j = 0; j < 15000; j++) truth.push(o(applyTransform(casteljau([cur, seg.control1, seg.control2, seg.to], j / 15000), e.transform)));
+      cur = seg.to;
+    }
+    truth.push(truth[0]!);
+    out(`D11-${k}x`, { segs: curve.segments.length, n: worldPolys(obj('e'))[0]?.length, hdVsStoredCubic: hausdorff([truth], worldPolys(obj('e')), 0.05) });
+  }
+});
