@@ -150,15 +150,7 @@ function pieceColour(
 ): Colour | null {
   const atReference = reference === null ? null : meanColour(coarse, reference);
   if (atReference !== null && colourDistance(atReference, bed) > contrast) return atReference;
-  const bright: number[] = [];
-  const dark: number[] = [];
-  const bedLuma = luma(bed[0], bed[1], bed[2]);
-  for (let i = 0; i < coarse.visible.length; i += 1) {
-    if (coarse.visible[i] !== 1 || !(distance(coarse.rgb, i, bed) > contrast)) continue;
-    const l = luma(coarse.rgb[i * 3] ?? 0, coarse.rgb[i * 3 + 1] ?? 0, coarse.rgb[i * 3 + 2] ?? 0);
-    (l >= bedLuma ? bright : dark).push(i);
-  }
-  const side = dark.length > DARK_SIDE_MAJORITY * bright.length ? dark : bright;
+  const side = standingOutSide(coarse, bed, contrast);
   if (side.length < MIN_PIECE_PIXELS_MM2 * pixelsPerMm * pixelsPerMm) return null;
   const some = spread(side);
   const far = some.map((i) => distance(coarse.rgb, i, bed));
@@ -167,6 +159,20 @@ function pieceColour(
     coarse.rgb,
     some.filter((_, k) => (far[k] ?? 0) >= cut),
   );
+}
+
+// The pixels standing out from the bed on its brighter side, or on its darker
+// side when those outnumber them DARK_SIDE_MAJORITY times.
+function standingOutSide(coarse: PieceImage, bed: Colour, contrast: number): number[] {
+  const bright: number[] = [];
+  const dark: number[] = [];
+  const bedLuma = luma(bed[0], bed[1], bed[2]);
+  for (let i = 0; i < coarse.visible.length; i += 1) {
+    if (coarse.visible[i] !== 1 || !(distance(coarse.rgb, i, bed) > contrast)) continue;
+    const l = luma(coarse.rgb[i * 3] ?? 0, coarse.rgb[i * 3 + 1] ?? 0, coarse.rgb[i * 3 + 2] ?? 0);
+    (l >= bedLuma ? bright : dark).push(i);
+  }
+  return dark.length > DARK_SIDE_MAJORITY * bright.length ? dark : bright;
 }
 
 // Each pixel's place on the line from the bed's colour to the pieces', clamped to [0, 1].
@@ -237,20 +243,28 @@ function leastBlur(
 
 /** Mean blurred colour around `at`, or null where the camera saw none of it. */
 function meanColour(image: PieceImage, at: PixelPoint): Colour | null {
+  const pixels = seenAround(image, at);
+  if (pixels.length === 0) return null;
   const sum = [0, 0, 0];
-  let count = 0;
+  for (const i of pixels) {
+    for (let c = 0; c < 3; c += 1) sum[c] = (sum[c] ?? 0) + (image.rgb[i * 3 + c] ?? 0);
+  }
+  const n = pixels.length;
+  return [(sum[0] ?? 0) / n, (sum[1] ?? 0) / n, (sum[2] ?? 0) / n];
+}
+
+// The seen pixels within REFERENCE_RADIUS_PX of `at` (a square window).
+function seenAround(image: PieceImage, at: PixelPoint): number[] {
+  const pixels: number[] = [];
   const cx = Math.round(at.x);
   const cy = Math.round(at.y);
   for (let y = cy - REFERENCE_RADIUS_PX; y <= cy + REFERENCE_RADIUS_PX; y += 1) {
     for (let x = cx - REFERENCE_RADIUS_PX; x <= cx + REFERENCE_RADIUS_PX; x += 1) {
       if (x < 0 || y < 0 || x >= image.width || y >= image.height) continue;
-      const i = y * image.width + x;
-      if (image.visible[i] !== 1) continue;
-      for (let c = 0; c < 3; c += 1) sum[c] = (sum[c] ?? 0) + (image.rgb[i * 3 + c] ?? 0);
-      count += 1;
+      if (image.visible[y * image.width + x] === 1) pixels.push(y * image.width + x);
     }
   }
-  return count === 0 ? null : [(sum[0] ?? 0) / count, (sum[1] ?? 0) / count, (sum[2] ?? 0) / count];
+  return pixels;
 }
 
 function distance(rgb: Float32Array, i: number, colour: Colour): number {

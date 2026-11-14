@@ -49,6 +49,21 @@ function transformLine(
   d: Float64Array,
 ): void {
   for (let i = 0; i < length; i += 1) f[i] = values[start + i * step] ?? 0;
+  const { v, z } = lowerEnvelope(f, length);
+  let k = 0;
+  for (let q = 0; q < length; q += 1) {
+    while ((z[k + 1] ?? Infinity) < q) k += 1;
+    const p = v[k] ?? 0;
+    d[q] = (q - p) * (q - p) + (f[p] ?? 0);
+  }
+  for (let i = 0; i < length; i += 1) values[start + i * step] = d[i] ?? 0;
+}
+
+// The parabolas of the lower envelope (v) and where each takes over (z).
+function lowerEnvelope(
+  f: Float64Array,
+  length: number,
+): { readonly v: Int32Array; readonly z: Float64Array } {
   const v = new Int32Array(length);
   const z = new Float64Array(length + 1);
   let k = 0;
@@ -65,13 +80,7 @@ function transformLine(
     z[k] = s;
     z[k + 1] = Infinity;
   }
-  k = 0;
-  for (let q = 0; q < length; q += 1) {
-    while ((z[k + 1] ?? Infinity) < q) k += 1;
-    const p = v[k] ?? 0;
-    d[q] = (q - p) * (q - p) + (f[p] ?? 0);
-  }
-  for (let i = 0; i < length; i += 1) values[start + i * step] = d[i] ?? 0;
+  return { v, z };
 }
 
 function intersection(f: Float64Array, q: number, p: number): number {
@@ -88,36 +97,61 @@ export function cutAtNecks(
   width: number,
   pixelsPerMm: number,
 ): number {
-  const order = deepestFirst(on, depth);
-  const parent = new Int32Array(on.length).fill(-1);
-  const peak = new Float32Array(on.length);
-  const prominence = PROMINENCE_MM * pixelsPerMm;
-  const minDepth = MIN_DEPTH_MM * pixelsPerMm;
   const height = on.length / width;
-  const near = new Int32Array(4);
-  const roots = new Int32Array(4);
-  for (const p of order) {
-    const level = depth[p] ?? 0;
-    const count = rootsAround(p, width, height, parent, near, roots);
-    if (count === 0) {
-      parent[p] = p;
-      peak[p] = level;
-      continue;
-    }
-    let main = roots[0] ?? p;
-    for (let k = 1; k < count; k += 1) {
-      const root = roots[k] ?? p;
-      if ((peak[root] ?? 0) > (peak[main] ?? 0)) main = root;
-    }
-    parent[p] = main;
-    for (let k = 0; k < count; k += 1) {
-      const root = roots[k] ?? p;
-      if (root === main) continue;
-      const rise = (peak[root] ?? 0) - level;
-      if (rise < prominence || (peak[root] ?? 0) < minDepth) parent[root] = main;
-    }
+  const flood: Flood = {
+    parent: new Int32Array(on.length).fill(-1),
+    peak: new Float32Array(on.length),
+    near: new Int32Array(4),
+    roots: new Int32Array(4),
+    width,
+    height,
+    prominence: PROMINENCE_MM * pixelsPerMm,
+    minDepth: MIN_DEPTH_MM * pixelsPerMm,
+  };
+  for (const p of deepestFirst(on, depth)) floodPixel(flood, p, depth[p] ?? 0);
+  return cutBetweenBasins(on, flood.parent, width, height);
+}
+
+type Flood = {
+  /** Flooded region of each pixel (union-find), -1 before it is reached. */
+  readonly parent: Int32Array;
+  /** Depth of each region's deepest pixel, kept at its root. */
+  readonly peak: Float32Array;
+  readonly near: Int32Array;
+  readonly roots: Int32Array;
+  readonly width: number;
+  readonly height: number;
+  readonly prominence: number;
+  readonly minDepth: number;
+};
+
+// Pixel p, at depth `level`, joins the deepest region beside it; any other
+// region beside it that does not stand clear of that level joins too.
+function floodPixel(flood: Flood, p: number, level: number): void {
+  const { parent, peak, roots } = flood;
+  const count = rootsAround(p, flood.width, flood.height, parent, flood.near, roots);
+  if (count === 0) {
+    parent[p] = p;
+    peak[p] = level;
+    return;
   }
-  return cutBetweenBasins(on, parent, width, height);
+  const main = deepestRoot(flood, count, p);
+  parent[p] = main;
+  for (let k = 0; k < count; k += 1) {
+    const root = roots[k] ?? p;
+    if (root === main) continue;
+    const top = peak[root] ?? 0;
+    if (top - level < flood.prominence || top < flood.minDepth) parent[root] = main;
+  }
+}
+
+function deepestRoot(flood: Flood, count: number, fallback: number): number {
+  let main = flood.roots[0] ?? fallback;
+  for (let k = 1; k < count; k += 1) {
+    const root = flood.roots[k] ?? fallback;
+    if ((flood.peak[root] ?? 0) > (flood.peak[main] ?? 0)) main = root;
+  }
+  return main;
 }
 
 // The distinct flooded regions next to pixel p, written into `roots`; returns how many.
@@ -144,26 +178,31 @@ function rootsAround(
 
 // Piece pixels, deepest first: a counting sort on the bucketed depth.
 function deepestFirst(on: Uint8Array, depth: Float32Array): Int32Array {
-  const bucketOf = (i: number): number => Math.round((depth[i] ?? 0) / DEPTH_STEP_PX);
-  let top = 0;
-  let total = 0;
+  // Each piece pixel's bucket counted from the deepest (0), -1 off the pieces.
+  const bucket = new Int32Array(on.length).fill(-1);
+  let deepest = 0;
   for (let i = 0; i < on.length; i += 1) {
     if (on[i] !== 1) continue;
-    top = Math.max(top, bucketOf(i));
-    total += 1;
+    bucket[i] = Math.round((depth[i] ?? 0) / DEPTH_STEP_PX);
+    deepest = Math.max(deepest, bucket[i] ?? 0);
   }
-  const starts = new Int32Array(top + 2);
   for (let i = 0; i < on.length; i += 1) {
-    if (on[i] === 1) starts[top - bucketOf(i) + 1] = (starts[top - bucketOf(i) + 1] ?? 0) + 1;
+    if ((bucket[i] ?? -1) >= 0) bucket[i] = deepest - (bucket[i] ?? 0);
   }
+  return countingOrder(bucket, deepest + 1);
+}
+
+// Indices with a bucket of 0 .. buckets - 1, ordered by bucket, stable.
+function countingOrder(bucket: Int32Array, buckets: number): Int32Array {
+  const starts = new Int32Array(buckets + 1);
+  for (const b of bucket) if (b >= 0) starts[b + 1] = (starts[b + 1] ?? 0) + 1;
   for (let k = 1; k < starts.length; k += 1) starts[k] = (starts[k] ?? 0) + (starts[k - 1] ?? 0);
-  const order = new Int32Array(total);
-  for (let i = 0; i < on.length; i += 1) {
-    if (on[i] !== 1) continue;
-    const bucket = top - bucketOf(i);
-    order[starts[bucket] ?? 0] = i;
-    starts[bucket] = (starts[bucket] ?? 0) + 1;
-  }
+  const order = new Int32Array(starts[buckets] ?? 0);
+  bucket.forEach((b, i) => {
+    if (b < 0) return;
+    order[starts[b] ?? 0] = i;
+    starts[b] = (starts[b] ?? 0) + 1;
+  });
   return order;
 }
 

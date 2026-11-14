@@ -369,5 +369,7 @@ it('leaves out of Place a piece the design runs off, and says which', async () =
   expect(host.textContent).toContain('The design runs 3.0 mm off this piece');
   await clickControl(host, 'Place selection on each piece');
   expect(useStore.getState().project.scene.objects).toHaveLength(2);
-  expect(host.textContent).toContain('Placed on 2 pieces. Left out piece 3: the design runs off it.');
+  expect(host.textContent).toContain(
+    'Placed on 2 pieces. Left out piece 3: the design runs off it.',
+  );
 });
