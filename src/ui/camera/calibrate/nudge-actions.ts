@@ -32,7 +32,8 @@ import {
   captureSourceFrame,
   type ActiveCameraSource,
 } from '../frame-source';
-import { markCameraSteady } from '../helpers/moved-check';
+import { markCameraSteady, useCameraMovedStore } from '../helpers/moved-check';
+import { nudgeMoveCheck, type NudgeMoveCheck } from './nudge-move-check';
 import { saveViewReference } from '../helpers/view-reference';
 import { viewThumbnail } from '../../../core/camera/model/view-shift';
 import { refreshCameraPicture } from '../helpers/refresh-picture';
@@ -142,6 +143,16 @@ function unusableCalibrationReason(): string | null {
   return note !== null && !note.usable ? note.message : null;
 }
 
+/** What the camera-moved check knows about the running camera's own calibration. */
+export function nudgeMoveCheckNow(): NudgeMoveCheck {
+  const { sourceState } = useCameraStore.getState();
+  const own =
+    sourceState.kind === 'live'
+      ? ownCameraModel(useStore.getState().project.device, sourceState)
+      : undefined;
+  return nudgeMoveCheck(useCameraMovedStore.getState().state, own?.calibratedAt);
+}
+
 /**
  * Move the running camera's saved calibration by `offsetMm` (one undo step)
  * and show a fresh picture with it. A ring burned before the bed position was
@@ -155,6 +166,9 @@ export function applyNudge(offsetMm: Vec2, ringBedUnknown = false): boolean {
   if (sourceState.kind !== 'live') return false;
   const own = ownCameraModel(project.device, sourceState);
   if (own === undefined || isHeadCameraModel(own)) return false;
+  // A measured turn is never fixed with one offset (ADR-663 Amendment 7).
+  const check = nudgeMoveCheck(useCameraMovedStore.getState().state, own.calibratedAt);
+  if (check.kind === 'turned') return false;
   const moved = nudgedCameraModel(own, offsetMm);
   const nudged = ringBedUnknown ? withUnknownNativeOffset(moved) : moved;
   updateDeviceProfile(withSavedCameraModel(project.device, nudged));
@@ -169,7 +183,9 @@ export function applyNudge(offsetMm: Vec2, ringBedUnknown = false): boolean {
       now.projectDocumentEpoch !== owner.projectDocumentEpoch ||
       now.project.device !== owner.project.device ||
       camera.sourceState !== sourceState ||
-      camera.overlayStill === null
+      camera.overlayStill === null ||
+      // A view that no longer matched keeps its warning: the fix saw the middle only.
+      check.kind === 'changed'
     )
       return;
     saveViewReference(nudged, viewThumbnail(camera.overlayStill));

@@ -10,7 +10,7 @@ import type { CameraModelRecord } from './camera-model-record';
 import { brownToBed, trueOverlayErrorMm, type BrownCamera } from './brown-truth-camera';
 import { lookAt, wideLens } from './model-fixtures';
 import { calibrateFromBedTarget } from '../target/bed-calibration';
-import { bedTargetLayout } from '../target/bed-target';
+import { bedTargetLayout, bedTargetLayoutWithRings } from '../target/bed-target';
 import { renderTargetScene } from '../target/target-render-fixtures';
 
 const SHEET_MM = 3;
@@ -73,19 +73,23 @@ export function calibrateTruthCamera(
   truth: BrownCamera,
   sheet: { readonly width: number; readonly height: number } = { width: 300, height: 200 },
   bed: { readonly width: number; readonly height: number } = { width: 400, height: 400 },
+  /** A head camera's small target: its margin and ring size, mm. */
+  target: { readonly marginMm: number; readonly ringMm: number } | null = null,
 ): TruthCalibration {
+  const margin = target?.marginMm ?? 5;
   const sheetArea = {
     x: (bed.width - sheet.width) / 2,
     y: (bed.height - sheet.height) / 2,
     ...sheet,
   };
   const area = {
-    x: sheetArea.x + 5,
-    y: sheetArea.y + 5,
-    width: sheet.width - 10,
-    height: sheet.height - 10,
+    x: sheetArea.x + margin,
+    y: sheetArea.y + margin,
+    width: sheet.width - 2 * margin,
+    height: sheet.height - 2 * margin,
   };
-  const layout = bedTargetLayout({ area });
+  const layout =
+    target === null ? bedTargetLayout({ area }) : bedTargetLayoutWithRings(area, target.ringMm);
   const frame = renderTargetScene({
     lens: wideLens(truth.width),
     pose: truth.pose,
@@ -112,7 +116,21 @@ export function calibrateTruthCamera(
       marks: savedMarkErrors(calibration.markErrors),
     },
   };
-  let worst = 0;
+  const trueOffTarget = trueErrorOffTarget(truth, calibration, area, bed);
+  const worst = trueOffTarget.reduce((most, point) => Math.max(most, point.mm), 0);
+  return { record, trueOffTargetMm: worst, trueOffTarget };
+}
+
+// The true overlay error at each 10 mm grid point the camera sees outside `area`.
+function trueErrorOffTarget(
+  truth: BrownCamera,
+  calibration: {
+    readonly lens: CameraModelRecord['lens'];
+    readonly pose: CameraModelRecord['pose'];
+  },
+  area: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
+  bed: { readonly width: number; readonly height: number },
+): Array<{ x: number; y: number; mm: number }> {
   const trueOffTarget: Array<{ x: number; y: number; mm: number }> = [];
   for (let y = 0; y <= bed.height; y += 10) {
     for (let x = 0; x <= bed.width; x += 10) {
@@ -125,10 +143,8 @@ export function calibrateTruthCamera(
         { x, y },
         SHEET_MM,
       );
-      if (error === null) continue;
-      worst = Math.max(worst, error);
-      trueOffTarget.push({ x, y, mm: error });
+      if (error !== null) trueOffTarget.push({ x, y, mm: error });
     }
   }
-  return { record, trueOffTargetMm: worst, trueOffTarget };
+  return trueOffTarget;
 }

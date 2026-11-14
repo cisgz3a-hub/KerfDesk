@@ -149,7 +149,7 @@ describe('the quick nudge fix', () => {
   it('changes nothing when the picture already lines up', async () => {
     const before = useStore.getState().project.device.cameraModel;
     await photoWithOffset(0.1, -0.05);
-    expect(document.body.textContent).toContain('Nothing to fix.');
+    expect(document.body.textContent).toContain('Nothing to fix there.');
     await clickControl(document.body, 'Done');
     expect(useStore.getState().project.device.cameraModel).toBe(before);
   });
