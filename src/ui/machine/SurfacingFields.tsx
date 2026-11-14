@@ -9,12 +9,9 @@ import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useSourceTrackedState } from '../common/use-source-tracked-state';
 import { useStore } from '../state/store';
 import { surfacingSeed } from './surfacing-seed';
+import { roundToTenth } from '../../core/util/rounding';
 import { surfacingSentRates } from './surfacing-rates';
 
-// A scaled feed can carry decimals; the note shows one (the F word carries three).
-function roundedRate(mmPerMin: number): number {
-  return Math.round(mmPerMin * 10) / 10;
-}
 export function useSurfacingValues(
   machine: CncMachineConfig,
   project: Project,
@@ -102,8 +99,9 @@ export function SurfacingFields({
       </p>
       {limited ? (
         <p role="note">
-          Output uses {roundedRate(sent.feedMmPerMin)} mm/min feed,{' '}
-          {roundedRate(sent.plungeMmPerMin)} mm/min plunge and {sent.spindleRpm} RPM after machine
+          {/* A scaled feed can carry decimals: one is shown (the F word carries three). */}
+          Output uses {roundToTenth(sent.feedMmPerMin)} mm/min feed,{' '}
+          {roundToTenth(sent.plungeMmPerMin)} mm/min plunge and {sent.spindleRpm} RPM after machine
           limits.
           {sent.spindleCap === undefined
             ? null
