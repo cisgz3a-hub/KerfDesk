@@ -64,7 +64,7 @@ export function stampDraftImage(
 /** Add a fresh image through the existing artwork operation allocator. Source
  * objects, groups and pixels retain their exact identities, but they stop
  * burning: left on, they would engrave the raised face the stamp leaves
- * standing (ADR-570 Amendment 2, tools audit T32-P1-1). Undo restores them. */
+ * standing (ADR-570 Amendment 3, tools audit T32-P1-1). Undo restores them. */
 export function applyStampDraft(
   state: AppState,
   owner: StampOwner,

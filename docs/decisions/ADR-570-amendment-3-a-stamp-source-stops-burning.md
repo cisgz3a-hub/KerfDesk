@@ -1,4 +1,4 @@
-## ADR-570 Amendment 2 - A stamp's source artwork stays, with Output off (2026-11-14)
+## ADR-570 Amendment 3 - A stamp's source artwork stays, with Output off (2026-11-14)
 
 **Status:** Accepted. Tools audit T1 finding T32-P1-1 and the P3s found with it. | **Date:** 2026-11-14
 
