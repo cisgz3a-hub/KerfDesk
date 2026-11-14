@@ -13,7 +13,10 @@
 // Only flat and ball-nose cutters are compared: an angled bit's cutting width
 // and chip load change with depth, and the chart does not describe it.
 
-import { findCncMachineStarterById } from '../../core/cnc/cnc-machine-starter-catalog';
+import {
+  cncSpindleMinRpm,
+  findCncMachineStarterById,
+} from '../../core/cnc/cnc-machine-starter-catalog';
 import { cncGroupMaximumDepthMm } from '../../core/cnc/cnc-group-maximum-depth';
 import {
   chiploadFor,
@@ -35,12 +38,13 @@ export function detectCncCutGuideWarnings(project: Project, job: Job): ReadonlyA
   const machine = project.machine;
   if (machine?.kind !== 'cnc') return [];
   const warnings = new Set<string>();
+  const spindleMinRpm = cncSpindleMinRpm(project.device);
   for (const group of job.groups) {
     if (group.kind !== 'cnc' || group.passes.length === 0 || !comparable(group)) continue;
     const source = sourceName(project, group);
     const tool = machine.tools.find((candidate) => candidate.id === group.toolId);
     for (const warning of depthGuide(group, tool, source)) warnings.add(warning);
-    const low = lowChipload(group, source);
+    const low = lowChipload(group, source, spindleMinRpm);
     if (low !== null) warnings.add(low);
   }
   return [...warnings];
@@ -75,7 +79,11 @@ function depthGuide(group: CncGroup, tool: CncTool | undefined, source: string):
   return out;
 }
 
-function lowChipload(group: CncGroup, source: string): string | null {
+function lowChipload(
+  group: CncGroup,
+  source: string,
+  spindleMinRpm: number | undefined,
+): string | null {
   if (group.cutType === 'drill') return null;
   const material = chartMaterial(group);
   if (material === null) return null;
@@ -87,8 +95,19 @@ function lowChipload(group: CncGroup, source: string): string | null {
     `${source} cuts at ${sent.toFixed(4)} mm/tooth, ${Math.round((sent / chart) * 100)}% of the ` +
     `${chart.toFixed(4)} mm/tooth the material chart gives a ${mm(group.toolDiameterMm)} mm bit ` +
     `(${Math.round(group.feedMmPerMin)} mm/min at ${Math.round(group.spindleRpm)} RPM, ${flutes} ` +
-    'flutes). At that chip load the bit rubs instead of cutting, which heats and dulls it: raise ' +
-    'the feed, or lower the spindle speed, until it is nearer the chart.'
+    `flutes). At that chip load the bit rubs instead of cutting, which heats and dulls it: ${lowChiploadAdvice(group, spindleMinRpm)}`
+  );
+}
+
+// CNC audit v3 N7r-P3-1: at the spindle's rated minimum (ADR-256 Amd 1) a lower
+// speed is not on offer, so the advice names what is left.
+function lowChiploadAdvice(group: CncGroup, spindleMinRpm: number | undefined): string {
+  if (spindleMinRpm === undefined || group.spindleRpm > spindleMinRpm) {
+    return 'raise the feed, or lower the spindle speed, until it is nearer the chart.';
+  }
+  return (
+    `the spindle is already at its ${spindleMinRpm} RPM minimum, so raise the feed if the ` +
+    'machine can take it, or use a smaller bit, whose chart chip load is lower.'
   );
 }
 

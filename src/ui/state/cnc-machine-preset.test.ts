@@ -76,6 +76,32 @@ describe('applyCncMachinePreset', () => {
     expect(layers.find((layer) => layer.id === 'automatic')?.cnc?.spindleRpm).toBe(10000);
   });
 
+  // CNC audit v3 N6-P3-3: the presets cite Z travel but never recorded it.
+  it.each([
+    ['genmitsu-3018', 45],
+    ['genmitsu-4040', 78],
+    ['neotronics-4040-max', 75],
+  ])('records the cited Z travel of %s as unconfirmed', (id, travel) => {
+    const preset = CNC_MACHINE_CATALOG.find((candidate) => candidate.id === id);
+    if (preset === undefined) throw new Error('preset missing');
+    useStore.getState().applyCncMachinePreset(preset);
+    expect(useStore.getState().project.device).toMatchObject({
+      zTravelMm: travel,
+      zTravelConfirmed: false,
+    });
+  });
+
+  it('keeps a confirmed, measured Z travel', () => {
+    useStore.getState().updateDeviceProfile({ zTravelMm: 52, zTravelConfirmed: true });
+    const preset = CNC_MACHINE_CATALOG.find((candidate) => candidate.id === 'genmitsu-3018');
+    if (preset === undefined) throw new Error('preset missing');
+    useStore.getState().applyCncMachinePreset(preset);
+    expect(useStore.getState().project.device).toMatchObject({
+      zTravelMm: 52,
+      zTravelConfirmed: true,
+    });
+  });
+
   it('is a no-op in laser mode', () => {
     useStore.getState().setMachineKind('laser');
     const beforeBed = useStore.getState().project.device.bedWidth;

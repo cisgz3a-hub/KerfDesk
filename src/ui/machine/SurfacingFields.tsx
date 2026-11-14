@@ -9,6 +9,9 @@ import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useSourceTrackedState } from '../common/use-source-tracked-state';
 import { useStore } from '../state/store';
 import { surfacingSeed } from './surfacing-seed';
+import { roundToTenth } from '../../core/util/rounding';
+import { surfacingSentRates } from './surfacing-rates';
+
 export function useSurfacingValues(
   machine: CncMachineConfig,
   project: Project,
@@ -90,10 +93,11 @@ export function SurfacingFields({
   readonly machine: CncMachineConfig;
 }): JSX.Element {
   const { tool, starter, maxFeed, inputs } = values;
+  const sent = surfacingSentRates(inputs, maxFeed, machine.params.spindleMaxRpm);
   const limited =
-    inputs.feedMmPerMin > maxFeed ||
-    inputs.plungeMmPerMin > maxFeed ||
-    inputs.spindleRpm > machine.params.spindleMaxRpm;
+    sent.feedMmPerMin !== inputs.feedMmPerMin ||
+    sent.plungeMmPerMin !== inputs.plungeMmPerMin ||
+    sent.spindleRpm !== inputs.spindleRpm;
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
@@ -110,9 +114,13 @@ export function SurfacingFields({
       <p>{surfacingOverhangNote(tool.diameterMm)}</p>
       {limited ? (
         <p role="note">
-          Output uses {Math.min(inputs.feedMmPerMin, maxFeed)} mm/min feed,{' '}
-          {Math.min(inputs.plungeMmPerMin, maxFeed)} mm/min plunge and{' '}
-          {Math.min(inputs.spindleRpm, machine.params.spindleMaxRpm)} RPM after machine limits.
+          {/* A scaled feed can carry decimals: one is shown (the F word carries three). */}
+          Output uses {roundToTenth(sent.feedMmPerMin)} mm/min feed,{' '}
+          {roundToTenth(sent.plungeMmPerMin)} mm/min plunge and {sent.spindleRpm} RPM after machine
+          limits.
+          {sent.spindleCap === undefined
+            ? null
+            : ` The spindle is capped at ${sent.spindleRpm} RPM, so feed and plunge are lowered by the same ratio to keep the chip load planned at ${sent.spindleCap.requestedRpm} RPM.`}
         </p>
       ) : null}
     </>
