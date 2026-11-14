@@ -9,6 +9,7 @@ import {
   type TraceOptions,
 } from '../../core/trace';
 import type { BatchTraceJob, BatchTraceOutput, BatchTraceSkip } from '../../core/trace/batch-trace';
+import { errorMessage } from '../../core/util/error-message';
 import { tracedLayersToDxf } from '../../io/dxf/export-dxf';
 import { writeTracedDrawing } from '../../io/vector-formats/traced-drawing';
 import type { PlatformAdapter, SaveDirectoryTarget } from '../../platform/types';
@@ -198,7 +199,7 @@ async function buildWithTracer(
       // preview grid instead of aborting the batch. Cancellation still aborts.
       canFallBack: (error) => recoverable(error) && !isTraceInterrupted(error),
       canSkip: recoverable,
-      onFallback: (index, error) => previewResolution.set(index, fallbackReason(error)),
+      onFallback: (index, error) => previewResolution.set(index, errorMessage(error)),
       writeDrawing: writeTracedDrawing,
     },
     deps.output ?? {},
@@ -222,10 +223,6 @@ async function buildWithTracer(
     };
     return fileNotices.length === 0 ? sized : { ...sized, notices: fileNotices };
   }
-}
-
-function fallbackReason(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function multiFileJobContext(deps: MultiFileTraceDeps): MultiFileJobContext {
