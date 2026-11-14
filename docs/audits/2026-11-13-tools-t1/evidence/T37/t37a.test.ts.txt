@@ -1,0 +1,293 @@
+// @vitest-environment jsdom
+// T37 Optimize Shapes: burn before vs after through the store action, an independent
+// Hausdorff oracle on the decoded G-code, transforms, text, variable data, undo, reopen.
+import { beforeEach, it } from 'vitest';
+import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  DEFAULT_PROJECT_VARIABLE_DATA,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type Layer,
+  type Polyline,
+  type Project,
+  type SceneObject,
+  type TextObject,
+  type TracedImage,
+  type Transform,
+  type Vec2,
+} from '../t36-main/src/core/scene';
+import { textToPolylines } from '../t36-main/src/core/text';
+import { prepareOutput } from '../t36-main/src/io/gcode/prepare-output';
+import { prepareOutputSnapshot, type VariableTextRenderer } from '../t36-main/src/io/gcode/prepare-output-snapshot';
+import { emitPreparedGcode } from '../t36-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t36-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t36-main/src/io/project/deserialize-project';
+import { useStore } from '../t36-main/src/ui/state/store';
+import { resetStore } from '../t36-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t36-main/src/ui/state/toast-store';
+import { DEFAULT_SHAPE_OPTIMIZE_OPTIONS, type ShapeOptimizeOptions } from '../t36-main/src/core/geometry/shape-optimize/shape-optimize-options';
+import { planOptimizeShapes, optimizeShapesSelection } from '../t36-main/src/ui/state/optimize-shapes-plan';
+import { createBarcodeObject, defaultBarcodeSpec } from '../t36-main/src/core/barcode';
+import { parseVariableTemplateSource } from '../t36-main/src/core/variables';
+import { litMoves, totalLen, bbox, type LitMove } from './decode';
+import { hausdorff, segsFromMoves } from './oracle';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t37/t37a.log';
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync(LOG, log.join('\n'));
+};
+beforeEach(() => {
+  resetStore();
+  useToastStore.setState({ toasts: [] } as never);
+});
+const st = () => useStore.getState();
+const f3 = (n: number) => n.toFixed(3);
+const toasts = () => useToastStore.getState().toasts.map((t) => t.message);
+
+const roboto = (() => {
+  const b = readFileSync('C:/Users/stolk/kd-t1/t36-main/src/ui/text/fonts/Roboto-Regular.ttf');
+  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+})();
+const renderer: VariableTextRenderer = ({ text, content }) =>
+  textToPolylines({
+    content,
+    sizeMm: text.sizeMm,
+    alignment: text.alignment,
+    lineHeight: text.lineHeight,
+    letterSpacing: text.letterSpacing,
+    color: text.color,
+    fontBuffer: roboto,
+  });
+
+function layer(mode: 'line' | 'fill', id = 'L', color = '#000000'): Layer {
+  return {
+    ...createLayer({ id, color, name: id, mode }),
+    speed: mode === 'line' ? 1234 : 4321,
+    power: 37,
+    passes: 1,
+    ...(mode === 'fill' ? { hatchSpacingMm: 0.1, hatchAngleDeg: 0 } : {}),
+  } as Layer;
+}
+function proj(objects: SceneObject[], layers: Layer[], extra: Partial<Project> = {}): Project {
+  const base = createProject();
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers, groups: [] }, ...extra };
+}
+function load(p: Project, ids: string[]): void {
+  useStore.setState({ project: p, selectedObjectId: ids[0] ?? null, additionalSelectedIds: new Set(ids.slice(1)), undoStack: [], redoStack: [], dirty: false });
+}
+type Burn = { ok: boolean; moves: LitMove[]; gcode: string; why: string };
+function burn(p: Project): Burn {
+  const prepared = prepareOutput(p);
+  if (!prepared.ok) return { ok: false, moves: [], gcode: '', why: JSON.stringify(prepared.preflight).slice(0, 300) };
+  const g = emitPreparedGcode(prepared).gcode;
+  return { ok: true, moves: litMoves(g, p.device), gcode: g, why: '' };
+}
+function chains(moves: ReadonlyArray<LitMove>): number {
+  let n = 0;
+  let last: LitMove | undefined;
+  for (const m of moves) {
+    if (last === undefined || Math.hypot(last.to.x - m.from.x, last.to.y - m.from.y) > 1e-3) n++;
+    last = m;
+  }
+  return n;
+}
+function travel(gcode: string): number {
+  let x = 0, y = 0, g = 0, t = 0;
+  for (const raw of gcode.split('\n')) {
+    const line = raw.replace(/;.*$/, '').replace(/\(.*?\)/g, '').toUpperCase();
+    const gm = line.match(/G0*([0-3])(?!\d)/);
+    if (gm) g = Number(gm[1]);
+    const xm = line.match(/X(-?\d*\.?\d+)/), ym = line.match(/Y(-?\d*\.?\d+)/);
+    if (!xm && !ym) continue;
+    const nx = xm ? Number(xm[1]) : x, ny = ym ? Number(ym[1]) : y;
+    if (g === 0) t += Math.hypot(nx - x, ny - y);
+    x = nx; y = ny;
+  }
+  return t;
+}
+const arcs = (g: string) => (g.match(/^G[23]\b/gm) ?? []).length;
+
+function rng(seed: number) {
+  let s = seed >>> 0;
+  return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32 - 0.5);
+}
+function noisyCircle(r: number, n: number, jitter: number, seed = 7): Polyline {
+  const R = rng(seed);
+  return { closed: true, points: Array.from({ length: n }, (_, k) => { const a = (2 * Math.PI * k) / n; const rr = r + jitter * R(); return { x: rr * Math.cos(a), y: rr * Math.sin(a) }; }) };
+}
+function traced(id: string, polylines: Polyline[], transform: Transform): TracedImage {
+  return { kind: 'traced-image', id, source: `${id}.png`, bounds: { minX: -20, minY: -20, maxX: 20, maxY: 20 }, transform, paths: [{ color: '#000000', polylines }] } as TracedImage;
+}
+function svg(id: string, polylines: Polyline[], transform: Transform, color = '#000000', extra: Partial<ImportedSvg> = {}): ImportedSvg {
+  return { kind: 'imported-svg', id, source: `${id}.svg`, bounds: { minX: -20, minY: -20, maxX: 20, maxY: 20 }, transform, paths: [{ color, polylines }], ...extra } as ImportedSvg;
+}
+async function textObj(id: string, content: string, sizeMm: number, transform: Transform): Promise<TextObject> {
+  const r = await textToPolylines({ fontBuffer: roboto, content, sizeMm, alignment: 'left', lineHeight: 1.4, color: '#000000' });
+  return { kind: 'text', id, content, fontKey: 'roboto-regular', sizeMm, alignment: 'left', lineHeight: 1.4, letterSpacing: 0, color: '#000000', bounds: r.bounds, transform, paths: r.paths, name: 'my label' } as TextObject;
+}
+const T = (p: Partial<Transform>): Transform => ({ ...IDENTITY_TRANSFORM, x: 100, y: 100, ...p });
+
+/** Optimize through the store, compare decoded G-code before/after with the Hausdorff oracle. */
+function run(name: string, objects: SceneObject[], mode: 'line' | 'fill', opts: Partial<ShapeOptimizeOptions> = {}, layers?: Layer[]) {
+  const p0 = proj(objects, layers ?? [layer(mode)]);
+  load(p0, objects.map((o) => o.id));
+  const options = { ...DEFAULT_SHAPE_OPTIMIZE_OPTIONS, ...opts };
+  const b = burn(p0);
+  const plan = planOptimizeShapes(optimizeShapesSelection(p0.scene, objects.map((o) => o.id)).targets, options);
+  const changed = st().optimizeSelectedShapes(options, plan);
+  const p1 = st().project;
+  const a = burn(p1);
+  const h = mode === 'line' && b.moves.length > 0 && a.moves.length > 0 ? hausdorff(segsFromMoves(b.moves), segsFromMoves(a.moves)) : { h: NaN, ab: NaN, ba: NaN };
+  st().undo();
+  const undoOk = st().project === p0;
+  st().redo();
+  const redoOk = st().project.scene === p1.scene || JSON.stringify(st().project.scene) === JSON.stringify(p1.scene);
+  const re = deserializeProject(serializeProject(p1));
+  const r = re.kind === 'ok' ? burn(re.project) : null;
+  const reopenSame = r !== null && r.moves.length === a.moves.length && Math.abs(totalLen(r.moves) - totalLen(a.moves)) < 1e-6;
+  const o1 = p1.scene.objects;
+  out(`## ${name} [${mode}] opts ${JSON.stringify(opts)}`);
+  out(`  changed ${changed}; kinds ${o1.map((o) => o.kind).join(',')}; plan moved ${f3(plan.stats.movedMm)} pts ${plan.stats.sourcePoints}->${plan.stats.segments}`);
+  out(`  burn ok ${b.ok}/${a.ok} lit ${f3(totalLen(b.moves))} -> ${f3(totalLen(a.moves))}; pierces ${chains(b.moves)} -> ${chains(a.moves)}; travel ${f3(travel(b.gcode))} -> ${f3(travel(a.gcode))}; G2/G3 ${arcs(b.gcode)} -> ${arcs(a.gcode)}; G1 lit moves ${b.moves.length} -> ${a.moves.length}`);
+  out(`  bbox ${JSON.stringify(bbox(b.moves))} -> ${JSON.stringify(bbox(a.moves))}`);
+  out(`  oracle Hausdorff(burn before, burn after) ${f3(h.h)} (b->a ${f3(h.ab)}, a->b ${f3(h.ba)}) vs tolerance ${options.fitToleranceMm}, reported ${f3(plan.stats.movedMm)}`);
+  out(`  undo ${undoOk} redo ${redoOk} reopen ${re.kind} same ${reopenSame}${a.why || b.why ? ` why ${b.why} | ${a.why}` : ''}`);
+  out(`  toast ${JSON.stringify(toasts())}`);
+  return { p0, p1, b, a, h, plan };
+}
+
+it('A. noisy traced circle, identity and rotated/mirrored/non-uniform', () => {
+  for (const [tn, t] of [
+    ['identity', T({})],
+    ['rot20 3x0.5 mirX', T({ rotationDeg: 20, scaleX: 3, scaleY: 0.5, mirrorX: true })],
+    ['scale 0.1', T({ scaleX: 0.1, scaleY: 0.1 })],
+  ] as const) {
+    for (const opts of [{}, { smooth: false }, { smooth: false, fitWith: 'lines-arcs' as const }, { smooth: false, fitToleranceMm: 0.005 }, { smooth: false, fitToleranceMm: 1 }]) {
+      const res = run(`A circle r10 600pts jitter 0.08 ${tn}`, [traced('c', [noisyCircle(10, 600, 0.08)], t)], 'line', opts);
+      // analytic: mean radius of the after burn around the object's centre (identity only)
+      if (tn === 'identity') {
+        const rs = res.a.moves.map((m) => Math.hypot(m.to.x - 100, m.to.y - 100));
+        const mean = rs.reduce((s, v) => s + v, 0) / rs.length;
+        out(`  analytic: after radius mean ${f3(mean)} min ${f3(Math.min(...rs))} max ${f3(Math.max(...rs))} (source 10 +/- 0.04)`);
+      }
+    }
+  }
+});
+
+it('B. text Ag8%@ 20 mm and 3 mm, line and fill; name/metadata', async () => {
+  for (const size of [20, 3]) {
+    for (const mode of ['line', 'fill'] as const) {
+      const t = await textObj('t', 'Ag8%@', size, T({}));
+      const res = run(`B text ${size}mm`, [t], mode);
+      const o = res.p1.scene.objects[0]!;
+      if (mode === 'fill') {
+        out(`  fill hatch lit ${f3(totalLen(res.b.moves))} -> ${f3(totalLen(res.a.moves))} (x0.1 = area ${f3(totalLen(res.b.moves) * 0.1)} -> ${f3(totalLen(res.a.moves) * 0.1)} mm2)`);
+      }
+      out(`  result kind ${o.kind} name ${JSON.stringify((o as { name?: string }).name)} source ${JSON.stringify((o as { source?: string }).source)} contours ${t.paths.reduce((n, p) => n + p.polylines.length, 0)} -> ${'paths' in o ? o.paths.reduce((n, p) => n + p.polylines.length, 0) : 0} fillRule ${'paths' in o ? o.paths.map((p) => p.fillRule ?? '-').join('/') : ''}`);
+    }
+  }
+});
+
+it('C. open noisy arc: ends pinned; two objects on different operations overlapping', () => {
+  const R = rng(3);
+  const open: Polyline = { closed: false, points: Array.from({ length: 200 }, (_, k) => { const a = (Math.PI * k) / 199; return { x: 10 * Math.cos(a) + 0.03 * R(), y: 10 * Math.sin(a) + 0.03 * R() }; }) };
+  const res = run('C open half circle', [svg('o', [open], T({ rotationDeg: 33 }))], 'line');
+  const src = open.points;
+  const o = res.p1.scene.objects[0] as ImportedSvg;
+  const c = o.paths[0]!.curves?.[0];
+  const end = c ? c.segments.at(-1)!.to : o.paths[0]!.polylines[0]!.points.at(-1)!;
+  const start = c ? c.start : o.paths[0]!.polylines[0]!.points[0]!;
+  out(`  ends: start moved ${Math.hypot(start.x - src[0]!.x, start.y - src[0]!.y)}; end moved ${Math.hypot(end.x - src.at(-1)!.x, end.y - src.at(-1)!.y)}`);
+  // overlap: two identical noisy circles, one on Line (cut) and one on another layer colour
+  const l1 = layer('line', 'L', '#000000');
+  const l2 = { ...layer('line', 'M', '#ff0000'), speed: 999 } as Layer;
+  const c1 = traced('a', [noisyCircle(10, 600, 0.08, 1)], T({}));
+  const c2 = { ...traced('b', [noisyCircle(10, 600, 0.08, 1)], T({})), paths: [{ color: '#ff0000', polylines: [noisyCircle(10, 600, 0.08, 1)] }] } as TracedImage;
+  const r2 = run('C2 same outline on two layers', [c1, c2], 'line', {}, [l1, l2]);
+  const per = (moves: LitMove[]) => [...new Set(moves.map((m) => m.f))].map((f) => `F${f}:${f3(totalLen(moves.filter((m) => m.f === f)))}`).join(' ');
+  out(`  per-speed lit ${per(r2.b.moves)} -> ${per(r2.a.moves)}`);
+});
+
+it('D. variable text and variable Code 128 with caption', async () => {
+  const template = 'SN {{serial:4}}';
+  const parsed = parseVariableTemplateSource(template);
+  if (!parsed.ok) throw new Error('parse');
+  const base = { ...(await textObj('VT', template, 10, T({ x: 50, y: 50 }))), variableTemplate: parsed.template } as TextObject;
+  const p0 = proj([base], [layer('line')], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 42 } });
+  load(p0, ['VT']);
+  const snap = async (p: Project, serial: number) => {
+    const pp = { ...p, variables: { ...p.variables, serialValue: serial } };
+    const prepared = await prepareOutputSnapshot(pp, { clock: () => new Date(0), renderVariableText: renderer });
+    if (!prepared.ok) return { len: NaN, b: null as unknown };
+    const moves = litMoves(emitPreparedGcode(prepared).gcode, pp.device);
+    return { len: totalLen(moves), b: bbox(moves) };
+  };
+  const b42 = await snap(p0, 42);
+  const b43 = await snap(p0, 43);
+  st().optimizeSelectedShapes(DEFAULT_SHAPE_OPTIMIZE_OPTIONS, null);
+  const p1 = st().project;
+  const o = p1.scene.objects[0]!;
+  const a42 = await snap(p1, 42);
+  const a43 = await snap(p1, 43);
+  const value = await renderer({ text: base, content: 'SN 0042', project: p0 } as never);
+  const valueLen = value.paths.flatMap((p) => p.polylines).reduce((n, l) => { const pts = l.closed ? [...l.points, l.points[0]!] : l.points; let s = 0; for (let i = 1; i < pts.length; i++) s += Math.hypot(pts[i]!.x - pts[i - 1]!.x, pts[i]!.y - pts[i - 1]!.y); return n + s; }, 0);
+  out(`## D variable text "${template}" serial 42/43`);
+  out(`  before: lit ${f3(b42.len)} / ${f3(b43.len)} bbox42 ${JSON.stringify(b42.b)}`);
+  out(`  after Optimize: kind ${o.kind} variableTemplate ${'variableTemplate' in o ? 'kept' : 'gone'} source ${JSON.stringify((o as { source?: string }).source)}; lit ${f3(a42.len)} / ${f3(a43.len)} bbox42 ${JSON.stringify(a42.b)}`);
+  out(`  oracle: outline length of rendered "SN 0042" ${f3(valueLen)} mm`);
+  out(`  toast ${JSON.stringify(toasts())}`);
+
+  // Variable Code 128 with Roboto caption
+  useToastStore.setState({ toasts: [] } as never);
+  const pb = parseVariableTemplateSource('LOT-{{serial:3}}');
+  if (!pb.ok) throw new Error('parse');
+  const spec = { ...defaultBarcodeSpec('code128'), moduleMm: 0.3, showText: true, data: 'LOT-{{serial:3}}', variableTemplate: pb.template };
+  const created = await createBarcodeObject({
+    id: 'B1', color: '#000000', spec, value: 'LOT-041',
+    renderCaption: async ({ text, sizeMm }) => { const r = await textToPolylines({ fontBuffer: roboto, content: text, sizeMm, alignment: 'center', lineHeight: 1.2, color: '#000000' }); return { polylines: r.paths.flatMap((p) => p.polylines), bounds: r.bounds }; },
+    transform: T({ x: 30, y: 150 }),
+  });
+  if (!created.ok) throw new Error(created.message);
+  const q0 = proj([created.object], [layer('line')], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 41 } });
+  load(q0, ['B1']);
+  const qb41 = await snap(q0, 41);
+  const qb42 = await snap(q0, 42);
+  const changed = st().optimizeSelectedShapes(DEFAULT_SHAPE_OPTIMIZE_OPTIONS, null);
+  const q1 = st().project;
+  const ob = q1.scene.objects[0]!;
+  const qa41 = await snap(q1, 41);
+  const qa42 = await snap(q1, 42);
+  out(`## D2 variable Code 128 "LOT-{{serial:3}}" with caption, serial 41/42`);
+  out(`  before lit ${f3(qb41.len)} / ${f3(qb42.len)}; after changed ${changed} kind ${ob.kind} spec ${ob.kind === 'shape' ? ob.spec.kind : '-'} lit ${f3(qa41.len)} / ${f3(qa42.len)}`);
+  out(`  toast ${JSON.stringify(toasts())}`);
+});
+
+it('E. degenerate and huge inputs', () => {
+  const cases: [string, Polyline[]][] = [
+    ['two equal points open', [{ closed: false, points: [{ x: 0, y: 0 }, { x: 0, y: 0 }] }]],
+    ['closed two points', [{ closed: true, points: [{ x: 0, y: 0 }, { x: 5, y: 0 }] }]],
+    ['closed zero-area retrace', [{ closed: true, points: [{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 10, y: 0 }, { x: 5, y: 0 }] }]],
+    ['collinear run', [{ closed: false, points: Array.from({ length: 50 }, (_, k) => ({ x: k * 0.2, y: 0 })) }]],
+    ['duplicate consecutive points circle', [{ closed: true, points: noisyCircle(5, 100, 0).points.flatMap((p) => [p, p]) }]],
+    ['tiny circle r0.05', [noisyCircle(0.05, 50, 0)]],
+    ['huge circle r 600', [noisyCircle(600, 4000, 0.08)]],
+    ['figure eight self crossing', [{ closed: true, points: Array.from({ length: 400 }, (_, k) => { const a = (2 * Math.PI * k) / 400; return { x: 10 * Math.sin(a), y: 10 * Math.sin(a) * Math.cos(a) }; }) }]],
+  ];
+  for (const [n, polys] of cases) {
+    try {
+      run(`E ${n}`, [svg('e', polys, T({ x: n.startsWith('huge') ? 700 : 100, y: n.startsWith('huge') ? 700 : 100 }))], 'line');
+    } catch (e) {
+      out(`## E ${n} THREW ${(e as Error).message}`);
+    }
+  }
+  // non-finite options through the store
+  const p = proj([traced('c', [noisyCircle(10, 600, 0.08)], T({}))], [layer('line')]);
+  load(p, ['c']);
+  const ok = st().optimizeSelectedShapes({ ...DEFAULT_SHAPE_OPTIMIZE_OPTIONS, smoothingMm: Number.NaN, fitToleranceMm: -3, cornerAngleDeg: Infinity }, null);
+  out(`## E options NaN/-3/Inf -> changed ${ok}; toast ${JSON.stringify(toasts())}`);
+});

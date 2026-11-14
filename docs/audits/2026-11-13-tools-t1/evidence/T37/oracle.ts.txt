@@ -1,0 +1,79 @@
+// T37 independent oracle: two-way (Hausdorff) distance between two sets of
+// world polylines, by densified points to a segment grid. No app code.
+import type { LitMove, Vec } from './decode';
+
+export type Seg = { a: Vec; b: Vec };
+
+export function segsFromMoves(moves: ReadonlyArray<LitMove>): Seg[] {
+  return moves.filter((m) => m.len > 1e-9).map((m) => ({ a: m.from, b: m.to }));
+}
+
+export function segsFromPolys(polys: ReadonlyArray<{ pts: Vec[]; closed: boolean }>): Seg[] {
+  const out: Seg[] = [];
+  for (const p of polys) {
+    const n = p.pts.length;
+    const edges = p.closed ? n : n - 1;
+    for (let i = 0; i < edges; i++) out.push({ a: p.pts[i]!, b: p.pts[(i + 1) % n]! });
+  }
+  return out;
+}
+
+function densify(segs: ReadonlyArray<Seg>, step: number): Vec[] {
+  const res: Vec[] = [];
+  for (const s of segs) {
+    const len = Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y);
+    const n = Math.max(1, Math.ceil(len / step));
+    for (let k = 0; k <= n; k++) res.push({ x: s.a.x + ((s.b.x - s.a.x) * k) / n, y: s.a.y + ((s.b.y - s.a.y) * k) / n });
+  }
+  return res;
+}
+
+function pointSeg(p: Vec, s: Seg): number {
+  const dx = s.b.x - s.a.x;
+  const dy = s.b.y - s.a.y;
+  const l2 = dx * dx + dy * dy;
+  let t = l2 === 0 ? 0 : ((p.x - s.a.x) * dx + (p.y - s.a.y) * dy) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p.x - (s.a.x + t * dx), p.y - (s.a.y + t * dy));
+}
+
+class Grid {
+  cell: number;
+  map = new Map<string, Seg[]>();
+  constructor(segs: ReadonlyArray<Seg>, cell: number) {
+    this.cell = cell;
+    for (const s of segs) {
+      const x0 = Math.floor(Math.min(s.a.x, s.b.x) / cell), x1 = Math.floor(Math.max(s.a.x, s.b.x) / cell);
+      const y0 = Math.floor(Math.min(s.a.y, s.b.y) / cell), y1 = Math.floor(Math.max(s.a.y, s.b.y) / cell);
+      for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+        const k = `${x},${y}`;
+        const list = this.map.get(k);
+        if (list) list.push(s); else this.map.set(k, [s]);
+      }
+    }
+  }
+  nearest(p: Vec): number {
+    const cx = Math.floor(p.x / this.cell), cy = Math.floor(p.y / this.cell);
+    let best = Infinity;
+    for (let r = 0; r < 60; r++) {
+      for (let x = cx - r; x <= cx + r; x++) for (let y = cy - r; y <= cy + r; y++) {
+        if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) !== r) continue;
+        const list = this.map.get(`${x},${y}`);
+        if (list) for (const s of list) best = Math.min(best, pointSeg(p, s));
+      }
+      if (best <= r * this.cell) return best;
+    }
+    return best;
+  }
+}
+
+/** Two-way distance; also returns the one-way parts. */
+export function hausdorff(A: ReadonlyArray<Seg>, B: ReadonlyArray<Seg>, step = 0.005) {
+  const gA = new Grid(A, 0.5);
+  const gB = new Grid(B, 0.5);
+  let ab = 0;
+  for (const p of densify(A, step)) ab = Math.max(ab, gB.nearest(p));
+  let ba = 0;
+  for (const p of densify(B, step)) ba = Math.max(ba, gA.nearest(p));
+  return { h: Math.max(ab, ba), ab, ba };
+}

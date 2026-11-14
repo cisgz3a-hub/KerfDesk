@@ -1,0 +1,130 @@
+// @vitest-environment jsdom
+// T37 follow-ups: small closed contours vanish? text fill rule after conversion;
+// locked/mixed selection; preview plan vs Apply.
+import { beforeEach, it } from 'vitest';
+import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type Layer,
+  type Polyline,
+  type Project,
+  type SceneObject,
+  type TextObject,
+  type Transform,
+} from '../t36-main/src/core/scene';
+import { applyTransform } from '../t36-main/src/core/scene/transform';
+import { textToPolylines } from '../t36-main/src/core/text';
+import { prepareOutput } from '../t36-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t36-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t36-main/src/ui/state/store';
+import { resetStore } from '../t36-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t36-main/src/ui/state/toast-store';
+import { DEFAULT_SHAPE_OPTIMIZE_OPTIONS, type ShapeOptimizeOptions } from '../t36-main/src/core/geometry/shape-optimize/shape-optimize-options';
+import { planOptimizeShapes, optimizeShapesSelection, optimizedSceneObject } from '../t36-main/src/ui/state/optimize-shapes-plan';
+import { litMoves, totalLen, gridArea, type LitMove } from './decode';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t37/t37b.log';
+const log: string[] = [];
+const out = (s: string) => { log.push(s); writeFileSync(LOG, log.join('\n')); };
+beforeEach(() => { resetStore(); useToastStore.setState({ toasts: [] } as never); });
+const st = () => useStore.getState();
+const f3 = (n: number) => n.toFixed(3);
+const toasts = () => useToastStore.getState().toasts.map((t) => t.message);
+const font = (n: string) => { const b = readFileSync(`C:/Users/stolk/kd-t1/t36-main/src/ui/text/fonts/${n}`); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; };
+
+function layer(mode: 'line' | 'fill'): Layer {
+  return { ...createLayer({ id: 'L', color: '#000000', name: 'L', mode }), speed: 1234, power: 37, passes: 1, ...(mode === 'fill' ? { hatchSpacingMm: 0.05, hatchAngleDeg: 0 } : {}) } as Layer;
+}
+function proj(objects: SceneObject[], layers: Layer[]): Project {
+  const base = createProject();
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers, groups: [] } };
+}
+function load(p: Project, ids: string[]) {
+  useStore.setState({ project: p, selectedObjectId: ids[0] ?? null, additionalSelectedIds: new Set(ids.slice(1)), undoStack: [], redoStack: [], dirty: false });
+}
+function burn(p: Project) {
+  const prepared = prepareOutput(p);
+  if (!prepared.ok) return { ok: false, moves: [] as LitMove[], why: JSON.stringify(prepared.preflight).slice(0, 400) };
+  return { ok: true, moves: litMoves(emitPreparedGcode(prepared).gcode, p.device), why: '' };
+}
+const T = (p: Partial<Transform> = {}): Transform => ({ ...IDENTITY_TRANSFORM, x: 100, y: 100, ...p });
+function circle(r: number, n: number): Polyline {
+  return { closed: true, points: Array.from({ length: n }, (_, k) => ({ x: r * Math.cos((2 * Math.PI * k) / n), y: r * Math.sin((2 * Math.PI * k) / n) })) };
+}
+function svg(id: string, polylines: Polyline[], t: Transform, extra: Partial<ImportedSvg> = {}): ImportedSvg {
+  return { kind: 'imported-svg', id, source: `${id}.svg`, bounds: { minX: -1, minY: -1, maxX: 1, maxY: 1 }, transform: t, paths: [{ color: '#000000', polylines }], ...extra } as ImportedSvg;
+}
+
+it('F. small closed contours: dot sizes under default and Smooth off', () => {
+  for (const opts of [{}, { smooth: false }] as Partial<ShapeOptimizeOptions>[]) {
+    for (const r of [0.05, 0.08, 0.1, 0.15, 0.2, 0.3, 0.5]) {
+      for (const mode of ['line', 'fill'] as const) {
+        const o = svg('d', [circle(r, 48)], T());
+        const p0 = proj([o], [layer(mode)]);
+        load(p0, ['d']);
+        const b = burn(p0);
+        st().optimizeSelectedShapes({ ...DEFAULT_SHAPE_OPTIMIZE_OPTIONS, ...opts }, null);
+        const p1 = st().project;
+        const a = burn(p1);
+        const o1 = p1.scene.objects[0] as ImportedSvg;
+        const c = o1.paths[0]!.curves?.[0];
+        const desc = c ? `${c.closed ? 'closed' : 'open'} start ${f3(c.start.x)},${f3(c.start.y)} segs ${c.segments.map((s) => `${s.kind[0]}->${f3(s.to.x)},${f3(s.to.y)}${s.kind === 'elliptical-arc' ? ` r${f3(s.radiusX)} L${+s.largeArc} S${+s.sweep}` : ''}`).join(' | ')}` : `poly ${o1.paths[0]!.polylines[0]!.points.length} pts`;
+        const poly = o1.paths[0]!.polylines[0]!;
+        out(`F r ${r} ${mode} ${JSON.stringify(opts)}: lit ${f3(totalLen(b.moves))} -> ${f3(totalLen(a.moves))} ok ${b.ok}/${a.ok} ${a.why} | ${desc} | compat poly ${poly.points.length} pts | toast ${toasts().at(-1)}`);
+      }
+    }
+  }
+});
+
+it('G. text fill rule after conversion: overlapping glyphs', async () => {
+  for (const [fname, content, spacing] of [
+    ['Roboto-Regular.ttf', 'OO', -0.35],
+    ['GreatVibes-Regular.ttf', 'Hello', 0],
+    ['DancingScript-Regular.ttf', 'mill', 0],
+    ['AlexBrush-Regular.ttf', 'Anna', 0],
+  ] as const) {
+    const r = await textToPolylines({ fontBuffer: font(fname), content, sizeMm: 20, alignment: 'left', lineHeight: 1.2, letterSpacing: spacing, color: '#000000' });
+    const text = { kind: 'text', id: 't', content, fontKey: 'x', sizeMm: 20, alignment: 'left', lineHeight: 1.2, letterSpacing: spacing, color: '#000000', bounds: r.bounds, transform: T(), paths: r.paths } as TextObject;
+    const world = r.paths.flatMap((p) => p.polylines).map((l) => l.points.map((pt) => applyTransform(pt, text.transform)));
+    const nz = gridArea(world, 'nonzero', 0.05);
+    const eo = gridArea(world, 'evenodd', 0.05);
+    const p0 = proj([text], [layer('fill')]);
+    load(p0, ['t']);
+    const b = burn(p0);
+    st().optimizeSelectedShapes(DEFAULT_SHAPE_OPTIMIZE_OPTIONS, null);
+    const p1 = st().project;
+    const o1 = p1.scene.objects[0]!;
+    const a = burn(p1);
+    out(`G ${fname} "${content}" spacing ${spacing}: oracle nonzero ${f3(nz)} mm2, evenodd ${f3(eo)} mm2 | burn area before ${f3(totalLen(b.moves) * 0.05)} after ${f3(totalLen(a.moves) * 0.05)} | kind ${o1.kind} fillRule ${'paths' in o1 ? o1.paths.map((p) => p.fillRule ?? '-').join('/') : ''} | source fillRule ${r.paths.map((p) => p.fillRule ?? '-').join('/')}`);
+    out(`   toast ${toasts().at(-1)}`);
+  }
+});
+
+it('H. locked + unlocked selection, preview plan equals Apply, stale ready plan', () => {
+  const a = svg('a', [circle(10, 300)], T());
+  const b = svg('b', [circle(5, 300)], T({ x: 150 }), { locked: true, operationOverride: { power: 50 } as never, powerScale: 0.5 });
+  const p0 = proj([a, b], [layer('line')]);
+  load(p0, ['a', 'b']);
+  const sel = optimizeShapesSelection(p0.scene, ['a', 'b']);
+  const plan = planOptimizeShapes(sel.targets, DEFAULT_SHAPE_OPTIMIZE_OPTIONS);
+  const preview = plan.objects.map((e) => optimizedSceneObject(e));
+  st().optimizeSelectedShapes(DEFAULT_SHAPE_OPTIMIZE_OPTIONS, plan);
+  const p1 = st().project;
+  const applied = p1.scene.objects.find((o) => o.id === 'a');
+  out(`H targets ${sel.targets.length} locked ${sel.locked}; preview==apply ${JSON.stringify(preview[0]) === JSON.stringify(applied)}; locked b unchanged ${p1.scene.objects[1] === b}; toast ${toasts().at(-1)}`);
+  // stale plan: options differ from the plan's -> recomputed
+  load(p0, ['a']);
+  st().optimizeSelectedShapes({ ...DEFAULT_SHAPE_OPTIMIZE_OPTIONS, fitToleranceMm: 0.5 }, plan);
+  const p2 = st().project;
+  const o2 = p2.scene.objects[0] as ImportedSvg;
+  out(`H stale plan with other options: segments ${o2.paths[0]!.curves?.[0]?.segments.length} (plan had ${plan.stats.segments}); toast ${toasts().at(-1)}`);
+  // object edited since the plan: moved object should be recomputed (identity check)
+  const moved = { ...a, transform: T({ scaleX: 4, scaleY: 4 }) };
+  load(proj([moved], [layer('line')]), ['a']);
+  st().optimizeSelectedShapes(DEFAULT_SHAPE_OPTIMIZE_OPTIONS, plan);
+  out(`H edited since plan: toast ${toasts().at(-1)}`);
+});

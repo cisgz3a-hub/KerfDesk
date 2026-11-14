@@ -1,0 +1,97 @@
+// @vitest-environment jsdom
+// T37 refuter r3: small closed contours under default Smooth: per-contour shoelace area, Line lit length,
+// Fill per-row oracle; text with weld on (the default), two fonts.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  createLayer, createProject, DEFAULT_PROJECT_OPTIMIZATION, IDENTITY_TRANSFORM,
+  type ImportedSvg, type Layer, type Project, type SceneObject, type TextObject,
+} from '../t36-main/src/core/scene';
+import { applyTransform } from '../t36-main/src/core/scene/transform';
+import { textToPolylines } from '../t36-main/src/core/text';
+import { prepareOutput } from '../t36-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t36-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t36-main/src/ui/state/store';
+import { resetStore } from '../t36-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t36-main/src/ui/state/toast-store';
+import { DEFAULT_SHAPE_OPTIMIZE_OPTIONS } from '../t36-main/src/core/geometry/shape-optimize/shape-optimize-options';
+import { applyTextWeld } from '../t36-main/src/ui/text/apply-text-weld';
+import { decode, fillAudit, fontBuf, rowsOf, segLen, shoelace } from './r-util';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t37r/r3.log';
+const lines: string[] = [];
+const out = (s: string) => { lines.push(s); writeFileSync(LOG, lines.join('\n')); };
+const f3 = (n: number) => n.toFixed(3);
+const st = () => useStore.getState();
+const toasts = () => useToastStore.getState().toasts.map((t) => t.message);
+beforeEach(() => { resetStore(); useToastStore.setState({ toasts: [] } as never); });
+const SP = 0.05;
+const layer = (mode: 'line' | 'fill'): Layer => ({ ...createLayer({ id: 'L', color: '#000000', name: 'L', mode }), speed: 3000, power: 40, passes: 1, ...(mode === 'fill' ? { hatchSpacingMm: SP, hatchAngleDeg: 0 } : {}) } as Layer);
+function proj(objects: SceneObject[], mode: 'line' | 'fill'): Project {
+  const base = createProject();
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers: [layer(mode)], groups: [] } };
+}
+function burn(p: Project) {
+  const prepared = prepareOutput(p);
+  if (!prepared.ok) throw new Error(JSON.stringify(prepared.preflight).slice(0, 300));
+  return decode(emitPreparedGcode(prepared).gcode, p.device);
+}
+function worldContours(o: SceneObject) {
+  if (!('paths' in o)) return [];
+  return o.paths.flatMap((p) => p.polylines).map((l) => ({ closed: l.closed, pts: l.points.map((q) => applyTransform(q, o.transform)) }));
+}
+
+it('S small text dots, weld on', async () => {
+  for (const [file, key] of [['Roboto-Regular.ttf', 'roboto-regular'], ['Tinos-Regular.ttf', 'tinos-regular']] as const) {
+    for (const size of [2, 2.5, 3, 4, 5]) {
+      const content = 'Serial No. i:j;';
+      const r = applyTextWeld(await textToPolylines({ fontBuffer: fontBuf(file), content, sizeMm: size, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000' }), key, true);
+      const transform = { ...IDENTITY_TRANSFORM, x: 30, y: 40 };
+      const text = { kind: 'text', id: 'T', content, fontKey: key, sizeMm: size, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, weldOverlaps: true, color: '#000000', bounds: r.bounds, transform, paths: r.paths } as TextObject;
+      const before = worldContours(text);
+      const res: string[] = [];
+      for (const mode of ['line', 'fill'] as const) {
+        resetStore(); useToastStore.setState({ toasts: [] } as never);
+        const p0 = proj([text], mode);
+        useStore.setState({ project: p0, selectedObjectId: 'T', additionalSelectedIds: new Set() } as never);
+        const b = burn(p0);
+        st().optimizeSelectedShapes(DEFAULT_SHAPE_OPTIMIZE_OPTIONS, null);
+        const p1 = st().project;
+        const a = burn(p1);
+        if (mode === 'line') {
+          res.push(`line lit ${f3(segLen(b))} -> ${f3(segLen(a))}`);
+          const after = worldContours(p1.scene.objects[0]!);
+          // small contours: by source area < 0.5 mm2 (dots, period, colon, semicolon dots)
+          const small = before.map((c, i) => ({ i, a0: Math.abs(shoelace(c.pts)), a1: after[i] ? Math.abs(shoelace(after[i]!.pts)) : NaN })).filter((c) => c.a0 < 0.5 * size * size / 4);
+          res.push(`small contours (n ${small.length}) area mm2: ${small.map((c) => `${f3(c.a0)}->${f3(c.a1)}`).join(' ')}`);
+          res.push(`toast "${toasts().at(-1)}"`);
+        } else {
+          const contours = before.filter((c) => c.closed).map((c) => c.pts);
+          const rows = [...new Set([...rowsOf(b), ...rowsOf(a)])];
+          const A = fillAudit(b, contours, rows, SP), B = fillAudit(a, contours, rows, SP);
+          res.push(`fill oracle ${f3(A.expNZ)} | burned ${f3(A.burned)} -> ${f3(B.burned)} | missed ${f3(A.missedNZ)} -> ${f3(B.missedNZ)}`);
+        }
+      }
+      out(`S ${file} ${size} mm: ${res.join(' | ')}`);
+    }
+  }
+});
+
+it('C plain closed circles (imported SVG, 64 pts), default vs smoothing 0.1', async () => {
+  for (const r of [0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.75, 1]) {
+    const res: string[] = [];
+    for (const smoothingMm of [0.25, 0.1]) {
+      resetStore(); useToastStore.setState({ toasts: [] } as never);
+      const pts = Array.from({ length: 64 }, (_, k) => ({ x: r * Math.cos((2 * Math.PI * k) / 64), y: r * Math.sin((2 * Math.PI * k) / 64) }));
+      const o = { kind: 'imported-svg', id: 'C', source: 'c.svg', bounds: { minX: -r, minY: -r, maxX: r, maxY: r }, transform: { ...IDENTITY_TRANSFORM, x: 50, y: 50 }, paths: [{ color: '#000000', polylines: [{ closed: true, points: pts }] }] } as ImportedSvg;
+      const a0 = Math.abs(shoelace(pts));
+      useStore.setState({ project: proj([o], 'line'), selectedObjectId: 'C', additionalSelectedIds: new Set() } as never);
+      st().optimizeSelectedShapes({ ...DEFAULT_SHAPE_OPTIMIZE_OPTIONS, smoothingMm }, null);
+      const o1 = st().project.scene.objects[0]!;
+      const after = worldContours(o1)[0]!;
+      const a1 = Math.abs(shoelace(after.pts));
+      res.push(`σ ${smoothingMm}: area ${f3(a0)} -> ${f3(a1)} (${((a1 / a0 - 1) * 100).toFixed(1)} %) eq.radius ${f3(Math.sqrt(a1 / Math.PI))}`);
+    }
+    out(`C r ${r}: ${res.join(' | ')}`);
+  }
+});

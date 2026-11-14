@@ -1,0 +1,90 @@
+// @vitest-environment jsdom
+// T37: small text punctuation under default smoothing; G2/G3 with arcs on.
+import { beforeEach, it } from 'vitest';
+import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  createLayer, createProject, DEFAULT_PROJECT_OPTIMIZATION, IDENTITY_TRANSFORM,
+  type Layer, type Polyline, type Project, type SceneObject, type TextObject, type Transform, type TracedImage,
+} from '../t36-main/src/core/scene';
+import { applyTransform } from '../t36-main/src/core/scene/transform';
+import { textToPolylines } from '../t36-main/src/core/text';
+import { prepareOutput } from '../t36-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t36-main/src/io/gcode/emit-gcode';
+import { litSamples } from '../t36-main/src/io/gcode/laser-lit-samples.test-support';
+import { useStore } from '../t36-main/src/ui/state/store';
+import { resetStore } from '../t36-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t36-main/src/ui/state/toast-store';
+import { DEFAULT_SHAPE_OPTIMIZE_OPTIONS } from '../t36-main/src/core/geometry/shape-optimize/shape-optimize-options';
+import { litMoves, totalLen, gridArea, type LitMove } from './decode';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t37/t37c.log';
+const log: string[] = [];
+const out = (s: string) => { log.push(s); writeFileSync(LOG, log.join('\n')); };
+beforeEach(() => { resetStore(); useToastStore.setState({ toasts: [] } as never); });
+const st = () => useStore.getState();
+const f3 = (n: number) => n.toFixed(3);
+const toasts = () => useToastStore.getState().toasts.map((t) => t.message);
+const roboto = (() => { const b = readFileSync('C:/Users/stolk/kd-t1/t36-main/src/ui/text/fonts/Roboto-Regular.ttf'); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; })();
+function layer(mode: 'line' | 'fill'): Layer {
+  return { ...createLayer({ id: 'L', color: '#000000', name: 'L', mode }), speed: 1234, power: 37, passes: 1, ...(mode === 'fill' ? { hatchSpacingMm: 0.05, hatchAngleDeg: 0 } : {}) } as Layer;
+}
+function proj(objects: SceneObject[], layers: Layer[], device?: Partial<Project['device']>): Project {
+  const base = createProject();
+  return { ...base, device: { ...base.device, ...(device ?? {}) }, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers, groups: [] } };
+}
+function load(p: Project, ids: string[]) {
+  useStore.setState({ project: p, selectedObjectId: ids[0] ?? null, additionalSelectedIds: new Set(ids.slice(1)), undoStack: [], redoStack: [], dirty: false });
+}
+function burnG(p: Project) {
+  const prepared = prepareOutput(p);
+  if (!prepared.ok) return { moves: [] as LitMove[], g: '' };
+  const g = emitPreparedGcode(prepared).gcode;
+  return { moves: litMoves(g, p.device), g };
+}
+const T = (p: Partial<Transform> = {}): Transform => ({ ...IDENTITY_TRANSFORM, x: 100, y: 100, ...p });
+
+it('I. small text punctuation and dots', async () => {
+  for (const size of [2, 3, 5]) {
+    const content = 'i.j:;!';
+    const r = await textToPolylines({ fontBuffer: roboto, content, sizeMm: size, alignment: 'left', lineHeight: 1.2, color: '#000000' });
+    const text = { kind: 'text', id: 't', content, fontKey: 'x', sizeMm: size, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000', bounds: r.bounds, transform: T(), paths: r.paths } as TextObject;
+    // per-contour areas (oracle) of the source, smallest first
+    const contours = r.paths.flatMap((p) => p.polylines);
+    const areaOf = (pts: { x: number; y: number }[]) => { let a = 0; for (let i = 0; i < pts.length; i++) { const p = pts[i]!, q = pts[(i + 1) % pts.length]!; a += p.x * q.y - q.x * p.y; } return Math.abs(a / 2); };
+    const srcAreas = contours.map((c) => areaOf(c.points)).sort((a, b) => a - b);
+    for (const mode of ['fill', 'line'] as const) {
+      const p0 = proj([text], [layer(mode)]);
+      load(p0, ['t']);
+      const b = burnG(p0);
+      st().optimizeSelectedShapes(DEFAULT_SHAPE_OPTIMIZE_OPTIONS, null);
+      const p1 = st().project;
+      const o = p1.scene.objects[0]!;
+      const a = burnG(p1);
+      const after = 'paths' in o ? o.paths.flatMap((p) => p.polylines) : [];
+      const afterAreas = after.map((c) => areaOf(c.points)).sort((x, y) => x - y);
+      const world = (ls: Polyline[], t: Transform) => ls.map((l) => l.points.map((pt) => applyTransform(pt, t)));
+      out(`I ${size}mm "${content}" ${mode}: burn ${mode === 'fill' ? 'area' : 'lit'} ${f3(totalLen(b.moves) * (mode === 'fill' ? 0.05 : 1))} -> ${f3(totalLen(a.moves) * (mode === 'fill' ? 0.05 : 1))}` +
+        (mode === 'fill' ? ` (oracle evenodd area before ${f3(gridArea(world(contours, text.transform), 'evenodd', 0.01))}, after ${f3(gridArea(world(after, o.transform), 'evenodd', 0.01))})` : '') +
+        ` | 4 smallest contour areas ${srcAreas.slice(0, 4).map(f3).join(',')} -> ${afterAreas.slice(0, 4).map(f3).join(',')} | ${toasts().at(-1)}`);
+    }
+  }
+});
+
+it('J. lines-arcs fit with laser arc moves on: G2/G3 written?', () => {
+  const R = (() => { let s = 5; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32 - 0.5); })();
+  const poly: Polyline = { closed: true, points: Array.from({ length: 600 }, (_, k) => { const a = (2 * Math.PI * k) / 600; const r = 10 + 0.04 * R(); return { x: r * Math.cos(a), y: r * Math.sin(a) }; }) };
+  for (const [tn, t] of [['identity', T()], ['3x0.5 rot20', T({ scaleX: 3, scaleY: 0.5, rotationDeg: 20 })]] as const) {
+    const obj = { kind: 'traced-image', id: 'c', source: 'c.png', bounds: { minX: -10, minY: -10, maxX: 10, maxY: 10 }, transform: t, paths: [{ color: '#000000', polylines: [poly] }] } as TracedImage;
+    const p0 = proj([obj], [layer('line')], { laserArcMoves: 'on' } as never);
+    load(p0, ['c']);
+    const b = burnG(p0);
+    st().optimizeSelectedShapes({ ...DEFAULT_SHAPE_OPTIMIZE_OPTIONS, fitWith: 'lines-arcs' }, null);
+    const p1 = st().project;
+    const a = burnG(p1);
+    const arcs = (g: string) => (g.match(/^G[23]\b/gm) ?? []).length;
+    const sb = litSamples(b.g, p0.device), sa = litSamples(a.g, p1.device);
+    // radial deviation of the burned samples from the ideal ellipse (identity: circle r10)
+    const dev = (s: { x: number; y: number }[]) => tn === 'identity' ? Math.max(...s.map((q) => Math.abs(Math.hypot(q.x - 100, q.y - 100) - 10))) : NaN;
+    out(`J ${tn}: device arcs ${p0.device.laserArcMoves}; G2/G3 ${arcs(b.g)} -> ${arcs(a.g)}; lit samples ${sb.length} -> ${sa.length}; radial dev ${f3(dev(sb))} -> ${f3(dev(sa))}; segs kinds ${(p1.scene.objects[0] as TracedImage).paths[0]!.curves?.[0]?.segments.map((s) => s.kind[0]).join('')}`);
+  }
+});
