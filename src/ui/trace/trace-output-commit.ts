@@ -2,6 +2,7 @@ import type { Project, RasterImage, TracedImage } from '../../core/scene';
 import type { TraceOptions } from '../../core/trace';
 import type { TraceExistingImageOptions } from '../state/scene-mutations';
 import { projectWithCameraTraceSource } from '../state/camera-trace-import';
+import { replacedTraceResult, retraceOperationsNote } from '../state/retrace-carry';
 import { useStore } from '../state/store';
 import { checkTraceSignal } from './trace-cancellation';
 import type { TraceOutput } from './dialog-parts';
@@ -16,7 +17,9 @@ import {
 
 export type TraceOutputCommitArgs = {
   readonly photoShading?: boolean;
-  readonly seed: Pick<RasterImage, 'id' | 'source'>;
+  /** The source as the dialog opened on it; a re-trace measures the replaced
+   *  trace's offset against its transform (ADR-408 Amendment 1). */
+  readonly seed: Pick<RasterImage, 'id' | 'source'> & Partial<Pick<RasterImage, 'transform'>>;
   readonly traceOutput?: TraceOutput;
   readonly deleteSourceAfterTrace?: boolean;
   readonly replaceTraceId?: string;
@@ -50,30 +53,52 @@ export async function commitTraceOutput(
 ): Promise<boolean> {
   const owner = ctx.claimOwner();
   if (owner === null) return false;
-  const deleteSourceAfterTrace = args.deleteSourceAfterTrace === true;
-  const traceOptions: TraceExistingImageOptions = {
-    deleteSourceAfterTrace,
-    ...(owner.cameraSource === undefined ? {} : { cameraSource: owner.cameraSource }),
-    ...(args.replaceTraceId === undefined ? {} : { replaceTraceId: args.replaceTraceId }),
-  };
-  const sourceStatus = deleteSourceAfterTrace ? 'source deleted' : 'source kept';
+  const traceOptions = traceCommitOptions(args, owner);
+  const status = traceCommitStatus(args, owner, liveProject, traced);
   if (usesRasterTraceOutput(args, traced, liveProject)) {
     const outputProject =
       owner.cameraSource === undefined
         ? liveProject
         : projectWithCameraTraceSource(liveProject, owner.cameraSource);
-    return commitRasterTraceOutput(args, ctx, traced, outputProject, traceOptions, sourceStatus);
+    return commitRasterTraceOutput(args, ctx, traced, outputProject, traceOptions, status);
   }
   if (ctx.claimOwner() === null) return false;
   ctx.traceExistingImage(args.seed.id, traced, withColourLayerOutput(traceOptions, args));
   const cnc = liveProject.machine?.kind === 'cnc';
-  ctx.pushToast(traceSuccessMessage(args, traced, sourceStatus, false, cnc), 'success');
+  ctx.pushToast(traceSuccessMessage(args, traced, status, false, cnc), 'success');
   scheduleTraceMinFeatureNotice(
     traced.id,
     () => useStore.getState().project,
     (message) => ctx.pushToast(message, 'warning'),
   );
   return true;
+}
+
+function traceCommitOptions(
+  args: TraceOutputCommitArgs,
+  owner: TraceCommitClaim,
+): TraceExistingImageOptions {
+  return {
+    deleteSourceAfterTrace: args.deleteSourceAfterTrace === true,
+    ...(owner.cameraSource === undefined ? {} : { cameraSource: owner.cameraSource }),
+    ...(args.replaceTraceId === undefined ? {} : { replaceTraceId: args.replaceTraceId }),
+    ...(args.replaceTraceId === undefined || args.seed.transform === undefined
+      ? {}
+      : { retraceSourceTransform: args.seed.transform }),
+  };
+}
+
+function traceCommitStatus(
+  args: TraceOutputCommitArgs,
+  owner: TraceCommitClaim,
+  liveProject: Project,
+  traced: TracedImage,
+): TraceCommitStatus {
+  const sourceStatus = args.deleteSourceAfterTrace === true ? 'source deleted' : 'source kept';
+  // A camera trace commits through its own import, not the in-place re-trace.
+  if (owner.cameraSource !== undefined) return { sourceStatus };
+  const retrace = retraceSummary(liveProject, args.replaceTraceId, traced);
+  return retrace === undefined ? { sourceStatus } : { sourceStatus, retrace };
 }
 
 // Line + fill (ADR-454) is vector-only: the raster route renders one
@@ -96,7 +121,7 @@ async function commitRasterTraceOutput(
   traced: TracedImage,
   liveProject: Project,
   traceOptions: TraceExistingImageOptions,
-  sourceStatus: string,
+  status: TraceCommitStatus,
 ): Promise<boolean> {
   const inputs = rasterTraceInputs(liveProject, args.seed.id);
   if (inputs === null) {
@@ -129,7 +154,7 @@ async function commitRasterTraceOutput(
     return false;
   }
   ctx.commitRasterizedTrace(args.seed.id, raster, traceOptions);
-  ctx.pushToast(traceSuccessMessage(args, traced, sourceStatus, true, false), 'success');
+  ctx.pushToast(traceSuccessMessage(args, traced, status, true, false), 'success');
   return true;
 }
 
@@ -188,10 +213,27 @@ function withColourLayerOutput(
   };
 }
 
+// Re-trace Original keeps the replaced trace's place and, for a same-mode
+// vector re-trace, its operations (ADR-408 Amendment 1); the toast says so.
+type RetraceSummary = { readonly label: string; readonly note?: string };
+
+type TraceCommitStatus = { readonly sourceStatus: string; readonly retrace?: RetraceSummary };
+
+function retraceSummary(
+  project: Project,
+  replaceTraceId: string | undefined,
+  traced: TracedImage,
+): RetraceSummary | undefined {
+  const previous = replacedTraceResult(project.scene, replaceTraceId);
+  if (previous === undefined) return undefined;
+  const note = retraceOperationsNote(previous, traced);
+  return { label: previous.name ?? traced.source, ...(note === undefined ? {} : { note }) };
+}
+
 function traceSuccessMessage(
   args: TraceOutputCommitArgs,
   traced: TracedImage,
-  sourceStatus: string,
+  { sourceStatus, retrace }: TraceCommitStatus,
   raster: boolean,
   cnc: boolean,
 ): string {
@@ -206,6 +248,13 @@ function traceSuccessMessage(
         ? layers
         : `${layers}, power set by darkness`
       : `${colorCount} color${colorCount === 1 ? '' : 's'}`;
-  const summary = `Traced ${args.seed.source}${output} — ${colours}, ${sourceStatus}`;
+  const summary =
+    retrace === undefined
+      ? `Traced ${args.seed.source}${output} — ${colours}, ${sourceStatus}`
+      : [
+          `Re-traced ${retrace.label}${output} in place — ${colours}, kept its place`,
+          ...(retrace.note === undefined || raster ? [] : [retrace.note]),
+          sourceStatus,
+        ].join(', ');
   return [summary, ...(args.notices ?? []).map(traceNoticeMessage)].join('. ');
 }
