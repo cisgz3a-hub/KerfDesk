@@ -14,6 +14,12 @@ import {
   offsetShapesTargets,
   type OffsetShapesRequest,
 } from '../state/offset-shapes-actions';
+import {
+  OffsetNotices,
+  ResultOperationField,
+  useNoInwardNotice,
+  useOffsetResultOperation,
+} from './OffsetResultOperationField';
 import type { PreparedOffsetShapes } from '../state/vector-op-prepared';
 import { OffsetShapesPreview } from './OffsetShapesPreview';
 import {
@@ -50,6 +56,10 @@ export function OffsetShapesDialog(props: {
   readonly scene: Scene;
   readonly selectedIds: ReadonlyArray<string>;
   readonly initial: OffsetShapesRequest;
+  /** The artwork outputs a jig's Artwork only restores (ADR-410 Amendment 6). */
+  readonly artworkSnapshot?: Readonly<Record<string, boolean>> | null;
+  /** The machine bed, for the too-large hint (tools audit T1, T33-P3-4). */
+  readonly bed?: { readonly widthMm: number; readonly heightMm: number };
   readonly onCancel: () => void;
   readonly onApply: (request: OffsetShapesRequest, prepared?: PreparedOffsetShapes) => void;
 }): JSX.Element {
@@ -69,6 +79,15 @@ export function OffsetShapesDialog(props: {
   const sources = useStableObjects(picked.targets);
   const { preview, prepared } = useOffsetShapesPreview(props.scene, sources, request);
   const shown = preview.settled?.sources === sources ? preview.settled.result : null;
+  const snapshot = props.artworkSnapshot ?? null;
+  const choice = useOffsetResultOperation(
+    props.scene,
+    picked.targets,
+    props.selectedIds,
+    form.operationId,
+    snapshot,
+  );
+  const lost = useNoInwardNotice(sources, shown, request);
   const canApply = prepared !== undefined || preview.unavailable !== null;
   return (
     <Dialog
@@ -78,17 +97,25 @@ export function OffsetShapesDialog(props: {
       onClose={props.onCancel}
       onSubmit={(event) => {
         event.preventDefault();
-        if (canApply) props.onApply(request, prepared);
+        if (!canApply) return;
+        const chosen = choice.operation === null ? {} : { operationId: choice.operation.id };
+        props.onApply({ ...request, ...chosen }, prepared);
       }}
     >
       <OffsetShapesFields
         form={form}
         onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
       />
+      <ResultOperationField
+        choice={choice}
+        snapshot={snapshot}
+        style={fieldStyle}
+        onChange={(operationId) => setForm((current) => ({ ...current, operationId }))}
+      />
       <OffsetShapesPreview sources={sources} result={shown?.kind === 'ok' ? shown.value : null} />
-      {picked.notice === '' ? null : <p role="note">{picked.notice}</p>}
+      <OffsetNotices note={picked.notice} alerts={[choice.offNotice, lost]} />
       <p role="status" aria-live="polite">
-        {offsetStatus(preview)}
+        {offsetStatus(preview, props.bed)}
       </p>
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
@@ -181,10 +208,15 @@ function useOffsetShapesPreview(
   return { preview, prepared };
 }
 
-function offsetStatus(preview: VectorOpPreview<OffsetShapesTask>): string {
+function offsetStatus(
+  preview: VectorOpPreview<OffsetShapesTask>,
+  bed?: { readonly widthMm: number; readonly heightMm: number },
+): string {
   const result = preview.current?.result;
   if (result !== undefined)
-    return result.kind === 'ok' ? summary(result.value) : result.error.message;
+    return result.kind === 'ok'
+      ? summary(result.value) + bedHint(result.value, bed)
+      : result.error.message;
   if (preview.failed !== null) return `${preview.failed} Change the settings to try again.`;
   if (preview.unavailable !== null) return `${preview.unavailable} Offset still works.`;
   return 'Updating preview…';
@@ -197,6 +229,18 @@ function summary(result: { outward: ImportedSvg | null; inward: ImportedSvg | nu
   ].filter((part): part is string => part !== null);
   const count = parts.length === 1 ? 'one new shape' : 'two new shapes';
   return `Adds ${count}: ${parts.join(', ')}.`;
+}
+
+function bedHint(
+  result: { outward: ImportedSvg | null },
+  bed?: { readonly widthMm: number; readonly heightMm: number },
+): string {
+  const { outward } = result;
+  if (bed === undefined || outward === null) return '';
+  const width = outward.bounds.maxX - outward.bounds.minX;
+  const height = outward.bounds.maxY - outward.bounds.minY;
+  if (width <= bed.widthMm && height <= bed.heightMm) return '';
+  return ` The outward offset is larger than the ${bed.widthMm} × ${bed.heightMm} mm bed.`;
 }
 
 function size(object: ImportedSvg): string {
