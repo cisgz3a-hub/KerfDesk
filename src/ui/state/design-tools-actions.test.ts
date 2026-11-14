@@ -182,7 +182,8 @@ describe('Create Rubber-Band Outline', () => {
     expect(selection()).toEqual([outline.id]);
     expect(useStore.getState().undoStack).toEqual([before]);
     expect(lastToast()).toEqual({
-      message: 'Added a rubber-band outline around 2 objects (40 × 30 mm).',
+      message:
+        "Added a rubber-band outline around 2 objects (40 × 30 mm), cut with a copy of “cut”, with the artwork's own settings.",
       variant: 'success',
     });
 
@@ -241,7 +242,8 @@ describe('Create Rubber-Band Outline', () => {
     expect(project()).toBe(before);
     expect(undoCount()).toBe(0);
     expect(lastToast()).toEqual({
-      message: 'The selection has no area to outline: it lies on one straight line.',
+      message:
+        'The selection has no area to outline: it lies on one straight line or is too small.',
       variant: 'warning',
     });
   });
