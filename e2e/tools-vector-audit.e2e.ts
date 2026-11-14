@@ -204,7 +204,13 @@ const cases: readonly { id: string; seed: Seed; dialog?: string; apply?: string 
   },
   { id: 'prepare-stamp', seed: 'single', dialog: 'Prepare Stamp', apply: 'Apply as new image' },
   { id: 'offset-shapes', seed: 'single', dialog: 'Offset Shapes', apply: 'Offset' },
-  { id: 'rubber-band-outline', seed: 'pair' },
+  // ADR-480 Amd 7: the outline's cut operation is chosen in a dialog first.
+  {
+    id: 'rubber-band-outline',
+    seed: 'pair',
+    dialog: 'Rubber-band outline',
+    apply: 'Add outline',
+  },
   { id: 'close-paths', seed: 'open' },
   { id: 'reverse-paths', seed: 'open' },
   { id: 'optimize-shapes', seed: 'optimize', dialog: 'Optimize Shapes', apply: 'Optimize' },
