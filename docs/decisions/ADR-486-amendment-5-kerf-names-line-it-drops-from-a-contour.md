@@ -114,5 +114,8 @@ makes, and the fix here is to say what it leaves out.
     0.05 mm slot is still reported as closed up only.
   - EMS Nixish "H" and Relief "P" at +0.1, and EMS Casual Hand "P" at −0.1, after Convert to Path
     and Close Path, are named.
+- `src/io/gcode/laser-leads-scrap-side.test.ts`: two squares joined by a 0.4 mm neck, cut at
+  −0.25 and −0.3 mm, lose the neck's 10 mm walls. Each kerfed operation now names about 9 mm of
+  line in "bell" and nothing else.
 - `src/core/geometry/dropped-contour-line.test.ts` covers the coverage walk, the once-only count,
   the 1 mm floor and `retracedLineMm`.
