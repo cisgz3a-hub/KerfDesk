@@ -156,4 +156,19 @@ describe('linked tapered inlay contact geometry', () => {
       planTaperedInlayPair([circle(10)], { ...INTENT, fitClearanceMm: 0.55 }, bit(60)).ok,
     ).toBe(true);
   });
+
+  // CNC audit v2 J1-P3-2 (ADR-258 Amendment 8): the plug sinks fit / tan(half
+  // angle) to close its walls; past the glue gap it bottoms out first.
+  it('notes the seam a fit gap leaves when it closes deeper than the glue gap', () => {
+    const seamed = planTaperedInlayPair([circle(10)], { ...INTENT, fitClearanceMm: 0.4 }, bit(60));
+    if (!seamed.ok) throw new Error(seamed.reason);
+    expect(seamed.findings.join(' ')).toContain(
+      'The 0.4 mm radial fit gap closes only after the plug sinks 0.693 mm, deeper than the 0.5 mm glue gap',
+    );
+    expect(seamed.findings.join(' ')).toContain('about a 0.111 mm seam');
+
+    const seated = planTaperedInlayPair([circle(10)], INTENT, bit(60));
+    if (!seated.ok) throw new Error(seated.reason);
+    expect(seated.findings.join(' ')).not.toContain('radial fit gap closes');
+  });
 });

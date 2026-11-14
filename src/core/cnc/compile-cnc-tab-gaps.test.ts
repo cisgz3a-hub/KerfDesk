@@ -162,3 +162,76 @@ describe('N7-P3-1: small holes are not said to hold by nothing', () => {
     expect(narrow?.bridgeMm).toBeLessThan(3);
   });
 });
+
+// ADR-258 Amendment 8 (CNC audit v3 N8-P2-1, regression of Amendment 7): the
+// tabs of an outline opened at mid-edge keep the corner-avoiding places a
+// closed outline gets. Amendment 7 shifted them all together off the gap, onto
+// every corner of a square or L: 6.00 -> 3.27 mm bridges, and 1 mm tabs cut free.
+describe('N8-P2-1: an outline opened at mid-edge keeps its tabs off the corners', () => {
+  // A square drawn from the middle of its bottom edge, stopping `gapMm` short.
+  function openSquare(x: number, y: number, size: number, gapMm: number): Polyline {
+    const mid = x + size / 2;
+    return {
+      closed: false,
+      points: [
+        { x: mid + gapMm / 2, y },
+        { x: x + size, y },
+        { x: x + size, y: y + size },
+        { x, y: y + size },
+        { x, y },
+        { x: mid - gapMm / 2, y },
+      ],
+    };
+  }
+
+  it.each([
+    { cutType: 'profile-outside' as const, gapMm: 1 },
+    { cutType: 'profile-on-path' as const, gapMm: 1 },
+    { cutType: 'profile-on-path' as const, gapMm: 2.5 },
+  ])('holds a 60 mm square cut $cutType with a $gapMm mm gap by full 6 mm tabs', (input) => {
+    const { segments } = compiled([art([openSquare(50, 50, 60, input.gapMm)])], {
+      cutType: input.cutType,
+    });
+    const cut = throughCut(segments, TAB_TOP, BIT, machineBox(50, 50, 60, 60));
+
+    // Holding section per tab: bridge x 2 mm tab height. Main: 3.27 mm on every corner.
+    expect(cut.pieces).toBe(4);
+    expect(cut.narrowestBridgeMm).toBeGreaterThan(5.9);
+  });
+
+  it('holds an L opened at mid-edge by full 2 mm tabs (main: 0.44 mm)', () => {
+    const ell: Polyline = {
+      closed: false,
+      points: [
+        { x: 90.5, y: 50 },
+        { x: 130, y: 50 },
+        { x: 130, y: 90 },
+        { x: 90, y: 90 },
+        { x: 90, y: 130 },
+        { x: 50, y: 130 },
+        { x: 50, y: 50 },
+        { x: 89.5, y: 50 },
+      ],
+    };
+    const { segments } = compiled([art([ell])], { cutType: 'profile-outside', tabWidthMm: 2 });
+    const cut = throughCut(segments, TAB_TOP, BIT, machineBox(50, 50, 80, 80));
+
+    expect(cut.pieces).toBeGreaterThanOrEqual(4);
+    expect(cut.narrowestBridgeMm).toBeGreaterThan(1.9);
+  });
+
+  it.each([
+    { size: 60, tabWidthMm: 1 },
+    { size: 10, tabWidthMm: 1 },
+    { size: 8, tabWidthMm: 0.5 },
+  ])('keeps a $size mm square with $tabWidthMm mm tabs held (main: cut free)', (input) => {
+    const { segments } = compiled([art([openSquare(50, 50, input.size, 1)])], {
+      cutType: 'profile-outside',
+      tabWidthMm: input.tabWidthMm,
+    });
+    const cut = throughCut(segments, TAB_TOP, BIT, machineBox(50, 50, input.size, input.size));
+
+    expect(cut.pieces).toBeGreaterThanOrEqual(2);
+    expect(cut.narrowestBridgeMm).toBeGreaterThan(input.tabWidthMm - 0.1);
+  });
+});

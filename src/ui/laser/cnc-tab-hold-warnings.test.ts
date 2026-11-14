@@ -46,6 +46,23 @@ describe('cncTabHoldWarnings', () => {
     expect(warning).toContain('Edit positions');
   });
 
+  it('tells an open outline to close itself, since it has no tab handles (ADR-258 Amd 8)', () => {
+    const [warning] = cncTabHoldWarnings(
+      job([
+        shape({
+          kind: 'narrow-bridge',
+          role: 'part',
+          tabsCut: 4,
+          bridgeMm: 0.4,
+          openOutline: true,
+        }),
+      ]),
+    );
+
+    expect(warning).toContain('Close the open outline with Tools > Join paths');
+    expect(warning).not.toContain('Edit positions');
+  });
+
   it('says an open outline the bit closes is tabbed as a closed shape', () => {
     const [warning] = cncTabHoldWarnings(
       job([shape({ kind: 'closed-gap', role: 'part', widthMm: 80, heightMm: 60, tabsCut: 4 })]),

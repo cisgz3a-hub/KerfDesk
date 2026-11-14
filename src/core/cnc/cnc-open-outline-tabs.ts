@@ -1,5 +1,5 @@
 // Holding tabs on an open outline that the cut frees all the same (ADR-258
-// Amendments 5 and 7).
+// Amendments 5, 7 and 8).
 //
 // Amendment 5 tabbed an open outline as a closed loop when its ends lie closer
 // than the cut width: the bit sweeps the gap. CNC audit v3 N7-P1-2 found the
@@ -12,15 +12,20 @@
 // times the cut depth, is smaller than one tab's, tab width times tab height,
 // and at least while it is under THIN_POCKET_FLOOR_MM (0.2 mm), the codebase's
 // "holds nothing" floor. With the default 6 x 2 mm tabs through 6.35 mm that is
-// any gap under D + 1.89 mm. The tabs keep off the gap itself, where the cut
-// does not run and a tab would hold nothing.
+// any gap under D + 1.89 mm.
+//
+// Amendment 8 (CNC audit v3 N8-P2-1): the tabs stay where the closed loop's
+// corner-avoiding plan puts them (Amendment 5), even over the gap. Amendment 7
+// moved them all off it together, which put every tab of a square or L opened
+// at mid-edge on a corner (6.00 -> 3.27 mm bridges; 1 mm tabs cut free). A
+// window over the gap holds its full width: the cut rides the tab top from the
+// window's edge to the outline's end, so each kerf still stops at a window edge
+// and the material between them is the window less the cut width, sliver or no.
 //
 // Pure: no clock, no randomness, no I/O.
 
 import { signedAreaMm2 } from '../geometry/polyline-orientation';
 import type { CncLayerSettings, Polyline } from '../scene';
-import { circularGap, modulo, tabLoop } from './cnc-tab-loop';
-import { windowsBridgeMm, type TabPlan } from './cnc-tab-placement';
 
 const EPS = 1e-9;
 /** A wall thinner than this holds nothing (THIN_POCKET_FLOOR_MM). */
@@ -57,36 +62,4 @@ export function cutFreesOpenOutline(
 ): boolean {
   const gapMm = openOutlineGapMm(toolpath, cutWidthMm);
   return gapMm !== null && gapMm < closedForTabsBelowMm(settings, cutWidthMm) - EPS;
-}
-
-/**
- * `plan` for `loop` (the open outline closed across its gap) with every window
- * moved off the gap: the windows shift together until the gap's middle sits
- * halfway between two of them. Unchanged when no window touches the gap.
- */
-export function planClearOfGap(loop: Polyline, plan: TabPlan, cutWidthMm: number): TabPlan {
-  const measured = tabLoop(loop.points);
-  if (measured === null || plan.coversLoop || plan.centers.length === 0) return plan;
-  const { perimeter } = measured;
-  const openLengthMm = measured.cumulative[measured.points.length - 1] as number;
-  const gapLengthMm = perimeter - openLengthMm;
-  const gapMiddle = openLengthMm + gapLengthMm / 2;
-  const touches = plan.centers.some(
-    (center) => circularGap(center, gapMiddle, perimeter) < (plan.windowMm + gapLengthMm) / 2 - EPS,
-  );
-  if (!touches) return plan;
-  const sorted = [...plan.centers].sort((a, b) => a - b);
-  let delta = 0;
-  sorted.forEach((center, index) => {
-    const next =
-      index + 1 < sorted.length ? (sorted[index + 1] as number) : (sorted[0] as number) + perimeter;
-    const between = modulo(gapMiddle - center, perimeter);
-    if (between < next - center) delta = between - (next - center) / 2;
-  });
-  const centers = plan.centers.map((center) => modulo(center + delta, perimeter));
-  return {
-    ...plan,
-    centers,
-    narrowestBridgeMm: windowsBridgeMm(measured, centers, plan.windowMm, cutWidthMm),
-  };
 }

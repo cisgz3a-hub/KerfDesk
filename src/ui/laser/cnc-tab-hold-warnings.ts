@@ -88,11 +88,15 @@ const WARNINGS: Readonly<Record<Kind, (m: Message) => string>> = {
     `${layer}${named} ${w.is} too small for ${first.tabsSet} tabs of ${tab} ` +
     `beside the ${cut} cut, so ${w.gets} ${tabRange(shapes)}, ` +
     `as many as still let ${w.it} cut through.`,
-  'narrow-bridge': ({ shapes, layer, named, tab }) =>
+  'narrow-bridge': ({ shapes, w, layer, named, tab }) =>
     `${layer}the tabs on ${named} hold by as little as ` +
     `${formatMm(minOf(shapes.map((shape) => shape.bridgeMm ?? 0)))} mm of the ${tab} set, ` +
-    'because the outline turns inside the tab. Drag those tabs to straighter edges with ' +
-    'Edit positions, or use narrower tabs.',
+    'because the outline turns inside the tab. ' +
+    // ADR-258 Amendment 8: an open outline has no tab handles to drag.
+    (shapes.some((shape) => shape.openOutline === true)
+      ? `Close the open ${w.outlines} with Tools > Join paths and drag ${w.its} tabs to straighter edges, ` +
+        'or use narrower tabs.'
+      : 'Drag those tabs to straighter edges with Edit positions, or use narrower tabs.'),
   'closed-gap': ({ shapes, w, layer, cut }) =>
     `${layer}${shapes.length} open ${w.outlines} (${sizes(shapes)}) ` +
     // ADR-258 Amendment 7: also an outline just over one cut width short, held

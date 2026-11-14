@@ -105,6 +105,8 @@ export type CncTabHoldShape = {
   readonly cutWidthMm: number;
   /** The narrowest bridge left, mm (narrow-bridge only). */
   readonly bridgeMm?: number;
+  /** An open outline tabbed as the loop the cut frees (ADR-258 Amendments 5, 7 and 8). */
+  readonly openOutline?: true;
 };
 
 /** Structured-clone-safe CNC evidence retained with the exact compiled Job. */
