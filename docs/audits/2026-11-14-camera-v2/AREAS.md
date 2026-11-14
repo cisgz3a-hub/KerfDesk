@@ -40,4 +40,4 @@ Finding IDs are `K<area>-P<n>-<k>`. Severity follows [METHOD.md §3](../2026-10-
 - security findings stay redacted until fixed, with details only in the coordinator's scratchpad;
 - fix PRs use auto-merge with the MERGE method, plus Auto-fix.
 
-**Status:** started 2026-11-14. K1 running.
+**Status:** started 2026-11-14. K1 ledgered ([LEDGER.md](LEDGER.md)); K2 next.
