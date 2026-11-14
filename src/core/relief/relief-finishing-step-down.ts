@@ -16,7 +16,7 @@ import type { CncPath3dPass } from '../job';
 import type { Vec3 } from '../geometry/vec3';
 import type { CncTool } from '../scene';
 import { kernelForTool } from '../sim';
-import type { ReliefRoughingReach } from './relief-roughing-reach';
+import { sweepPathIntoStock, type ReliefRoughingReach } from './relief-roughing-reach';
 
 // A level point rides above its finishing row only past this rise.
 const RISE_EPS_MM = 1e-3;
@@ -43,11 +43,12 @@ export function finishingStepDown(
     tool.kind === 'v-bit' || tool.kind === 'engraving' || tool.kind === 'tapered-ball-nose';
   // Finishing keeps one move per straight stretch, so sample every half cell.
   const dense = rows.map((row) => densified(row.points, reach.map.mmPerCell / 2));
-  const tops = dense.map((points) =>
-    points.map((p) =>
+  const underTip = measuredTakeTops(dense, reach, tool, pointed);
+  const tops = dense.map((points, row) =>
+    points.map((p, i) =>
       Math.max(
         stockTop === null ? Number.NEGATIVE_INFINITY : stockAt(reach, stockTop, p),
-        stockUnderTip(reach, p, pointed),
+        underTip[row]?.[i] ?? Number.NEGATIVE_INFINITY,
       ),
     ),
   );
@@ -115,6 +116,69 @@ function reachOffsets(
       if (near <= kernel.radiusMm) offsets.push([dx, dy, kernel.surfaceDzAtRadius(near)]);
     }
   return offsets;
+}
+
+// CNC audit v3 N8-P3-1: where a row's own tip would take more than a pass.
+// The rows are swept in program order over a copy of the previous bit's
+// stock, so each row is judged on what is still standing when it arrives (its
+// earlier neighbours take most of a terrace before it): an ⅛" ball the
+// previous rule stepped down for 0.6 mm is left alone, while a pointed tip or
+// a ball on a shallow ramp, which do meet more than a pass, still trigger.
+// Where a point triggers, its levels start from the previous bit's stock
+// itself, since the levels run before any finishing row.
+function measuredTakeTops(
+  dense: ReadonlyArray<ReadonlyArray<Vec3>>,
+  reach: ReliefRoughingReach,
+  tool: CncTool,
+  pointed: boolean,
+): ReadonlyArray<ReadonlyArray<number>> {
+  const standing = { ...reach, stock: Float32Array.from(reach.stock) };
+  return dense.map((points) => {
+    const tops: number[] = [];
+    for (const [start, end] of rowsOf(points)) {
+      for (const p of points.slice(start, end))
+        tops.push(
+          stockUnderTip(standing, p, pointed) === Number.NEGATIVE_INFINITY
+            ? Number.NEGATIVE_INFINITY
+            : stockUnderTip(reach, p, pointed),
+        );
+      sweepPathIntoStock(
+        reach.map,
+        standing.stock,
+        tool,
+        points.slice(Math.max(0, start - 1), end),
+      );
+    }
+    return tops;
+  });
+}
+
+// A row ends where the path turns more than 60° from the heading it started
+// on. A raster finish links its rows back and forth into one stretch, and a
+// row is what the tip meets in one go.
+const ROW_TURN_COS = 0.5;
+
+/** [start, end) point ranges of the rows of one finishing stretch. */
+export function rowsOf(points: ReadonlyArray<Vec3>): ReadonlyArray<readonly [number, number]> {
+  const rows: Array<readonly [number, number]> = [];
+  let start = 0;
+  let heading: { x: number; y: number } | null = null;
+  for (let i = 1; i < points.length; i += 1) {
+    const a = points[i - 1];
+    const b = points[i];
+    if (a === undefined || b === undefined) continue;
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    if (length < 1e-9) continue;
+    const here = { x: (b.x - a.x) / length, y: (b.y - a.y) / length };
+    if (heading !== null && here.x * heading.x + here.y * heading.y < ROW_TURN_COS) {
+      rows.push([start, i]);
+      start = i;
+      heading = null;
+    }
+    heading ??= here;
+  }
+  rows.push([start, points.length]);
+  return rows;
 }
 
 // CNC audit v3 N7-P2-1: the stock the previous bit left right under this

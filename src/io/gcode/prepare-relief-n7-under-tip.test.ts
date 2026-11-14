@@ -39,6 +39,16 @@ const TAPERED: CncTool = {
 };
 const BALL_1MM: CncTool = { id: 'r-bn1', name: '1 mm ball', kind: 'ball-nose', diameterMm: 1 };
 
+function ramp(deg: number) {
+  const slope = Math.tan((deg * Math.PI) / 180);
+  return {
+    w: 40,
+    h: 20,
+    maxDepth: 5,
+    depth: (x: number) => Math.min(5, Math.max(0, (x - 5) * slope)),
+  };
+}
+
 // The refuter's surfaces (zz-n2r/r-surf.ts), at (40, 40).
 const SURFACES = {
   pyramid: {
@@ -57,6 +67,9 @@ const SURFACES = {
       return r < 1 ? 4 - 4 * Math.sqrt(1 - r * r) : 4;
     },
   },
+  // Ramps like the N8 verifier's (zz-n8/v/n7r/v-relief.ts).
+  ramp10: ramp(10),
+  ramp30: ramp(30),
 } as const;
 
 function project(surface: keyof typeof SURFACES, finishToolId: string): Project {
@@ -85,9 +98,17 @@ function worstUnderTip(surface: keyof typeof SURFACES, toolId: string) {
   const moves = simulateStock(p, gcode, 0.05).moves.filter(
     (move) => move.tool === toolId && !move.rapid && move.len > 0.05,
   );
+  const finish = prepared.job.groups.find(
+    (group) => group.kind === 'cnc' && group.cutType === 'relief-finish',
+  );
   return {
     worst: Math.max(0, ...moves.map((move) => move.centreRem)),
     warnings: detectMachineJobWarnings(p, null, null, prepared),
+    stepPasses:
+      finish?.kind === 'cnc'
+        ? finish.passes.filter((pass) => pass.kind === 'path3d' && pass.reliefStepDown === true)
+            .length
+        : 0,
   };
 }
 
@@ -109,6 +130,29 @@ describe('relief finishing steps down by the stock under its tip (N7-P2-1, N7-P3
       expect(warnings.join('\n')).toMatch(
         /finishing bit (cuts it|cuts that) first in \d+ step-down/,
       );
+    },
+    120_000,
+  );
+});
+
+describe('a row is judged on the stock still standing when it arrives (N8-P3-1)', () => {
+  it('the ⅛" ball on the pyramid meets well under a pass, so it gets no levels and no note', () => {
+    // Before: one step-down level (+22 % path) and the "under the path" note for
+    // a ball whose tip took at most 0.6 mm.
+    const { worst, warnings, stepPasses } = worstUnderTip('pyramid', 'bn-3175');
+    expect(worst).toBeLessThanOrEqual(PER_PASS_MM + SLACK_MM);
+    expect(stepPasses).toBe(0);
+    expect(warnings.join(' ')).not.toContain("finishing bit's path");
+  }, 120_000);
+
+  // Before #1904 the ⅛" ball took up to 2.4 mm (10°) and 2.2 mm (30°) under
+  // its tip here, so gating the rule to pointed bits would reopen this.
+  it.each(['ramp10', 'ramp30'] as const)(
+    'the ⅛" ball on the %s, which does meet more than a pass, still steps down',
+    (surface) => {
+      const { worst, stepPasses } = worstUnderTip(surface, 'bn-3175');
+      expect(worst).toBeLessThanOrEqual(PER_PASS_MM + SLACK_MM);
+      expect(stepPasses).toBeGreaterThan(0);
     },
     120_000,
   );

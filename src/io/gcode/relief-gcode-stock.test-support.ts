@@ -83,7 +83,7 @@ function newGrid(
     top: new Float64Array(NX * NY),
     passOf: new Int32Array(NX * NY).fill(-1),
     passRem: new Float32Array(NX * NY),
-    pass: { id: 0 },
+    pass: { id: 0, heading: null },
     X0,
     Y0,
     NX,
@@ -96,10 +96,25 @@ function newGrid(
 // pass. Returns the move's record when it cut, or when it was a feed move.
 function feedMove(tool: CncTool | undefined, head: Head, to: Point3, grid: Grid): SimMove | null {
   const inStock = Math.min(head.z, to.z) < 1e-4;
-  if (head.mode === 0 || !inStock) grid.pass.id += 1;
+  if (head.mode === 0 || !inStock) newPass(grid.pass, null);
+  else followRow(grid.pass, to.x - head.x, to.y - head.y);
   if (tool === undefined || !inStock) return null;
   const cut = cutMove(tool, head, to, grid);
   return head.mode === 1 || cut.vol > 1e-4 ? simMove(head, to, cut) : null;
+}
+
+function newPass(pass: Grid['pass'], heading: Grid['pass']['heading']): void {
+  pass.id += 1;
+  pass.heading = heading;
+}
+
+// A turn of more than 60° from the row's first heading starts a new row.
+function followRow(pass: Grid['pass'], dx: number, dy: number): void {
+  const length = Math.hypot(dx, dy);
+  if (length < 1e-6) return;
+  const here = { x: dx / length, y: dy / length };
+  if (pass.heading === null) pass.heading = here;
+  else if (here.x * pass.heading.x + here.y * pass.heading.y < 0.5) newPass(pass, here);
 }
 
 type Head = { x: number; y: number; z: number; mode: number; tool: string; layer: string };
@@ -165,13 +180,16 @@ function programBounds(lines: ReadonlyArray<string>) {
 
 type Grid = {
   readonly top: Float64Array;
-  // CNC audit v3 N7: the load "under the tip per pass" is what one pass (the
-  // feed moves between rapids) takes off a cell in all, not what one of its
-  // moves takes: a row descending a slope cuts the same cell over several
-  // short moves. Each cell keeps the pass that last cut it and its total.
+  // CNC audit v3 N7: the load "under the tip per pass" is what one row takes
+  // off a cell in all, not what one of its moves takes: a row descending a
+  // slope cuts the same cell over several short moves. Each cell keeps the
+  // row that last cut it and its total. N8-P3-2: a row is the feed moves
+  // between two rapids, cut short where the path turns more than 60° from the
+  // heading the row started on, so the rows of a back-and-forth finish are
+  // each their own (the stock an earlier row's flank took is not this row's).
   readonly passOf: Int32Array;
   readonly passRem: Float32Array;
-  readonly pass: { id: number };
+  readonly pass: { id: number; heading: { x: number; y: number } | null };
   readonly X0: number;
   readonly Y0: number;
   readonly NX: number;
