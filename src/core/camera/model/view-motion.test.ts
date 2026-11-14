@@ -5,9 +5,9 @@
 // slide as 1.4 mm; patches fitted on the bed measure all of them.
 
 import { describe, expect, it } from 'vitest';
-import type { CameraPose } from './camera-model';
+import { bedPoint, pixelToBed, projectWorldPoint, type CameraPose } from './camera-model';
 import { overheadPose, wideLens } from './model-fixtures';
-import { bedSamplePoints, compareViews } from './view-motion';
+import { bedMotionFromPatches, bedSamplePoints, compareViews } from './view-motion';
 import {
   cutParts,
   machineScene,
@@ -104,5 +104,65 @@ describe('compareViews on a rendered machine', () => {
       bedHeightMm: BED,
     });
     expect(outcome.kind).toBe('none');
+  });
+
+  // Camera audit v2 K2-P3-1: the sign is what the type documents.
+  it('gives each displacement as where the drawn point truly is, less the point', () => {
+    const after = slidPose(pose, 5, 0);
+    const outcome = compare(after);
+    if (outcome.kind !== 'measured') throw new Error('expected a measured slide');
+    const [centre] = bedSamplePoints(BED, BED);
+    const [reported] = outcome.displacementsMm;
+    if (centre === undefined || reported === undefined) throw new Error('expected the centre');
+    // The calibration draws the centre at this pixel; the moved camera sees there:
+    const pixel = projectWorldPoint(lens, pose, bedPoint(centre.x, centre.y, 0));
+    const truly = pixel === null ? null : pixelToBed(lens, after, pixel, 0);
+    if (truly === null) throw new Error('expected the centre in the picture');
+    expect(reported.x).toBeCloseTo(truly.x - centre.x, 0);
+    expect(reported.y).toBeCloseTo(truly.y - centre.y, 0);
+  });
+
+  // Camera audit v2 K2r-P3-1: a flip setting changed is no small move.
+  it('does not measure a mirrored picture as a move', () => {
+    const view = viewThumbnail(renderView(lens, pose, machineScene(cutParts, { gantryY: 300 })));
+    const mirrored = new Uint8Array(view.data.length);
+    for (let y = 0; y < view.height; y += 1) {
+      for (let x = 0; x < view.width; x += 1) {
+        mirrored[y * view.width + x] = view.data[y * view.width + (view.width - 1 - x)] ?? 0;
+      }
+    }
+    const outcome = compareViews({
+      reference,
+      current: { ...view, data: mirrored },
+      lens,
+      pose,
+      bedWidthMm: BED,
+      bedHeightMm: BED,
+    });
+    expect(outcome.kind).not.toBe('measured');
+  });
+
+  it('turns down a fit that mirrors the bed, even when every patch matches', () => {
+    // Each patch of a left-right mirrored picture shows across the middle.
+    const width = 192;
+    const height = 108;
+    const patches = [];
+    for (const cy of [12, 30, 54, 78, 96]) {
+      for (const cx of [10, 30, 60, 132, 162, 182]) {
+        patches.push({ cx, cy, dxPx: width - 1 - 2 * cx, dyPx: 0, score: 1 });
+      }
+    }
+    const args = {
+      lens,
+      pose,
+      thumbWidth: width,
+      thumbHeight: height,
+      bedWidthMm: BED,
+      bedHeightMm: BED,
+    };
+    expect(bedMotionFromPatches({ ...args, patches })).toBeNull();
+    // The same patches moved, not mirrored, are measured.
+    const slid = patches.map((patch) => ({ ...patch, dxPx: 3 }));
+    expect(bedMotionFromPatches({ ...args, patches: slid })).not.toBeNull();
   });
 });

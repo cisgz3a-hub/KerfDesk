@@ -68,6 +68,7 @@ export function machineSnapshot(
     // The running camera's own calibration, for where its picture is only
     // estimated (ADR-441 Amendment 9).
     cameraCalibration: ownCameraModel(project.device, camera.sourceState) ?? null,
+    cameraSurfaceHeightMm: camera.surfaceHeightMm,
     registrationOutline: registrationOutlinePlacement(project, laser.registrationOutlineRun),
     homingState: laser.homingState,
     trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,
