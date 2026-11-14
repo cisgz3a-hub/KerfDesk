@@ -22,6 +22,7 @@ import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { buildBitmapFromVectors } from '../raster/vector-to-bitmap';
 import { ImportImageDialog } from './ImportImageDialog';
+import { positionTraceOverRasterSource } from '../state/trace-placement';
 import { resolveTraceCommitResult } from './trace-commit-result';
 import type { TraceResult } from './use-trace-worker-client';
 
@@ -348,14 +349,19 @@ describe('Trace commit dialog and document lifetime', () => {
   );
 
   it('preserves same-ID retrace and movement before Submit with grouped undo', async () => {
-    const target: TracedImage = {
+    // The trace sits registered over its photo, as a committed trace does; a
+    // re-trace keeps the offset from the photo as the dialog opened on it, so
+    // a photo moved before Submit takes the trace along (ADR-408 Amendment 1).
+    const target: TracedImage = positionTraceOverRasterSource(source, {
       kind: 'traced-image',
       id: 'target',
       source: source.source,
       traceSourceId: source.id,
       ...result,
+      tracePixelWidth: result.width,
+      tracePixelHeight: result.height,
       transform: IDENTITY_TRANSFORM,
-    };
+    });
     const project = useStore.getState().project;
     await act(async () => {
       useStore

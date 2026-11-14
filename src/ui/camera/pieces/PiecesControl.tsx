@@ -3,8 +3,9 @@
 // canvas; each piece can be left in or out; Place selection on each piece
 // repeats the selected design on every piece left in, as one undo step. When
 // the design already sits on one piece, every copy lands on its piece the
-// same way; otherwise the design is centred on each piece. Nothing changes
-// in the project until Place.
+// same way; otherwise the design is centred on each piece. A piece the copy
+// would run off is named and left out of Place (ADR-442 Amendment 2).
+// Nothing changes in the project until Place.
 
 import { useMemo, useState } from 'react';
 import type { DetectedPiece } from '../../../core/camera/pieces/find-pieces';
@@ -15,7 +16,8 @@ import {
   type DesignFrame,
 } from '../../../core/camera/pieces/piece-placements';
 import { useStore } from '../../state';
-import { pieceMoveLabel, pieceNotes, pieceSizeLabel } from './piece-label';
+import { offPieceMm, piecesTheDesignFits } from '../../../core/camera/pieces/piece-fit';
+import { pieceFitNote, pieceMoveLabel, pieceNotes, pieceSizeLabel } from './piece-label';
 import { usePieceScanStore, type PieceScan } from './piece-scan-store';
 import { selectionFrame } from './selection-frame';
 import { useFindPieces } from './use-find-pieces';
@@ -113,13 +115,16 @@ function FoundPieces(props: {
       props.onPlaced('Tick the pieces to place the design on.');
       return;
     }
-    const placements = piecePlacements({
-      pieces: included,
-      design: current,
-      sample: pieceUnder(scan.pieces, current.centre),
-    });
+    const sampleNow = pieceUnder(scan.pieces, current.centre);
+    const { fitting, runsOff } = piecesTheDesignFits(included, current, sampleNow);
+    const leftOut = runsOff.map((piece) => scan.pieces.indexOf(piece) + 1);
+    if (fitting.length === 0) {
+      props.onPlaced(NOTHING_FITS);
+      return;
+    }
+    const placements = piecePlacements({ pieces: fitting, design: current, sample: sampleNow });
     const placed = state.placeSelectionCopies(placements, state.project);
-    props.onPlaced(placed ? placedMessage(included.length) : NOTHING_PLACED);
+    props.onPlaced(placed ? placedMessage(fitting.length, leftOut) : NOTHING_PLACED);
   };
 
   if (scan.pieces.length === 0) {
@@ -163,9 +168,16 @@ function FoundPieces(props: {
   );
 }
 
-function placedMessage(pieces: number): string {
-  return `Placed on ${pieces} ${pieces === 1 ? 'piece' : 'pieces'}. One Undo takes them all back. Frame traces the rectangle around all of them, not each piece.`;
+function placedMessage(pieces: number, leftOut: ReadonlyArray<number>): string {
+  const skipped =
+    leftOut.length === 0
+      ? ''
+      : ` Left out ${leftOut.length === 1 ? 'piece' : 'pieces'} ${leftOut.join(', ')}: the design runs off ${leftOut.length === 1 ? 'it' : 'them'}.`;
+  return `Placed on ${pieces} ${pieces === 1 ? 'piece' : 'pieces'}.${skipped} One Undo takes them all back. Frame traces the rectangle around all of them, not each piece.`;
 }
+
+const NOTHING_FITS =
+  'Nothing was placed: the design runs off every ticked piece. Make it smaller or put it on one of the pieces, then place again.';
 
 // The project refuses copies it has no room for, and says why in a notice; a
 // locked or hidden design is not repeated at all.
@@ -180,8 +192,19 @@ function PieceRow(props: {
   readonly design: DesignFrame | null;
   readonly onToggle: () => void;
 }): JSX.Element {
-  const { piece } = props;
-  const notes = pieceNotes(piece, props.sample);
+  const { piece, design, sample } = props;
+  const placement = useMemo(
+    () => (design === null ? null : placementOn(piece, design, sample)),
+    [piece, design, sample],
+  );
+  const fitNote = useMemo(
+    () =>
+      design === null || placement === null || piece === sample
+        ? null
+        : pieceFitNote(offPieceMm(piece, design, placement)),
+    [piece, design, sample, placement],
+  );
+  const notes = [...pieceNotes(piece, sample), ...(fitNote === null ? [] : [fitNote])];
   return (
     <div style={pieceStyle} data-testid="camera-piece">
       <label style={lineStyle}>
@@ -194,11 +217,7 @@ function PieceRow(props: {
         <strong>Piece {props.index + 1}</strong>
         <span>{pieceSizeLabel(piece)}</span>
       </label>
-      {props.design === null ? null : (
-        <div style={detailStyle}>
-          {pieceMoveLabel(placementOn(piece, props.design, props.sample))}
-        </div>
-      )}
+      {placement === null ? null : <div style={detailStyle}>{pieceMoveLabel(placement)}</div>}
       {notes.map((note) => (
         <div key={note} style={noteStyle}>
           {note}

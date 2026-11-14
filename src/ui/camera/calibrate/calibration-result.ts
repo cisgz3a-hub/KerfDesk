@@ -7,6 +7,7 @@ import type { CameraCaptureBinding } from '../../../core/camera/camera-capture-b
 import type { CameraBedFrame } from '../../../core/camera/model/camera-bed-frame';
 import { savedMarkErrors, type BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
+import { headCameraBandEstimateMm } from '../../../core/camera/model/head-camera-estimate';
 import type { Vec2 } from '../../../core/scene';
 import type {
   BedCalibration,
@@ -151,6 +152,15 @@ export function calibrationGrade(record: CameraModelRecord): CalibrationGrade {
 // millimetres off, and the grade said "Accurate enough" for all of it. Good
 // now means the whole bed the camera sees (ADR-441 Amendment 9).
 function goodOnTheRings(record: CameraModelRecord, advice: string | null): CalibrationGrade {
+  // A head camera's rings sit in the middle of its picture; the stitch uses 80 % of it.
+  const band = headCameraBandEstimateMm(record);
+  if (band !== null && band > GOOD_EXTRAPOLATED_MM) {
+    return {
+      tone: 'fair',
+      headline: `Accurate on the target; elsewhere in the picture the stitch uses, up to about ${roundToTenth(band)} mm off.`,
+      advice,
+    };
+  }
   const offTarget = offTargetEstimate(record);
   if (offTarget !== null && offTarget.worstMm > GOOD_EXTRAPOLATED_MM) {
     return {
@@ -173,17 +183,32 @@ function extrapolationAdvice(record: CameraModelRecord): string | null {
   const large = offTarget !== null && offTarget.worstMm > GOOD_EXTRAPOLATED_MM;
   if ((share === null || share < EXTRAPOLATED_SHARE) && !large) return null;
   if (record.mount?.kind === 'head') {
-    return `About ${Math.round((share ?? 0) * 100)} % of the picture lies outside the target. The accuracy is measured on its rings; elsewhere the picture is estimated. A larger target size measures more of it.`;
+    const band = headCameraBandEstimateMm(record);
+    const figure =
+      band === null
+        ? ''
+        : `, and may be up to about ${roundToTenth(band)} mm off where the stitch uses it`;
+    return `About ${Math.round((share ?? 0) * 100)} % of the picture lies outside the target. The accuracy is measured on its rings; elsewhere the picture is estimated${figure}. A larger target size measures more of it.`;
   }
   const outside = outsideSentence(share);
   const estimate =
     offTarget === null
       ? 'outside the target the picture is estimated.'
       : `outside the target the picture is estimated, and may be up to about ${roundToTenth(offTarget.worstMm)} mm off ${bedRegion(offTarget)}.`;
-  const fix = large
-    ? ' Engrave the target on a larger sheet, one that covers more of the bed the camera sees, to measure more of it.'
-    : '';
+  // A sheet that already covers the bed cannot be made larger (camera audit v2 K1-P2-1).
+  const fix =
+    large && !targetCoversBed(record)
+      ? ' Engrave the target on a larger sheet, one that covers more of the bed the camera sees, to measure more of it.'
+      : '';
   return `${outside} The accuracy is measured on its rings; ${estimate}${fix}`;
+}
+
+// The target reaches to within this much of every bed edge: a whole-bed sheet.
+const WHOLE_BED_MARGIN_MM = 15;
+
+function targetCoversBed(record: CameraModelRecord): boolean {
+  const area = record.accuracy.targetArea;
+  return area !== undefined && area.x <= WHOLE_BED_MARGIN_MM && area.y <= WHOLE_BED_MARGIN_MM;
 }
 
 function outsideSentence(share: number | null): string {
@@ -251,7 +276,7 @@ export function calibrationFailureMessage(
     case 'target-too-large':
       return 'The target fills the picture from edge to edge, so the rings around its three solid discs may be cut off. Move the camera further from the target or engrave a smaller target (a larger margin, or a smaller target size for a camera on the head), and make sure nothing covers the discs.';
     case 'anchors-unclear':
-      return 'Some rings look like solid discs in the photo, so KerfDesk cannot tell which three discs mark the middle of the target. Light the bed evenly, set the camera to a larger picture size or move it closer, and if the rings are burned nearly solid, engrave a new target with less power. Old marks next to the target can also cause this.';
+      return 'Some rings look like solid discs in the photo, so KerfDesk cannot tell which three discs mark the middle of the target. Light the bed evenly, set the camera to a larger picture size or move it closer, or engrave larger rings (Engrave settings, Ring size): on a large sheet the far rings look smallest. If the rings are burned nearly solid, engrave a new target with less power. Old marks next to the target can also cause this.';
     case 'mirrored-image':
       return 'The camera picture is mirrored. Turn off mirroring or flipping in the camera settings, then take the photo again.';
     case 'too-few-marks':

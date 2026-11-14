@@ -185,7 +185,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'tools.resize-joints': {
     family: 'tools',
-    tooltip: 'Review straight receiving slots and notches against measured material thickness.',
+    tooltip: 'Review straight receiving slots, notches and tabs against measured thickness.',
   },
   'tools.prepare-stamp': {
     family: 'tools',

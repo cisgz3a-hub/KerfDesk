@@ -35,7 +35,7 @@ describe('extrapolationEstimate', () => {
       }),
     ],
   ])(
-    'estimates the far bed for %s on the default sheet within about a factor of two',
+    'estimates the far bed for %s on the default sheet within about a factor of three',
     (_, truth) => {
       const { record, trueOffTargetMm } = calibrateTruthCamera(truth);
       // The rings alone say all is well.
@@ -47,7 +47,8 @@ describe('extrapolationEstimate', () => {
       if (estimate === null) return;
       expect(estimate.worstMm).toBeGreaterThan(GOOD_EXTRAPOLATED_MM);
       expect(estimate.worstMm).toBeGreaterThan(0.6 * trueOffTargetMm);
-      expect(estimate.worstMm).toBeLessThan(2.5 * trueOffTargetMm);
+      // A bound since Amendment 11: its floor may read up to about three times a mild lens.
+      expect(estimate.worstMm).toBeLessThan(3 * trueOffTargetMm);
     },
     60_000,
   );

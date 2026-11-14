@@ -12,9 +12,12 @@ export type JointResizeObject = ImportedSvg | TracedImage;
 export type JointCandidate = {
   readonly id: string;
   readonly objectId: string;
+  /** The object's name, or its id when it has none, for the review list. */
+  readonly objectName: string;
   readonly pathIndex: number;
   readonly contourIndex: number;
-  /** An outward tab is measured by its depth (how far it protrudes), the material it passes through. */
+  /** An outward tab is measured by its depth (how far it protrudes), the material it passes
+   *  through; an opening by its width. `widthMm` and `depthMm` are always the feature's own. */
   readonly kind: 'enclosed-rectangle' | 'inward-slot' | 'outward-tab';
   readonly widthMm: number;
   readonly depthMm: number;

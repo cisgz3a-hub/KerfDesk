@@ -56,7 +56,10 @@ LightBurn behaviour, read on 2026-09-27 from `https://docs.lightburnsoftware.com
    "current palette layer", so the outline takes a copy of the first selected artwork's Line
    operation settings (the ADR-103 offset rule), or a new Line operation named Outline when nothing
    selected is on a Line operation. A selection with no area (one straight line) is explained in a
-   notice and changes nothing. One undo step.
+   notice and changes nothing. One undo step. *Amended by Amendment 7: a dialog shows and picks
+   the operation; only a Line operation whose enabled sub-operations are Line (a Profile in CNC)
+   may be copied, with the source artwork's own settings, else a new "Outline" (Outside path in
+   CNC).*
 4. **Select Contained and Select Smaller Shapes.** Both are in the Edit menu, keep the current
    selection and add to it, and only pick artwork the user could click (unlocked, on a visible
    operation), like Select Open Shapes (ADR-410). Contained means every outline point of the

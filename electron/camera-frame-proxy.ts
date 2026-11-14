@@ -155,6 +155,14 @@ export async function serveHttpFrame(
     writeJson(res, { kind: 'unavailable', ...failure }, 502);
     return failure;
   }
+  // A camera that closes its connection mid-picture can send a JPEG cut
+  // short with no length, or a length that matches the cut (camera audit v2
+  // K4-P3-2): without its end marker it is no picture.
+  if (isJpeg(frame.contentType) && !endsLikeJpeg(frame.bytes)) {
+    const failure = { reason: CUT_PICTURE_REASON };
+    writeJson(res, { kind: 'unavailable', ...failure }, 502);
+    return failure;
+  }
   res.writeHead(200, { 'Content-Type': frame.contentType, 'Cache-Control': 'no-store' });
   res.end(frame.bytes);
   return null;
@@ -174,6 +182,21 @@ async function serveRtspFrame(url: URL, res: ServerResponse): Promise<CameraFram
   res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store' });
   res.end(result.jpeg);
   return null;
+}
+
+const CUT_PICTURE_REASON = 'The camera sent a picture cut short.';
+
+function isJpeg(contentType: string): boolean {
+  return /^image\/(jpeg|jpg|pjpeg)\b/i.test(contentType);
+}
+
+// A JPEG ends with its end-of-image marker, FF D9, perhaps followed by a few
+// padding bytes some cameras add.
+export function endsLikeJpeg(bytes: Uint8Array): boolean {
+  for (let i = bytes.length - 2; i >= Math.max(0, bytes.length - 16); i -= 1) {
+    if (bytes[i] === 0xff && bytes[i + 1] === 0xd9) return true;
+  }
+  return false;
 }
 
 function frameFailure(reason: string, login: CameraLoginProblem | undefined): CameraFrameFailure {

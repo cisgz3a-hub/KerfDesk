@@ -44,6 +44,12 @@ export type EngravedTarget = {
    * away from where the target put them, so they cannot be calibrated on.
    */
   readonly burnedFrom?: 'current-position' | 'user-origin' | 'verified-origin';
+  /**
+   * A target put on the canvas whose rings a Start streamed through a Print
+   * and Cut registration (camera audit v2 K3-P1-4): moved and turned by it,
+   * so they cannot be calibrated on.
+   */
+  readonly burnedRegistered?: true;
   /** Outer diameter of its rings, mm; absent on targets remembered before ring sizes (10 mm). */
   readonly ringDiameterMm?: number;
 };
@@ -180,7 +186,10 @@ function parseTarget(value: unknown): EngravedTarget | null {
 // How the target was placed and how large its rings are, when remembered.
 function targetExtras(
   value: Record<string, unknown>,
-): Pick<EngravedTarget, 'onCanvas' | 'burnSeen' | 'burnedFrom' | 'ringDiameterMm'> {
+): Pick<
+  EngravedTarget,
+  'onCanvas' | 'burnSeen' | 'burnedFrom' | 'burnedRegistered' | 'ringDiameterMm'
+> {
   const ring = value['ringDiameterMm'];
   const onCanvas = value['onCanvas'] === true;
   const burnedFrom = value['burnedFrom'];
@@ -193,6 +202,7 @@ function targetExtras(
       burnedFrom === 'verified-origin')
       ? { burnedFrom }
       : {}),
+    ...(onCanvas && value['burnedRegistered'] === true ? { burnedRegistered: true as const } : {}),
     ...(isFiniteNumber(ring) && ring > 0 ? { ringDiameterMm: ring } : {}),
   };
 }

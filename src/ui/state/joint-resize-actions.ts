@@ -4,6 +4,8 @@ import { previewJointResize, type JointResizeRequest } from '../../core/geometry
 import { selectedObjectIds } from './scene-group-actions';
 import { pushUndo } from './undo-stack';
 import type { AppState } from './store';
+import { movedTabsNotice } from './path-node-edit-actions';
+import { useToastStore } from './toast-store';
 
 export type JointResizeSession = {
   readonly project: Project;
@@ -35,6 +37,12 @@ export function jointResizeSelectionMutation(
   const result = previewJointResize(sources, request, candidateIds);
   if (result.kind === 'error') return result;
   const changed = new Map(result.value.objects.map((object) => [object.id, object]));
+  const { changedFeatures, movedTabs } = result.value;
+  const tabs = movedTabsNotice(movedTabs);
+  const features = changedFeatures === 1 ? '1 joint feature' : `${changedFeatures} joint features`;
+  useToastStore
+    .getState()
+    .pushToast(`Resized ${features}.${tabs === '' ? '' : ` ${tabs}`}`, 'info');
   return ok({
     project: {
       ...state.project,
