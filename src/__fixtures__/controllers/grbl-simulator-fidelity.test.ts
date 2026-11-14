@@ -113,6 +113,31 @@ describe('GRBL simulator fidelity against GRBL 1.1h (audit ST-2)', () => {
     expect(lines.at(-1)).toMatch(/^<Door:0\|/);
   });
 
+  // CNC audit v3 N5-P3-4: the door stops the spindle and cycle start restores it.
+  it('turns the spindle back on when cycle start resumes from a safety door', async () => {
+    const { sim, conn, lines } = await openSim({ motionMs: 1_000 });
+    await conn.write('M3 S12000\n');
+    await conn.write('G1 X10 F600\n');
+    await pump(50);
+    expect(sim.state().spindle).toBe(12000);
+    await conn.write('\x84');
+    await pump(50);
+    expect(sim.state()).toMatchObject({ machine: 'Door', spindle: 0 });
+    await conn.write('~');
+    await pump(5);
+    expect(sim.state()).toMatchObject({ machine: 'Run', spindle: 12000 });
+    await conn.write('?');
+    await pump(5);
+    expect(lines.at(-1)).toMatch(/^<Run\|.*FS:600,12000/);
+    // A reset ends the door suspend without anything left to restore.
+    await conn.write('\x84');
+    await pump(50);
+    await conn.write('\x18');
+    await pump(50);
+    expect(sim.state().spindle).toBe(0);
+    expect(sim.state().spindleBeforeDoor).toBeUndefined();
+  });
+
   it('stays silent to status queries and lines after a hard-limit alarm until reset (protocol.c:226-236)', async () => {
     const { sim, conn, lines } = await openSim();
     sim.triggerAlarm(1);

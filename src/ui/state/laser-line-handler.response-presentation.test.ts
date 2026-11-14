@@ -94,8 +94,8 @@ describe('live configured-family response presentation', () => {
       await flush();
       expect(get().streamer?.inFlight).toEqual([]);
       expect(get().pendingUntrackedAcks).toBe(2);
-      expect(safeWrite).toHaveBeenCalledWith('M5\n', 'stop', 'system');
-      expect(safeWrite).toHaveBeenCalledWith('M9\n', 'stop', 'system');
+      expect(safeWrite).toHaveBeenCalledWith('M5\n', 'stop-cleanup', 'system');
+      expect(safeWrite).toHaveBeenCalledWith('M9\n', 'stop-cleanup', 'system');
       handleLine(set, get, refs, safeWrite, 'ok');
       expect(get().pendingUntrackedAcks).toBe(1);
       handleLine(set, get, refs, safeWrite, 'ok');

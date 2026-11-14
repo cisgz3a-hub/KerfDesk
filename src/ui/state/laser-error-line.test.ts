@@ -267,8 +267,8 @@ describe('handleLine controller error (P0-1)', () => {
     expect(refs.pendingResetCleanup?.lines).toEqual([CMD_SPINDLE_OFF, CMD_COOLANT_OFF]);
     handleLine(set, get, refs, safeWrite, 'Grbl 1.1f');
     for (let index = 0; index < 12; index++) await Promise.resolve();
-    expect(safeWrite).toHaveBeenCalledWith(`${CMD_SPINDLE_OFF}\n`, 'stop', 'system');
-    expect(safeWrite).toHaveBeenCalledWith(`${CMD_COOLANT_OFF}\n`, 'stop', 'system');
+    expect(safeWrite).toHaveBeenCalledWith(`${CMD_SPINDLE_OFF}\n`, 'stop-cleanup', 'system');
+    expect(safeWrite).toHaveBeenCalledWith(`${CMD_COOLANT_OFF}\n`, 'stop-cleanup', 'system');
   });
 
   it('includes the rejected in-flight G-code line in the controller-error notice', () => {

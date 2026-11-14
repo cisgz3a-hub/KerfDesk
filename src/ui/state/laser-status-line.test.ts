@@ -102,6 +102,24 @@ describe('laser status-line controller-owned hold record (ADR-333)', () => {
     expect(get().log.filter((line) => line.includes('entered Hold'))).toHaveLength(1);
   });
 
+  // CNC audit v3 N5-P3-2: KerfDesk's own Pause is not an unrequested hold.
+  it("stays silent when the hold is KerfDesk's own Pause", () => {
+    const { refs, set, get } = makeLineHandlerHarness();
+    const streaming = step(createStreamer('G1 X1\nG1 X2\n')).state;
+    const owned = [
+      { streamer: { ...streaming, status: 'paused' as const } },
+      {
+        streamer: streaming,
+        pauseResumeTransition: { token: Symbol('pause'), action: 'pause' as const },
+      },
+    ];
+    for (const patch of owned) {
+      set({ ...patch, statusReport: null, log: [] });
+      handleStatusLine(set, get, refs, async () => undefined, report('<Door:0|MPos:1,0,0|FS:0,0>'));
+      expect(get().log.some((line) => line.includes('entered Door'))).toBe(false);
+    }
+  });
+
   it('logs a door hold and stays silent with no job running', () => {
     const { refs, set, get } = makeLineHandlerHarness();
     set({ streamer: step(createStreamer('G1 X1\nG1 X2\n')).state, log: [] });

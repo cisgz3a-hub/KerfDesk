@@ -18,6 +18,20 @@ export type PauseResumeTransitionState = {
   readonly action: PauseResumeTransitionAction;
 };
 
+/** Whether a Hold or Door is KerfDesk's own: the stream is paused, a Pause or
+ * Resume is in flight, or a CNC Pause and lift runs (ADR-333 Amendment 1). */
+export function kerfDeskOwnsHold(state: {
+  readonly streamer: { readonly status: string } | null;
+  readonly pauseResumeTransition: PauseResumeTransitionState | null;
+  readonly cncPauseLift?: unknown;
+}): boolean {
+  return (
+    state.streamer?.status === 'paused' ||
+    state.pauseResumeTransition !== null ||
+    (state.cncPauseLift ?? null) !== null
+  );
+}
+
 /** A laser Resume that left grblHAL Idle at the end of a job, which may still
  * hold the paused move's tail (ADR-684; held-resume-tail.ts reads it). */
 export type HeldResumeTail = {

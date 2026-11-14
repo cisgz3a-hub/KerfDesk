@@ -6,7 +6,7 @@ import {
 import type { ControllerDriver } from '../../core/controllers';
 import { wireEncodingError } from '../../core/controllers/serial-wire-encoding';
 import type { SerialConnection } from '../../platform/types';
-import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
+import { writeFailedNoticeAfter, type LaserSafetyAction } from './laser-safety-notice';
 import { outboundTranscriptEntry, type TranscriptSource } from './laser-transcript';
 import {
   bufferTranscriptEntry,
@@ -107,7 +107,9 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
           get(),
           `[lf2] Serial write failed: ${message}. Machine may not have received the command.`,
         ),
-        ...(action === undefined ? {} : { safetyNotice: writeFailedNotice(action) }),
+        ...(action === undefined
+          ? {}
+          : { safetyNotice: writeFailedNoticeAfter(get().safetyNotice, action) }),
       });
       throw new Error(message);
     }
@@ -319,7 +321,9 @@ function recordWriteFailure(
       state,
       `[lf2] Serial write failed: ${message}. Machine may not have received the command.`,
     ),
-    ...(action === undefined ? {} : { safetyNotice: writeFailedNotice(action) }),
+    ...(action === undefined
+      ? {}
+      : { safetyNotice: writeFailedNoticeAfter(state.safetyNotice, action) }),
   }));
   console.error('Serial write failed:', err);
 }
