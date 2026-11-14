@@ -16,7 +16,6 @@ const offsetRequest = {
 
 const copyActions = [
   { name: 'Offset', run: () => useStore.getState().offsetSelection(1) },
-  { name: 'Rubber-Band Outline', run: () => useStore.getState().addRubberBandOutline() },
   {
     name: 'Offset Shapes dialog',
     run: () => useStore.getState().offsetShapesSelection(offsetRequest),
@@ -163,6 +162,18 @@ describe.each(copyActions)('$name Pro operation admission', ({ name, run }) => {
     expect(request).not.toHaveBeenCalled();
     if (name !== 'Offset') expect(result).toBe(true);
   });
+});
+
+// ADR-480 Amendment 7: the outline never copies a V-carve operation, so it
+// makes its own Outside-path Outline and needs no Pro admission.
+it('gives a Rubber-Band Outline round V-carve artwork a new profile in Free, with no Pro prompt', () => {
+  const request = edition();
+  load();
+  expect(useStore.getState().addRubberBandOutline()).toBe(true);
+  const layers = useStore.getState().project.scene.layers;
+  expect(layers).toHaveLength(2);
+  expect(layers[1]).toMatchObject({ name: 'Outline', cnc: { cutType: 'profile-outside' } });
+  expect(request).not.toHaveBeenCalled();
 });
 
 it.each([false, true])(
