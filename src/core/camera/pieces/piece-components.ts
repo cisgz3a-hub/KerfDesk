@@ -1,6 +1,7 @@
 // The separate pieces in a piece mask (ADR-442): the mask is opened to drop
-// specks and closed to bridge hairline gaps, pieces meeting at a narrow neck
-// are cut apart (piece-split.ts), then each 4-connected group of piece pixels
+// specks and closed to bridge hairline gaps, what it leaves out inside a piece
+// that is not the bed showing through is filled (piece-holes.ts), pieces
+// meeting at a narrow neck are cut apart (piece-split.ts), then each 4-connected group of piece pixels
 // becomes one component with its pixel count, centroid, mean colour, outer
 // outline and holes, the point of it furthest from the bed, and whether it
 // runs into a part of the bed the camera did not see (a piece cut off by the
@@ -9,6 +10,7 @@
 
 import { contractMask, expandMask, maskOutline, type SelectionMask } from '../../image-select';
 import type { Colour, PieceMask, PixelPoint } from './piece-mask';
+import { fillMaterialHoles } from './piece-holes';
 import { cutAtNecks, distanceToBed } from './piece-split';
 
 export type PieceComponent = {
@@ -44,6 +46,12 @@ export type CleanRadii = { readonly openPx: number; readonly closePx: number };
 const MASK_SOLID = 255;
 // Holes smaller than this many pixels are noise, not cut-outs.
 const MIN_HOLE_PIXELS = 8;
+// A meeting point whose feature lies below this share of the way from the
+// split up to the pieces' level is on a seam between two pieces.
+const SEAM_SHARE = 0.5;
+// Where two flooded regions first meet can lie this far from the seam itself,
+// mm; a waist is solid wood further than this either side of its middle.
+const SEAM_REACH_MM = 2.5;
 // The deepest points are those within this many pixels of the deepest.
 const DEEPEST_TOLERANCE_PX = 1;
 
@@ -71,11 +79,24 @@ export function pieceComponents(
   pixelsPerMm: number,
 ): PieceComponent[] {
   const clean = cleaned(mask, visible, radii);
+  // Filled knots are wood: their dark colour is no seam.
+  const filled = fillMaterialHoles(
+    clean,
+    visible,
+    mask.width,
+    mask.rgb,
+    mask.bedColour,
+    mask.bedContrast,
+  );
+  // A seam: the pieces' colour dips at least halfway from their level to the
+  // split, where two blanks lie a hairline apart and the close bridged them.
+  const seamLevel = mask.threshold + SEAM_SHARE * (mask.pieceLevel - mask.threshold);
   cutAtNecks(
     clean,
     distanceToBed(clean, visible, mask.width, mask.height),
     mask.width,
     pixelsPerMm,
+    (pixel) => dipsNear(mask, filled, pixel, seamLevel, Math.round(SEAM_REACH_MM * pixelsPerMm)),
   );
   const depth = distanceToBed(clean, visible, mask.width, mask.height);
   const labels = new Int32Array(mask.width * mask.height);
@@ -103,6 +124,26 @@ export function pieceComponents(
     });
   }
   return components;
+}
+
+// True when the feature within `reach` pixels of `pixel` falls below `level`:
+// the meeting point lies on, or beside, a seam.
+function dipsNear(
+  mask: PieceMask,
+  filled: Uint8Array,
+  pixel: number,
+  level: number,
+  reach: number,
+): boolean {
+  const x0 = pixel % mask.width;
+  const y0 = (pixel - x0) / mask.width;
+  for (let y = Math.max(0, y0 - reach); y <= Math.min(mask.height - 1, y0 + reach); y += 1) {
+    for (let x = Math.max(0, x0 - reach); x <= Math.min(mask.width - 1, x0 + reach); x += 1) {
+      const i = y * mask.width + x;
+      if (filled[i] !== 1 && (mask.feature[i] ?? 0) < level) return true;
+    }
+  }
+  return false;
 }
 
 // Open (shrink then grow) removes specks narrower than its radius; close

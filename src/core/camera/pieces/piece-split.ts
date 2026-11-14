@@ -2,16 +2,29 @@
 // are cut apart (ADR-442 Amendment 2). Every piece pixel's distance to the
 // nearest bed pixel is measured exactly (Felzenszwalb and Huttenlocher's
 // two-pass transform), and the pixels are flooded from the deepest down. Two
-// flooded regions that meet stay apart when each rises well above the level
-// where they meet, the watershed's dynamics test; then the line where they
-// meet is cut from the mask. A straight-sided union, such as two equal
-// squares pushed flush together, has no neck and is not cut: its size flags
-// it instead (piece-doubts.ts). Pure core.
+// flooded regions that meet stay apart only where they meet through a narrow
+// contact, or across a seam the picture shows (Amendment 3): two solid blanks
+// touch at a point or along a sliver, or lie a hairline apart, never joined
+// through solid wood as wide as a bone tag's waist, a two-ball ornament's or
+// an hourglass offcut's, which are one piece each. The line where they meet is
+// then cut from the mask. A straight-sided union, such as two equal squares
+// pushed flush together, has no neck and is not cut: its size flags it
+// instead (piece-doubts.ts). Pure core.
 
-// A region must rise this far above where it meets a deeper one to stay apart, mm.
-const PROMINENCE_MM = 3;
-// And reach at least this far from the bed: half the width of the narrowest piece cut free, mm.
+// Both regions must reach at least this far from the bed: half the width of
+// the narrowest piece cut free, mm.
 const MIN_DEPTH_MM = 5;
+// The contact's half-width (the depth where the regions meet) must be at most
+// this share of the shallower region's depth. Two discs touching meet through
+// the sliver the blur and the close bridge beside the touch, about sqrt(gap x
+// radius) wide; measured 0.18-0.31 for coasters 40-90 mm across, the most on a
+// low-contrast MDF bed. A waist is wider: measured 0.48 for a bone tag (30 mm
+// lobes, 14 mm neck) and 0.51 for a snowman ornament (camera audit v2
+// K6-P1-2). When in doubt pieces stay whole: a merged pair is doubted by its
+// size, while a cut blank would take two copies.
+const NECK_SHARE = 0.4;
+// Regions meeting at this share of their depth or more lie on one flat top.
+const PLATEAU_SHARE = 0.95;
 // Depths are bucketed this finely for the flood order, px.
 const DEPTH_STEP_PX = 0.25;
 
@@ -96,6 +109,7 @@ export function cutAtNecks(
   depth: Float32Array,
   width: number,
   pixelsPerMm: number,
+  seam: (pixel: number) => boolean = () => false,
 ): number {
   const height = on.length / width;
   const flood: Flood = {
@@ -105,8 +119,9 @@ export function cutAtNecks(
     roots: new Int32Array(4),
     width,
     height,
-    prominence: PROMINENCE_MM * pixelsPerMm,
     minDepth: MIN_DEPTH_MM * pixelsPerMm,
+    seam,
+    apart: new Map(),
   };
   for (const p of deepestFirst(on, depth)) floodPixel(flood, p, depth[p] ?? 0);
   return cutBetweenBasins(on, flood.parent, width, height);
@@ -121,12 +136,19 @@ type Flood = {
   readonly roots: Int32Array;
   readonly width: number;
   readonly height: number;
-  readonly prominence: number;
   readonly minDepth: number;
+  /** True where the picture shows a seam: the pieces' colour dips there. */
+  readonly seam: (pixel: number) => boolean;
+  /**
+   * The regions each region was found apart from where they first met. That
+   * first meeting, the highest, decides: lower ones along the same seam may
+   * miss its dip, and must not join what it kept apart.
+   */
+  readonly apart: Map<number, Set<number>>;
 };
 
 // Pixel p, at depth `level`, joins the deepest region beside it; any other
-// region beside it that does not stand clear of that level joins too.
+// region beside it that it does not meet through a narrow contact joins too.
 function floodPixel(flood: Flood, p: number, level: number): void {
   const { parent, peak, roots } = flood;
   const count = rootsAround(p, flood.width, flood.height, parent, flood.near, roots);
@@ -139,10 +161,45 @@ function floodPixel(flood: Flood, p: number, level: number): void {
   parent[p] = main;
   for (let k = 0; k < count; k += 1) {
     const root = roots[k] ?? p;
-    if (root === main) continue;
-    const top = peak[root] ?? 0;
-    if (top - level < flood.prominence || top < flood.minDepth) parent[root] = main;
+    if (root === main || flood.apart.get(main)?.has(root) === true) continue;
+    if (separate(flood, peak[root] ?? 0, level, p)) keepApart(flood, main, root);
+    else join(flood, root, main);
   }
+}
+
+function keepApart(flood: Flood, a: number, b: number): void {
+  apartFrom(flood, a).add(b);
+  apartFrom(flood, b).add(a);
+}
+
+// Region `root` joins `main`, and `main` is kept apart from whatever it was.
+function join(flood: Flood, root: number, main: number): void {
+  flood.parent[root] = main;
+  const others = flood.apart.get(root);
+  if (others === undefined) return;
+  flood.apart.delete(root);
+  for (const other of others) {
+    flood.apart.get(other)?.delete(root);
+    keepApart(flood, main, other);
+  }
+}
+
+function apartFrom(flood: Flood, region: number): Set<number> {
+  let set = flood.apart.get(region);
+  if (set === undefined) {
+    set = new Set();
+    flood.apart.set(region, set);
+  }
+  return set;
+}
+
+// Two regions, the shallower `top` deep, meeting `level` deep at pixel p,
+// are two pieces: through a narrow contact, or across a seam.
+function separate(flood: Flood, top: number, level: number, p: number): boolean {
+  if (top < flood.minDepth) return false;
+  if (level <= NECK_SHARE * top) return true;
+  // A meeting across a flat top inside one blank is no contact at all.
+  return level < PLATEAU_SHARE * top && flood.seam(p);
 }
 
 function deepestRoot(flood: Flood, count: number, fallback: number): number {

@@ -24,11 +24,19 @@ export type PieceMask = {
   /** The value each pixel was split by, and where the split is, for finding edges between pixels. */
   readonly feature: Float32Array;
   readonly threshold: number;
+  /** The feature's level inside the pieces, above `threshold`. */
+  readonly pieceLevel: number;
   /** Unblurred colour, three floats per pixel. */
   readonly rgb: Float32Array;
   /** The bed's colour and the pieces' colour the picture was split between; null when no piece stands out. */
   readonly bedColour: Colour | null;
   readonly pieceColour: Colour | null;
+  /**
+   * How far an unblurred colour may lie from the bed's and still be bed, 0..255
+   * per channel: the bed's own spread, pixel by pixel, which on a honeycomb
+   * runs from its dark cells to its bright walls.
+   */
+  readonly bedContrast: number;
 };
 
 export type PixelPoint = { readonly x: number; readonly y: number };
@@ -50,6 +58,9 @@ const BLUR_RADII_MM = [0.5, 1, 1.5, PIECE_BLUR_RADIUS_MM];
 // The bed's texture must stay this share of the bed-to-piece step below the split.
 const TEXTURE_MARGIN = 0.1;
 const TEXTURE_QUANTILE = 0.995;
+// The share of the bed's own unblurred pixels a colour must lie beyond to be
+// something other than bed showing through a hole.
+const RAW_BED_QUANTILE = 0.95;
 // Fewer standing-out pixels than this many mm² is no piece at all.
 const MIN_PIECE_PIXELS_MM2 = 25;
 
@@ -65,21 +76,38 @@ export function pieceMask(
   const bed = medianColour(coarse.rgb, band);
   const contrast = bed === null ? 0 : minContrast(coarse.rgb, band, bed);
   const piece = bed === null ? null : pieceColour(coarse, bed, contrast, reference, pixelsPerMm);
-  if (bed === null || piece === null) return emptyMask(width, height, rgb, bed);
+  if (bed === null || piece === null) return emptyMask(width, height, rgb, bed, contrast);
   const along = alongBedToPiece(rgb, visible, bed, piece);
   const levels = {
     bed: spread(band.filter((i) => distance(coarse.rgb, i, bed) < contrast)),
     piece: spread(nearColour(coarse, piece, bed)),
   };
-  const { feature, threshold } = leastBlur(along, coarse, levels, pixelsPerMm);
+  const { feature, threshold, pieceLevel } = leastBlur(along, coarse, levels, pixelsPerMm);
   const on = new Uint8Array(width * height);
   for (let i = 0; i < on.length; i += 1) {
     on[i] = visible[i] === 1 && (feature[i] ?? 0) > threshold ? 1 : 0;
   }
-  return { width, height, on, feature, threshold, rgb, bedColour: bed, pieceColour: piece };
+  return {
+    width,
+    height,
+    on,
+    feature,
+    threshold,
+    pieceLevel,
+    rgb,
+    bedColour: bed,
+    pieceColour: piece,
+    bedContrast: rawBedSpread(rgb, levels.bed, bed, contrast),
+  };
 }
 
-function emptyMask(width: number, height: number, rgb: Float32Array, bed: Colour | null) {
+function emptyMask(
+  width: number,
+  height: number,
+  rgb: Float32Array,
+  bed: Colour | null,
+  bedContrast: number,
+): PieceMask {
   const n = width * height;
   return {
     width,
@@ -87,10 +115,24 @@ function emptyMask(width: number, height: number, rgb: Float32Array, bed: Colour
     on: new Uint8Array(n),
     feature: new Float32Array(n),
     threshold: 0.5,
+    pieceLevel: 1,
     rgb,
     bedColour: bed,
     pieceColour: null,
+    bedContrast,
   };
+}
+
+// The distance from the bed's colour within which nearly all the bed's own
+// unblurred pixels lie, and never less than the blurred contrast.
+function rawBedSpread(
+  rgb: Float32Array,
+  bedPixels: ReadonlyArray<number>,
+  bed: Colour,
+  contrast: number,
+): number {
+  const far = bedPixels.map((i) => distance(rgb, i, bed));
+  return Math.max(contrast, quantile(far, RAW_BED_QUANTILE));
 }
 
 function rawColour(raw: RgbaImage): Float32Array {
@@ -211,9 +253,9 @@ function leastBlur(
   coarse: PieceImage,
   levels: { readonly bed: ReadonlyArray<number>; readonly piece: ReadonlyArray<number> },
   pixelsPerMm: number,
-): { readonly feature: Float32Array; readonly threshold: number } {
+): Pick<PieceMask, 'feature' | 'threshold' | 'pieceLevel'> {
   let tried = 0;
-  let last: { feature: Float32Array; threshold: number } | null = null;
+  let last: Pick<PieceMask, 'feature' | 'threshold' | 'pieceLevel'> | null = null;
   for (const radiusMm of BLUR_RADII_MM) {
     const radius = Math.max(1, Math.round(radiusMm * pixelsPerMm));
     if (radius === tried) continue;
@@ -231,14 +273,14 @@ function leastBlur(
             0.5,
           );
     const threshold = (bedLevel + pieceLevel) / 2;
-    last = { feature, threshold };
+    last = { feature, threshold, pieceLevel };
     const texture = quantile(
       levels.bed.map((i) => feature[i] ?? 0),
       TEXTURE_QUANTILE,
     );
     if (texture < threshold - TEXTURE_MARGIN * (pieceLevel - bedLevel)) return last;
   }
-  return last ?? { feature: new Float32Array(along.length), threshold: 0.5 };
+  return last ?? { feature: new Float32Array(along.length), threshold: 0.5, pieceLevel: 1 };
 }
 
 /** Mean blurred colour around `at`, or null where the camera saw none of it. */

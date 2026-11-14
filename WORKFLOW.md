@@ -10189,7 +10189,7 @@ Simulator-tested only; no real JCZ board has run this path.
 - **Edge / watching a job.** **Larger view** in Camera settings toggles the panel between compact
   and wide monitoring widths, with the preference kept locally.
 
-### F-CAM9. Find pieces on the bed and place the design on each (ADR-442, Amendments 1 and 2)
+### F-CAM9. Find pieces on the bed and place the design on each (ADR-442, Amendments 1 to 3)
 
 - **Success / fill a batch of blanks.** With a saved calibration and a live camera, the operator
   lays out blanks, puts the design on one of them, selects it and presses **Find pieces** in the
@@ -10212,7 +10212,12 @@ Simulator-tested only; no real JCZ board has run this path.
   same-sized pieces (glare, or two blanks touching), is listed with the reason and starts
   unticked; ticking it includes it. Scorch marks, old cuts and shadows darker than the bed are
   never found as pieces, and blanks 1 mm or more apart are found one by one; coasters touching at
-  a point are cut apart.
+  a point are cut apart. A blank with a waist (a bone tag, a two-ball ornament, an hourglass
+  offcut) stays one piece: only a narrow contact is cut (Amendment 3). A dark knot or mark inside a
+  blank is its own wood, not a hole; a hole is where the bed shows through.
+- **Edge / design on a doubtful piece (Amendment 3).** When the design sits on a piece left out as
+  doubtful (such as two blanks touching read as one) and no copy fits, the panel says the piece
+  may not be one piece and to move the pieces apart, or move the design off the pieces.
 - **Edge / piece partly out of view.** It is listed and outlined but starts unticked, with the
   reason; ticking it includes it.
 - **Edge / different piece.** A piece of another shape, or more than 3 mm longer or wider than the
