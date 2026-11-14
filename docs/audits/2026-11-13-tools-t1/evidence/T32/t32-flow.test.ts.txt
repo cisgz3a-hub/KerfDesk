@@ -1,0 +1,416 @@
+// @vitest-environment jsdom
+// T32 Prepare Stamp: core oracle, real source path, apply, undo, burn decode.
+import { writeFileSync, readFileSync } from 'node:fs';
+import { beforeEach, it, vi } from 'vitest';
+import {
+  applyTransform,
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  DEFAULT_PROJECT_VARIABLE_DATA,
+  IDENTITY_TRANSFORM,
+  type Layer,
+  type Project,
+  type RasterImage,
+  type SceneObject,
+  type Transform,
+} from '../t31-main/src/core/scene';
+import { prepareStampHeight } from '../t31-main/src/core/raster/stamp-height';
+import { prepareStampSource, canPrepareStamp } from '../t31-main/src/ui/raster/stamp-source';
+import { applyStampDraft, stampDraftImage, type StampOwner } from '../t31-main/src/ui/state/stamp-preparation-actions';
+import { stampPreparationCommand } from '../t31-main/src/ui/commands/stamp-preparation-command';
+import { lumaToBase64 } from '../t31-main/src/ui/raster/luma-bitmap';
+import { prepareOutput } from '../t31-main/src/io/gcode/prepare-output';
+import { prepareOutputSnapshot, type VariableTextRenderer } from '../t31-main/src/io/gcode/prepare-output-snapshot';
+import { emitPreparedGcode } from '../t31-main/src/io/gcode/emit-gcode';
+import { textToPolylines } from '../t31-main/src/core/text';
+import { useStore } from '../t31-main/src/ui/state/store';
+import { resetStore } from '../t31-main/src/ui/state/test-helpers';
+import { litMoves, totalLen, bbox, type LitMove } from './decode';
+
+vi.mock('../t31-main/src/ui/raster/convert-bitmap-worker-client', async () => {
+  const asm = await import('../t31-main/src/ui/raster/bitmap-assembly');
+  const lb = await import('../t31-main/src/ui/raster/luma-bitmap');
+  return {
+    convertBitmapInWorker: (vectors: never, options: never, id: string) =>
+      asm.assembleBitmapAsync(vectors, async (r) => ({ dataUrl: 'data:image/png;base64,AA==', lumaBase64: lb.lumaToBase64(r.luma) }), id, options),
+    resetConvertBitmapWorkerForTests: () => undefined,
+  };
+});
+
+const lines: string[] = [];
+const out = (s: string) => {
+  lines.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t32/t32-flow.log', lines.join('\n'));
+};
+const f3 = (n: number) => n.toFixed(3);
+const st = () => useStore.getState();
+beforeEach(() => resetStore());
+
+const roboto = (() => {
+  const b = readFileSync('C:/Users/stolk/kd-t1/t31-main/src/ui/text/fonts/Roboto-Regular.ttf');
+  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+})();
+
+const layer = (id: string, mode: 'line' | 'fill' | 'image', speed: number, power: number, extra: Partial<Layer> = {}) =>
+  ({ ...createLayer({ id, color: '#000000', name: id, mode }), speed, power, ...extra }) as Layer;
+function proj(objects: SceneObject[], layers: Layer[], extra: Partial<Project> = {}): Project {
+  const base = createProject();
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers, groups: [] }, ...extra };
+}
+function select(project: Project, ids: string[]) {
+  useStore.setState({
+    project,
+    projectDocumentEpoch: 7,
+    selectedObjectId: ids[0] ?? null,
+    additionalSelectedIds: new Set(ids.slice(1)),
+    undoStack: [],
+    redoStack: [],
+    dirty: false,
+  });
+}
+function burn(project: Project) {
+  const prepared = prepareOutput(project);
+  if (!prepared.ok) return { ok: false, moves: [] as LitMove[], why: JSON.stringify(prepared).slice(0, 300) };
+  const g = emitPreparedGcode(prepared).gcode;
+  return { ok: true, moves: litMoves(g, project.device), why: '' };
+}
+
+// ---------- independent oracle ----------
+type Src = { w: number; h: number; wMm: number; hMm: number; luma: Uint8Array };
+function oracleFace(src: Src, thr: number, mirror: boolean, padX: number, padY: number) {
+  const W = src.w + 2 * padX;
+  const H = src.h + 2 * padY;
+  const face = new Uint8Array(W * H);
+  for (let y = 0; y < src.h; y++)
+    for (let x = 0; x < src.w; x++) {
+      // a stamp's mirror: output column x shows source column (w-1-x)
+      const sx = mirror ? src.w - 1 - x : x;
+      if (src.luma[y * src.w + sx]! <= thr) face[(y + padY) * W + x + padX] = 1;
+    }
+  return { W, H, face };
+}
+/** brute-force Euclidean distance from pixel centre to nearest face-pixel square, in mm. */
+function oracleHeight(face: Uint8Array, W: number, H: number, px: number, py: number, taper: number) {
+  const pts: Array<[number, number]> = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (face[y * W + x]) pts.push([x, y]);
+  const outL = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (face[y * W + x]) { outL[y * W + x] = 255; continue; }
+      if (taper <= 0) continue;
+      let best = Infinity;
+      for (const [fx, fy] of pts) {
+        const dx = Math.max(0, Math.abs(x - fx) - 0.5) * px;
+        const dy = Math.max(0, Math.abs(y - fy) - 0.5) * py;
+        const d = dx * dx + dy * dy;
+        if (d < best) best = d;
+      }
+      outL[y * W + x] = Math.round(255 * Math.max(0, 1 - Math.sqrt(best) / taper));
+    }
+  return outL;
+}
+/** ring (counter) + island + asymmetric tab, dark = 0 */
+function ringLuma(w: number, h: number, cx: number, cy: number, ro: number, ri: number, rIsland: number) {
+  const l = new Uint8Array(w * h).fill(255);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const r = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+      const tab = x >= w - 18 && x < w - 4 && y >= 4 && y < 14;
+      if ((r <= ro && r >= ri) || r <= rIsland || tab) l[y * w + x] = 0;
+    }
+  return l;
+}
+
+it('C1 core: face, counters, islands, mirror, taper vs brute-force oracle', () => {
+  for (const [wMm, hMm, taper, mirror] of [
+    [40, 30, 1, true],
+    [40, 30, 1, false],
+    [20, 30, 0.75, true], // anisotropic pitch 0.25 x 0.5
+    [40, 30, 0, true],
+  ] as const) {
+    const src: Src = { w: 80, h: 60, wMm, hMm, luma: ringLuma(80, 60, 30, 30, 22, 14, 6) };
+    const d = prepareStampHeight({ width: 80, height: 60, widthMm: wMm, heightMm: hMm, luma: src.luma }, { threshold: 127, taperMm: taper, mirror });
+    const px = wMm / 80, py = hMm / 60;
+    const padX = Math.ceil(taper / px) + 1, padY = Math.ceil(taper / py) + 1;
+    const o = oracleFace(src, 127, mirror, padX, padY);
+    let faceDiff = 0;
+    for (let i = 0; i < o.face.length; i++) if (o.face[i] !== d.face[i]) faceDiff++;
+    const oh = oracleHeight(o.face, o.W, o.H, px, py, taper);
+    let maxH = 0;
+    for (let i = 0; i < oh.length; i++) maxH = Math.max(maxH, Math.abs(oh[i]! - d.luma[i]!));
+    // counter centre (30,30)+pad must not be face; island centre must be face; counter mid-ring (r=10) recessed
+    const at = (x: number, y: number) => d.face[(y + padY) * d.width + (mirror ? 79 - x : x) + padX];
+    // physical shoulder: count ramp pixels left of the ring's outermost face pixel on row 30
+    const row = 30 + padY;
+    let first = -1;
+    for (let x = 0; x < d.width; x++) if (d.face[row * d.width + x]) { first = x; break; }
+    let ramp = 0;
+    for (let x = first - 1; x >= 0 && d.luma[row * d.width + x]! > 0; x--) ramp++;
+    out(`C1 ${wMm}x${hMm}mm taper ${taper} mirror ${mirror}: size ${d.width}x${d.height} (oracle ${o.W}x${o.H}) pad ${d.paddingX},${d.paddingY}; ` +
+      `face diff ${faceDiff}; max |height-oracle| ${maxH}; facePixels ${d.facePixels}; island centre face ${at(30, 30)}; counter (30+10,30) face ${at(40, 30)}; tab (70,8) face ${at(70, 8)}; ` +
+      `tab drawn at output column ${mirror ? 79 - 70 : 70}; row-30 ramp ${ramp} px = ${f3(ramp * px)} mm (taper ${taper}); extent ${f3(d.widthMm)}x${f3(d.heightMm)} mm; corner luma ${d.luma[0]}`);
+  }
+});
+
+const rasterSource = (t: Partial<Transform>, extra: Partial<RasterImage> = {}): RasterImage => {
+  const luma = ringLuma(80, 60, 30, 30, 22, 14, 6);
+  return {
+    kind: 'raster-image', id: 'IMG', source: 'logo.png', pixelWidth: 80, pixelHeight: 60,
+    bounds: { minX: 0, minY: 0, maxX: 40, maxY: 30 }, transform: { ...IDENTITY_TRANSFORM, ...t },
+    color: '#000000', dither: 'threshold', linesPerMm: 10, dataUrl: 'data:image/png;base64,AA==',
+    lumaBase64: lumaToBase64(luma), operationIds: ['IMGOP'], ...extra,
+  } as unknown as RasterImage;
+};
+
+async function runStamp(project: Project, ids: string[], opts: { taper: number; mirror: boolean; dpi?: number; thr?: number }) {
+  select(project, ids);
+  const owner: StampOwner = { project, documentEpoch: 7, ids };
+  const source = await prepareStampSource(project, ids, opts.dpi ?? 254, new AbortController().signal);
+  const draft = prepareStampHeight(source.pixels, { threshold: opts.thr ?? 127, taperMm: opts.taper, mirror: opts.mirror });
+  const { face, luma, ...meta } = draft;
+  const encoded = { ...meta, dataUrl: 'data:image/png;base64,AA==', lumaBase64: lumaToBase64(luma), sourceDataUrl: '', faceDataUrl: '' };
+  const image = stampDraftImage(source, encoded, 'STAMP');
+  const before = st().project;
+  useStore.setState((s) => applyStampDraft(s, owner, image));
+  return { source, draft, face, image, before, after: st().project };
+}
+
+/** lit length (mm) whose samples land on face (must-stay-raised) pixels of an identity-transform stamp */
+function litOnFace(moves: LitMove[], img: RasterImage, face: Uint8Array) {
+  const pw = (img.bounds.maxX - img.bounds.minX) / img.pixelWidth;
+  const ph = (img.bounds.maxY - img.bounds.minY) / img.pixelHeight;
+  let onFace = 0, all = 0;
+  for (const m of moves) {
+    const n = Math.max(1, Math.ceil(m.len / 0.02));
+    for (let k = 0; k < n; k++) {
+      const t = (k + 0.5) / n;
+      const x = m.from.x + (m.to.x - m.from.x) * t;
+      const y = m.from.y + (m.to.y - m.from.y) * t;
+      const i = Math.floor((x - img.bounds.minX - img.transform.x) / pw);
+      const j = Math.floor((y - img.bounds.minY - img.transform.y) / ph);
+      all += m.len / n;
+      if (i >= 0 && j >= 0 && i < img.pixelWidth && j < img.pixelHeight && face[j * img.pixelWidth + i]) onFace += m.len / n;
+    }
+  }
+  return { onFace, all };
+}
+
+it('B1 raster source: apply, inheritance, burn of face with source op on/off, undo', async () => {
+  const src = rasterSource({ x: 20, y: 20 });
+  const p0 = proj([src], [layer('IMGOP', 'image', 3000, 60)]);
+  const ctxCmd = stampPreparationCommand({ hasSelection: true, prepareStamp: () => undefined } as never);
+  const r = await runStamp(p0, ['IMG'], { taper: 1, mirror: true });
+  const objs = r.after.scene.objects;
+  const stamp = objs.find((o) => o.id === 'STAMP') as RasterImage;
+  const op = r.after.scene.layers.find((l) => stamp.operationIds?.includes(l.id))!;
+  out(`B1 menu enabled ${ctxCmd.enabled}; objects ${objs.map((o) => o.id).join(',')}; layers ${r.after.scene.layers.map((l) => `${l.id}:${l.name}:${l.mode}:out=${l.output}`).join(' | ')}`);
+  out(`B1 new op: power ${op.power} speed ${op.speed} linesPerMm ${op.linesPerMm} dither(image) ${stamp.dither} op dither ${(op as never as { dither?: string }).dither} negative ${(op as never as { negativeImage?: boolean }).negativeImage}; source op still output ${r.after.scene.layers.find((l) => l.id === 'IMGOP')!.output}`);
+  out(`B1 stamp bounds ${JSON.stringify(stamp.bounds)} px ${stamp.pixelWidth}x${stamp.pixelHeight}; transform ${JSON.stringify(stamp.transform)}`);
+  const both = burn(r.after);
+  const stampOnly = burn({ ...r.after, scene: { ...r.after.scene, layers: r.after.scene.layers.map((l) => (l.id === 'IMGOP' ? { ...l, output: false } : l)) } });
+  const srcOnly = burn(r.before);
+  const a = litOnFace(both.moves, stamp, r.face);
+  const b = litOnFace(stampOnly.moves, stamp, r.face);
+  const c = litOnFace(srcOnly.moves, stamp, r.face);
+  out(`B1 burn ok ${both.ok}/${stampOnly.ok}/${srcOnly.ok} ${both.why}${stampOnly.why}`);
+  out(`B1 job as applied (source op left on): lit ${f3(a.all)} mm, on raised face ${f3(a.onFace)} mm (${f3((100 * a.onFace) / a.all)} %)`);
+  out(`B1 stamp op alone:                     lit ${f3(b.all)} mm, on raised face ${f3(b.onFace)} mm`);
+  out(`B1 source alone (before Prepare):      lit ${f3(c.all)} mm, on (mirrored) face ${f3(c.onFace)} mm`);
+  // Undo
+  const before = JSON.stringify(r.before);
+  st().undo();
+  out(`B1 undo restores exactly: ${JSON.stringify(st().project) === before}; redo stack ${st().redoStack.length}`);
+  st().redo();
+  out(`B1 redo has stamp: ${st().project.scene.objects.some((o) => o.id === 'STAMP')}`);
+});
+
+it('B2 raster source rotated/scaled/mirrored: placement oracle', async () => {
+  for (const t of [
+    { x: 50, y: 40, rotationDeg: 30, scaleX: 1.5, scaleY: 0.8 },
+    { x: 50, y: 40, rotationDeg: 90, mirrorX: true },
+    { x: 50, y: 40, scaleX: -1 } as Partial<Transform>,
+  ]) {
+    const src = rasterSource(t);
+    const p0 = proj([src], [layer('IMGOP', 'image', 3000, 60)]);
+    const r = await runStamp(p0, ['IMG'], { taper: 1, mirror: false });
+    const stamp = r.after.scene.objects.find((o) => o.id === 'STAMP') as RasterImage;
+    const centre = (img: RasterImage, i: number, j: number) => applyTransform({
+      x: img.bounds.minX + ((i + 0.5) * (img.bounds.maxX - img.bounds.minX)) / img.pixelWidth,
+      y: img.bounds.minY + ((j + 0.5) * (img.bounds.maxY - img.bounds.minY)) / img.pixelHeight,
+    }, img.transform);
+    let maxErr = 0;
+    for (const [i, j] of [[0, 0], [79, 0], [40, 30], [79, 59]] as const) {
+      const a = centre(src, i, j);
+      const b = centre(stamp, i + r.draft.paddingX, j + r.draft.paddingY);
+      maxErr = Math.max(maxErr, Math.hypot(a.x - b.x, a.y - b.y));
+    }
+    // physical taper: pixel pitch along local X in world
+    const p0w = centre(stamp, 0, 0), p1w = centre(stamp, 1, 0);
+    out(`B2 ${JSON.stringify(t)}: source pixel → stamp pixel world error ${maxErr.toExponential(2)} mm; world pitch X ${f3(Math.hypot(p1w.x - p0w.x, p1w.y - p0w.y))} vs draft pitchX ${f3(r.draft.pitchXmm)}; padding ${r.draft.paddingX},${r.draft.paddingY}`);
+  }
+});
+
+const circlePts = (cx: number, cy: number, r: number, n = 360, ccw = false) =>
+  Array.from({ length: n }, (_, i) => {
+    const a = ((ccw ? -1 : 1) * 2 * Math.PI * i) / n;
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  });
+const svgObj = (id: string, contours: Array<Array<{ x: number; y: number }>>, ops: string[], extra: Record<string, unknown> = {}) => {
+  const all = contours.flat();
+  return {
+    kind: 'imported-svg', id, source: `${id}.svg`,
+    bounds: { minX: Math.min(...all.map((p) => p.x)), minY: Math.min(...all.map((p) => p.y)), maxX: Math.max(...all.map((p) => p.x)), maxY: Math.max(...all.map((p) => p.y)) },
+    transform: IDENTITY_TRANSFORM, operationIds: ops,
+    paths: [{ color: '#000000', polylines: contours.map((points) => ({ points, closed: true })) }],
+    ...extra,
+  } as unknown as SceneObject;
+};
+function pointInEvenOdd(x: number, y: number, contours: Array<Array<{ x: number; y: number }>>) {
+  let inside = false;
+  for (const c of contours)
+    for (let i = 0, j = c.length - 1; i < c.length; j = i++) {
+      const a = c[i]!, b = c[j]!;
+      if ((a.y > y) !== (b.y > y) && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+    }
+  return inside;
+}
+
+it('B3 vector source: ring with counter and island + tab on a Fill op', async () => {
+  const contours = [
+    circlePts(30, 30, 11), circlePts(30, 30, 7, 360, true), circlePts(30, 30, 3),
+    [{ x: 44, y: 18 }, { x: 50, y: 18 }, { x: 50, y: 22 }, { x: 44, y: 22 }],
+  ];
+  const v = svgObj('V', contours, ['FILL']);
+  const p0 = proj([v], [layer('FILL', 'fill', 3000, 60)]);
+  out(`B3 canPrepareStamp ${canPrepareStamp([v])}`);
+  const r = await runStamp(p0, ['V'], { taper: 0.5, mirror: true, dpi: 254 });
+  const s = r.source.image;
+  // oracle face: even-odd at pixel centres, mirrored about the raster's centre x
+  const W = s.pixelWidth, H = s.pixelHeight;
+  const pw = (s.bounds.maxX - s.bounds.minX) / W, ph = (s.bounds.maxY - s.bounds.minY) / H;
+  let mismatch = 0, interior = 0;
+  for (let j = 0; j < H; j++)
+    for (let i = 0; i < W; i++) {
+      const si = W - 1 - i;
+      const x = s.bounds.minX + (si + 0.5) * pw, y = s.bounds.minY + (j + 0.5) * ph;
+      const expect = pointInEvenOdd(x, y, contours) ? 1 : 0;
+      const got = r.face[(j + r.draft.paddingY) * r.draft.width + i + r.draft.paddingX]!;
+      if (expect !== got) {
+        mismatch++;
+        // distance to nearest edge > 1 px means a real mismatch
+        let dmin = Infinity;
+        for (const c of contours) for (const p of c) dmin = Math.min(dmin, Math.hypot(p.x - x, p.y - y));
+        if (dmin > 1.5 * pw + 0.2) interior++;
+      }
+    }
+  const stamp = r.after.scene.objects.find((o) => o.id === 'STAMP') as RasterImage;
+  out(`B3 source raster ${W}x${H} bounds ${JSON.stringify(s.bounds)} transform ${JSON.stringify(s.transform)}; face mismatches vs even-odd oracle ${mismatch} (non-edge ${interior}) of ${W * H}`);
+  out(`B3 stamp bounds ${JSON.stringify(stamp.bounds)} px ${stamp.pixelWidth}x${stamp.pixelHeight}; objects after ${r.after.scene.objects.map((o) => o.id).join(',')}; layers ${r.after.scene.layers.map((l) => `${l.name}:${l.mode}:out=${l.output}`).join(' | ')}`);
+  const both = burn(r.after);
+  const fillOnly = burn(r.before);
+  const stampOnly = burn({ ...r.after, scene: { ...r.after.scene, layers: r.after.scene.layers.map((l) => (l.id === 'FILL' ? { ...l, output: false } : l)) } });
+  const a = litOnFace(both.moves, stamp, r.face);
+  const b = litOnFace(stampOnly.moves, stamp, r.face);
+  const c = litOnFace(fillOnly.moves, stamp, r.face);
+  out(`B3 job as applied (Fill left on): lit ${f3(a.all)} mm, on raised face ${f3(a.onFace)} mm`);
+  out(`B3 stamp op alone:                lit ${f3(b.all)} mm, on raised face ${f3(b.onFace)} mm`);
+  out(`B3 Fill alone (unmirrored art):   lit ${f3(c.all)} mm, on mirrored face ${f3(c.onFace)} mm; bbox ${JSON.stringify(bbox(fillOnly.moves))}`);
+  out(`B3 stamp-alone burn bbox ${JSON.stringify(bbox(stampOnly.moves))}`);
+});
+
+it('B4 variable text and variable barcode', async () => {
+  const L = layer('FILL', 'fill', 3000, 60);
+  const template = 'SN {{serial:4}}';
+  const tokens = [{ kind: 'literal', value: 'SN ' }, { kind: 'serial', prefix: '', width: 4 }];
+  const render = (content: string) => textToPolylines({ content, sizeMm: 10, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000', fontBuffer: roboto });
+  const tpl = await render(template);
+  const val = await render('SN 0042');
+  const text = {
+    kind: 'text', id: 'VT', content: template, variableTemplate: { tokens }, fontKey: 'roboto-regular', sizeMm: 10, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000',
+    bounds: tpl.bounds, transform: { ...IDENTITY_TRANSFORM, x: 20, y: 20 }, paths: tpl.paths, operationIds: ['FILL'],
+  } as unknown as SceneObject;
+  const p0 = proj([text], [L], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 42 } });
+  out(`B4 canPrepareStamp(variable text) ${canPrepareStamp([text])}`);
+  const renderer: VariableTextRenderer = ({ text: t, content }) => textToPolylines({ content, sizeMm: t.sizeMm, alignment: t.alignment, lineHeight: t.lineHeight, letterSpacing: t.letterSpacing, color: t.color, fontBuffer: roboto });
+  const snap = await prepareOutputSnapshot(p0, { clock: () => new Date(0), renderVariableText: renderer });
+  const bm = snap.ok ? litMoves(emitPreparedGcode(snap).gcode, p0.device) : [];
+  const bb = bbox(bm);
+  try {
+    const r = await runStamp(p0, ['VT'], { taper: 0, mirror: false, dpi: 254 });
+    // face extent in mm
+    let minI = Infinity, maxI = -Infinity;
+    for (let j = 0; j < r.draft.height; j++) for (let i = 0; i < r.draft.width; i++) if (r.face[j * r.draft.width + i]) { minI = Math.min(minI, i); maxI = Math.max(maxI, i); }
+    const faceW = (maxI - minI + 1) * r.draft.pitchXmm;
+    const stampObj = r.after.scene.objects.find((o) => o.id === 'STAMP');
+    out(`B4 stamp made from variable text: face width ${f3(faceW)} mm; template glyph width ${f3(tpl.bounds.maxX - tpl.bounds.minX)}; value "SN 0042" width ${f3(val.bounds.maxX - val.bounds.minX)}; text's own burn (serial 42) width ${f3(bb.maxX - bb.minX)}`);
+    out(`B4 stamp object variableTemplate ${stampObj !== undefined && 'variableTemplate' in stampObj}; source text kept ${r.after.scene.objects.some((o) => o.id === 'VT')}`);
+  } catch (e) {
+    out(`B4 refused: ${String(e)}`);
+  }
+});
+
+it('B5 mixed / open / many / mask', async () => {
+  const closed = svgObj('C', [circlePts(10, 10, 5)], ['A']);
+  const open = { ...(svgObj('O', [[{ x: 0, y: 0 }, { x: 10, y: 0 }]], ['A']) as never as Record<string, unknown>), paths: [{ color: '#000000', polylines: [{ points: [{ x: 0, y: 0 }, { x: 10, y: 0 }], closed: false }] }] } as unknown as SceneObject;
+  const img = rasterSource({ x: 60, y: 0 });
+  out(`B5 canPrepareStamp closed+open ${canPrepareStamp([closed, open])}; image+vector ${canPrepareStamp([img, closed])}; two images ${canPrepareStamp([img, { ...img, id: 'I2' } as SceneObject])}`);
+  const many = Array.from({ length: 30 }, (_, k) => svgObj(`M${k}`, [circlePts(5 + (k % 6) * 12, 5 + Math.floor(k / 6) * 12, 4)], [k % 2 ? 'A' : 'B']));
+  const p = proj(many, [layer('A', 'fill', 3000, 60), layer('B', 'line', 1000, 30)]);
+  const r = await runStamp(p, many.map((o) => o.id), { taper: 0.5, mirror: true });
+  out(`B5 30 objects on 2 ops → objects ${r.after.scene.objects.length} layers ${r.after.scene.layers.length}; facePixels ${r.draft.facePixels}`);
+  // mask: image with an owned imageClip that keeps only the left half
+  const clipped = rasterSource({ x: 20, y: 20 }, { imageClip: [{ color: '#000000', polylines: [{ points: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 30 }, { x: 0, y: 30 }], closed: true }] }] } as never);
+  const pm = proj([clipped], [layer('IMGOP', 'image', 3000, 60)]);
+  const rm = await runStamp(pm, ['IMG'], { taper: 0, mirror: false });
+  let leftFace = 0, rightFace = 0;
+  for (let j = 0; j < rm.draft.height; j++) for (let i = 0; i < rm.draft.width; i++) if (rm.face[j * rm.draft.width + i]) (i - rm.draft.paddingX < 40 ? leftFace++ : rightFace++);
+  out(`B5 image clip keeps left half: face pixels left ${leftFace} right ${rightFace}`);
+});
+
+it('B6 mirror off: how much of the face the left-on source burns; stamp S values; save/reopen', async () => {
+  const src = rasterSource({ x: 20, y: 20 });
+  const p0 = proj([src], [layer('IMGOP', 'image', 3000, 60)]);
+  const r = await runStamp(p0, ['IMG'], { taper: 1, mirror: false });
+  const stamp = r.after.scene.objects.find((o) => o.id === 'STAMP') as RasterImage;
+  const srcOnly = burn(r.before);
+  const stampOnly = burn({ ...r.after, scene: { ...r.after.scene, layers: r.after.scene.layers.map((l) => (l.id === 'IMGOP' ? { ...l, output: false } : l)) } });
+  const c = litOnFace(srcOnly.moves, stamp, r.face);
+  // face row-length oracle: face pixels * pitch on the 0.1 mm rows = face area / 0.1
+  const faceArea = r.draft.facePixels * r.draft.pitchXmm * r.draft.pitchYmm;
+  out(`B6 mirror off: source op burns ${f3(c.onFace)} mm on the face; face area ${f3(faceArea)} mm² ≈ ${f3(faceArea / 0.1)} mm of 0.1 mm rows → ${f3((100 * c.onFace) / (faceArea / 0.1))} % of the raised face burned`);
+  const sv = new Map<number, number>();
+  for (const m of stampOnly.moves) sv.set(m.s, (sv.get(m.s) ?? 0) + m.len);
+  out(`B6 stamp op S values (mm per S): ${[...sv].sort((a, b) => a[0] - b[0]).map(([s, l]) => `S${s}:${f3(l)}`).join(' ')}`);
+  const { serializeProject } = await import('../t31-main/src/io/project/serialize-project');
+  const { deserializeProject } = await import('../t31-main/src/io/project/deserialize-project');
+  const re = deserializeProject(serializeProject(r.after) as never);
+  if ((re as { kind: string }).kind === "ok") {
+    const again = burn((re as never as { project: Project }).project);
+    out(`B6 save/reopen: lit ${f3(totalLen(again.moves))} vs ${f3(totalLen(burn(r.after).moves))}`);
+  } else out(`B6 reopen failed ${JSON.stringify(re).slice(0, 200)}`);
+});
+
+it('B7 variable barcode', async () => {
+  const { createBarcodeObject } = await import('../t31-main/src/core/barcode/materialize-barcode');
+  const { defaultBarcodeSpec } = await import('../t31-main/src/core/barcode/barcode-spec');
+  const tokens = [{ kind: 'serial', prefix: '', width: 4 }];
+  const spec = { ...defaultBarcodeSpec('code128'), data: '{{serial:4}}', showText: false, variableTemplate: { tokens } };
+  const made = await createBarcodeObject({ id: 'BC', color: '#000000', spec: spec as never, value: '0042', renderCaption: async () => ({ polylines: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }) as never, transform: { ...IDENTITY_TRANSFORM, x: 10, y: 10 } });
+  if (!made.ok) { out(`B7 barcode not made: ${made.message}`); return; }
+  const bc = { ...made.object, operationIds: ['FILL'] } as SceneObject;
+  out(`B7 canPrepareStamp(variable barcode) ${canPrepareStamp([bc])}`);
+  const p0 = proj([bc], [layer('FILL', 'fill', 3000, 60)], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 43 } });
+  try {
+    const r = await runStamp(p0, ['BC'], { taper: 0, mirror: false });
+    // compare bar pattern in the stamp's middle row with the barcode re-encoded at serial 43 by output
+    const v43 = await createBarcodeObject({ id: 'BC', color: '#000000', spec: spec as never, value: '0043', renderCaption: async () => ({ polylines: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }) as never, transform: { ...IDENTITY_TRANSFORM, x: 10, y: 10 } });
+    const p43 = proj([{ ...(v43 as { object: SceneObject }).object, operationIds: ['FILL'] } as SceneObject], [layer('FILL', 'fill', 3000, 60)]);
+    const r43 = await runStamp(p43, ['BC'], { taper: 0, mirror: false });
+    let diff = 0;
+    for (let i = 0; i < Math.min(r.face.length, r43.face.length); i++) if (r.face[i] !== r43.face[i]) diff++;
+    out(`B7 stamp from the variable barcode (stored code 0042, project serial 43): facePixels ${r.draft.facePixels}; a stamp of the 0043 code differs in ${diff} pixels (sizes ${r.draft.width}x${r.draft.height} / ${r43.draft.width}x${r43.draft.height}); stamp keeps variableTemplate ${'variableTemplate' in (r.image as object)}; no notice (pure path)`);
+  } catch (e) {
+    out(`B7 refused: ${String(e).slice(0, 200)} ${String((e as Error).stack).split(String.fromCharCode(10)).slice(1, 8).join(' | ')}`);
+  }
+});
