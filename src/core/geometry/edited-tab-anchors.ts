@@ -1,6 +1,7 @@
 // edited-tab-anchors — keeps tabs placed by hand where they were when an edit
 // redraws an object's contours in place: Edit nodes Delete and Radius / Fillet
-// (ADR-494 Amendment 2), and Optimize Shapes (Amendment 3). A tab is a fraction
+// (ADR-494 Amendment 2), Optimize Shapes (Amendment 3) and Resize Joint
+// Openings (ADR-570 Amendment 2). A tab is a fraction
 // of its contour from the start (ADR-156), and these edits can move the start,
 // so each tab on a changed contour is re-measured at its old place, or at the
 // nearest point of the new outline when the edit removed that place. Tabs on

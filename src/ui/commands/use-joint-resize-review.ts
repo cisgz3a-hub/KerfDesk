@@ -15,13 +15,26 @@ import {
 } from '../state/joint-resize-actions';
 import { proOperationMutationSetter } from '../licensing/pro-operation-mutation';
 import { useToastStore } from '../state/toast-store';
+import { useDisplayUnitsStore } from '../state/display-units';
+import { formatDisplayLength, type DisplayLengthUnit } from '../display-length';
 export type JointResizeForm = Record<keyof JointResizeRequest, string>;
-const INITIAL: JointResizeForm = {
-  currentWidthMm: '3',
-  materialThicknessMm: '3',
-  fitAllowanceMm: '0.1',
-  detectionToleranceMm: '0.1',
+// The starting values in millimetres; the fields show and take the display unit.
+const INITIAL_MM: Record<keyof JointResizeRequest, number> = {
+  currentWidthMm: 3,
+  materialThicknessMm: 3,
+  fitAllowanceMm: 0.1,
+  detectionToleranceMm: 0.1,
 };
+function initialForm(unit: DisplayLengthUnit): JointResizeForm {
+  const entry = (key: keyof JointResizeRequest): string =>
+    formatDisplayLength(INITIAL_MM[key], unit);
+  return {
+    currentWidthMm: entry('currentWidthMm'),
+    materialThicknessMm: entry('materialThicknessMm'),
+    fitAllowanceMm: entry('fitAllowanceMm'),
+    detectionToleranceMm: entry('detectionToleranceMm'),
+  };
+}
 export function useJointResizeReview(onClose: () => void) {
   const [session] = useState<JointResizeSession>(() => {
     const state = useStore.getState();
@@ -31,7 +44,8 @@ export function useJointResizeReview(onClose: () => void) {
       ids: selectedObjectIds(state),
     };
   });
-  const [form, setForm] = useState(INITIAL);
+  const [unit] = useState(() => useDisplayUnitsStore.getState().lengthUnit);
+  const [form, setForm] = useState(() => initialForm(unit));
   const [chosen, setChosen] = useState<ReadonlyArray<string>>([]);
   const revision = useRef(0);
   useEffect(
@@ -41,7 +55,7 @@ export function useJointResizeReview(onClose: () => void) {
     [],
   );
   const current = useCurrentJointOwner(session);
-  const request = useMemo(() => parseRequest(form), [form]);
+  const request = useMemo(() => parseRequest(form, unit), [form, unit]);
   const geometry = useJointPreview(session, request, chosen);
   const close = (): void => {
     revision.current += 1;
@@ -74,7 +88,7 @@ export function useJointResizeReview(onClose: () => void) {
       isCurrent,
     );
   };
-  return { ...geometry, form, chosen, current, close, change, choose, apply };
+  return { ...geometry, form, unit, chosen, current, close, change, choose, apply };
 }
 export type JointResizeReview = ReturnType<typeof useJointResizeReview>;
 function useCurrentJointOwner(session: JointResizeSession): boolean {
@@ -123,9 +137,9 @@ function useJointPreview(
   }, [displaySources, preview]);
   return { analysis, preview, displaySources, after };
 }
-function parseRequest(form: JointResizeForm): JointResizeRequest {
+function parseRequest(form: JointResizeForm, unit: DisplayLengthUnit): JointResizeRequest {
   const value = (key: keyof JointResizeForm): number => {
-    const parsed = evaluateNumericEntry(form[key], { kind: 'length' });
+    const parsed = evaluateNumericEntry(form[key], { kind: 'length', lengthUnit: unit });
     return parsed.kind === 'ok' ? parsed.value : Number.NaN;
   };
   return {
