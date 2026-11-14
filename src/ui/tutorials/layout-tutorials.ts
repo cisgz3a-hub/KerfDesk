@@ -179,21 +179,21 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Verify each numbered feature',
         instruction:
-          'Match the numbered preview to the candidate list. Select only the enclosed rectangles or inward U-slots intended to receive material. Changing dimensions clears the feature selection so you can review it again.',
+          'Match the numbered preview to the candidate list. Select only the enclosed rectangular cutouts and inward U-slots intended to receive material, and the outward tabs intended to pass through it. Changing dimensions clears the feature selection so you can review it again.',
         focus: 'Detected receiving features',
         result:
-          'Ambiguous, curved, open and unsupported geometry is disclosed and stays unchanged.',
+          'Ambiguous, curved, open and unsupported geometry is disclosed and stays unchanged, and so is a finger-jointed outline whose corner fingers would keep the old depth.',
       },
       {
         title: 'Apply and test the fit',
         instruction:
-          'Compare dashed original outlines with the solid result. Apply selected openings changes their width in one undo step while preserving their depth and centre. Review the job again and test a fit coupon with your actual stock and process.',
+          'Compare dashed original outlines with the solid result. Apply selected openings changes the width of each opening while preserving its depth and centre, and the depth of each tab to the material thickness while preserving its width and root, in one undo step. Tabs placed by hand stay where they were. Review the job again and test a fit coupon with your actual stock and process.',
         focus: 'Apply selected openings',
         result:
           'The design change retains artwork identity and operations. It does not establish physical fit.',
       },
     ],
-    tip: 'This bounded tool does not resize finger-joint depth, tabs or every feature in a thickness-dependent design. Tool diameter and kerf compensation remain separate operation settings.',
+    tip: 'This bounded tool does not convert a whole finger-jointed box or every feature in a thickness-dependent design: generate a Box Generator box again at the new thickness. Tool diameter and kerf compensation remain separate operation settings.',
     keywords: ['joint', 'slot', 'thickness', 'fit', 'allowance'],
     related: ['box', 'box-fit', 'nodes'],
   },

@@ -37,6 +37,7 @@ import {
   type CncMachineStarterLiveCaps,
 } from '../../core/cnc/machine-starters';
 import { pushUndo, type MutationResult, type StateSlice } from './scene-mutations';
+import { BOX_PANEL_SOURCE_PREFIX } from '../../core/box/box-panel-source';
 
 // The default drawn-vector cut color (draw-tool parity): panels join the
 // black line layer, auto-created when the scene has none. Kept local — the
@@ -45,8 +46,8 @@ import { pushUndo, type MutationResult, type StateSlice } from './scene-mutation
 const BOX_PANEL_COLOR = '#000000';
 
 // Never routed through importSvgObject, so Phase C re-import
-// replace-by-source semantics cannot trigger on generated panels.
-const BOX_PANEL_SOURCE_PREFIX = 'Box panel: ';
+// replace-by-source semantics cannot trigger on generated panels. The prefix
+// lives in core so Resize Joint Openings can recognise a generated panel.
 const PANEL_OPERATION_NAME = 'Box panels';
 const SLOT_OPERATION_NAME = 'Box slots';
 

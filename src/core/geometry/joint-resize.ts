@@ -1,6 +1,13 @@
 import { err, ok, type Result } from '../result';
 import type { ColoredPath, CurveSubpath, Polyline, SceneObject, Transform, Vec2 } from '../scene';
-import { detectCandidates } from './joint-resize-detection';
+import {
+  detectCandidates,
+  jointObjectLabel,
+  measuredMm,
+  unmovedJointSteps,
+} from './joint-resize-detection';
+import { withTabsFollowingEdit } from './edited-tab-anchors';
+import { isBoxGeneratorPanelSource } from '../box/box-panel-source';
 import type {
   JointResizeRequest,
   JointResizeObject,
@@ -57,11 +64,10 @@ export function analyseJointResize(
             ),
         ),
     );
+    const label = jointObjectLabel(geometry.object);
     if (unique.length !== found.length)
-      notices.push(
-        `${geometry.object.id}: overlapping candidate vertices were excluded as ambiguous.`,
-      );
-    candidates.push(...unique);
+      notices.push(`${label}: overlapping candidate vertices were excluded as ambiguous.`);
+    candidates.push(...withoutMixedDepthOutlines(geometry, unique, request, label, notices));
   }
   return ok({
     candidates,
@@ -75,7 +81,12 @@ export function previewJointResize(
   request: JointResizeRequest,
   selectedIds: ReadonlyArray<string>,
 ): Result<
-  { readonly objects: ReadonlyArray<JointResizeObject>; readonly changedFeatures: number },
+  {
+    readonly objects: ReadonlyArray<JointResizeObject>;
+    readonly changedFeatures: number;
+    /** Tabs placed by hand that sat on a resized part of an outline and moved onto it. */
+    readonly movedTabs: number;
+  },
   Failure
 > {
   const analysis = analyseJointResize(objects, request);
@@ -90,20 +101,53 @@ export function previewJointResize(
     });
   if (
     selected.every(
-      (candidate) => Math.abs(targetFor(candidate, request) - candidate.widthMm) <= EPS,
+      (candidate) => Math.abs(targetFor(candidate, request) - measuredMm(candidate)) <= EPS,
     )
   )
     return err({ message: 'The selected widths already match the requested width.' });
   const extracted = extract(objects);
   const changed: JointResizeObject[] = [];
+  let movedTabs = 0;
   for (const geometry of extracted.geometries) {
     const features = selected.filter((candidate) => candidate.objectId === geometry.object.id);
     if (features.length === 0) continue;
     const result = resizeGeometry(geometry, features, request);
     if (result.kind === 'error') return result;
-    changed.push(result.value);
+    // A tab placed by hand is a share of its contour's length, which the resize
+    // changes, so each is re-measured where it was (ADR-494 Amendment 2).
+    const followed = withTabsFollowingEdit(geometry.object, result.value);
+    movedTabs += followed.moved;
+    changed.push(followed.object);
   }
-  return ok({ objects: changed, changedFeatures: selected.length });
+  return ok({ objects: changed, changedFeatures: selected.length, movedTabs });
+}
+
+// A finger-jointed outline whose corner fingers or notch floors no candidate
+// moves would come out with mixed joint depths and no longer assemble, so its
+// features are withheld and named (T31-P1-1, ADR-570 Amendment 2).
+function withoutMixedDepthOutlines(
+  geometry: Geometry,
+  found: ReadonlyArray<JointCandidate>,
+  request: JointResizeRequest,
+  label: string,
+  notices: string[],
+): ReadonlyArray<JointCandidate> {
+  const withheld = new Set<Contour>();
+  for (const contour of geometry.contours) {
+    const own = found.filter((feature) => onContour(feature, contour));
+    if (own.length === 0) continue;
+    const steps = unmovedJointSteps(contour, own, request);
+    if (steps === 0) continue;
+    withheld.add(contour);
+    notices.push(
+      `${label}: ${steps === 1 ? '1 joint step' : `${steps} joint steps`} of this width on one outline (a corner finger or the notch beside it) cannot be resized with the rest, so its ${own.length === 1 ? 'feature was' : `${own.length} features were`} left out to keep its joints one depth. Change a finger-jointed design where it was made.`,
+    );
+  }
+  return found.filter((feature) => ![...withheld].some((contour) => onContour(feature, contour)));
+}
+
+function onContour(feature: JointCandidate, contour: Contour): boolean {
+  return feature.pathIndex === contour.pathIndex && feature.contourIndex === contour.contourIndex;
 }
 
 /** Openings take the thickness plus the fit allowance; a tab's depth is the bare thickness. */
@@ -135,9 +179,11 @@ function extract(objects: ReadonlyArray<SceneObject>): Extraction {
   const notices: string[] = [];
   let reviewedPoints = 0;
   for (const object of objects) {
-    const reason = unsupportedReason(object);
+    const reason = generatedBoxReason(object) ?? unsupportedReason(object);
     if (reason !== null || (object.kind !== 'imported-svg' && object.kind !== 'traced-image')) {
-      notices.push(`${object.id}: ${reason ?? 'Convert editable shapes or text to paths first.'}`);
+      notices.push(
+        `${jointObjectLabel(object)}: ${reason ?? 'Convert editable shapes or text to paths first.'}`,
+      );
       continue;
     }
     const contours = object.paths.flatMap((path, pathIndex) =>
@@ -153,7 +199,7 @@ function extract(objects: ReadonlyArray<SceneObject>): Extraction {
     const pointCount = contours.reduce((sum, contour) => sum + contour.points.length, 0);
     if (reviewedPoints + pointCount > TOTAL_POINT_LIMIT) {
       notices.push(
-        `${object.id}: selection review is limited to ${TOTAL_POINT_LIMIT} points; review this object separately.`,
+        `${jointObjectLabel(object)}: selection review is limited to ${TOTAL_POINT_LIMIT} points; review this object separately.`,
       );
       continue;
     }
@@ -163,13 +209,21 @@ function extract(objects: ReadonlyArray<SceneObject>): Extraction {
       .some((contour) => !simpleJointPolygon(contour.points));
     if (invalid || !safeRelations(contours)) {
       notices.push(
-        `${object.id}: touching, crossing or degenerate contours are ambiguous and were excluded.`,
+        `${jointObjectLabel(object)}: touching, crossing or degenerate contours are ambiguous and were excluded.`,
       );
       continue;
     }
     geometries.push({ object, contours });
   }
   return { geometries, notices };
+}
+
+// A generated panel's corner fingers and notch floors are joint steps no
+// candidate moves, and the other panels must change with it (ADR-570 Amendment 2).
+function generatedBoxReason(object: SceneObject): string | null {
+  return object.kind === 'imported-svg' && isBoxGeneratorPanelSource(object.source)
+    ? 'A Box Generator panel changes thickness with its whole box: open Box Generator and generate the box again at the new material thickness.'
+    : null;
 }
 
 function unsupportedReason(object: SceneObject): string | null {
@@ -233,7 +287,7 @@ function resizeGeometry(
         if (shift === undefined) return current;
         // An opening widens about its centre; a tab grows from its root.
         const share = feature.kind === 'outward-tab' ? 1 : 0.5;
-        const amount = shift.sign * (targetFor(feature, request) - feature.widthMm) * share;
+        const amount = shift.sign * (targetFor(feature, request) - measuredMm(feature)) * share;
         return {
           x: current.x + feature.direction.x * amount,
           y: current.y + feature.direction.y * amount,
