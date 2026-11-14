@@ -1,0 +1,33 @@
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { IDENTITY_TRANSFORM, type ImportedSvg, type Vec2 } from '../t31-main/src/core/scene';
+import { analyseJointResize, previewJointResize } from '../t31-main/src/core/geometry/joint-resize';
+import { generateBox } from '../t31-main/src/core/box/generate-box';
+const f = (n: number) => n.toFixed(2);
+it('E: Bottom panel vertex dump', () => {
+  const lines: string[] = [];
+  const spec = { widthMm: 60, depthMm: 40, heightMm: 30, dimensionMode: 'inner' as const, thicknessMm: 3, targetFingerWidthMm: 9, style: 'closed' as const, clearanceMm: 0, relief: { kind: 'none' as const }, partSpacingMm: 8 };
+  const g = generateBox(spec);
+  const g4 = generateBox({ ...spec, thicknessMm: 4 });
+  if (g.kind !== 'generated' || g4.kind !== 'generated') throw new Error('x');
+  for (const idx of [0, 2]) {
+    const panel = g.panels[idx]!;
+    const pts = panel.outline.points.map((p) => ({ x: p.x - panel.offsetMm.x, y: p.y - panel.offsetMm.y }));
+    if (Math.hypot(pts[0]!.x - pts.at(-1)!.x, pts[0]!.y - pts.at(-1)!.y) < 1e-9) pts.pop();
+    const o = { kind: 'imported-svg', id: panel.name, source: 'x', transform: IDENTITY_TRANSFORM, bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 }, operationIds: ['cut'],
+      paths: [{ color: '#000000', operationIds: ['cut'], polylines: [{ closed: true, points: [...pts, pts[0]!] }] }] } as ImportedSvg;
+    const req = { currentWidthMm: 3, materialThicknessMm: 4, fitAllowanceMm: 0, detectionToleranceMm: 0.05 };
+    const a = analyseJointResize([o], req);
+    if (a.kind !== 'ok') throw new Error('a');
+    const r = previewJointResize([o], req, a.value.candidates.map((c) => c.id));
+    if (r.kind !== 'ok') throw new Error(r.error.message);
+    const after = (r.value.objects[0] as ImportedSvg).paths[0]!.polylines[0]!.points;
+    const p4 = g4.panels[idx]!;
+    const pts4 = p4.outline.points.map((p) => ({ x: p.x - p4.offsetMm.x, y: p.y - p4.offsetMm.y }));
+    lines.push(`${panel.name} T3: ${pts.map((p) => `(${f(p.x)},${f(p.y)})`).join(' ')}`);
+    lines.push(`${panel.name} tool T4: ${after.slice(0, -1).map((p: Vec2) => `(${f(p.x)},${f(p.y)})`).join(' ')}`);
+    lines.push(`${panel.name} generator T4: ${pts4.map((p) => `(${f(p.x)},${f(p.y)})`).join(' ')}`);
+    lines.push(`candidates: ${a.value.candidates.map((c) => c.id).join(' ')}`);
+  }
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t31/t31-box.log', lines.join('\n'));
+});

@@ -1,0 +1,22 @@
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { IDENTITY_TRANSFORM, type ImportedSvg, type Vec2 } from '../t31-main/src/core/scene';
+import { analyseJointResize, previewJointResize } from '../t31-main/src/core/geometry/joint-resize';
+const f = (n: number) => n.toFixed(3);
+it('G: keyway off a cutout, thickness 4 + fit 0.2', () => {
+  const ring = (c: Vec2[]) => ({ closed: true, points: [...c, c[0]!] });
+  const outer = [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 60, y: 40 }, { x: 0, y: 40 }];
+  const hole = [{ x: 20, y: 15 }, { x: 40, y: 15 }, { x: 40, y: 25 }, { x: 31.5, y: 25 }, { x: 31.5, y: 28 }, { x: 28.5, y: 28 }, { x: 28.5, y: 25 }, { x: 20, y: 25 }];
+  const o = { kind: 'imported-svg', id: 'kw', source: 'x', transform: IDENTITY_TRANSFORM, bounds: { minX: 0, minY: 0, maxX: 60, maxY: 40 }, operationIds: ['cut'],
+    paths: [{ color: '#000000', operationIds: ['cut'], polylines: [ring(outer), ring(hole)] }] } as ImportedSvg;
+  const req = { currentWidthMm: 3, materialThicknessMm: 4, fitAllowanceMm: 0.2, detectionToleranceMm: 0.05 };
+  const a = analyseJointResize([o], req);
+  if (a.kind !== 'ok') throw new Error('a');
+  const r = previewJointResize([o], req, a.value.candidates.map((c) => c.id));
+  const lines = [`candidates ${a.value.candidates.map((c) => `${c.kind} w${f(c.widthMm)} d${f(c.depthMm)}`).join(', ')}`];
+  if (r.kind === 'ok') {
+    const pts = (r.value.objects[0] as ImportedSvg).paths[0]!.polylines[1]!.points.slice(0, -1).filter((p) => p.y > 25.001);
+    lines.push(`keyway corners after: ${pts.map((p) => `(${f(p.x)},${f(p.y)})`).join(' ')}; oracle opening 4.2 wide: x 27.900..32.100 at y 28.000`);
+  } else lines.push(r.error.message);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t31/t31-hole.log', lines.join('\n'));
+});

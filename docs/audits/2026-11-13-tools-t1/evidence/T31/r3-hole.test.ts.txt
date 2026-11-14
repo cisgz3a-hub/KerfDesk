@@ -1,0 +1,65 @@
+// Refuter R3: features on a cutout (hole) contour and an island part.
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { IDENTITY_TRANSFORM, type ImportedSvg, type Vec2 } from '../t31-main/src/core/scene';
+import { analyseJointResize, previewJointResize } from '../t31-main/src/core/geometry/joint-resize';
+
+const out: string[] = [];
+const log = (s: string) => {
+  out.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t31r/r3-hole.log', out.join('\n'));
+};
+const f = (n: number) => n.toFixed(3);
+const ring = (c: Vec2[]) => ({ closed: true, points: [...c, c[0]!] });
+const obj = (id: string, rings: Vec2[][]) => ({
+  kind: 'imported-svg', id, name: id, source: 'x', transform: IDENTITY_TRANSFORM,
+  bounds: { minX: 0, minY: 0, maxX: 80, maxY: 60 }, operationIds: ['cut'],
+  paths: [{ color: '#000000', operationIds: ['cut'], polylines: rings.map(ring) }],
+}) as unknown as ImportedSvg;
+
+function run(label: string, o: ImportedSvg, req: { currentWidthMm: number; materialThicknessMm: number; fitAllowanceMm: number; detectionToleranceMm: number }) {
+  const a = analyseJointResize([o], req);
+  if (a.kind !== 'ok') { log(`${label}: analysis error ${a.error.message}`); return; }
+  log(`${label}: candidates ${a.value.candidates.map((c) => `[c${c.contourIndex} ${c.kind} w${f(c.widthMm)} d${f(c.depthMm)} @(${f(c.centre.x)},${f(c.centre.y)})]`).join(' ')} notices ${JSON.stringify(a.value.notices)}`);
+  if (a.value.candidates.length === 0) return;
+  const r = previewJointResize([o], req, a.value.candidates.map((c) => c.id));
+  if (r.kind !== 'ok') { log(`  apply: ${r.error.message}`); return; }
+  const after = (r.value.objects[0] as ImportedSvg).paths[0]!.polylines;
+  after.forEach((pl, i) => log(`  contour ${i} after: ${pl.points.slice(0, -1).map((p) => `(${f(p.x)},${f(p.y)})`).join(' ')}`));
+}
+
+const outer: Vec2[] = [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 80, y: 60 }, { x: 0, y: 60 }];
+// Window 25..55 x 20..40 with a keyway cut UP into the material at x 38.5..41.5, y 40..43,
+// and a material tooth sticking UP into the window from its bottom edge at x 30..33, y 20..23.
+const windowSame: Vec2[] = [
+  { x: 25, y: 20 }, { x: 30, y: 20 }, { x: 30, y: 23 }, { x: 33, y: 23 }, { x: 33, y: 20 }, { x: 55, y: 20 },
+  { x: 55, y: 40 }, { x: 41.5, y: 40 }, { x: 41.5, y: 43 }, { x: 38.5, y: 43 }, { x: 38.5, y: 40 }, { x: 25, y: 40 },
+];
+const windowOpp = windowSame.slice().reverse();
+const req4 = { currentWidthMm: 3, materialThicknessMm: 4, fitAllowanceMm: 0.2, detectionToleranceMm: 0.05 };
+
+it('R3a window same winding as outer', () => {
+  log('Oracle: keyway (an opening in the material) -> 4.2 wide x 37.9..42.1, top stays y 43; tooth (material) -> a tab: width 3, depth 4 (top to y 24) or refused');
+  run('R3a same winding T4 fit0.2', obj('plate', [outer, windowSame]), req4);
+});
+it('R3b window opposite winding', () => {
+  run('R3b opposite winding T4 fit0.2', obj('plate', [outer, windowOpp]), req4);
+});
+it('R3c keyway at T3 fit 0.2 (should widen to 3.2)', () => {
+  run('R3c T3 fit0.2', obj('plate', [outer, windowSame]), { ...req4, materialThicknessMm: 3 });
+});
+it('R3d control: the same keyway on the OUTER edge (a true U-slot)', () => {
+  const o2: Vec2[] = [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 80, y: 60 }, { x: 41.5, y: 60 }, { x: 41.5, y: 57 }, { x: 38.5, y: 57 }, { x: 38.5, y: 60 }, { x: 0, y: 60 }];
+  run('R3d outer-edge U-slot T4 fit0.2', obj('plate2', [o2]), req4);
+});
+it('R3e island: a 3x15 strip part inside a 40x30 cutout of another part', () => {
+  const cut: Vec2[] = [{ x: 20, y: 15 }, { x: 60, y: 15 }, { x: 60, y: 45 }, { x: 20, y: 45 }];
+  const strip: Vec2[] = [{ x: 38.5, y: 22.5 }, { x: 41.5, y: 22.5 }, { x: 41.5, y: 37.5 }, { x: 38.5, y: 37.5 }];
+  run('R3e island strip (depth 2)', obj('sheet', [outer, cut, strip]), req4);
+  // control: a genuine 3x15 enclosed slot (depth 1)
+  run('R3e control enclosed slot (depth 1)', obj('sheet2', [outer, strip]), req4);
+});
+it('P3-2 spot check: tolerance edge', () => {
+  const o2 = (w: number): Vec2[] => [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 80, y: 60 }, { x: 40 + w / 2, y: 60 }, { x: 40 + w / 2, y: 50 }, { x: 40 - w / 2, y: 50 }, { x: 40 - w / 2, y: 60 }, { x: 0, y: 60 }];
+  for (const w of [3.1, 2.9, 3.09, 3.05]) run(`P3-2 slot width ${w} current 3 tol 0.1`, obj('t', [o2(w)]), { currentWidthMm: 3, materialThicknessMm: 3.5, fitAllowanceMm: 0, detectionToleranceMm: 0.1 });
+});

@@ -1,0 +1,246 @@
+// T31 Resize Joint Openings: core oracle checks. Own geometry, own expectations.
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { IDENTITY_TRANSFORM, type ImportedSvg, type Transform, type Vec2 } from '../t31-main/src/core/scene';
+import { applyTransform } from '../t31-main/src/core/scene/transform';
+import {
+  analyseJointResize,
+  previewJointResize,
+  type JointResizeRequest,
+} from '../t31-main/src/core/geometry/joint-resize';
+import { generateBox } from '../t31-main/src/core/box/generate-box';
+import type { BoxSpec } from '../t31-main/src/core/box/box-spec';
+
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t31/t31-core.log', log.join('\n'));
+};
+const f3 = (n: number) => n.toFixed(3);
+
+function obj(id: string, contours: Vec2[][], transform: Transform = IDENTITY_TRANSFORM): ImportedSvg {
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    transform,
+    bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+    paths: [
+      {
+        color: '#000000',
+        operationIds: ['cut'],
+        fillRule: 'evenodd',
+        strokeWidthMm: 0.1,
+        polylines: contours.map((c) => ({ closed: true, points: [...c, c[0]!] })),
+      },
+    ],
+    operationIds: ['cut'],
+  } as ImportedSvg;
+}
+const rect = (x: number, y: number, w: number, h: number): Vec2[] => [
+  { x, y },
+  { x: x + w, y },
+  { x: x + w, y: y + h },
+  { x, y: y + h },
+];
+
+function runAll(o: ImportedSvg, req: JointResizeRequest) {
+  const a = analyseJointResize([o], req);
+  if (a.kind !== 'ok') return { a, r: null as null | ImportedSvg, err: a.error.message };
+  const ids = a.value.candidates.map((c) => c.id);
+  if (ids.length === 0) return { a, r: null, err: 'no candidates' };
+  const p = previewJointResize([o], req, ids);
+  if (p.kind !== 'ok') return { a, r: null, err: p.error.message };
+  return { a, r: p.value.objects[0] as ImportedSvg, err: '' };
+}
+const scenePts = (o: ImportedSvg, k = 0) =>
+  o.paths[0]!.polylines[k]!.points.slice(0, -1).map((p) => applyTransform(p, o.transform));
+
+function edgeLens(pts: Vec2[]): number[] {
+  return pts.map((p, i) => Math.hypot(pts[(i + 1) % pts.length]!.x - p.x, pts[(i + 1) % pts.length]!.y - p.y));
+}
+
+it('A: box generator panels, T=3 resized to T=4 vs boxes generated at T=4', () => {
+  const base: BoxSpec = {
+    widthMm: 60,
+    depthMm: 40,
+    heightMm: 30,
+    dimensionMode: 'inner',
+    thicknessMm: 3,
+    targetFingerWidthMm: 9,
+    style: 'closed',
+    clearanceMm: 0,
+    relief: { kind: 'none' },
+    partSpacingMm: 8,
+    dividersXCount: 1,
+  };
+  const g3 = generateBox(base);
+  const g4 = generateBox({ ...base, thicknessMm: 4 });
+  if (g3.kind !== 'generated' || g4.kind !== 'generated') throw new Error('gen');
+  const req: JointResizeRequest = { currentWidthMm: 3, materialThicknessMm: 4, fitAllowanceMm: 0, detectionToleranceMm: 0.05 };
+  for (let i = 0; i < g3.panels.length; i++) {
+    const p3 = g3.panels[i]!;
+    const p4 = g4.panels[i]!;
+    const contours = [p3.outline, ...p3.cutouts].map((pl) => {
+      const pts = pl.points.slice();
+      const a = pts[0]!, b = pts[pts.length - 1]!;
+      if (Math.hypot(a.x - b.x, a.y - b.y) < 1e-9) pts.pop();
+      return pts;
+    });
+    const o = obj(`panel-${p3.name}`, contours);
+    const { a, r, err } = runAll(o, req);
+    const kinds = a.kind === 'ok' ? a.value.candidates.map((c) => c.kind) : [];
+    const count = (k: string) => kinds.filter((x) => x === k).length;
+    const pts3 = contours[0]!;
+    // Oracle: depth-direction steps of 3 mm in the T=3 outline (every finger/notch step).
+    const steps3 = edgeLens(pts3).filter((l) => Math.abs(l - 3) < 1e-6).length;
+    const bb = (pts: Vec2[]) => {
+      const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+      return { w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+    };
+    const b3 = bb(pts3);
+    const p4pts = p4.outline.points;
+    const b4 = bb(p4pts);
+    let line = `A ${p3.name}: vertices ${pts3.length}, 3mm steps ${steps3}; candidates tab ${count('outward-tab')} slot ${count('inward-slot')} rect ${count('enclosed-rectangle')}; notices ${a.kind === 'ok' ? JSON.stringify(a.value.notices) : a.error.message}`;
+    line += `\n   bbox T3 ${f3(b3.w)}x${f3(b3.h)}; generator T4 ${f3(b4.w)}x${f3(b4.h)}`;
+    if (r) {
+      const after = scenePts(r);
+      const ba = bb(after);
+      const left3 = edgeLens(after).filter((l) => Math.abs(l - 3) < 1e-6).length;
+      const now4 = edgeLens(after).filter((l) => Math.abs(l - 4) < 1e-6).length;
+      line += `; resized ${f3(ba.w)}x${f3(ba.h)}; edges still 3mm ${left3}, edges 4mm ${now4}`;
+      if (p3.cutouts.length) {
+        const holes = r.paths[0]!.polylines.slice(1).map((pl) => edgeLens(pl.points.slice(0, -1)).map(f3).join('/'));
+        line += `; cutouts ${holes.join(' | ')}`;
+      }
+    } else line += `; result: ${err}`;
+    out(line);
+  }
+});
+
+it('B: features of a hole contour (cutout with a keyway; cutout with a tooth)', () => {
+  const req: JointResizeRequest = { currentWidthMm: 3, materialThicknessMm: 3, fitAllowanceMm: 0.2, detectionToleranceMm: 0.05 };
+  // Outer 60x40. Hole: 20x10 window at (20,15)-(40,25) with a keyway 3 wide x 3 deep cut up into material at x 28.5..31.5.
+  const outer = rect(0, 0, 60, 40);
+  const keywayHole: Vec2[] = [
+    { x: 20, y: 15 },
+    { x: 40, y: 15 },
+    { x: 40, y: 25 },
+    { x: 31.5, y: 25 },
+    { x: 31.5, y: 28 },
+    { x: 28.5, y: 28 },
+    { x: 28.5, y: 25 },
+    { x: 20, y: 25 },
+  ];
+  for (const [label, hole] of [
+    ['keyway CCW', keywayHole],
+    ['keyway CW', [...keywayHole].reverse()],
+  ] as const) {
+    const { a, r, err } = runAll(obj('kw', [outer, hole]), req);
+    const c = a.kind === 'ok' ? a.value.candidates : [];
+    out(`B ${label}: candidates ${c.map((x) => `${x.kind} w${f3(x.widthMm)} d${f3(x.depthMm)}`).join(', ') || 'none'}`);
+    if (r) {
+      const pts = r.paths[0]!.polylines[1]!.points.slice(0, -1);
+      const xs = pts.filter((p) => p.y > 25.001);
+      out(`   keyway after: top corners ${xs.map((p) => `(${f3(p.x)},${f3(p.y)})`).join(' ')}; oracle for a 3.2 opening: x 28.4..31.6 at y 28`);
+    } else out(`   result: ${err}`);
+  }
+  // Hole with a 3 mm material tooth projecting down into the window (material, not an opening).
+  const toothHole: Vec2[] = [
+    { x: 20, y: 15 },
+    { x: 40, y: 15 },
+    { x: 40, y: 25 },
+    { x: 31.5, y: 25 },
+    { x: 31.5, y: 22 },
+    { x: 28.5, y: 22 },
+    { x: 28.5, y: 25 },
+    { x: 20, y: 25 },
+  ];
+  const { a, r, err } = runAll(obj('tooth', [outer, toothHole]), req);
+  const c = a.kind === 'ok' ? a.value.candidates : [];
+  out(`B tooth: candidates ${c.map((x) => `${x.kind} w${f3(x.widthMm)} d${f3(x.depthMm)}`).join(', ') || 'none'}`);
+  if (r) {
+    const pts = r.paths[0]!.polylines[1]!.points.slice(0, -1);
+    const xs = pts.filter((p) => p.y < 24.999 && p.y > 15.001);
+    out(`   tooth after: ${xs.map((p) => `(${f3(p.x)},${f3(p.y)})`).join(' ')} (material tooth width now ${f3(Math.max(...xs.map((p) => p.x)) - Math.min(...xs.map((p) => p.x)))})`);
+  } else out(`   result: ${err}`);
+  // Island: a 3x20 strip part nested inside a large cutout of another part (same object).
+  const bigHole = rect(10, 5, 40, 30);
+  const strip = rect(20, 10, 3, 20);
+  const s = runAll(obj('nest', [outer, bigHole, strip]), req);
+  out(`B island strip: candidates ${(s.a.kind === 'ok' ? s.a.value.candidates : []).map((x) => `${x.kind} w${f3(x.widthMm)}`).join(', ') || 'none'}; result ${s.r ? edgeLens(s.r.paths[0]!.polylines[2]!.points.slice(0, -1)).map(f3).join('/') : s.err}`);
+});
+
+it('C: transforms, rotated slot, near-miss tolerance, several thicknesses', () => {
+  const notch: Vec2[] = [
+    { x: 0, y: 0 },
+    { x: 40, y: 0 },
+    { x: 40, y: 20 },
+    { x: 21.5, y: 20 },
+    { x: 21.5, y: 10 },
+    { x: 18.5, y: 10 },
+    { x: 18.5, y: 20 },
+    { x: 0, y: 20 },
+  ];
+  const req: JointResizeRequest = { currentWidthMm: 3, materialThicknessMm: 4, fitAllowanceMm: 0.2, detectionToleranceMm: 0.1 };
+  const ts: [string, Transform, number][] = [
+    ['identity', IDENTITY_TRANSFORM, 3],
+    ['rot 30 + mirrorY + scale 1.5x0.5 (slot x-scale 1.5 -> 4.5mm)', { ...IDENTITY_TRANSFORM, x: 100, y: 50, rotationDeg: 30, mirrorY: true, scaleX: 1.5, scaleY: 0.5 }, 4.5],
+    ['rot 90 scale 2 (6mm)', { ...IDENTITY_TRANSFORM, x: 10, y: 10, rotationDeg: 90, scaleX: 2, scaleY: 2 }, 6],
+  ];
+  for (const [label, t, w] of ts) {
+    const o = obj('n', [notch], t);
+    const { a, r, err } = runAll(o, { ...req, currentWidthMm: w });
+    if (!r) {
+      out(`C ${label}: ${err}`);
+      continue;
+    }
+    const after = scenePts(r);
+    // Oracle: slot base is between local vertices 4 and 5; centre fixed; width 4.2; depth unchanged.
+    const before = scenePts(o);
+    const bw = Math.hypot(after[5]!.x - after[4]!.x, after[5]!.y - after[4]!.y);
+    const cB = { x: (before[4]!.x + before[5]!.x) / 2, y: (before[4]!.y + before[5]!.y) / 2 };
+    const cA = { x: (after[4]!.x + after[5]!.x) / 2, y: (after[4]!.y + after[5]!.y) / 2 };
+    const depthB = Math.hypot(before[4]!.x - before[3]!.x, before[4]!.y - before[3]!.y);
+    const depthA = Math.hypot(after[4]!.x - after[3]!.x, after[4]!.y - after[3]!.y);
+    const others = [0, 1, 2, 7].map((i) => Math.hypot(after[i]!.x - before[i]!.x, after[i]!.y - before[i]!.y));
+    out(`C ${label}: candidates ${a.kind === 'ok' ? a.value.candidates.length : 0}; width ${f3(bw)} (oracle 4.200); centre shift ${f3(Math.hypot(cA.x - cB.x, cA.y - cB.y))}; depth ${f3(depthB)}->${f3(depthA)}; other vertices max move ${f3(Math.max(...others))}`);
+  }
+  // Rotated in local path coordinates (slot drawn at 17 degrees).
+  const rad = (17 * Math.PI) / 180;
+  const rot = (p: Vec2) => ({ x: p.x * Math.cos(rad) - p.y * Math.sin(rad), y: p.x * Math.sin(rad) + p.y * Math.cos(rad) });
+  const { r: rr, err: re } = runAll(obj('rot', [notch.map(rot)]), req);
+  out(`C path rotated 17deg: ${rr ? `width ${f3(Math.hypot(rr.paths[0]!.polylines[0]!.points[5]!.x - rr.paths[0]!.polylines[0]!.points[4]!.x, rr.paths[0]!.polylines[0]!.points[5]!.y - rr.paths[0]!.polylines[0]!.points[4]!.y))}` : re}`);
+  // Near-miss: 3.1 with tol 0.1 (boundary), 3.1000001, 2.9
+  for (const w of [3.1, 3.1 + 1e-9, 3.1000001, 2.9, 2.8999]) {
+    const n2 = notch.map((p) => ({ ...p }));
+    n2[3] = { x: 20 + w / 2, y: 20 };
+    n2[4] = { x: 20 + w / 2, y: 10 };
+    n2[5] = { x: 20 - w / 2, y: 10 };
+    n2[6] = { x: 20 - w / 2, y: 20 };
+    const { a } = runAll(obj('nm', [n2]), req);
+    out(`C near-miss width ${w}: candidates ${a.kind === 'ok' ? a.value.candidates.length : a.error.message}`);
+  }
+  // Several thicknesses: slots 3 and 6 in one object; ask for 3 -> only 3s should change.
+  const two: Vec2[] = [
+    { x: 0, y: 0 }, { x: 60, y: 0 }, { x: 60, y: 20 },
+    { x: 43, y: 20 }, { x: 43, y: 10 }, { x: 37, y: 10 }, { x: 37, y: 20 },
+    { x: 21.5, y: 20 }, { x: 21.5, y: 10 }, { x: 18.5, y: 10 }, { x: 18.5, y: 20 },
+    { x: 0, y: 20 },
+  ];
+  const t2 = runAll(obj('two', [two]), req);
+  out(`C two widths: candidates ${(t2.a.kind === 'ok' ? t2.a.value.candidates : []).map((c) => `${c.kind} ${f3(c.widthMm)}`).join(', ')}; edges after ${t2.r ? edgeLens(t2.r.paths[0]!.polylines[0]!.points.slice(0, -1)).map(f3).join('/') : t2.err}`);
+  // Slot near a corner (the 'before' edge is 1mm long) and slot at a corner (no before edge).
+  const nearCorner: Vec2[] = [
+    { x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 20 }, { x: 4, y: 20 }, { x: 4, y: 10 }, { x: 1, y: 10 }, { x: 1, y: 20 }, { x: 0, y: 20 },
+  ];
+  const nc = runAll(obj('nc', [nearCorner]), req);
+  out(`C slot 1mm from corner: ${(nc.a.kind === 'ok' ? nc.a.value.candidates.length : 0)} candidates; ${nc.r ? 'edges ' + edgeLens(nc.r.paths[0]!.polylines[0]!.points.slice(0, -1)).map(f3).join('/') : nc.err}`);
+  // Long slot 3 x 3.05 enclosed (both dims within tolerance -> excluded?)
+  const sq = runAll(obj('sq', [rect(0, 0, 40, 40), rect(10, 10, 3, 3.05)]), req);
+  out(`C enclosed 3x3.05: ${(sq.a.kind === 'ok' ? `${sq.a.value.candidates.length} candidates, notices ${JSON.stringify(sq.a.value.notices)}` : '')}`);
+  // Enclosed rectangle with an extra collinear node (5 points)
+  const five = [{ x: 10, y: 10 }, { x: 13, y: 10 }, { x: 13, y: 20 }, { x: 13, y: 30 }, { x: 10, y: 30 }];
+  const fv = runAll(obj('five', [rect(0, 0, 40, 40), five]), req);
+  out(`C enclosed 3x20 with extra collinear node: ${(fv.a.kind === 'ok' ? `${fv.a.value.candidates.length} candidates, notices ${JSON.stringify(fv.a.value.notices)}` : '')}`);
+});

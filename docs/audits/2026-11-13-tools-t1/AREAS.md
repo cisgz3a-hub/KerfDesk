@@ -69,7 +69,7 @@ Run order puts tools that make or change burns first, then new tools, then the r
 | T28 | Vector | Weld | `tools.weld` | ledgered: P1 1 + P2 2 (fix session proposed), P3 7 |
 | T29 | Vector | Union Silhouette | `tools.union-silhouette` | ledgered: P1 1 + P2 4 (fix session proposed), P3 6 |
 | T30 | Vector | Join Paths | `tools.join-paths` | ledgered: P1 1 + P2 2 (two fix sessions proposed), P3 6 |
-| T31 | Vector | Resize Joint Openings | `tools.resize-joints` | |
+| T31 | Vector | Resize Joint Openings | `tools.resize-joints` | ledgered: P2 3 (fix session proposed), P3 6 |
 | T32 | Vector | Prepare Stamp | `tools.prepare-stamp` | |
 | T33 | Vector | Offset Shapes | `tools.offset-shapes` | |
 | T34 | Vector | Rubber-Band Outline | `tools.rubber-band-outline` | |

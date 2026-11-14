@@ -1,0 +1,85 @@
+// Refuter R1: Box Generator panels through Resize Joint Openings, measured
+// against analytic finger/notch depths (every joint step = thickness).
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { IDENTITY_TRANSFORM, type ImportedSvg, type Vec2 } from '../t31-main/src/core/scene';
+import { analyseJointResize, previewJointResize } from '../t31-main/src/core/geometry/joint-resize';
+import { generateBox } from '../t31-main/src/core/box/generate-box';
+import { checkBoxAssembly } from '../t31-main/src/core/box/assembly-referee';
+import type { BoxSpec } from '../t31-main/src/core/box/box-spec';
+
+const out: string[] = [];
+const log = (s: string) => {
+  out.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t31r/r1-box.log', out.join('\n'));
+};
+const r2 = (n: number) => Math.round(n * 1000) / 1000;
+
+function ring(pts: ReadonlyArray<Vec2>): Vec2[] {
+  const p = pts.slice();
+  if (p.length > 1 && Math.hypot(p[0]!.x - p.at(-1)!.x, p[0]!.y - p.at(-1)!.y) < 1e-9) p.pop();
+  return p;
+}
+
+// Every segment shorter than 'stepMax' is a joint step (finger side). Its length
+// is the joint depth on that edge. Long segments are edges. Analytic: all = T.
+function stepHistogram(pts: ReadonlyArray<Vec2>, stepMax: number): Map<number, number> {
+  const h = new Map<number, number>();
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i]!, b = pts[(i + 1) % pts.length]!;
+    const len = r2(Math.hypot(b.x - a.x, b.y - a.y));
+    if (len < stepMax) h.set(len, (h.get(len) ?? 0) + 1);
+  }
+  return h;
+}
+function bboxOf(pts: ReadonlyArray<Vec2>) {
+  const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+  return `${r2(Math.max(...xs) - Math.min(...xs))}x${r2(Math.max(...ys) - Math.min(...ys))}`;
+}
+const hstr = (h: Map<number, number>) => [...h.entries()].sort((a, b) => a[0] - b[0]).map(([k, v]) => `${k}mm:${v}`).join(' ');
+
+it('R1 box 80x50x40 inner, T3 finger 10 -> tool T4 vs generator T4', () => {
+  const spec: BoxSpec = { widthMm: 80, depthMm: 50, heightMm: 40, dimensionMode: 'inner', thicknessMm: 3, targetFingerWidthMm: 10, style: 'closed', clearanceMm: 0, relief: { kind: 'none' }, partSpacingMm: 8 } as BoxSpec;
+  const g3 = generateBox(spec);
+  const g4 = generateBox({ ...spec, thicknessMm: 4 });
+  if (g3.kind !== 'generated' || g4.kind !== 'generated') throw new Error('gen');
+  // All panels in ONE object, as an imported box SVG would be, plus each separately.
+  const objects = g3.panels.map((panel) => {
+    const pts = ring(panel.outline.points);
+    return {
+      kind: 'imported-svg', id: `p-${panel.name}`, name: panel.name, source: 'box.svg', transform: IDENTITY_TRANSFORM,
+      bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 }, operationIds: ['cut'],
+      paths: [{ color: '#000000', operationIds: ['cut'], polylines: [{ closed: true, points: [...pts, pts[0]!] }] }],
+    } as unknown as ImportedSvg;
+  });
+  const req = { currentWidthMm: 3, materialThicknessMm: 4, fitAllowanceMm: 0, detectionToleranceMm: 0.1 };
+  const a = analyseJointResize(objects, req);
+  if (a.kind !== 'ok') throw new Error(a.error.message);
+  log(`analysis: ${a.value.candidates.length} candidates over ${objects.length} panels; notices: ${JSON.stringify(a.value.notices)}`);
+  const r = previewJointResize(objects, req, a.value.candidates.map((c) => c.id));
+  if (r.kind !== 'ok') throw new Error(r.error.message);
+  const after = new Map(r.value.objects.map((o) => [o.id, o as ImportedSvg]));
+  const resizedLocal: { panel: string; outline: { closed: boolean; points: Vec2[] } }[] = [];
+  g3.panels.forEach((panel, i) => {
+    const before = ring(panel.outline.points);
+    const o = after.get(`p-${panel.name}`);
+    const aft = o === undefined ? before : ring(o.paths[0]!.polylines[0]!.points);
+    const gen4 = ring(g4.panels[i]!.outline.points);
+    const cands = a.value.candidates.filter((c) => c.objectId === `p-${panel.name}`);
+    log(`${panel.name} (${panel.kind}): candidates ${cands.length} [${cands.map((c) => `${c.kind} w${r2(c.widthMm)} d${r2(c.depthMm)}`).join('; ')}]`);
+    log(`  T3 steps   ${hstr(stepHistogram(before, 6))}  size ${bboxOf(before)}`);
+    log(`  tool T4    ${hstr(stepHistogram(aft, 6))}  size ${bboxOf(aft)}`);
+    log(`  gen  T4    ${hstr(stepHistogram(gen4, 6))}  size ${bboxOf(gen4)}`);
+    const off = panel.offsetMm;
+    resizedLocal.push({ panel: panel.panel as string, outline: { closed: true, points: aft.map((p) => ({ x: p.x - off.x, y: p.y - off.y })) } });
+  });
+  const loc = (g: typeof g3) => (g as { panels: typeof g3.panels }).panels.map((p) => ({ panel: p.panel, outline: { closed: true, points: ring(p.outline.points).map((q) => ({ x: q.x - p.offsetMm.x, y: q.y - p.offsetMm.y })) } }));
+  log(`referee control: gen T3 vs T3 spec ${checkBoxAssembly(loc(g3) as never, spec).length} issues; gen T4 vs T4 spec ${checkBoxAssembly(loc(g4) as never, { ...spec, thicknessMm: 4 }).length} issues`);
+  // Secondary: the generator's own referee (the analytic histogram above is the oracle).
+  try {
+    const issues = checkBoxAssembly(resizedLocal as never, { ...spec, thicknessMm: 4 });
+    log(`referee (T4 inner spec) on tool output: ${issues.length} issues; first: ${JSON.stringify(issues.slice(0, 3))}`);
+  } catch (e) {
+    log(`referee threw: ${(e as Error).message}`);
+  }
+});

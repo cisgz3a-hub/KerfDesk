@@ -1,0 +1,26 @@
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { IDENTITY_TRANSFORM, type ImportedSvg, type Vec2 } from '../t31-main/src/core/scene';
+import { analyseJointResize, previewJointResize } from '../t31-main/src/core/geometry/joint-resize';
+import { projectCncTabAnchor } from '../t31-main/src/core/cnc/cnc-tab-anchors';
+import { laserTabAnchorPosition } from '../t31-main/src/core/job/laser-tab-anchors';
+it('H: 400x200 panel, 20 fingers on bottom and top edges, hand tabs on the plain sides', () => {
+  const pts: Vec2[] = [{ x: 0, y: 0 }];
+  for (let i = 0; i < 20; i++) { const x0 = 5 + i * 20; pts.push({ x: x0, y: 0 }, { x: x0, y: -3 }, { x: x0 + 10, y: -3 }, { x: x0 + 10, y: 0 }); }
+  pts.push({ x: 400, y: 0 }, { x: 400, y: 200 });
+  for (let i = 19; i >= 0; i--) { const x0 = 5 + i * 20; pts.push({ x: x0 + 10, y: 200 }, { x: x0 + 10, y: 203 }, { x: x0, y: 203 }, { x: x0, y: 200 }); }
+  pts.push({ x: 0, y: 200 });
+  let o = { kind: 'imported-svg', id: 'p', source: 'x', transform: IDENTITY_TRANSFORM, bounds: { minX: 0, minY: -3, maxX: 400, maxY: 203 }, operationIds: ['cut'],
+    paths: [{ color: '#000000', operationIds: ['cut'], polylines: [{ closed: true, points: [...pts, pts[0]!] }] }] } as ImportedSvg;
+  const hand = [{ x: 400, y: 100 }, { x: 0, y: 100 }, { x: 0, y: 30 }];
+  o = { ...o, laserTabAnchors: hand.map((h) => projectCncTabAnchor(o, '#000000', h)!) };
+  const req = { currentWidthMm: 3, materialThicknessMm: 4, fitAllowanceMm: 0, detectionToleranceMm: 0.05 };
+  const a = analyseJointResize([o], req);
+  if (a.kind !== 'ok') throw new Error('a');
+  const r = previewJointResize([o], req, a.value.candidates.map((c) => c.id));
+  if (r.kind !== 'ok') throw new Error(r.error.message);
+  const o2 = r.value.objects[0] as ImportedSvg;
+  const lines = [`${a.value.candidates.length} tabs resized`];
+  o.laserTabAnchors!.forEach((an, i) => { const b = laserTabAnchorPosition(o, an)!; const c = laserTabAnchorPosition(o2, o2.laserTabAnchors![i]!)!; lines.push(`hand tab at (${b.x},${b.y}) -> (${c.x.toFixed(3)},${c.y.toFixed(3)}) moved ${Math.hypot(c.x - b.x, c.y - b.y).toFixed(3)} mm`); });
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t31/t31-drift.log', lines.join('\n'));
+});
