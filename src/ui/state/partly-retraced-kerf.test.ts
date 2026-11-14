@@ -175,13 +175,26 @@ describe('A closing line beside the stem, on the shrinking side (T35R-P2-2)', ()
 describe('DXF import leaves a lollipop LWPOLYLINE open (T35R-P2-1)', () => {
   const lollipop = [
     ['0', 'LWPOLYLINE', '8', '0', '90', '8', '70', '0'],
-    [[0, 0], [40, 0], [40, -10], [60, -10], [60, 10], [40, 10], [40, 0], [0, 0]].flatMap(
-      ([x, y]) => ['10', `${x}`, '20', `${y}`],
-    ),
+    [
+      [0, 0],
+      [40, 0],
+      [40, -10],
+      [60, -10],
+      [60, 10],
+      [40, 10],
+      [40, 0],
+      [0, 0],
+    ].flatMap(([x, y]) => ['10', `${x}`, '20', `${y}`]),
   ];
   const square = [
     ['0', 'LWPOLYLINE', '8', '0', '90', '5', '70', '0'],
-    [[0, 0], [20, 0], [20, 20], [0, 20], [0, 0]].flatMap(([x, y]) => ['10', `${x}`, '20', `${y}`]),
+    [
+      [0, 0],
+      [20, 0],
+      [20, 20],
+      [0, 20],
+      [0, 0],
+    ].flatMap(([x, y]) => ['10', `${x}`, '20', `${y}`]),
   ];
   const dxf = (entities: ReadonlyArray<ReadonlyArray<string>>) =>
     [
@@ -271,7 +284,9 @@ describe('Single-line glyphs after Convert to Path and Close Path (T35-P2-1)', (
   for (const [font, letter, kerf] of cases) {
     it(`${font} "${letter}" at kerf ${kerf} is named in Job Review`, async () => {
       const burn = burnOf(project([glyphArt(await glyph(font, letter))], kerf));
-      expect(burn.warnings.join(' ')).toMatch(/cut only part of \d+ closed paths?: about .* in "Glyph"/);
+      expect(burn.warnings.join(' ')).toMatch(
+        /cut only part of \d+ closed paths?: about .* in "Glyph"/,
+      );
     });
   }
 });

@@ -11,10 +11,7 @@ import {
   type Vec2,
 } from '../../core/scene';
 import { CLOSURE_EPS_MM } from '../../core/scene/polyline-closure';
-import {
-  closedContourEnclosesNoArea,
-  retracedLineMm,
-} from '../../core/geometry/zero-area-contour';
+import { closedContourEnclosesNoArea, retracedLineMm } from '../../core/geometry/zero-area-contour';
 import { parseDecimalReal } from '../../core/util';
 import type { DxfTag } from './dxf-tags';
 import {
