@@ -37,6 +37,22 @@ export type KerfNoAreaDiagnostic = {
   readonly count: number;
 };
 
+/** ADR-486 Amendment 5: closed contours the offset kept only in part. Each
+ * entry names an object and how much of its line (millimetres, counted once
+ * where the contour runs back over itself) has no cut, on either side. */
+export type KerfDroppedLineDiagnostic = {
+  readonly kind: 'kerf-offset-dropped-line';
+  readonly layerName: string;
+  readonly kerfOffsetMm: number;
+  readonly parts: ReadonlyArray<{ readonly name: string; readonly lengthMm: number }>;
+};
+
+/** Line the kerf offset dropped although it succeeded (Amendments 1, 4 and 5). */
+export type KerfLossDiagnostic =
+  | KerfClosedUpDiagnostic
+  | KerfNoAreaDiagnostic
+  | KerfDroppedLineDiagnostic;
+
 // Below the offset engine's 1 µm grid an offset contour can land on its source
 // contour, where a probe cannot tell inside from outside.
 const MIN_CHECKED_OFFSET_MM = 0.001;

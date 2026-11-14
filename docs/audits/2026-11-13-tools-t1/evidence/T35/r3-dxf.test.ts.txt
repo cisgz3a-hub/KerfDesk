@@ -1,0 +1,50 @@
+// @vitest-environment jsdom
+// T35 refuter R3: does DXF import already make the partly retraced ring (lollipop) without Close Path?
+import { writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+} from '../t31-main/src/core/scene';
+import { parseDxf } from '../t31-main/src/io/dxf/parse-dxf';
+import { compileJob } from '../t31-main/src/core/job';
+import { prepareOutput } from '../t31-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t31-main/src/io/gcode/emit-gcode';
+import { fmt, litSegments, total } from './gdec';
+
+const lines: string[] = [];
+const log = (s: string) => {
+  lines.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t35r/r3.log', lines.join('\n'));
+};
+const lw = (pts: Array<[number, number]>, flag: number) =>
+  ['0', 'LWPOLYLINE', '8', '0', '90', String(pts.length), '70', String(flag), ...pts.flatMap(([x, y]) => ['10', String(x), '20', String(y)])];
+const dxf = (ents: string[][]) => ['0', 'SECTION', '2', 'ENTITIES', ...ents.flat(), '0', 'ENDSEC', '0', 'EOF'].join('\n');
+
+const burn = (o: ImportedSvg, kerf: number) => {
+  const base = createProject();
+  const L = { ...createLayer({ id: 'L', color: '#000000', name: 'Cut', mode: 'line' }), speed: 1200, power: 60, kerfOffsetMm: kerf } as Layer;
+  const p: Project = { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects: [{ ...o, operationIds: ['L'] } as never], layers: [L], groups: [] } };
+  const prep = prepareOutput(p);
+  if (!prep.ok) return `NOT OK ${JSON.stringify(prep).slice(0, 200)}`;
+  return `${fmt(total(litSegments(emitPreparedGcode(prep).gcode)))} diag ${JSON.stringify(compileJob(p.scene, p.device).diagnostics ?? [])} adv ${JSON.stringify((prep as unknown as { advisories?: unknown }).advisories ?? [])}`;
+};
+
+it('R3 DXF lollipop', () => {
+  const lolli: Array<[number, number]> = [[0, 0], [40, 0], [40, -10], [60, -10], [60, 10], [40, 10], [40, 0], [0, 0]];
+  const hook: Array<[number, number]> = [[0, 0], [0, 50], [25, 50], [25, 25], [0, 25]];
+  for (const [name, ents] of [['lollipop unflagged', [lw(lolli, 0)]], ['hook (P) unflagged', [lw(hook, 0)]]] as const) {
+    const r = parseDxf({ dxfText: dxf(ents as string[][]), id: 'd', source: 'd.dxf' });
+    if (r.kind !== 'ok' || !r.object) {
+      log(`${name}: ${JSON.stringify(r).slice(0, 300)}`);
+      continue;
+    }
+    const pls = r.object.paths.flatMap((p) => p.polylines);
+    log(`${name}: imported ${pls.length} polyline(s), closed flags ${pls.map((p) => p.closed).join(',')}, points ${pls.map((p) => p.points.length).join(',')}`);
+    for (const k of [0, 0.1]) log(`   kerf ${k}: ${burn(r.object, k)}`);
+  }
+});

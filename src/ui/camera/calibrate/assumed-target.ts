@@ -159,6 +159,9 @@ export function canvasTargetBurnedOffAbsolute(
   return `This target's rings were burned from ${START_FROM_WORDS[from]}, not Absolute Coordinates, so they are not where the target put them on the bed, and a calibration from them would put every camera placement that far off. Add the target to the canvas again and Start it at Absolute Coordinates, or use Engrave target.`;
 }
 
+export const CANVAS_TARGET_BURNED_REGISTERED =
+  "This target's rings were burned through the project's Print and Cut registration, which moved and turned them off where the target put them, so a calibration from them would put every camera placement that far off. Add the target to the canvas again (that clears the Print and Cut marks) and Start it at Absolute Coordinates, or use Engrave target.";
+
 export const CANVAS_TARGET_BURN_NOT_SEEN =
   'KerfDesk has not seen a Start burn this target at Absolute Coordinates, so it cannot tell where on the bed its rings are. Start the target on the canvas at Absolute Coordinates (Frame, then Start), or use Engrave target, then take the photo.';
 
@@ -172,6 +175,7 @@ function canvasTargetRefusal(
   frameNow: CameraBedFrame,
 ): { readonly refusal?: string } {
   if (target.onCanvas !== true || target.burnSeen === true) return {};
+  if (target.burnedRegistered === true) return { refusal: CANVAS_TARGET_BURNED_REGISTERED };
   if (target.burnedFrom !== undefined) {
     return { refusal: canvasTargetBurnedOffAbsolute(target.burnedFrom) };
   }

@@ -25,7 +25,12 @@ import { burnRegion } from './job-burn-route';
 import type { WatchIo } from './job-watch-camera';
 import { canRetakeAfterPicture, installJobWatch } from './job-watch-runner';
 import { DEFAULT_JOB_WATCH_SETTINGS } from './job-watch-settings';
-import { useJobWatchStore } from './job-watch-store';
+import {
+  KEPT_TIMELAPSE_NOTE,
+  timelapseWouldBeKept,
+  useJobWatchStore,
+  type TimelapseView,
+} from './job-watch-store';
 
 const initialLaser = useLaserStore.getState();
 const capture: CameraCaptureBinding = {
@@ -296,5 +301,44 @@ describe('watching a job with the camera', () => {
     useLaserStore.setState({ liveCanvasRun: startLiveCanvasRun(fillPlan(), 2000) });
     expect(useJobWatchStore.getState().burnCheck).toBe(verdict);
     expect(canRetakeAfterPicture()).toBe(false);
+  });
+});
+
+// ADR-490 Amendment 4 (the maintainer's choice on camera audit v2 K4-P2-3,
+// "Keep until saved/dismissed"): a new run never empties an unsaved recording.
+describe('an unsaved timelapse', () => {
+  const unsaved: TimelapseView = {
+    frames: [new Blob(['a']), new Blob(['b'])],
+    intervalMs: 2000,
+    flat: false,
+    recording: false,
+    note: null,
+  };
+
+  it('is kept, and the next watched job is not recorded over it', () => {
+    useJobWatchStore.setState({ timelapse: unsaved });
+    expect(timelapseWouldBeKept()).toBe(true);
+    useLaserStore.setState({ liveCanvasRun: startLiveCanvasRun(fillPlan(), 1000) });
+    const { timelapse } = useJobWatchStore.getState();
+    expect(timelapse?.frames).toBe(unsaved.frames);
+    expect(timelapse?.recording).toBe(false);
+    expect(timelapse?.note).toBe(KEPT_TIMELAPSE_NOTE);
+  });
+
+  it('is replaced by the next job once it was saved', () => {
+    useJobWatchStore.setState({ timelapse: unsaved });
+    useJobWatchStore.getState().markTimelapseSaved();
+    expect(timelapseWouldBeKept()).toBe(false);
+    useLaserStore.setState({ liveCanvasRun: startLiveCanvasRun(fillPlan(), 1000) });
+    const { timelapse } = useJobWatchStore.getState();
+    expect(timelapse?.frames).not.toBe(unsaved.frames);
+    expect(timelapse?.recording).toBe(true);
+  });
+
+  it('is kept when a job starts with watching off too', () => {
+    useJobWatchStore.setState({ settings: DEFAULT_JOB_WATCH_SETTINGS, timelapse: unsaved });
+    expect(timelapseWouldBeKept()).toBe(false);
+    useLaserStore.setState({ liveCanvasRun: startLiveCanvasRun(fillPlan(), 1000) });
+    expect(useJobWatchStore.getState().timelapse?.frames).toBe(unsaved.frames);
   });
 });

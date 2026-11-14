@@ -7,6 +7,7 @@ import { ownCameraModel } from '../camera/active-camera-model';
 import { cameraPlacementGeometryIssue } from '../camera/camera-model-frame';
 import { canvasTargetInScene } from '../camera/calibrate/canvas-target-burn';
 import { cameraMovedStartWarning } from '../camera/helpers/camera-moved-start-warning';
+import { timelapseWouldBeKept } from '../camera/job-watch/job-watch-store';
 import type { useCameraStore } from '../state/camera-store';
 import type { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
@@ -69,6 +70,7 @@ export function machineSnapshot(
     // estimated (ADR-441 Amendment 9).
     cameraCalibration: ownCameraModel(project.device, camera.sourceState) ?? null,
     cameraSurfaceHeightMm: camera.surfaceHeightMm,
+    timelapseUnsaved: timelapseWouldBeKept(),
     registrationOutline: registrationOutlinePlacement(project, laser.registrationOutlineRun),
     homingState: laser.homingState,
     trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,

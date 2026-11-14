@@ -260,19 +260,24 @@ function passesForDepths(
   }
 
   if (allowanceMm > 0) {
-    return untabbed(
-      profilePassesWithFinishAllowance(
-        contours,
-        settings,
-        wallDiameterMm,
-        toolpaths,
-        handedness,
-        sourceContours,
-        (part, tabCenters) =>
-          contourMajorPasses(part, depths, settings, wallDiameterMm, tabCenters).passes,
-        finishingSettings,
-      ),
+    // The roughing rings' tab findings reach Job Review as they do without an
+    // allowance (ADR-258 Amendment 5; audit of the last 200 PRs, #1889).
+    const tabHolds: CncTabHoldFinding[] = [];
+    const passes = profilePassesWithFinishAllowance(
+      contours,
+      settings,
+      wallDiameterMm,
+      toolpaths,
+      handedness,
+      sourceContours,
+      (part, tabCenters) => {
+        const rough = contourMajorPasses(part, depths, settings, wallDiameterMm, tabCenters);
+        tabHolds.push(...rough.tabHolds);
+        return rough.passes;
+      },
+      finishingSettings,
     );
+    return { passes, tabHolds };
   }
   const manualTabCenters = manualTabCentersForToolpaths(toolpaths, sourceContours);
   if (settings.cutType === 'pocket') {

@@ -232,7 +232,29 @@ describe('the scrap side of laser leads (ADR-626 Amendment 1)', () => {
       const cuts = job.groups.flatMap((group) => (group.kind === 'cut' ? group.segments : []));
       expect(cuts).toHaveLength(first === 0 ? 3 : 4);
       for (const cut of cuts) expect(cut.closed).toBe(false);
-      expect(job.diagnostics ?? []).toEqual([]);
+      // The pinched neck's 10 mm walls are the only line lost, and each kerfed
+      // operation names it (ADR-486 Amendment 5); nothing about leads.
+      const kerfed = [first, second].flatMap((kerf, index) =>
+        kerf === 0 ? [] : [{ layerName: index === 0 ? 'a' : 'b', kerfOffsetMm: kerf }],
+      );
+      const lost = (job.diagnostics ?? []).map((diagnostic) =>
+        diagnostic.kind === 'kerf-offset-dropped-line'
+          ? {
+              ...diagnostic,
+              parts: diagnostic.parts.map((part) => ({
+                ...part,
+                lengthMm: part.lengthMm > 7 && part.lengthMm <= 10 ? 'about 9' : part.lengthMm,
+              })),
+            }
+          : diagnostic,
+      );
+      expect(lost).toEqual(
+        kerfed.map((layer) => ({
+          kind: 'kerf-offset-dropped-line',
+          ...layer,
+          parts: [{ name: 'bell', lengthMm: 'about 9' }],
+        })),
+      );
     }
   });
 

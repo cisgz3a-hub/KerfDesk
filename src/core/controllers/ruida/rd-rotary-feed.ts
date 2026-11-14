@@ -70,10 +70,15 @@ function splitAll(
   const spread = { min: Number.POSITIVE_INFINITY, max: 0 };
   const held = new Map<string, Held>();
   let head: Head = { at: null, dir: 0 };
+  // Where the planner left the head before this part: planRdMotion carries it
+  // across layers, so a part may open with a cut from there (audit of the last
+  // 200 PRs, #1762).
+  let planned: RdMotionStep | null = null;
   for (const part of parts) {
-    const classes = [...classifyPart(part, match, classStep, spread, held).values()].sort(
+    const classes = [...classifyPart(part, planned, match, classStep, spread, held).values()].sort(
       (a, b) => a.key - b.key,
     );
+    planned = part.steps[part.steps.length - 1] ?? planned;
     // ADR-127 Amd 9 (C2 verify E4-P3-3): the sweep, unless it travels clearly
     // further than the pieces' own order, which on a k > 1 roller it can.
     const sweep = sweepOrder(classes, head, part.bounds);
@@ -147,8 +152,11 @@ function pathOrder(classes: ReadonlyArray<Class>, from: Head, bounds: RdBoundsUm
   return { groups, head, travelUm };
 }
 
+/** `entry` is where the plan left the head before this part; a part that
+ *  opens with a cut burns it from there. */
 function classifyPart(
   part: RdMotionPart,
+  entry: RdMotionStep | null,
   match: RotaryFeedMatch,
   classStep: number,
   spread: { min: number; max: number },
@@ -156,7 +164,7 @@ function classifyPart(
 ): Map<number, Class> {
   const layerFeed = part.group.speed;
   const classes = new Map<number, Class>();
-  let previous: RdMotionStep | null = null;
+  let previous: RdMotionStep | null = entry;
   let open: { key: number; piece: OpenPiece } | null = null;
   for (const step of part.steps) {
     if (!step.cut || previous === null) {

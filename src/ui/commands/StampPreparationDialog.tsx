@@ -12,6 +12,7 @@ export function StampPreparationDialog({
         Choose dark artwork as the raised face. Review a mirrored face mask and a grayscale height
         intent with measured shoulders.
       </p>
+      {review.skippedNotice !== '' && <p role="note">{review.skippedNotice}</p>}
       <StampFields review={review} />
       <div style={{ display: 'flex', gap: 8, marginBlock: 12 }}>
         <Button
@@ -33,10 +34,12 @@ export function StampPreparationDialog({
         edges. This is a sampled design, not a material depth or power calibration.
       </p>
       <p style={{ fontSize: 12 }}>
-        Apply adds an image with ordinary image-operation defaults. Set proportional laser power or
-        CNC relief depth through existing tools for your material. Qualify a physical coupon before
-        using the stamp. PNG exports pixels; set the displayed mm extent when importing. Stamp
-        quality is unqualified.
+        Apply adds the stamp as a Grayscale image, so its power follows the height map (3D Sliced in
+        Cut Settings burns it as depth slices instead), and turns Output off for the source artwork
+        it was made from, which would otherwise burn the raised face. Set laser power or CNC relief
+        depth through existing tools for your material. Qualify a physical coupon before using the
+        stamp. PNG exports pixels; set the displayed mm extent when importing. Stamp quality is
+        unqualified.
       </p>
       <p role="status" aria-live="polite">
         {!review.current

@@ -41,6 +41,36 @@ export function pieceImage(image: RgbaImage, pixelsPerMm: number): PieceImage {
   return { width, height, rgb, visible };
 }
 
+/**
+ * `values` blurred like the colour above (two box passes of `radiusPx`),
+ * normalised by the pixels the camera saw; 0 where it saw none nearby.
+ */
+export function blurVisible(
+  values: Float32Array,
+  visible: Uint8Array,
+  width: number,
+  height: number,
+  radiusPx: number,
+): Float32Array {
+  const plane = new Float32Array(values.length);
+  const weight = new Float32Array(values.length);
+  for (let i = 0; i < values.length; i += 1) {
+    if (visible[i] !== 1) continue;
+    plane[i] = values[i] ?? 0;
+    weight[i] = 1;
+  }
+  const r = Math.max(1, Math.round(radiusPx));
+  for (let pass = 0; pass < 2; pass += 1) {
+    boxBlur(plane, width, height, r);
+    boxBlur(weight, width, height, r);
+  }
+  for (let i = 0; i < plane.length; i += 1) {
+    const w = weight[i] ?? 0;
+    plane[i] = w > 1e-6 ? (plane[i] ?? 0) / w : 0;
+  }
+  return plane;
+}
+
 // The colour planes and a weight plane, 1 where the camera saw the bed.
 function visiblePlanes(image: RgbaImage) {
   const n = image.width * image.height;

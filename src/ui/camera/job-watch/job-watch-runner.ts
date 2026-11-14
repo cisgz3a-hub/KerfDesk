@@ -31,7 +31,14 @@ import {
   type WatchCamera,
   type WatchIo,
 } from './job-watch-camera';
-import { useJobWatchStore, type BurnCheckView, type TimelapseView } from './job-watch-store';
+import { useToastStore } from '../../state/toast-store';
+import {
+  KEPT_TIMELAPSE_NOTE,
+  unsavedTimelapse,
+  useJobWatchStore,
+  type BurnCheckView,
+  type TimelapseView,
+} from './job-watch-store';
 import { startTimelapse, type TimelapseRecorder } from './timelapse-recorder';
 
 // The after picture waits for the smoke to clear and the head to settle.
@@ -95,13 +102,13 @@ function beginJob(plan: CanvasMotionPlan, io: WatchIo): WatchedJob | null {
   const current = generation;
   const isCurrent = (): boolean => generation === current;
   clearBurnCheckResult();
-  useJobWatchStore.setState({ timelapse: null });
+  const kept = keepUnsavedTimelapse(settings.timelapse);
   const camera = watchCameraNow();
   const region = planPlacesOnBed(plan) ? burnRegion(plan) : null;
   let recorder: TimelapseRecorder | null = null;
-  if (settings.timelapse && camera === null) {
+  if (settings.timelapse && !kept && camera === null) {
     useJobWatchStore.setState({ timelapse: notRecorded() });
-  } else if (settings.timelapse && camera !== null) {
+  } else if (settings.timelapse && !kept && camera !== null) {
     recorder = startTimelapse({
       camera,
       region,
@@ -113,6 +120,26 @@ function beginJob(plan: CanvasMotionPlan, io: WatchIo): WatchedJob | null {
   }
   const before = settings.burnCheck ? startBurnCheck(plan, region, camera, io, isCurrent) : null;
   return { generation: current, plan, camera, recorder, before };
+}
+
+// ADR-490 Amendment 4: a new run (Continue, Second pass, the next job) never
+// empties a recording that was not saved or cleared. It is kept, finished,
+// and this run is not recorded; the note and a toast say so, and Job Review
+// said so before Start. True when one was kept.
+function keepUnsavedTimelapse(recordingWanted: boolean): boolean {
+  const timelapse = useJobWatchStore.getState().timelapse;
+  if (!unsavedTimelapse(timelapse)) {
+    useJobWatchStore.setState({ timelapse: null });
+    return false;
+  }
+  const note = recordingWanted ? KEPT_TIMELAPSE_NOTE : timelapse.note;
+  useJobWatchStore.setState({ timelapse: { ...timelapse, recording: false, note } });
+  if (recordingWanted) {
+    useToastStore
+      .getState()
+      .pushToast(`Timelapse: ${KEPT_TIMELAPSE_NOTE}`, 'warning', { key: 'timelapse-kept' });
+  }
+  return true;
 }
 
 function retirePendingWatch(): void {

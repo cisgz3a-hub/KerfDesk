@@ -100,6 +100,29 @@ function surfaceSpeeds(bytes: Uint8Array, k: number): number[] {
   return speeds;
 }
 
+type UmStep = { readonly xUm: number; readonly yUm: number; readonly cut?: boolean };
+
+const toUm = (point: Vec2): UmStep => ({ xUm: point.x * 1000, yUm: point.y * 1000 });
+
+/** Length of a polyline, or of only its cut steps when `cutsOnly`. */
+function lengthUm(steps: ReadonlyArray<UmStep>, cutsOnly = false): number {
+  let length = 0;
+  for (let i = 1; i < steps.length; i += 1) {
+    const [a, b] = [steps[i - 1], steps[i]];
+    if (a === undefined || b === undefined || (cutsOnly && b.cut !== true)) continue;
+    length += Math.hypot(b.xUm - a.xUm, b.yUm - a.yUm);
+  }
+  return length;
+}
+
+/** Burned length of a whole file: the head carries across parts, as the file runs them. */
+function burnedUm(parts: ReadonlyArray<{ readonly steps: ReadonlyArray<UmStep> }>): number {
+  return lengthUm(
+    parts.flatMap((part) => part.steps),
+    true,
+  );
+}
+
 describe('a Ruida rotary file moves the surface at the layer speed (ADR-127 Amd 5)', () => {
   it.each(SETUPS)('%s', (_name, rotary) => {
     const encoded = encode(rotary);
@@ -130,6 +153,26 @@ describe('a Ruida rotary file moves the surface at the layer speed (ADR-127 Amd 
         { kind: 'layer-speed', mmPerMin: LAYER_SPEED },
       ]);
     }
+  });
+
+  it('burns the first edge of a layer that starts where the last one ended', () => {
+    // Audit of the last 200 PRs (#1762): the plan writes no travel when a
+    // layer starts at the head, so the part opens with a cut, which the speed
+    // classes read as a bare position and dropped.
+    const square = (surfaceJob().groups[0] as CutGroup).segments[0];
+    if (square === undefined) throw new Error('fixture');
+    const layer = (layerId: string): CutGroup => ({
+      ...(surfaceJob().groups[0] as CutGroup),
+      layerId,
+      segments: [square],
+    });
+    const machine = device(SETUPS[0]?.[1]);
+    const job = machineSpaceJob({ groups: [layer('score'), layer('cut')] }, machine, undefined);
+    const encoded = encodeRdJob(job, machine);
+    if (!encoded.ok) throw new Error(JSON.stringify(encoded.error));
+    const [machineSquare] = (job.groups[0] as CutGroup).segments;
+    const perimeterUm = lengthUm((machineSquare?.polyline ?? []).map(toUm));
+    expect(burnedUm(encoded.motion)).toBeCloseTo(2 * perimeterUm, -1);
   });
 
   it('refuses a rotary job that needs more parts than a Ruida file holds', () => {

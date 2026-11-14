@@ -1,0 +1,42 @@
+// Refuter's own G-code reader: lit G1 segments (laser on, S > 0), machine coordinates.
+export type Seg = { x0: number; y0: number; x1: number; y1: number; len: number };
+
+export function litSegments(gcode: string): Seg[] {
+  let x = 0;
+  let y = 0;
+  let s = 0;
+  let motion = 0;
+  let on = false;
+  const segs: Seg[] = [];
+  for (const raw of gcode.split(/\r?\n/)) {
+    const line = raw.split(';')[0]!.replace(/\([^)]*\)/g, '').trim().toUpperCase();
+    if (line === '') continue;
+    const words = line.match(/[A-Z][-+]?[0-9]*\.?[0-9]+/g) ?? [];
+    let nx = x;
+    let ny = y;
+    let moved = false;
+    for (const w of words) {
+      const letter = w[0]!;
+      const v = Number(w.slice(1));
+      if (letter === 'G' && (v === 0 || v === 1)) motion = v;
+      if (letter === 'G' && (v === 2 || v === 3)) throw new Error(`arc not handled: ${raw}`);
+      if (letter === 'M' && (v === 3 || v === 4)) on = true;
+      if (letter === 'M' && v === 5) on = false;
+      if (letter === 'S') s = v;
+      if (letter === 'X') { nx = v; moved = true; }
+      if (letter === 'Y') { ny = v; moved = true; }
+    }
+    if (moved) {
+      const len = Math.hypot(nx - x, ny - y);
+      if (motion === 1 && on && s > 0 && len > 0) segs.push({ x0: x, y0: y, x1: nx, y1: ny, len });
+      x = nx;
+      y = ny;
+    }
+  }
+  return segs;
+}
+
+export const total = (segs: Seg[]) => segs.reduce((a, b) => a + b.len, 0);
+export const fmt = (n: number) => n.toFixed(3);
+export const show = (segs: Seg[]) =>
+  segs.map((g) => `(${fmt(g.x0)},${fmt(g.y0)})->(${fmt(g.x1)},${fmt(g.y1)})`).join(' ');

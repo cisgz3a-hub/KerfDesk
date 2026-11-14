@@ -20,6 +20,9 @@ export type ProductionNestStock = {
   readonly kind: 'sheet' | 'remnant';
   readonly materialKey: string;
   readonly thicknessMm: number;
+  /** The operator typed this thickness (ADR-258 Amendment 9): a generated
+   *  sheet then counts it as set at any value, 6.35 mm included. */
+  readonly thicknessSet?: true;
   readonly widthMm: number;
   readonly heightMm: number;
   readonly grain: ProductionGrain;

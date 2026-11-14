@@ -1,8 +1,9 @@
-// Multi-File Trace shares the one trace worker with the Trace Image dialog,
-// whose live preview supersedes every pending trace when it starts one. While
-// the editor stays usable during a batch, a preview must not end the batch:
-// a trace superseded by someone else is retried, and a file that keeps being
-// interrupted becomes that file's skip. Only the batch's own Cancel stops it.
+// Multi-File Trace traces on its own trace client (createTraceWorkerClient), so
+// a Trace Image preview or commit no longer supersedes it (ADR-431 Amendment
+// 2026-11-14). A superseded rejection can still reach the batch from an
+// injected tracer or a worker that answers late, so it is retried, and a file
+// that keeps being interrupted becomes that file's skip. Only the batch's own
+// Cancel stops it.
 
 import { isTraceRequestSuperseded } from '../trace/use-trace-worker-client';
 
@@ -11,6 +12,20 @@ export const SUPERSEDED_TRACE_RETRIES = 2;
 
 export const INTERRUPTED_TRACE_MESSAGE =
   'Another trace (such as a Trace Image preview) kept interrupting this file.';
+
+/** A file whose trace kept being superseded: it is skipped, never traced at a
+ * coarser grid instead (ADR-431 Amendment 2026-09-27, item 1). */
+export class TraceInterruptedError extends Error {
+  override readonly name = 'TraceInterruptedError';
+
+  constructor() {
+    super(INTERRUPTED_TRACE_MESSAGE);
+  }
+}
+
+export function isTraceInterrupted(error: unknown): boolean {
+  return error instanceof TraceInterruptedError;
+}
 
 type TraceCall<Image, Options, Result> = (
   image: Image,
@@ -31,7 +46,7 @@ export function retrySupersededTrace<Image, Options, Result>(
       } catch (error) {
         // After the batch's own Cancel, the superseded rejection IS the cancel.
         if (!isTraceRequestSuperseded(error) || batchSignal?.aborted === true) throw error;
-        if (attempt >= SUPERSEDED_TRACE_RETRIES) throw new Error(INTERRUPTED_TRACE_MESSAGE);
+        if (attempt >= SUPERSEDED_TRACE_RETRIES) throw new TraceInterruptedError();
       }
     }
   };

@@ -4,6 +4,8 @@
 **Read at:** `origin/main` 5c9441ba8 (2026-11-11). Method, severity and rules: [AREAS.md](AREAS.md).
 **Fix PR:** [#1780](https://github.com/cisgz3a-hub/KerfDesk/pull/1780) (O1-P2-1, O1-P3-1, O1-P3-2; ADR-386 Amendment 3).
 
+> **Status (2026-11-14):** #1780 was **closed unmerged** on 2026-11-11 and is with the maintainer ([LEDGER.md](LEDGER.md)). Where this report says "fixed in #1780", read "proposed in #1780": `main` has none of it, and ADR-386 Amendment 3 was never added.
+
 ## Headline
 
 Every encoder is right. A decoder written from the standards, sharing no table or helper with KerfDesk, read back:

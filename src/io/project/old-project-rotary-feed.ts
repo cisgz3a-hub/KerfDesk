@@ -76,7 +76,9 @@ function changedDoseRatios(project: Project, yScale: number): number[] {
 function doseRatio(angle: number, yScale: number, speed: number, maxFeed: number): number {
   const surface = Math.hypot(Math.cos(angle), Math.sin(angle));
   const machine = Math.hypot(Math.cos(angle), yScale * Math.sin(angle));
-  const held = maxFeed > 0 ? speed / maxFeed : 0;
+  // The compiler held the layer at the Max feed then and now (audit of the
+  // last 200 PRs, #1745), so a stored speed above it changed nothing.
+  const held = maxFeed > 0 ? Math.min(speed, maxFeed) / maxFeed : 0;
   return Math.max(surface / machine, held);
 }
 

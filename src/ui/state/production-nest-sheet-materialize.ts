@@ -152,6 +152,8 @@ function productionMachine(project: Project, stock: ProductionNestStock): Projec
       widthMm: stock.widthMm,
       heightMm: stock.heightMm,
       thicknessMm: stock.thicknessMm,
+      // A thickness typed in the nest counts as set (ADR-258 Amendment 9).
+      ...(stock.thicknessSet === true ? { thicknessSet: true as const } : {}),
       originOffset: { x: 0, y: 0 },
       ...(isChiploadMaterialKey(stock.materialKey) ? { materialKey: stock.materialKey } : {}),
     },

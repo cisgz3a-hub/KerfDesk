@@ -11,6 +11,7 @@ import {
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { convertSelectedVectorsToBitmap } from './bitmap-conversion';
+import { convertibleSkippedNotice, selectedObjectIds } from './selection-command-state';
 
 export function ConvertBitmapDialogHost(props: {
   readonly convertibles: ReadonlyArray<ConvertibleVector>;
@@ -19,6 +20,11 @@ export function ConvertBitmapDialogHost(props: {
   const layers = useStore((state) => state.project.scene.layers);
   const epoch = useStore((state) => state.projectDocumentEpoch);
   const [openingEpoch] = useState(epoch);
+  const [skippedNotice] = useState(() => {
+    const state = useStore.getState();
+    const ids = selectedObjectIds(state.selectedObjectId, state.additionalSelectedIds);
+    return convertibleSkippedNotice(state.project, ids);
+  });
   const convertToBitmap = useStore((state) => state.convertToBitmap);
   const pushToast = useToastStore((state) => state.pushToast);
   const active = useRef<AbortController | null>(null);
@@ -60,6 +66,7 @@ export function ConvertBitmapDialogHost(props: {
       if (active.current !== controller) return;
       active.current = null;
       setBusy(false);
+      if (outcome.kind === 'converted' && skippedNotice !== '') pushToast(skippedNotice, 'info');
       if (outcome.kind === 'converted' || outcome.kind === 'cancelled') props.onClose();
       else
         setError(

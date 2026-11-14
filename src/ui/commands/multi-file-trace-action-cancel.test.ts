@@ -85,4 +85,40 @@ describe('Multi-File Trace and the shared trace worker', () => {
     expect(text).toContain('b.png');
     expect(text).toContain(INTERRUPTED_TRACE_MESSAGE);
   });
+
+  it('skips a file whose finer trace keeps being interrupted, never tracing it coarser', async () => {
+    // T25R-P2-1: the interruption used to count as a finer-grid failure, so the
+    // file was written from the preview grid with a notice blaming the device.
+    const natural = { width: 6000, height: 4000 };
+    const written: string[] = [];
+    const traced: Array<readonly [string, number]> = [];
+    const pushToast = vi.fn();
+    const turn = { name: '' };
+    await runMultiFileTrace(files('a.png', 'b.png', 'c.png'), pushToast, {
+      readNaturalSize: async (file) => {
+        turn.name = file.name;
+        return natural;
+      },
+      readDensity: async () => null,
+      decodeRaster: async () => null,
+      loadImage: async (_file, maxEdge) => ({ ...rawImage(), width: maxEdge ?? 1000 }),
+      targetPxPerMm: 20,
+      deviceMemoryGb: 8,
+      trace: async (image) => {
+        traced.push([turn.name, image.width]);
+        if (turn.name === 'b.png') throw new TraceRequestSupersededError();
+        return [SQUARE_PATH];
+      },
+      write: recordWrites(written),
+    });
+    expect(written).toEqual(['a-trace.svg', 'c-trace.svg']);
+    // b.png: the first try and its two retries, all on the finer grid.
+    const bWidths = traced.filter(([name]) => name === 'b.png').map(([, width]) => width);
+    expect(bWidths).toHaveLength(3);
+    expect(bWidths.every((width) => width > 1000)).toBe(true);
+    const [text, kind] = pushToast.mock.calls[0] ?? [];
+    expect(kind).toBe('warning');
+    expect(text).toContain(`b.png: ${INTERRUPTED_TRACE_MESSAGE}`);
+    expect(text).not.toContain('preview resolution');
+  });
 });

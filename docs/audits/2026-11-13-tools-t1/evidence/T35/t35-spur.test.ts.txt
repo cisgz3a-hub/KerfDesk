@@ -1,0 +1,68 @@
+// @vitest-environment jsdom
+// T35: does any warning name the art that kerf drops after Close Path makes a spur?
+import { beforeEach, it } from 'vitest';
+import { IDENTITY_TRANSFORM, type ImportedSvg, type Layer, type Project } from '../t31-main/src/core/scene';
+import { compileJob } from '../t31-main/src/core/job';
+import { prepareOutput } from '../t31-main/src/io/gcode/prepare-output';
+import { resetStore } from '../t31-main/src/ui/state/test-helpers';
+import { totalLen } from './decode';
+import { burn, clearToasts, f3, layer, logger, proj, setProject, st, toasts } from './common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t35/t35-spur.log');
+beforeEach(() => {
+  resetStore();
+  clearToasts();
+});
+type V = { x: number; y: number };
+const svg = (id: string, pts: V[][], closed = false): ImportedSvg =>
+  ({
+    kind: 'imported-svg', id, source: `${id}.svg`, operationIds: ['L'],
+    bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 }, transform: IDENTITY_TRANSFORM,
+    paths: [{ color: '#000000', polylines: pts.map((points) => ({ points, closed })) }],
+  }) as ImportedSvg;
+
+function warnings(p: Project): string {
+  const job = compileJob(p.scene, p.device);
+  const prepared = prepareOutput(p) as unknown as Record<string, unknown>;
+  const keys = Object.keys(prepared).join(',');
+  const w = JSON.stringify(
+    Object.fromEntries(
+      Object.entries(prepared).filter(([k]) => /warn|diag|preflight|notice|advis/i.test(k)),
+    ),
+  ).slice(0, 600);
+  return `jobDiag ${JSON.stringify(job.diagnostics ?? [])} | prepared keys ${keys} | ${w}`;
+}
+
+const cases: Record<string, V[]> = {
+  // closing (25,10)->(10,10) runs back over 15 mm of the first edge
+  spur: [{ x: 10, y: 10 }, { x: 40, y: 10 }, { x: 40, y: 30 }, { x: 25, y: 30 }, { x: 25, y: 10 }],
+  // stem out to a square loop and back; ends coincide, flag open
+  lollipop: [{ x: 10, y: 50 }, { x: 40, y: 50 }, { x: 40, y: 40 }, { x: 60, y: 40 }, { x: 60, y: 60 }, { x: 40, y: 60 }, { x: 40, y: 50 }, { x: 10, y: 50 }],
+  // a "6"-like hook: an arc stroke that ends on its own stem (typical single-line glyph / DXF sketch)
+  hook: [{ x: 10, y: 80 }, { x: 10, y: 40 }, { x: 30, y: 40 }, { x: 30, y: 60 }, { x: 10, y: 60 }],
+};
+
+it('spur / lollipop / hook with kerf: warnings before and after Close Path', () => {
+  for (const [name, pts] of Object.entries(cases)) {
+    for (const kerf of [0.1, -0.1]) {
+      resetStore();
+      clearToasts();
+      const L = layer('L', 'line', 1000, 50, { kerfOffsetMm: kerf } as Partial<Layer>);
+      const p0 = proj([svg('a', [pts])], [L]);
+      setProject(p0, ['a']);
+      st().closeSelectedPaths();
+      const p1 = st().project;
+      const b0 = burn(p0);
+      const b1 = burn(p1);
+      out(`${name} kerf ${kerf}: toast ${toasts().join(' // ')}`);
+      out(`  before lit ${f3(totalLen(b0.moves))} ; ${warnings(p0)}`);
+      out(`  after  lit ${f3(totalLen(b1.moves))} ; ${warnings(p1)}`);
+      const ys = [...new Set(b1.moves.map((m) => `${f3(m.from.x)},${f3(m.from.y)}->${f3(m.to.x)},${f3(m.to.y)}`))];
+      out(`  after moves ${ys.join(' ')}`);
+    }
+  }
+  // Control: the same spur contour imported already closed (not via Close Path)
+  const L = layer('L', 'line', 1000, 50, { kerfOffsetMm: 0.1 } as Partial<Layer>);
+  const pc = proj([svg('c', [cases.spur!], true)], [L]);
+  out(`control imported-closed spur kerf 0.1: lit ${f3(totalLen(burn(pc).moves))} ; ${warnings(pc)}`);
+});

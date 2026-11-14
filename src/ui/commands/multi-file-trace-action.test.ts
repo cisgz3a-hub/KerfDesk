@@ -226,6 +226,34 @@ describe('buildMultiFileTraceExports', () => {
 });
 
 describe('runMultiFileTrace', () => {
+  it('names each file traced at the preview grid, and why, in the batch notice', async () => {
+    // T25R-P2-1: the notice said "This device could not trace the image" once
+    // for the whole batch, naming no file.
+    const natural = { width: 6000, height: 4000 };
+    const pushToast = vi.fn();
+    await runMultiFileTrace([namedFile('a.png'), namedFile('b.png')], pushToast, {
+      loadImage: async (file, maxEdge) => {
+        if (file.name === 'a.png' && maxEdge !== undefined && maxEdge > PREVIEW_MAX_EDGE_PX) {
+          throw new Error('Could not allocate the decode canvas');
+        }
+        const grid = scaleToCap(natural.width, natural.height, maxEdge ?? PREVIEW_MAX_EDGE_PX);
+        return rawImage(grid.width, grid.height);
+      },
+      readNaturalSize: async () => natural,
+      trace: async () => [SQUARE_PATH],
+      targetPxPerMm: 20,
+      deviceMemoryGb: 8,
+      write: async () => true,
+    });
+    const [text, kind] = pushToast.mock.calls[0] ?? [];
+    expect(kind).toBe('warning');
+    expect(text).toContain(
+      'Could not trace a.png (Could not allocate the decode canvas) at full resolution, so its trace uses the preview resolution.',
+    );
+    expect(text).not.toContain('b.png');
+    expect(text).not.toContain('This device could not trace the image');
+  });
+
   it('retains actual fallback notices on exported files and reports them after saving', async () => {
     const data = new Uint8ClampedArray(16 * 16 * 4).fill(255);
     for (const y of [7, 8]) data.set([0, 0, 0, 255], (y * 16 + 7) * 4);

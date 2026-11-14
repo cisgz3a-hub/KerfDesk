@@ -35,6 +35,7 @@ import { useCameraHelpersStore } from './camera-helpers-store';
 import { checkCameraMovedInWorker, rgbaView } from './moved-check';
 import { checkStartedCameraMoved } from './moved-check-capture';
 import { checkLivePictureForMoves } from './live-moved-check';
+import { followMaterialHeight } from './material-height';
 import { scheduleAfterJobRefresh } from './schedule-after-job-refresh';
 import { refreshCameraPicture, reportRefresh, takePendingRefresh } from './refresh-picture';
 
@@ -46,6 +47,8 @@ export function installCameraHelpers(deps: CameraStartDeps): () => void {
     checkForMoves(),
     // ADR-663 Amendment 8: a live picture is checked again while it is shown.
     checkLivePictureForMoves(),
+    // ADR-441 Amendment 14: the Material height follows the job material and is kept.
+    followMaterialHeight(),
     followBedPictureFrame(),
     watchCanvasTargetBurns(),
   ];

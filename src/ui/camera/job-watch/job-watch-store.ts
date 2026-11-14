@@ -19,6 +19,8 @@ export type TimelapseView = {
   readonly flat: boolean;
   readonly recording: boolean;
   readonly note: string | null;
+  /** Save video wrote it (ADR-490 Amendment 4): a new job may replace it. */
+  readonly saved?: boolean;
 };
 
 export type BurnCheckView =
@@ -34,6 +36,7 @@ type JobWatchStore = {
   readonly burnCheck: BurnCheckView;
   readonly setSettings: (patch: Partial<JobWatchSettings>) => void;
   readonly clearTimelapse: () => void;
+  readonly markTimelapseSaved: () => void;
 };
 
 export const useJobWatchStore = create<JobWatchStore>((set, get) => ({
@@ -48,7 +51,29 @@ export const useJobWatchStore = create<JobWatchStore>((set, get) => ({
   clearTimelapse: () => {
     if (get().timelapse?.recording !== true) set({ timelapse: null });
   },
+  markTimelapseSaved: () => {
+    const timelapse = get().timelapse;
+    if (timelapse !== null) set({ timelapse: { ...timelapse, saved: true } });
+  },
 }));
+
+/**
+ * A recording with frames that was neither saved nor cleared (ADR-490
+ * Amendment 4; the maintainer's choice on camera audit v2 K4-P2-3, "Keep
+ * until saved/dismissed"): no new run may empty it.
+ */
+export function unsavedTimelapse(timelapse: TimelapseView | null): timelapse is TimelapseView {
+  return timelapse !== null && timelapse.frames.length > 0 && timelapse.saved !== true;
+}
+
+/** A timelapse will be wanted for the next job, but the last one would be kept. */
+export function timelapseWouldBeKept(): boolean {
+  const { settings, timelapse } = useJobWatchStore.getState();
+  return settings.timelapse && unsavedTimelapse(timelapse);
+}
+
+export const KEPT_TIMELAPSE_NOTE =
+  'This timelapse is not saved yet, so it was kept and the next job was not recorded. Save it (Save video) or clear it, and the next job records again.';
 
 /** Whether the camera should keep running with its panel closed, to watch the next job. */
 export function jobWatchWantsCamera(): boolean {

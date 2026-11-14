@@ -1,0 +1,219 @@
+// @vitest-environment jsdom
+// T35 Close Path: store action, oracle, burn decode before/after.
+import { beforeEach, it } from 'vitest';
+import {
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type Transform,
+} from '../t31-main/src/core/scene';
+import { compileJob } from '../t31-main/src/core/job';
+import { serializeProject } from '../t31-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t31-main/src/io/project/deserialize-project';
+import { resetStore } from '../t31-main/src/ui/state/test-helpers';
+import { closeOpenPaths } from '../t31-main/src/core/geometry/path-direction-edits';
+import { totalLen, bbox } from './decode';
+import { burn, clearToasts, f3, layer, logger, proj, setProject, st, toasts } from './common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t35/t35-burn.log');
+beforeEach(() => {
+  resetStore();
+  clearToasts();
+});
+type V = { x: number; y: number };
+const svgOpen = (
+  id: string,
+  pts: V[][],
+  t: Partial<Transform> = {},
+  extra: Record<string, unknown> = {},
+  op = 'L',
+): ImportedSvg =>
+  ({
+    kind: 'imported-svg', id, source: `${id}.svg`, operationIds: [op],
+    bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 }, transform: { ...IDENTITY_TRANSFORM, ...t },
+    paths: [{ color: '#000000', polylines: pts.map((points) => ({ points, closed: false })) }],
+    ...extra,
+  }) as ImportedSvg;
+
+function diag(p: Project): string {
+  try {
+    const j = compileJob(p) as unknown as { diagnostics?: unknown[] };
+    return JSON.stringify(j.diagnostics ?? []).slice(0, 400);
+  } catch (e) {
+    return `compileJob threw ${String(e)}`;
+  }
+}
+function report(tag: string, p: Project) {
+  const b = burn(p);
+  if (!b.ok) {
+    out(`${tag}: NOT OK ${b.why}`);
+    return 0;
+  }
+  const bb = bbox(b.moves);
+  out(`${tag}: lit ${f3(totalLen(b.moves))} mm, moves ${b.moves.length}, bbox ${f3(bb.minX)},${f3(bb.minY)}..${f3(bb.maxX)},${f3(bb.maxY)} diag ${diag(p)}`);
+  return totalLen(b.moves);
+}
+function closeAll(objects: SceneObject[], layers: Layer[], sel: string[]) {
+  const p0 = proj(objects, layers);
+  setProject(p0, sel);
+  st().closeSelectedPaths();
+  return { before: p0, after: st().project };
+}
+const polyInfo = (o: SceneObject | undefined) =>
+  o && 'paths' in o
+    ? o.paths.map((p) => p.polylines.map((l) => `${l.closed ? 'C' : 'O'}${l.points.length}`).join(' ')).join(' | ')
+    : 'n/a';
+
+it('S1 three-sided open box closes with a straight line; gap reported; G-code +gap', () => {
+  const L = layer('L', 'line', 1000, 50);
+  const o = svgOpen('a', [[{ x: 10, y: 10 }, { x: 50, y: 10 }, { x: 50, y: 40 }, { x: 10, y: 40 }]]);
+  const { before, after } = closeAll([o], [L], ['a']);
+  out(`S1 toast ${toasts().join(' // ')}; shape ${polyInfo(after.scene.objects[0])}`);
+  const a = report('S1 before', before);
+  const b = report('S1 after', after);
+  out(`S1 delta ${f3(b - a)} (oracle 30.000)`);
+  st().undo();
+  out(`S1 undo restores exactly: ${JSON.stringify(st().project.scene) === JSON.stringify(before.scene)}`);
+  st().redo();
+  out(`S1 redo repeats exactly: ${JSON.stringify(st().project.scene) === JSON.stringify(after.scene)}`);
+  const re = deserializeProject(serializeProject(st().project));
+  const ro = (re as unknown as { ok?: boolean; project?: Project; value?: Project });
+  const rp = ro.project ?? ro.value ?? (re as unknown as Project);
+  out(`S1 save/reopen: ${polyInfo(rp.scene?.objects?.[0])}`);
+});
+
+it('S2 non-uniform scale and rotation: gap in world mm', () => {
+  const L = layer('L', 'line', 1000, 50);
+  const o = svgOpen('a', [[{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }]], { scaleX: 3, scaleY: 0.5, rotationDeg: 30, x: 60, y: 60 } as Partial<Transform>);
+  const { before, after } = closeAll([o], [L], ['a']);
+  out(`S2 toast ${toasts().join(' // ')} (oracle gap = 10*0.5 = 5.000)`);
+  const a = report('S2 before', before);
+  const b = report('S2 after', after);
+  out(`S2 delta ${f3(b - a)} (oracle 5.000)`);
+});
+
+it('S3 out-and-back stays open (ADR-486 Amd 4); kerf 0.1', () => {
+  const L = layer('L', 'line', 1000, 50, { kerfOffsetMm: 0.1 } as Partial<Layer>);
+  const o = svgOpen('a', [[{ x: 10, y: 10 }, { x: 60, y: 10 }, { x: 10, y: 10.0000001 }]]);
+  const { before, after } = closeAll([o], [L], ['a']);
+  out(`S3 toast ${toasts().join(' // ')}; shape ${polyInfo(after.scene.objects[0])}; changed ${before !== after}`);
+  report('S3 before', before);
+  report('S3 after', after);
+});
+
+it('S4 partial retrace: closing line runs back along the first segment (spur), kerf 0 and 0.1', () => {
+  for (const kerf of [0, 0.1, -0.1]) {
+    resetStore();
+    clearToasts();
+    const L = layer('L', 'line', 1000, 50, { kerfOffsetMm: kerf } as Partial<Layer>);
+    // start (10,10) -> (40,10) -> (40,30) -> (25,30) -> (25,10): closing (25,10)->(10,10) retraces 15 mm of the first edge
+    const o = svgOpen('a', [[{ x: 10, y: 10 }, { x: 40, y: 10 }, { x: 40, y: 30 }, { x: 25, y: 30 }, { x: 25, y: 10 }]]);
+    const { before, after } = closeAll([o], [L], ['a']);
+    out(`S4 kerf ${kerf} toast ${toasts().join(' // ')}; shape ${polyInfo(after.scene.objects[0])}`);
+    const a = report(`S4 kerf ${kerf} before`, before);
+    const b = report(`S4 kerf ${kerf} after`, after);
+    out(`S4 kerf ${kerf} delta ${f3(b - a)} (oracle w/o kerf +15.000; the 10..25 spur is real art)`);
+  }
+});
+
+it('S5 lollipop: stem out, loop, stem back; ends coincide but flag open; kerf 0.1', () => {
+  for (const kerf of [0, 0.1]) {
+    resetStore();
+    clearToasts();
+    const L = layer('L', 'line', 1000, 50, { kerfOffsetMm: kerf } as Partial<Layer>);
+    const o = svgOpen('a', [[{ x: 10, y: 50 }, { x: 40, y: 50 }, { x: 40, y: 40 }, { x: 60, y: 40 }, { x: 60, y: 60 }, { x: 40, y: 60 }, { x: 40, y: 50 }, { x: 10, y: 50 }]]);
+    const { before, after } = closeAll([o], [L], ['a']);
+    out(`S5 kerf ${kerf} toast ${toasts().join(' // ')}; shape ${polyInfo(after.scene.objects[0])}`);
+    const a = report(`S5 kerf ${kerf} before`, before);
+    const b = report(`S5 kerf ${kerf} after`, after);
+    out(`S5 kerf ${kerf} delta ${f3(b - a)} (stems 2x30 mm = 60 mm of art)`);
+  }
+});
+
+it('S6 Fill layer: open C becomes hatched after close', () => {
+  const F = layer('F', 'fill', 3000, 30);
+  const o = svgOpen('a', [[{ x: 10, y: 10 }, { x: 30, y: 10 }, { x: 30, y: 30 }, { x: 10, y: 30 }]], {}, {}, 'F');
+  const { before, after } = closeAll([o], [F], ['a']);
+  out(`S6 toast ${toasts().join(' // ')}`);
+  report('S6 before', before);
+  report('S6 after', after);
+});
+
+it('S7 far ends: long closing line across part, no warning beyond the gap number', () => {
+  const L = layer('L', 'line', 1000, 50);
+  // a 200 mm open zig path whose ends are 190 mm apart
+  const o = svgOpen('a', [[{ x: 5, y: 5 }, { x: 100, y: 100 }, { x: 195, y: 5 }]]);
+  const { before, after } = closeAll([o], [L], ['a']);
+  out(`S7 toast ${toasts().join(' // ')}; variants ${JSON.stringify((st() as unknown as { toasts?: unknown }).toasts ?? '')}`);
+  const a = report('S7 before', before);
+  const b = report('S7 after', after);
+  out(`S7 delta ${f3(b - a)} (oracle 190.000)`);
+});
+
+it('S8 near-coincident ends: duplicate seam point and zero-length segment', () => {
+  const L = layer('L', 'line', 1000, 50);
+  for (const eps of [0, 1e-12, 1e-6, 1e-3]) {
+    resetStore();
+    clearToasts();
+    const pts = [{ x: 10, y: 10 }, { x: 40, y: 10 }, { x: 40, y: 40 }, { x: 10 + eps, y: 10 }];
+    const o = svgOpen('a', [pts]);
+    const { before, after } = closeAll([o], [L], ['a']);
+    const obj = after.scene.objects[0] as ImportedSvg;
+    const p = obj.paths[0]!.polylines[0]!;
+    const last = p.points.at(-1)!;
+    const prev = p.points.at(-2)!;
+    out(`S8 eps ${eps}: toast ${toasts().join(' // ')}; ${polyInfo(obj)}; last seg ${Math.hypot(last.x - prev.x, last.y - prev.y)}`);
+    const a = report(`S8 eps ${eps} before`, before);
+    const b = report(`S8 eps ${eps} after`, after);
+    out(`S8 eps ${eps} delta ${f3(b - a)}`);
+  }
+});
+
+it('S9 locked object, mixed selection, many objects, degenerate inputs', () => {
+  const L = layer('L', 'line', 1000, 50);
+  const locked = svgOpen('lk', [[{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }]], {}, { locked: true });
+  const free = svgOpen('fr', [[{ x: 20, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 10 }]]);
+  closeAll([locked, free], [L], ['lk', 'fr']);
+  out(`S9a locked+free toast ${toasts().join(' // ')}; locked ${polyInfo(st().project.scene.objects[0])} free ${polyInfo(st().project.scene.objects[1])}`);
+  resetStore(); clearToasts();
+  closeAll([locked], [L], ['lk']);
+  out(`S9b locked only toast ${toasts().join(' // ')}`);
+  // degenerate: NaN point, two-point line, single point, empty
+  const t0 = performance.now();
+  const r = closeOpenPaths(
+    [{ color: '#000000', polylines: [
+      { points: [{ x: 0, y: 0 }, { x: NaN, y: 1 }, { x: 2, y: 2 }], closed: false },
+      { points: [{ x: 0, y: 0 }, { x: 5, y: 0 }], closed: false },
+      { points: [{ x: 0, y: 0 }], closed: false },
+      { points: [], closed: false },
+      { points: [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }], closed: false },
+    ] }],
+    IDENTITY_TRANSFORM,
+  );
+  out(`S9c degenerate: closed ${r.closed} gap ${r.longestGapMm} ${r.paths[0]!.polylines.map((l) => `${l.closed ? 'C' : 'O'}${l.points.length}`).join(' ')} (${f3(performance.now() - t0)} ms)`);
+  // many
+  const many: SceneObject[] = [];
+  for (let i = 0; i < 400; i++) many.push(svgOpen(`m${i}`, [Array.from({ length: 50 }, (_, k) => ({ x: (i % 20) * 10 + Math.cos(k / 8) * 4, y: Math.floor(i / 20) * 10 + Math.sin(k / 8) * 4 }))]));
+  const t1 = performance.now();
+  closeAll(many, [L], many.map((o) => o.id));
+  out(`S9d 400 objects x 50 pts: ${f3(performance.now() - t1)} ms; toast ${toasts().join(' // ')}`);
+});
+
+it('S10 polyline drawn shape and boolean compound', () => {
+  const L = layer('L', 'line', 1000, 50);
+  const shape = {
+    kind: 'shape', id: 's', operationIds: ['L'], color: '#000000',
+    spec: { kind: 'polyline', points: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }], closed: false },
+    transform: { ...IDENTITY_TRANSFORM, x: 30, y: 30 },
+    bounds: { minX: 0, minY: 0, maxX: 20, maxY: 20 },
+    paths: [{ color: '#000000', polylines: [{ points: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }], closed: false }] }],
+  } as unknown as SceneObject;
+  const { before, after } = closeAll([shape], [L], ['s']);
+  const o = after.scene.objects[0] as unknown as { spec: { closed: boolean; points: unknown[] } };
+  out(`S10a toast ${toasts().join(' // ')}; spec.closed ${o.spec.closed} specPts ${o.spec.points.length} ${polyInfo(after.scene.objects[0])}`);
+  const a = report('S10a before', before);
+  const b = report('S10a after', after);
+  out(`S10a delta ${f3(b - a)} (oracle ${f3(Math.hypot(20, 20))})`);
+});
