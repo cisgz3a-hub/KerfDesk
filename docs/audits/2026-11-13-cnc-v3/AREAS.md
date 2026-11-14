@@ -48,4 +48,4 @@ Finding IDs are `N<area>-P<n>-<k>`. Severity follows [METHOD.md §3](../2026-10-
 
 J1's G-code oracle can be reused as a second reader: `../2026-11-11-cnc-v2/evidence/oracle.ts.txt`. An auditor and its refuter must not both rely on it.
 
-**Status:** N1–N8 ledgered (2026-11-14); see the [round result](LEDGER.md#round-result-2026-11-13). The CNC P3 sweep is running.
+**Status:** DONE 2026-11-14. N1–N8 ledgered and the P3 sweep finished; see the [round result](LEDGER.md#round-result-2026-11-13) and the [P3 sweep](LEDGER.md#p3-sweep-2026-11-14).
