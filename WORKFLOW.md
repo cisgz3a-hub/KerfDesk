@@ -10131,7 +10131,7 @@ Simulator-tested only; no real JCZ board has run this path.
 - **Edge / watching a job.** **Larger view** in Camera settings toggles the panel between compact
   and wide monitoring widths, with the preference kept locally.
 
-### F-CAM9. Find pieces on the bed and place the design on each (ADR-442, Amendment 1)
+### F-CAM9. Find pieces on the bed and place the design on each (ADR-442, Amendments 1 and 2)
 
 - **Success / fill a batch of blanks.** With a saved calibration and a live camera, the operator
   lays out blanks, puts the design on one of them, selects it and presses **Find pieces** in the
@@ -10142,7 +10142,19 @@ Simulator-tested only; no real JCZ board has run this path.
 - **Success / design not on a piece.** The design is centred on each piece, its long side along
   the piece's long side, and the design itself moves to the first piece. A design already turned
   on the canvas is measured along its own turn, so it lies along the piece rather than keeping
-  its old angle (Amendment 1).
+  its old angle (Amendment 1). On an offcut whose rectangle's centre lies off the material (an L
+  in its notch, a ring in its hole) the design goes to the point of the material furthest from
+  its edges nearest that centre (Amendment 2).
+- **Edge / design does not fit a piece (Amendment 2).** A copy that would run more than 1 mm off
+  its piece, or into its hole, is left out of Place; the piece's row says how far, and the
+  message after Place names the pieces left out. When it fits none of them, nothing is placed and
+  the panel says to make the design smaller or put it on one of the pieces.
+- **Edge / doubtful piece (Amendment 2).** A piece whose colour is not like the other pieces'
+  (glare, a shadow, a mark on the bed), or that is far smaller or larger than a batch of
+  same-sized pieces (glare, or two blanks touching), is listed with the reason and starts
+  unticked; ticking it includes it. Scorch marks, old cuts and shadows darker than the bed are
+  never found as pieces, and blanks 1 mm or more apart are found one by one; coasters touching at
+  a point are cut apart.
 - **Edge / piece partly out of view.** It is listed and outlined but starts unticked, with the
   reason; ticking it includes it.
 - **Edge / different piece.** A piece of another shape, or more than 3 mm longer or wider than the

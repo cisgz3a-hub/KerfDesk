@@ -49,15 +49,33 @@ export function renderBedPicture(args: {
   readonly pixelsPerMm: number;
   readonly pieces: ReadonlyArray<RenderedPiece>;
   readonly noise?: number;
+  /** The bed's colour at a bed point, marks and shadows included; a honeycomb by default. */
+  readonly bed?: (x: number, y: number) => Colour;
+  /** Light added over everything at a bed point, such as a reflection; none by default. */
+  readonly light?: (x: number, y: number) => number;
 }): RgbaImage {
   const { region, pixelsPerMm: ppm } = args;
   const width = Math.round(region.width * ppm);
   const height = Math.round(region.height * ppm);
+  const bed = args.bed ?? honeycomb;
   return render(width, height, args.noise ?? 0, (px, py) => {
     const x = region.x + px / ppm;
     const y = region.y + py / ppm;
-    return pieceColour(args.pieces, x, y) ?? honeycomb(x, y);
+    const colour = pieceColour(args.pieces, x, y) ?? bed(x, y);
+    const add = args.light?.(x, y) ?? 0;
+    return add === 0 ? colour : [colour[0] + add, colour[1] + add, colour[2] + add];
   });
+}
+
+/** A light MDF spoilboard with soft blotches. */
+export function mdfBed(x: number, y: number): Colour {
+  const g = 8 * Math.sin(x * 0.9 + 3 * Math.sin(y * 0.05)) + 6 * Math.sin(x * 0.07 + y * 0.03);
+  return [178 + g, 146 + g * 0.8, 108 + g * 0.6];
+}
+
+/** True when bed point (x, y) lies on `piece`. */
+export function onRenderedPiece(piece: RenderedPiece, x: number, y: number): boolean {
+  return covers(piece, x, y);
 }
 
 /** What the camera sees with every piece `thicknessMm` tall, unless it has its own top. */
@@ -92,6 +110,8 @@ type Shade = (px: number, py: number) => Colour;
 
 // Supersampled; `shade` takes pixel-corner coordinates.
 function render(width: number, height: number, noise: number, shade: Shade): RgbaImage {
+  // Channels are clamped like a camera's.
+  const clampChannel = (value: number): number => Math.min(255, Math.max(0, value));
   const data = new Uint8ClampedArray(width * height * 4);
   let seed = 4242;
   const random = (): number => {
@@ -104,7 +124,7 @@ function render(width: number, height: number, noise: number, shade: Shade): Rgb
       for (let sy = 0; sy < SUPERSAMPLE; sy += 1) {
         for (let sx = 0; sx < SUPERSAMPLE; sx += 1) {
           const colour = shade(x + (sx + 0.5) / SUPERSAMPLE, y + (sy + 0.5) / SUPERSAMPLE);
-          for (let c = 0; c < 3; c += 1) sum[c] = (sum[c] ?? 0) + (colour[c] ?? 0);
+          for (let c = 0; c < 3; c += 1) sum[c] = (sum[c] ?? 0) + clampChannel(colour[c] ?? 0);
         }
       }
       const offset = (y * width + x) * 4;

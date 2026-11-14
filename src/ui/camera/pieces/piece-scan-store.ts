@@ -2,7 +2,9 @@
 // in the project changes until the operator places the selection on the
 // pieces, and every piece can be left in or out first. Pieces the camera saw
 // only in part start out left out, with the reason shown, because their
-// centre and angle are not trustworthy; ticking one puts it back.
+// centre and angle are not trustworthy; so do pieces that may not be pieces
+// at all (glare, a mark, two blanks touching; ADR-442 Amendment 2). Ticking
+// one puts it back.
 
 import { create } from 'zustand';
 import type { DetectedPiece } from '../../../core/camera/pieces/find-pieces';
@@ -55,7 +57,7 @@ export const usePieceScanStore = create<PieceScanStore>((set, get) => {
       finding: false,
       scan: {
         pieces,
-        excluded: new Set(pieces.flatMap((piece, index) => (piece.partial ? [index] : []))),
+        excluded: new Set(pieces.flatMap((piece, index) => (startsLeftOut(piece) ? [index] : []))),
       },
     });
   };
@@ -83,3 +85,7 @@ export const usePieceScanStore = create<PieceScanStore>((set, get) => {
     clear,
   };
 });
+
+function startsLeftOut(piece: DetectedPiece): boolean {
+  return piece.partial || piece.doubt !== undefined;
+}

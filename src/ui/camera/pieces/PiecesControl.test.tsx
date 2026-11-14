@@ -339,3 +339,35 @@ it('unmount releases the active request immediately and a later capture cannot p
   await settleCapture(pending.finish);
   expect(usePieceScanStore.getState().scan).toBeNull();
 });
+
+// ADR-442 Amendment 2 (camera audit v2 K3).
+it('starts a doubtful piece left out, with its reason', async () => {
+  scan.mockReturnValue([PIECES[0], PIECES[1], { ...piece(250, 200, 0), doubt: 'colour' }]);
+  const host = await mountControl(<PiecesControl />);
+  await findPieces(host);
+  const boxes = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+  expect(boxes.map((box) => box.checked)).toEqual([true, true, false]);
+  expect(host.textContent).toContain('it may be glare, a shadow or a mark on the bed');
+});
+
+it('leaves out of Place a piece the design runs off, and says which', async () => {
+  // A 20 × 14 blank: the 20 × 20 design runs 3 mm off it.
+  const tiny: DetectedPiece = {
+    ...piece(250, 200, 0),
+    outline: [
+      { x: 240, y: 193 },
+      { x: 260, y: 193 },
+      { x: 260, y: 207 },
+      { x: 240, y: 207 },
+    ],
+    rect: { centre: { x: 250, y: 200 }, axisDeg: 0, length: 20, width: 14 },
+    areaMm2: 280,
+  };
+  scan.mockReturnValue([PIECES[0], PIECES[1], tiny]);
+  const host = await mountControl(<PiecesControl />);
+  await findPieces(host);
+  expect(host.textContent).toContain('The design runs 3.0 mm off this piece');
+  await clickControl(host, 'Place selection on each piece');
+  expect(useStore.getState().project.scene.objects).toHaveLength(2);
+  expect(host.textContent).toContain('Placed on 2 pieces. Left out piece 3: the design runs off it.');
+});
