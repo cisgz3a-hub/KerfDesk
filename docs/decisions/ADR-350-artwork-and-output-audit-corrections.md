@@ -243,7 +243,7 @@ guard:
    - Prepare Stamp: `stampSourceSelection` (`src/ui/raster/stamp-source-selection.ts`) feeds the
      menu gating, the dialog (which shows the notice before Prepare preview), the source
      rasterisation and Apply, which turns only the kept sources' output off (ADR-570
-     Amendment 2). Applying names the left-out objects in its toast. A selection of only variable
+     Amendment 3). Applying names the left-out objects in its toast. A selection of only variable
      data refuses with the notice.
 2. A stamp or bitmap of the value the job burns now is a deliberate choice: Bake Variable Text
    first, then run the tool on the baked text. Neither tool bakes silently, because a stamp or
