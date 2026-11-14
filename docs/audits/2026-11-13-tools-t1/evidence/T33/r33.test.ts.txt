@@ -1,0 +1,209 @@
+// T33 refuter: own fixtures, own decoder, real store action + prepareOutput + emit.
+import { writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  createRegistrationLayer,
+  type Layer,
+  type Project,
+  type SceneObject,
+} from '../t31-main/src/core/scene';
+import { createRectangle } from '../t31-main/src/core/shapes/primitives/create-rectangle';
+import { createRegistrationBox } from '../t31-main/src/core/shapes';
+import { registrationJigCopyId } from '../t31-main/src/core/scene/registration-jig-artwork';
+import { prepareOutput } from '../t31-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t31-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t31-main/src/ui/state/store';
+import { useToastStore } from '../t31-main/src/ui/state/toast-store';
+import { applyRegistrationOutputToScene } from '../t31-main/src/ui/state/registration-output-actions';
+import { offsetShapes } from '../t31-main/src/core/geometry/offset-shapes';
+import { decodeBurn, fmt } from './gdec';
+
+const lines: string[] = [];
+const log = (s: string) => {
+  lines.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t33r/r33.log', lines.join('\n'));
+};
+const st = () => useStore.getState();
+const toasts = () => useToastStore.getState().toasts.map((t) => `${t.variant ?? ''}:${t.message}`);
+const clearToasts = () => useToastStore.setState({ toasts: [] } as never);
+
+const op = (id: string, mode: 'line' | 'fill', speed: number, power: number, extra: Partial<Layer> = {}) =>
+  ({ ...createLayer({ id, color: '#123456', name: id, mode }), speed, power, ...extra }) as Layer;
+const rr = (id: string, w: number, h: number, x: number, y: number, ops: string[], extra: Record<string, unknown> = {}) =>
+  ({
+    ...createRectangle({ id, color: '#000000', spec: { widthMm: w, heightMm: h, cornerRadiusMm: 0 }, transform: { ...IDENTITY_TRANSFORM, x, y } }),
+    operationIds: ops,
+    ...extra,
+  }) as SceneObject;
+const openLine = (id: string, x0: number, y0: number, x1: number, y1: number, ops: string[]) =>
+  ({
+    kind: 'imported-svg', id, source: `${id}.svg`,
+    bounds: { minX: Math.min(x0, x1), minY: Math.min(y0, y1), maxX: Math.max(x0, x1), maxY: Math.max(y0, y1) },
+    transform: IDENTITY_TRANSFORM,
+    paths: [{ color: '#000000', polylines: [{ points: [{ x: x0, y: y0 }, { x: x1, y: y1 }], closed: false }] }],
+    operationIds: ops,
+  }) as unknown as SceneObject;
+
+function project(objects: SceneObject[], layers: Layer[]): Project {
+  const base = createProject();
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers, groups: [] } };
+}
+function load(p: Project, sel: string[]) {
+  useStore.setState({ project: p, selectedObjectId: sel[0] ?? null, additionalSelectedIds: new Set(sel.slice(1)), undoStack: [], redoStack: [], dirty: false } as never);
+  clearToasts();
+}
+function burn(p: Project) {
+  const prep = prepareOutput(p);
+  if (!prep.ok) return `NOT OK ${JSON.stringify(prep).slice(0, 200)}`;
+  return fmt(decodeBurn(emitPreparedGcode(prep).gcode));
+}
+const newLayers = (before: Project, after: Project) =>
+  after.scene.layers.filter((l) => !before.scene.layers.some((b) => b.id === l.id))
+    .map((l) => `${l.id}[${l.name}] mode=${l.mode} out=${l.output} p=${l.power} s=${l.speed}`).join('; ');
+const req = (direction: 'outward' | 'inward' | 'both', distanceMm: number, deleteOriginals: boolean) =>
+  ({ distanceMm, direction, cornerStyle: 'round' as const, outerShapesOnly: false, deleteOriginals });
+
+it('R1 mixed Line + Fill selection', () => {
+  const cut = op('cut', 'line', 600, 50);
+  const fill = op('fill', 'fill', 2000, 25, { hatchSpacingMm: 0.2 } as Partial<Layer>);
+  const A = rr('A', 30, 10, 20, 20, ['cut']);
+  const B = rr('B', 20, 20, 80, 20, ['fill']);
+  for (const order of [[A, B], [B, A]]) {
+    const p0 = project(order, [cut, fill]);
+    load(p0, order.map((o) => o.id));
+    const okk = st().offsetShapesSelection(req('outward', 1, false));
+    const p1 = st().project;
+    log(`R1 order ${order.map((o) => o.id)} ok=${okk}\n  before ${burn(p0)}\n  after  ${burn(p1)}\n  new ops: ${newLayers(p0, p1)}\n  toasts: ${toasts().join(' || ') || 'none'}`);
+  }
+});
+
+it('R2 output-off guide + cut part', () => {
+  const guide = op('guide', 'line', 3000, 5, { output: false });
+  const cut = op('cut', 'line', 400, 95);
+  const G = rr('G', 100, 60, 10, 10, ['guide']);
+  const P = rr('P', 15, 15, 30, 30, ['cut']);
+  for (const order of [[G, P], [P, G]]) for (const del of [false, true]) {
+    const p0 = project(order, [guide, cut]);
+    load(p0, order.map((o) => o.id));
+    const okk = st().offsetShapesSelection(req('outward', 1, del));
+    const p1 = st().project;
+    log(`R2 order ${order.map((o) => o.id)} delete=${del} ok=${okk}\n  before ${burn(p0)}\n  after  ${burn(p1)}\n  new ops: ${newLayers(p0, p1)}\n  objects: ${p1.scene.objects.map((o) => o.id)}\n  toasts: ${toasts().join(' || ') || 'none'}`);
+  }
+  // Ordinary single-object case of the same thing: offset the guide alone (expected: offset is a guide too).
+  const p0 = project([G, P], [guide, cut]);
+  load(p0, ['P']);
+  st().offsetShapesSelection(req('outward', 1, true));
+  log(`R2 control: part alone, delete on: after ${burn(st().project)}; new ops ${newLayers(p0, st().project)}`);
+});
+
+it('R3 registration jig, Artwork only, Unlock All + Select All', () => {
+  const reg = createRegistrationLayer();
+  const art = op('art', 'line', 2222, 90);
+  const boxes = ['boxA', 'boxB'].map((id, i) => ({ ...createRegistrationBox({ id, widthMm: 60, heightMm: 60, x: 10 + i * 80, y: 10 }), locked: true }) as SceneObject);
+  const src = rr('S', 20, 20, 30, 30, ['art']);
+  const copy = { ...src, id: registrationJigCopyId('S', 'boxB'), transform: { ...(src as { transform: object }).transform, x: 110 } } as SceneObject;
+  for (const mode of ['artwork', 'box'] as const) {
+    let p0 = project([...boxes, src, copy], [reg, art]);
+    p0 = { ...p0, scene: applyRegistrationOutputToScene(p0.scene, mode) };
+    load(p0, []);
+    log(`R3 mode=${mode} layers: ${p0.scene.layers.map((l) => `${l.id} out=${l.output}`)}`);
+    // Without Unlock All
+    st().selectAllObjects();
+    const sel0 = [st().selectedObjectId, ...st().additionalSelectedIds];
+    st().offsetShapesSelection(req('outward', 1, false));
+    const pA = st().project;
+    log(`  locked boxes: selectAll=${sel0}; before ${burn(p0)}; after ${burn(pA)}; new ops ${newLayers(p0, pA)}`);
+    load(p0, []);
+    st().unlockAllObjects();
+    const pU = st().project;
+    st().selectAllObjects();
+    const sel = [st().selectedObjectId, ...st().additionalSelectedIds];
+    clearToasts();
+    st().offsetShapesSelection(req('outward', 1, false));
+    const pB = st().project;
+    log(`  unlocked: selectAll=${sel}; before ${burn(pU)}; after ${burn(pB)}; new ops ${newLayers(pU, pB)}; rings=${pB.scene.objects.filter((o) => !pU.scene.objects.some((b) => b.id === o.id)).map((o) => (o as { paths: { polylines: unknown[] }[] }).paths[0]!.polylines.length)}; toasts ${toasts().join(' || ') || 'none'}`);
+  }
+});
+
+it('R4 Inward + Delete originals with shapes that give nothing', () => {
+  const cut = op('cut', 'line', 500, 80);
+  const plate = rr('plate', 40, 30, 10, 10, ['cut']);
+  const small = rr('small', 2.5, 2.5, 70, 10, ['cut']);
+  const bar = rr('bar', 2, 40, 80, 10, ['cut']);
+  const line = openLine('line', 100, 10, 100, 35, ['cut']);
+  const cases: Array<[string, SceneObject[], 'inward' | 'both']> = [
+    ['plate+small square', [plate, small], 'inward'],
+    ['plate+thin bar 2mm', [plate, bar], 'inward'],
+    ['plate+open line', [plate, line], 'inward'],
+    ['plate+small+line Both', [plate, small, line], 'both'],
+  ];
+  for (const [name, objs, dir] of cases) for (const del of [true, false]) {
+    const p0 = project(objs, [cut]);
+    load(p0, objs.map((o) => o.id));
+    const okk = st().offsetShapesSelection(req(dir, 1.5, del));
+    const p1 = st().project;
+    log(`R4 ${name} ${dir} 1.5 delete=${del} ok=${okk}\n  before ${burn(p0)}\n  after  ${burn(p1)}\n  objects ${p1.scene.objects.map((o) => o.id)}\n  toasts: ${toasts().join(' || ') || 'none'}`);
+    if (del) { st().undo(); log(`  undo restores: ${JSON.stringify(st().project.scene.objects) === JSON.stringify(p0.scene.objects)}`); }
+  }
+  // what the dialog status line would say: core result for plate+small
+  const r = offsetShapes([plate, small] as never, { distanceMm: 1.5, direction: 'inward', cornerStyle: 'round', outerShapesOnly: false }, { outward: 'o', inward: 'i' });
+  log(`R4 core result plate+small inward: ${r.kind} inward rings=${r.kind === 'ok' ? r.value.inward?.paths[0]?.polylines.length : '-'}`);
+});
+
+it('R6 jig in Outline only (new jig default): offset the art, then switch to Artwork only', () => {
+  const reg = createRegistrationLayer();
+  const art = op('art', 'line', 2222, 90);
+  const boxes = ['boxA', 'boxB'].map((id, i) => ({ ...createRegistrationBox({ id, widthMm: 60, heightMm: 60, x: 10 + i * 80, y: 10 }), locked: true }) as SceneObject);
+  const src = rr('S', 20, 20, 30, 30, ['art']);
+  const copy = { ...src, id: registrationJigCopyId('S', 'boxB'), transform: { ...(src as { transform: object }).transform, x: 110 } } as SceneObject;
+  for (const sel of [['S', registrationJigCopyId('S', 'boxB')], ['S']]) {
+    const p0 = project([...boxes, src, copy], [reg, art]);
+    load(p0, []);
+    useStore.setState({ registrationArtworkOutputSnapshot: null } as never);
+    st().setRegistrationOutput('artwork');
+    st().setRegistrationOutput('box');
+    const pBox = st().project;
+    useStore.setState({ selectedObjectId: sel[0], additionalSelectedIds: new Set(sel.slice(1)) } as never);
+    st().offsetShapesSelection(req('outward', 1, false));
+    const pOff = st().project;
+    const outlineBurn = burn(pOff);
+    st().setRegistrationOutput('artwork');
+    const pArt = st().project;
+    log(`R6 sel=${sel.length} layers after Outline only: ${pBox.scene.layers.map((l) => `${l.id}=${l.output}`)}\n  after offset: ${pOff.scene.layers.map((l) => `${l.id}=${l.output}`)}; Outline only burn ${outlineBurn}\n  after Artwork only: ${pArt.scene.layers.map((l) => `${l.id}=${l.output}`)}; burn ${burn(pArt)}\n  control (Artwork only, no offset): ${(() => { load(p0, []); useStore.setState({ registrationArtworkOutputSnapshot: null } as never); st().setRegistrationOutput('artwork'); return burn(st().project); })()}`);
+  }
+});
+
+it('R5 P3 spot checks', () => {
+  const cut = op('cut', 'line', 500, 80);
+  const named = rr('N', 10, 10, 10, 10, ['cut'], { name: 'Bracket' });
+  for (const d of [0, 0.0009, 0.001, 1e5]) {
+    const t0 = performance.now();
+    const r = offsetShapes([named] as never, { distanceMm: d, direction: 'outward', cornerStyle: 'round', outerShapesOnly: false }, { outward: 'o', inward: 'i' });
+    log(`R5 distance ${d}: ${r.kind === 'ok' ? `ok width=${(r.value.outward!.bounds.maxX - r.value.outward!.bounds.minX).toFixed(3)}` : r.error.message} (${(performance.now() - t0).toFixed(0)} ms)`);
+  }
+  load(project([named], [cut]), ['N']);
+  st().offsetShapesSelection(req('outward', 1, false));
+  const res = st().project.scene.objects.find((o) => o.id !== 'N') as { name?: string; source?: string };
+  log(`R5 name: source name=Bracket, result name=${res.name} source=${res.source}`);
+});
+
+it('R7 #1900 dialog source guard', async () => {
+  const { offsetShapesTargets } = await import('../t31-main/src/ui/state/offset-shapes-actions');
+  const sq = rr('sq', 10, 10, 10, 10, ['cut']) as unknown as { paths: unknown; bounds: unknown };
+  const vt = { kind: 'text', id: 'VT', content: 'SN {{serial:4}}', variableTemplate: { template: 'SN {{serial:4}}' }, fontKey: 'roboto-regular', sizeMm: 10, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000', bounds: sq.bounds, transform: IDENTITY_TRANSFORM, paths: sq.paths, operationIds: ['cut'] } as unknown as SceneObject;
+  const reg = createRegistrationLayer();
+  const boxes = ['boxA', 'boxB'].map((id, i) => createRegistrationBox({ id, widthMm: 60, heightMm: 60, x: 10 + i * 80, y: 10 }) as SceneObject);
+  const src = rr('S', 20, 20, 30, 30, ['cut']);
+  const copy = { ...src, id: registrationJigCopyId('S', 'boxB') } as SceneObject;
+  const plain = rr('plain', 5, 5, 200, 200, ['cut']);
+  const p = project([vt, ...boxes, src, copy, plain], [reg, op('cut', 'line', 500, 80)]);
+  const ids = p.scene.objects.map((o) => o.id);
+  for (const del of [false, true]) {
+    const t = offsetShapesTargets(p.scene, ids, del);
+    log(`R7 delete=${del}: targets ${t.targets.map((o) => o.id)}; notice "${t.notice}"`);
+  }
+});
