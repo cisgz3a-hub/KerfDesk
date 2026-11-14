@@ -7,6 +7,7 @@ import {
   REGISTRATION_LAYER_ID,
   registrationRunState,
   updateLayer,
+  type Project,
   type Scene,
 } from '../../core/scene';
 import type { AppState } from './store';
@@ -83,6 +84,50 @@ export function applyRegistrationOutputToScene(
     if (layer.output !== output) scene = updateLayer(scene, layer.id, { output });
   }
   return scene;
+}
+
+/** The artwork outputs Artwork only restores, when a jig's Outline only took a snapshot. */
+export function registrationArtworkSnapshot(state: {
+  readonly project: Project;
+  readonly registrationArtworkOutputSnapshot?: Readonly<Record<string, boolean>> | null;
+}): Readonly<Record<string, boolean>> | null {
+  return (
+    state.registrationArtworkOutputSnapshot ??
+    state.project.registrationArtworkOutputSnapshot ??
+    null
+  );
+}
+
+/**
+ * An operation cloned from jig artwork (an offset of the art, ADR-410
+ * Amendment 6) restores what its source restores. Under Outline only the
+ * source is off only because of the run toggle, and Artwork only turns back
+ * on just the operations its snapshot names (tools audit T1, T33R-P2-1).
+ * Returns the project and snapshot to store, or null when nothing changes.
+ */
+export function inheritRegistrationArtworkOutput<
+  S extends {
+    readonly project: Project;
+    readonly registrationArtworkOutputSnapshot?: Readonly<Record<string, boolean>> | null;
+  },
+>(
+  state: S,
+  project: Project,
+  clones: ReadonlyArray<{ readonly sourceId: string; readonly cloneId: string }>,
+): {
+  readonly project: Project;
+  readonly registrationArtworkOutputSnapshot: Readonly<Record<string, boolean>>;
+} | null {
+  const snapshot = registrationArtworkSnapshot(state);
+  if (snapshot === null) return null;
+  const inherited = clones.filter(({ sourceId }) => snapshot[sourceId] !== undefined);
+  if (inherited.length === 0) return null;
+  const next: Record<string, boolean> = { ...snapshot };
+  for (const { sourceId, cloneId } of inherited) next[cloneId] = snapshot[sourceId] === true;
+  return {
+    project: { ...project, registrationArtworkOutputSnapshot: next },
+    registrationArtworkOutputSnapshot: next,
+  };
 }
 
 // The artwork outputs Artwork only should restore after this Outline only.

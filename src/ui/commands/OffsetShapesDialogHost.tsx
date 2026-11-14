@@ -1,5 +1,6 @@
 import { useStore } from '../state';
 import type { OffsetShapesRequest } from '../state/offset-shapes-actions';
+import { registrationArtworkSnapshot } from '../state/registration-output-actions';
 import { DEFAULT_OFFSET_SHAPES_REQUEST, OffsetShapesDialog } from './OffsetShapesDialog';
 import { selectedObjectIds } from './selection-command-state';
 
@@ -12,15 +13,22 @@ export function OffsetShapesDialogHost(props: { readonly onClose: () => void }):
   const primary = useStore((state) => state.selectedObjectId);
   const additional = useStore((state) => state.additionalSelectedIds);
   const offset = useStore((state) => state.offsetShapesSelection);
+  const artworkSnapshot = useStore(registrationArtworkSnapshot);
+  const widthMm = useStore((state) => state.project.device.bedWidth);
+  const heightMm = useStore((state) => state.project.device.bedHeight);
   return (
     <OffsetShapesDialog
       scene={scene}
       selectedIds={selectedObjectIds(primary, additional)}
       initial={lastApplied}
+      artworkSnapshot={artworkSnapshot}
+      bed={{ widthMm, heightMm }}
       onCancel={props.onClose}
       onApply={(request, prepared) => {
         if (!offset(request, prepared)) return;
-        lastApplied = request;
+        // The operation belongs to this selection; the next one picks its own.
+        const { operationId: _operationId, ...remembered } = request;
+        lastApplied = remembered;
         props.onClose();
       }}
     />

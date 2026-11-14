@@ -6,7 +6,13 @@
 import { isVectorPathObject, type VectorSceneObject } from '../../core/geometry';
 import { offsetShapes, type OffsetShapesOptions } from '../../core/geometry/offset-shapes';
 import { ok } from '../../core/result';
-import { addObject, type ImportedSvg, type Project, type Scene } from '../../core/scene';
+import {
+  addObject,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type Scene,
+} from '../../core/scene';
 import { geometryToolSkippedNotice, geometryToolSources } from './geometry-tool-sources';
 import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
 import { removedTabsNotice } from './removed-tabs-notice';
@@ -14,11 +20,24 @@ import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-acti
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
 import { useToastStore } from './toast-store';
 import { reusableOffsetShapes, type PreparedOffsetShapes } from './vector-op-prepared';
-import { prepareIndependentArtwork, uniqueObjectId } from './vector-path-actions';
+import { prepareIndependentArtworkOn } from './independent-artwork';
+import { offsetOperationOffNotice, offsetResultOperation } from './offset-result-operation';
+import { offsetNoInwardNotice } from './offset-shapes-notices';
+import {
+  inheritRegistrationArtworkOutput,
+  registrationArtworkSnapshot,
+} from './registration-output-actions';
+import { uniqueObjectId } from './vector-path-actions';
 
 export type OffsetShapesRequest = OffsetShapesOptions & {
   /** Remove the selected shapes once the offset objects exist. */
   readonly deleteOriginals: boolean;
+  /**
+   * The source operation the result's own operation is cloned from (ADR-410
+   * Amendment 6). Unset, or not one of the sources' operations, picks the
+   * default that offsetResultOperation describes.
+   */
+  readonly operationId?: string;
 };
 
 export type OffsetShapesActions = {
@@ -36,6 +55,7 @@ export type OffsetShapesActions = {
 type OffsetShapesState = StateSlice & {
   readonly selectedObjectId: string | null;
   readonly additionalSelectedIds: ReadonlySet<string>;
+  readonly registrationArtworkOutputSnapshot?: Readonly<Record<string, boolean>> | null;
 };
 
 type OffsetShapesMutation = {
@@ -47,6 +67,7 @@ type OffsetShapesMutation = {
   readonly undoStack: ReadonlyArray<Project>;
   readonly redoStack: ReadonlyArray<Project>;
   readonly dirty: true;
+  readonly registrationArtworkOutputSnapshot?: Readonly<Record<string, boolean>>;
 };
 
 type OffsetShapesSet = (
@@ -148,26 +169,17 @@ function offsetShapesMutation(
   );
   const first = created[0];
   if (first === undefined) return state;
-  if (request.direction === 'both' && result.value.inward === null) {
-    afterCommit(() =>
-      useToastStore
-        .getState()
-        .pushToast(
-          'Only the outward offset was added: the inward one collapsed the shape.',
-          'info',
-        ),
-    );
-  }
+  const operation = resultOperation(state, request, targets, result.value.inward, afterCommit);
   let scene = scene0;
   const createdIds: string[] = [];
   for (const artwork of created) {
-    const prepared = prepareIndependentArtwork(scene, artwork, targets[0]);
+    const prepared = prepareIndependentArtworkOn(scene, named(artwork, targets), operation);
     scene = addObject(prepared.scene, prepared.object);
     createdIds.push(prepared.object.id);
   }
   if (request.deleteOriginals) scene = removeOriginals(scene, targets, afterCommit);
   return {
-    project: { ...state.project, scene },
+    ...withArtworkOutputs(state, { ...state.project, scene }, createdIds, operation),
     selectedObjectId: createdIds[0] ?? first.id,
     selectedPathNode: null,
     selectedPathNodes: [],
@@ -176,6 +188,59 @@ function offsetShapesMutation(
     redoStack: [],
     dirty: true,
   };
+}
+
+// The notices about what the offset makes, and the operation it goes on
+// (ADR-410 Amendment 6).
+function resultOperation(
+  state: OffsetShapesState,
+  request: OffsetShapesRequest,
+  targets: ReadonlyArray<VectorSceneObject>,
+  inward: ImportedSvg | null,
+  afterCommit: (notify: () => void) => void,
+): Layer | null {
+  const warn = (message: string, tone: 'info' | 'warning' = 'warning') => {
+    if (message !== '') afterCommit(() => useToastStore.getState().pushToast(message, tone));
+  };
+  if (request.direction === 'both' && inward === null)
+    warn('Only the outward offset was added: the inward one collapsed the shape.', 'info');
+  // A partial collapse, or an open line under Inward, is named (T33-P2-2).
+  else warn(offsetNoInwardNotice(targets, inward, request));
+  const snapshot = registrationArtworkSnapshot(state);
+  const operation = offsetResultOperation(state.project.scene, targets, {
+    primaryId: state.selectedObjectId,
+    ...(request.operationId === undefined ? {} : { chosenId: request.operationId }),
+    snapshot,
+  });
+  warn(offsetOperationOffNotice(operation, snapshot));
+  return operation;
+}
+
+// A jig's Artwork only turns the offset on with the art it was cloned from.
+function withArtworkOutputs(
+  state: OffsetShapesState,
+  project: Project,
+  createdIds: ReadonlyArray<string>,
+  operation: Layer | null,
+): {
+  readonly project: Project;
+  readonly registrationArtworkOutputSnapshot?: Readonly<Record<string, boolean>>;
+} {
+  if (operation === null) return { project };
+  const clones = createdIds.flatMap((id) => {
+    const object = project.scene.objects.find((candidate) => candidate.id === id);
+    const cloneId = object?.operationIds?.[0];
+    return cloneId === undefined ? [] : [{ sourceId: operation.id, cloneId }];
+  });
+  return inheritRegistrationArtworkOutput(state, project, clones) ?? { project };
+}
+
+// A single named source names its offset (tools audit T1, T33-P3-2).
+function named(artwork: ImportedSvg, targets: ReadonlyArray<VectorSceneObject>): ImportedSvg {
+  const name = targets.length === 1 ? targets[0]?.name?.trim() : undefined;
+  if (name === undefined || name === '') return artwork;
+  const inward = artwork.source.startsWith('Offset inward');
+  return { ...artwork, name: `${name} ${inward ? 'inward offset' : 'offset'}` };
 }
 
 function removeOriginals(
