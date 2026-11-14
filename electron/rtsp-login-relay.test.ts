@@ -242,6 +242,20 @@ describe('the RTSP login relay (ADR-692 Amendment 1)', () => {
     relay.close();
   });
 
+  it('serves a Basic-login stream to FFmpeg on a busy loopback port', async () => {
+    const cam = await camera('basic');
+    const relay = await openRtspLoginRelay(cameraAddress(cam.port));
+    const port = Number(new URL(relay.url).port);
+    for (let i = 0; i < 12; i += 1) {
+      const other = new Socket();
+      sockets.push(other);
+      await new Promise<void>((resolve) => other.connect(port, '127.0.0.1', resolve));
+    }
+    const run = await ffmpeg(relay.url);
+    expect(run.replies).toEqual(['200', '200', '200', '200']);
+    relay.close();
+  });
+
   // ADR-692 Amendment 2.
   it('serves the stream it was opened for, and nothing else', async () => {
     const cam = await camera('basic');

@@ -73,10 +73,27 @@ describe('cameraHeightWarnings in Job Review', () => {
     for (const origin of [undefined, { startFrom: 'current-position' } as never]) {
       const [warning] = cameraHeightWarnings(tumbler, placed(0), origin);
       expect(warning).toContain('the camera picture lines up with the part only at the part');
-      expect(warning).toContain('at least 80 mm above the bed');
+      expect(warning).toContain('so at least 83 mm');
     }
     // Set to the top of the part (axis 45 mm up + 40 mm radius): nothing to say.
     expect(cameraHeightWarnings(tumbler, placed(85), undefined)).toEqual([]);
+  });
+
+  // Camera audit v2 K6-P3-2: the diameter itself was taken as the top, so 80 mm
+  // on an 80 mm tumbler whose top was 85 mm drew the picture 5.4 mm off, unsaid.
+  it('does not take a rotary part’s diameter as its top', () => {
+    const tumbler = project({ rotaryDiameterMm: 80 });
+    expect(cameraHeightWarnings(tumbler, placed(80), undefined)).toHaveLength(1);
+  });
+
+  // Camera audit v2 K6-P1-1 (ADR-441 Amendment 15): with no material named there
+  // was nothing to compare with, so a height kept from a tumbler job went unsaid.
+  it('says when a project that names no material is drawn above the bed', () => {
+    const [warning] = cameraHeightWarnings(project({}), placed(85), undefined);
+    expect(warning).toContain('this project names no material');
+    expect(warning).toContain('85 mm');
+    expect(cameraHeightWarnings(project({}), placed(0), undefined)).toEqual([]);
+    expect(cameraHeightWarnings(project({}), placed(0.5), undefined)).toEqual([]);
   });
 
   it('warns when the job material is thicker than the Material height', () => {
@@ -99,9 +116,14 @@ describe('cameraHeightWarnings in Job Review', () => {
     const machine = { ...placed(20), cameraCalibration: heightOnly };
     const [warning] = cameraHeightWarnings(project({}), machine, undefined);
     expect(warning).toContain('lines up only at the height of its target sheet (3 mm)');
-    expect(
-      cameraHeightWarnings(project({}), { ...machine, cameraSurfaceHeightMm: 3 }, undefined),
-    ).toEqual([]);
+    // At its target height only the missing material is left to say.
+    const atTarget = cameraHeightWarnings(
+      project({}),
+      { ...machine, cameraSurfaceHeightMm: 3 },
+      undefined,
+    );
+    expect(atTarget).toHaveLength(1);
+    expect(atTarget[0]).toContain('this project names no material');
   });
 
   it('says nothing without camera placement', () => {

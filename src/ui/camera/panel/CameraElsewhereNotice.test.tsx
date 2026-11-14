@@ -6,6 +6,8 @@ import { mountControl } from '../../image-editor/control-audit-test-support';
 import { useStore } from '../../state';
 import { useCameraStore, type CameraSourceState } from '../../state/camera-store';
 import { resetStore } from '../../state/test-helpers';
+import { CALIBRATION_ELSEWHERE_JOB_WARNING } from '../helpers/calibration-elsewhere';
+import { cameraMovedStartWarning } from '../helpers/camera-moved-start-warning';
 import { markCameraSteady } from '../helpers/moved-check';
 import { saveViewReference } from '../helpers/view-reference';
 import { CAMERA_ELSEWHERE_NOTICE, CameraElsewhereNotice } from './CameraElsewhereNotice';
@@ -66,5 +68,26 @@ describe('a calibration made on another computer', () => {
     useCameraStore.setState({ sourceState: live(THERE) });
     const host = await mountControl(<CameraElsewhereNotice />);
     expect(host.textContent).not.toContain(CAMERA_ELSEWHERE_NOTICE);
+  });
+});
+
+// Camera audit v2 K6-P2-1 (ADR-692 Amendment 4): the address alone cannot tell
+// the camera apart from another one there, and the notice lived in the Camera
+// panel only, claiming "the same camera". Job Review says it too, until a
+// Check camera passes on this computer.
+describe('Job Review for a calibration made on another computer', () => {
+  it('says so until a check keeps a view here', () => {
+    const device = useStore.getState().project.device;
+    expect(cameraMovedStartWarning(device, live(HERE))).toBe(CALIBRATION_ELSEWHERE_JOB_WARNING);
+    expect(cameraMovedStartWarning(device, live(THERE))).toBeNull();
+    saveViewReference(fromElsewhere, { width: 1, height: 1, data: new Uint8Array([7]) });
+    expect(cameraMovedStartWarning(device, live(HERE))).toBeNull();
+  });
+
+  it('does not claim it is the same camera', async () => {
+    useCameraStore.setState({ sourceState: live(HERE) });
+    const host = await mountControl(<CameraElsewhereNotice />);
+    expect(host.textContent).not.toContain('same camera');
+    expect(host.textContent).toContain('may be another camera');
   });
 });

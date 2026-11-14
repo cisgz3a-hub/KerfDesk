@@ -1,45 +1,41 @@
 // CameraElsewhereNotice — the running network camera's calibration was made on
 // another computer (ADR-692 Amendment 3; the maintainer's choice on camera
-// audit v2 K5-P3-3, "Notice + Check camera"). It is matched by the camera and
-// its address, but this computer keeps no view of it to watch for a move, so
-// the notice asks for Check camera once. A check that finds the camera where
-// it was keeps that view here, and the notice goes. No picture travels in the
-// project or machine files.
+// audit v2 K5-P3-3, "Notice + Check camera"). It is matched by the camera's
+// address only, so it may be another camera there (Amendment 4, K6-P2-1), and
+// this computer keeps no view of it to watch for a move: the notice asks for
+// Check camera, and Job Review says the same until it passes. A check that
+// finds the camera where it was keeps that view here, and both go. No picture
+// travels in the project or machine files.
 
 import type { CSSProperties } from 'react';
 import { useState } from 'react';
-import { modelFromElsewhere } from '../../../core/camera/model/saved-cameras';
 import { useEdition } from '../../licensing/edition';
 import { useCameraStore } from '../../state/camera-store';
-import { useOwnCameraModel } from '../active-camera-model';
 import { useCameraCalibrationStore } from '../calibrate/camera-calibration-store';
-import { cameraSourceIdentity } from '../frame-source';
+import {
+  CALIBRATION_ELSEWHERE_DETAIL,
+  CALIBRATION_ELSEWHERE_NOTICE,
+  uncheckedCalibrationFromElsewhere,
+} from '../helpers/calibration-elsewhere';
 import { useCameraMovedStore } from '../helpers/moved-check';
-import { hasViewReference } from '../helpers/view-reference';
+import { useStore } from '../../state';
 
-export const CAMERA_ELSEWHERE_NOTICE =
-  'This camera was calibrated on another computer: run Check camera once.';
+export const CAMERA_ELSEWHERE_NOTICE = CALIBRATION_ELSEWHERE_NOTICE;
 
 export function CameraElsewhereNotice(): JSX.Element | null {
-  const own = useOwnCameraModel();
+  const device = useStore((s) => s.project.device);
   const sourceState = useCameraStore((s) => s.sourceState);
   // A passing check marks the camera steady: read again then.
   useCameraMovedStore((s) => s.state);
   const openCheck = useCameraCalibrationStore((s) => s.openCheck);
   const { requestPro } = useEdition();
   const [dismissedFor, setDismissedFor] = useState<string | null>(null);
-  if (own === undefined || sourceState.kind !== 'live') return null;
-  if (dismissedFor === own.calibratedAt) return null;
-  if (!modelFromElsewhere(own, cameraSourceIdentity(sourceState.source))) return null;
-  if (hasViewReference(own)) return null;
+  const own = uncheckedCalibrationFromElsewhere(device, sourceState);
+  if (own === null || dismissedFor === own.calibratedAt) return null;
   return (
     <section role="status" aria-label="Calibrated on another computer" style={noticeStyle}>
       <strong>{CAMERA_ELSEWHERE_NOTICE}</strong>
-      <span style={textStyle}>
-        It is the same camera at the same address, so its calibration is used. This computer has not
-        seen the camera yet, so it cannot warn you if the camera has moved. A check that finds the
-        camera where it was starts that here.
-      </span>
+      <span style={textStyle}>{CALIBRATION_ELSEWHERE_DETAIL}</span>
       <div style={rowStyle}>
         <button
           type="button"
