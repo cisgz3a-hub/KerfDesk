@@ -29,6 +29,7 @@ Finding IDs are `K<area>-P<n>-<k>`. Severity follows [METHOD.md §3](../2026-10-
 | K3 | `target-trace-and-pieces` | camera target engrave, trace from the camera, pieces and fill blanks, fixture layout, print and cut marks | Each tool's output in machine coordinates against the truth position of the target, mark or piece; registration error, missed or extra pieces, and what the operator is told |
 | K4 | `job-watch-and-timelapse` | job watch, timelapse capture and export, frame capture binding, picture quality | Stub MJPEG/RTSP sources with scripted frames, drops and stalls; check that frames are bound to the right job moment, the timelapse is complete and in order, and the job is never slowed or stopped by the camera |
 | K5 | `camera-connect-and-privacy` | the address vault and login forms, the RTSP/MJPEG login probe, the Electron frame proxy and bridge routes, camera identity, and #1649 (logins kept out of saved and shared files) | Stub servers with Basic/Digest/form logins and bad TLS; grep saved projects, share bundles, logs, crash reports and phone/MCP payloads for credentials; proxy policy against SSRF-style addresses. **Security findings stay redacted until fixed** |
+| K6 | `camera-fix-verify` | every K1–K5 P1/P2 and the three decisions: #1917, #1918, #1922, #1925, #1930, #1932, #1935, #1936, #1937 | Added 2026-11-14 at the maintainer's choice ("Verify camera fixes"). Every earlier repro re-run against the tree before the fixes, plus regression probes; security repros private. |
 
 ## Rules
 
@@ -40,4 +41,4 @@ Finding IDs are `K<area>-P<n>-<k>`. Severity follows [METHOD.md §3](../2026-10-
 - security findings stay redacted until fixed, with details only in the coordinator's scratchpad;
 - fix PRs use auto-merge with the MERGE method, plus Auto-fix.
 
-**Status:** DONE 2026-11-14. K1–K5 ledgered; see the [round result](LEDGER.md#round-result-2026-11-14).
+**Status:** K1–K6 ledgered (2026-11-15); see the [round result](LEDGER.md#round-result-2026-11-14) and the [K6 addendum](LEDGER.md#k6-addendum-2026-11-15).
