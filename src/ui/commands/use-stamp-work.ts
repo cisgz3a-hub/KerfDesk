@@ -2,11 +2,13 @@ import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { useStore } from '../state';
 import {
   applyStampDraft,
+  stampAppliedNotice,
   stampDraftImage,
   stampOwnerIsCurrent,
   type StampOwner,
 } from '../state/stamp-preparation-actions';
 import { prepareStampSource } from '../raster/stamp-source';
+import { stampSourceSelection } from '../raster/stamp-source-selection';
 import { prepareStampInWorker } from '../raster/stamp-worker-client';
 import {
   MIN_CONVERT_TO_BITMAP_DPI,
@@ -159,9 +161,13 @@ function commitStamp(work: WorkOwner, draft: ReviewedStampDraft, close: () => vo
   const isCurrent = (): boolean =>
     submitted === work.revision.current && stampOwnerIsCurrent(useStore.getState(), work.owner);
   const image = stampDraftImage(draft.source, draft.pixels, crypto.randomUUID());
+  const skipped = stampSourceSelection(work.owner.project.scene, work.owner.ids).notice;
   proOperationMutationSetter(useStore.setState, useStore.getState)(
     (state) => applyStampDraft(state, work.owner, image),
-    close,
+    () => {
+      useToastStore.getState().pushToast(stampAppliedNotice(skipped), 'success');
+      close();
+    },
     isCurrent,
   );
 }

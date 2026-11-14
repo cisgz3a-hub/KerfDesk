@@ -213,3 +213,47 @@ warning and Undo for Union, Weld, Subtract, Intersect and Exclude, Weld with Kee
 guide notice, and Union's tab notice. It also checks that Offset Shapes, Cut Shapes, Trim, the
 rubber-band outline and Warp / Deform leave variable text. 27 of the 30 tests fail on main
 951f94712; the other three are controls for kept behaviour.
+
+### Amendment 3 - Prepare Stamp and Convert to Bitmap leave variable data out (2026-11-14)
+
+**Context.** Tools audit T1 (`docs/audits/2026-11-13-tools-t1/`, T32) confirmed on main eeac725e8
+that two raster tools read the same stored outlines as the geometry tools Amendments 1 and 2
+guard:
+
+- **T32R-P1-1 (P1).** Convert to Bitmap rasterises the selection from its stored outlines and
+  deletes the sources. On "LOT {{serial:3}}" at serial 7 the burn went from 28.945 mm wide (the
+  value "LOT 007") to 55.355 mm (the template glyphs), and the G-code at serial 7 and serial 8
+  was identical. The only message was "Converted to bitmap: …". A variable barcode froze its
+  stored code the same way.
+- **T32-P2-1.** Prepare Stamp's face for variable text matched the template (IoU 97.97 %) and not
+  the value (18.97 %). For a variable Code 128 stored at 00100 with the project serial at 117, the
+  face differed from the stored code in 0 of 54,285 pixels and from the code the canvas showed in
+  6,109. The stamp kept no variable template, so it could not follow the serial anyway.
+
+**Decision.**
+
+1. **Both tools use the `variable` guard**, as Weld does: they leave variable text and variable
+   barcodes out, work on the rest of the selection, and give Amendment 1's notice ("… left as
+   text: use Bake Variable Text first to fix its value"; barcodes "… left as it is: …"). A
+   selection of only variable data leaves the menu item disabled, and the disabled hover text
+   points to Bake Variable Text.
+   - Convert to Bitmap: `selectedConvertibleVectors` (menu gating, its keyboard shortcut and the
+     dialog's sources) returns only the objects it may rasterise. `convertibleSkippedNotice`
+     gives the notice, shown as a toast after the conversion. Variable data is not deleted.
+   - Prepare Stamp: `stampSourceSelection` (`src/ui/raster/stamp-source-selection.ts`) feeds the
+     menu gating, the dialog (which shows the notice before Prepare preview), the source
+     rasterisation and Apply, which turns only the kept sources' output off (ADR-570
+     Amendment 2). Applying names the left-out objects in its toast. A selection of only variable
+     data refuses with the notice.
+2. A stamp or bitmap of the value the job burns now is a deliberate choice: Bake Variable Text
+   first, then run the tool on the baked text. Neither tool bakes silently, because a stamp or
+   bitmap is one fixed object and the serial would stop advancing without the user choosing it.
+3. Convert to Bitmap does not take the `replace` guard. Its jig behaviour is unchanged and not
+   part of this finding.
+
+**Verification.** `src/ui/raster/stamp-bitmap-variable-data.test.ts` runs the real Convert to
+Bitmap path on "LOT {{serial:3}}" (Tinos) and decodes the G-code: the burn keeps the value's
+width and the G-code changes from serial 7 to serial 8. It checks that Prepare Stamp refuses
+variable text and a variable Code 128 with the notice, that a border selected with variable text
+is stamped alone (its source pixels are the 10 mm border's), and the mixed-selection notice for
+Convert to Bitmap. The behaviour tests fail on main 53393cc16.

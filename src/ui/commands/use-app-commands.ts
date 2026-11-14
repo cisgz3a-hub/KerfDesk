@@ -1,5 +1,6 @@
 import { fileCommandContext } from './file-command-context';
 import { recentProjectsCommandContext } from './recent-projects-command';
+import { stampSourceSelection } from '../raster/stamp-source-selection';
 import { settingsCommandContext } from './settings-command';
 import { profileSupportsCapability } from '../../core/devices';
 import { machineKindOf } from '../../core/scene';
@@ -159,6 +160,7 @@ function appCommandContext(
     ),
     canRetraceOriginal: traceSourceForTracedImage(app.project, selected) !== null,
     hasConvertibleSelection: selectedConvertibleVectors(app.project, selectedIds).length > 0,
+    canPrepareStamp: stampSourceSelection(app.project.scene, selectedIds).canPrepare,
     canConvertSelectionToPath: selectionHasUnlockedVectorObject(app.project, selectedIds),
     canWeldSelection: selectionCanWeld(app.project, selectedIds),
     canUnionSilhouette: unionSilhouetteOperations(app.project.scene, selectedIds).length > 0,
