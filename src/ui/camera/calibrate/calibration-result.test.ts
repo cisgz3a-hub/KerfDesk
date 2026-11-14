@@ -151,6 +151,13 @@ describe('calibration failures', () => {
     expect(calibrationFailureMessage('anchors-not-found')).toContain('Make sure nothing covers');
   });
 
+  // Camera audit v2 K1r-P3-1: a full-bed sheet's far rings filled in and read as anchors.
+  it('suggests larger rings when rings look like solid discs', () => {
+    expect(calibrationFailureMessage('anchors-unclear')).toContain(
+      'engrave larger rings (Engrave settings, Ring size)',
+    );
+  });
+
   it('suggests the ring size that makes rings too small in the picture findable', () => {
     // 7.7 px for 10 mm rings: 12 px needs 16 mm rings.
     expect(ringsTooSmallMessage(7.7, 10)).toContain('Engrave a new target with 16 mm rings');

@@ -15,7 +15,8 @@ import {
   type CalibrationStep,
   type PhotoStatus,
 } from './camera-calibration-store';
-import { engraveNudgeRing, nudgeRingCentre } from './nudge-actions';
+import { engraveNudgeRing, nudgeMoveCheckNow, nudgeRingCentre } from './nudge-actions';
+import { MIDDLE_ONLY_NOTE, turnedCameraNote } from './nudge-move-check';
 import type { NudgePhotoControls } from './use-nudge-photo';
 import { NumberField, PlacementNote } from './CalibrationSetupStep';
 import { columnStyle, errStyle, noteStyle, rowStyle } from './wizard-styles';
@@ -176,6 +177,16 @@ export function NudgeResultStep(props: {
       .pushToast(`Camera picture moved ${size.toFixed(1)} mm. Undo puts it back.`, 'success');
     closeWizard();
   };
+  const check = nudgeMoveCheckNow();
+  if (check.kind === 'turned') {
+    return (
+      <TurnedCamera
+        note={turnedCameraNote(check)}
+        onRecalibrate={openWizard}
+        onRetry={() => setStep({ kind: 'nudge-photo', status: { kind: 'idle' } })}
+      />
+    );
+  }
   if (size < NUDGE_NOTHING_MM) return <NothingToFix onDone={closeWizard} />;
   const tooBig = size > NUDGE_LIMIT_MM;
   return (
@@ -196,34 +207,83 @@ export function NudgeResultStep(props: {
       ) : (
         <p style={noteStyle}>
           Fix moves the camera picture {size.toFixed(1)} mm so the ring shows where it burned. It is
-          one step on Undo.
+          one step on Undo. {MIDDLE_ONLY_NOTE}
         </p>
       )}
+      <OffsetActions
+        tooBig={tooBig}
+        applied={applied}
+        onFix={apply}
+        onRecalibrate={openWizard}
+        onRetry={() => setStep({ kind: 'nudge-photo', status: { kind: 'idle' } })}
+      />
+    </div>
+  );
+}
+
+function OffsetActions(props: {
+  readonly tooBig: boolean;
+  readonly applied: boolean;
+  readonly onFix: () => void;
+  readonly onRecalibrate: () => void;
+  readonly onRetry: () => void;
+}): JSX.Element {
+  return (
+    <div style={rowStyle}>
+      {props.tooBig ? (
+        <button
+          type="button"
+          className="lf-btn lf-btn--primary"
+          onClick={props.onRecalibrate}
+          title="Engrave a new target and calibrate the camera again."
+        >
+          Recalibrate…
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="lf-btn lf-btn--primary"
+          disabled={props.applied}
+          onClick={props.onFix}
+          title="Move the saved camera picture by this much."
+        >
+          Fix
+        </button>
+      )}
+      <button
+        type="button"
+        className="lf-btn"
+        onClick={props.onRetry}
+        title="Take the photo again."
+      >
+        Try again
+      </button>
+    </div>
+  );
+}
+
+function TurnedCamera(props: {
+  readonly note: string;
+  readonly onRecalibrate: () => void;
+  readonly onRetry: () => void;
+}): JSX.Element {
+  return (
+    <div style={columnStyle}>
+      <p style={warnStyle}>One offset cannot fix this camera.</p>
+      <p style={noteStyle}>{props.note}</p>
       <div style={rowStyle}>
-        {tooBig ? (
-          <button
-            type="button"
-            className="lf-btn lf-btn--primary"
-            onClick={openWizard}
-            title="Engrave a new target and calibrate the camera again."
-          >
-            Recalibrate…
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="lf-btn lf-btn--primary"
-            disabled={applied}
-            onClick={apply}
-            title="Move the saved camera picture by this much."
-          >
-            Fix
-          </button>
-        )}
+        <button
+          type="button"
+          className="lf-btn lf-btn--primary"
+          onClick={props.onRecalibrate}
+          title="Engrave a new target and calibrate the camera again."
+        >
+          Recalibrate…
+        </button>
         <button
           type="button"
           className="lf-btn"
-          onClick={() => setStep({ kind: 'nudge-photo', status: { kind: 'idle' } })}
+          onClick={props.onRetry}
           title="Take the photo again."
         >
           Try again
@@ -237,15 +297,18 @@ function NothingToFix(props: { readonly onDone: () => void }): JSX.Element {
   return (
     <div style={columnStyle}>
       <p style={okStyle}>
-        The picture already lines up with the ring (within {NUDGE_NOTHING_MM} mm).
+        The middle of the bed already lines up with the ring (within {NUDGE_NOTHING_MM} mm).
       </p>
-      <p style={noteStyle}>Nothing to fix.</p>
+      <p style={noteStyle}>
+        Nothing to fix there. One ring cannot show a camera that tipped or turned: if the picture is
+        off towards the edges, use Check camera or calibrate again.
+      </p>
       <div style={rowStyle}>
         <button
           type="button"
           className="lf-btn lf-btn--primary"
           onClick={props.onDone}
-          title="Close: the camera picture already lines up."
+          title="Close: the middle of the camera picture already lines up."
         >
           Done
         </button>

@@ -210,7 +210,7 @@ function insideArea(
 
 // The rings as the photo saw them: each saved error is where the saved model
 // put the ring's pixel, so the pixel is the saved model's projection of it.
-function observedRings(record: CameraModelRecord): ObservedPoint[] {
+export function observedRings(record: CameraModelRecord): ObservedPoint[] {
   const height = record.accuracy.targetHeightMm;
   const points: ObservedPoint[] = [];
   for (const mark of record.accuracy.marks ?? []) {
@@ -225,11 +225,14 @@ function observedRings(record: CameraModelRecord): ObservedPoint[] {
   return points;
 }
 
-type Alternative = { readonly toBed: ReturnType<typeof bedMapper> };
+export type Alternative = { readonly toBed: ReturnType<typeof bedMapper> };
 
 // Other fits as good on the rings: the other numbers of lens terms on all of
 // them, and the saved number on each half (left, right, front, back).
-function alternativeLenses(record: CameraModelRecord, points: ObservedPoint[]): Alternative[] {
+export function alternativeLenses(
+  record: CameraModelRecord,
+  points: ObservedPoint[],
+): Alternative[] {
   const terms = distortionTermsOf(record.lens);
   const xs = points.map((p) => p.world.x).sort((a, b) => a - b);
   const ys = points.map((p) => p.world.y).sort((a, b) => a - b);
@@ -297,13 +300,13 @@ function rmsPx(
 
 // Where the rings pin the model down: their farthest image radius from the
 // principal point, their places on the bed, and their spacing there.
-type RingSupport = {
+export type RingSupport = {
   readonly radiusPx: number;
   readonly rings: ReadonlyArray<Vec2>;
   readonly pitchMm: number;
 };
 
-function ringSupport(lens: LensModel, points: ReadonlyArray<ObservedPoint>): RingSupport {
+export function ringSupport(lens: LensModel, points: ReadonlyArray<ObservedPoint>): RingSupport {
   const { cx, cy } = lens.intrinsics;
   const radiusPx = points.reduce(
     (most, p) => Math.max(most, Math.hypot(p.pixel.x - cx, p.pixel.y - cy)),
@@ -328,7 +331,7 @@ function nearestRingMm(at: Vec2, rings: ReadonlyArray<Vec2>, skip?: Vec2): numbe
 // model's: it counts from half a spacing out and fully from one and a half.
 // A full-bed sheet's corners were graded fair at 1.8-5.3 mm while 0.3-0.5 mm
 // off (K1-P2-1).
-function awayFromRings(at: Vec2, support: RingSupport): number {
+export function awayFromRings(at: Vec2, support: RingSupport): number {
   if (support.pitchMm <= 0) return 1;
   const distance = nearestRingMm(at, support.rings);
   return Math.min(1, Math.max(0, (distance - support.pitchMm / 2) / support.pitchMm));
@@ -337,7 +340,7 @@ function awayFromRings(at: Vec2, support: RingSupport): number {
 // The model-independent floor at a pixel past the rings: the pixel moved
 // outward by FLOOR_PER_PIXEL of its distance past the rings' radius, as the
 // saved model puts that on the bed.
-function floorAt(
+export function floorAt(
   lens: LensModel,
   saved: ReturnType<typeof bedMapper>,
   pixel: Vec2,
@@ -373,7 +376,7 @@ function distortionTermsOf(lens: LensModel): 1 | 2 | 4 {
   return used >= 3 ? 4 : used === 2 ? 2 : 1;
 }
 
-function spreadAt(
+export function spreadAt(
   alternatives: ReadonlyArray<Alternative>,
   pixel: Vec2,
   at: Vec2,
