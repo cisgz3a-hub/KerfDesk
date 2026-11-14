@@ -1,0 +1,198 @@
+// @vitest-environment jsdom
+import { useToastStore } from "../t36-main/src/ui/state/toast-store";
+import { prepareOutput } from "../t36-main/src/io/gcode/prepare-output";
+import { emitPreparedGcode } from "../t36-main/src/io/gcode/emit-gcode";
+import { appendFileSync } from "node:fs";
+const gc = (p: any) => { const r: any = prepareOutput(p); return r.ok ? emitPreparedGcode(r).gcode : "FAIL " + JSON.stringify(r.preflight).slice(0, 200); };
+import { createElement, act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { defaultBarcodeSpec, isBarcodeObject, type BarcodeObject } from '../t36-main/src/core/barcode';
+import {
+  IDENTITY_TRANSFORM,
+  type Project,
+  type ShapeObject,
+  type SceneObject,
+} from '../t36-main/src/core/scene';
+import { applyTransform } from '../t36-main/src/core/scene/transform';
+import { sampleGrid } from '../t36-main/src/__fixtures__/barcode/sample-geometry';
+import { decodeQrModules } from '../t36-main/src/__fixtures__/barcode/qr-decoder';
+import { draftFromSpec, previewBarcode } from '../t36-main/src/ui/barcode/barcode-form';
+import { commitBarcode } from '../t36-main/src/ui/barcode/commit-barcode';
+import { useStore } from '../t36-main/src/ui/state/store';
+import { resetStore } from '../t36-main/src/ui/state/test-helpers';
+import { useUiStore } from '../t36-main/src/ui/state/ui-store';
+import { useWarpDeformSession } from '../t36-main/src/ui/state/warp-deform-session';
+import { useCanvasDisplay } from '../t36-main/src/ui/workspace/use-warp-deform-preview';
+import {
+  startWarpDeformTool,
+  applyWarpDeformTool,
+  cancelWarpDeformTool,
+  activeWarpDeformSession,
+} from '../t36-main/src/ui/workspace/warp-deform-tool';
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
+let root: Root | null = null;
+let shown: Project | null = null;
+const none = new Set<string>();
+function Probe() {
+  const project = useStore((s) => s.project);
+  shown = useCanvasDisplay(project, false, null, none).project;
+  return null;
+}
+async function settle(done: () => boolean) {
+  for (let i = 0; i < 100 && !done(); i++)
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 5));
+    });
+  expect(done()).toBe(true);
+}
+function qr(project: Project) {
+  return project.scene.objects.find(isBarcodeObject)!;
+}
+function scan(object: SceneObject, original: BarcodeObject, dx = 0, dy = 0) {
+  if (!('paths' in object)) throw new Error('No vector');
+  const spec = original.spec;
+  const size =
+    Math.round((original.bounds.maxX - original.bounds.minX) / spec.moduleMm) -
+    2 * spec.quietZoneModules;
+  const quiet = spec.quietZoneModules * spec.moduleMm;
+  const polylines = object.paths.flatMap((p) =>
+    p.polylines.map((l) => ({
+      ...l,
+      points: l.points.map((p) => applyTransform(p, object.transform)),
+    })),
+  );
+  const grid = sampleGrid(polylines, size, size, spec.moduleMm, {
+    x: original.transform.x + quiet + dx,
+    y: original.transform.y + quiet + dy,
+  });
+  const decoded = decodeQrModules(grid, size);
+  return decoded.ok ? decoded.text : null;
+}
+async function insert() {
+  useStore.getState().setVariableSettings({ serialValue: 1, advancement: 'manual' });
+  const draft = {
+    ...draftFromSpec(defaultBarcodeSpec('qr')),
+    data: 'SN-{{serial:4}}',
+    variable: true,
+  };
+  const standIn: ShapeObject = {
+    kind: 'shape',
+    id: 'barcode-preview',
+    spec: defaultBarcodeSpec('qr'),
+    color: '#000000',
+    bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [],
+  };
+  const preview = previewBarcode(draft, {
+    project: useStore.getState().project,
+    object: standIn,
+    now: new Date(),
+  });
+  if (preview.kind !== 'ready') throw new Error(preview.kind);
+  expect(await commitBarcode({ spec: preview.spec, value: preview.value })).toMatchObject({
+    ok: true,
+  });
+  const original = qr(useStore.getState().project);
+  expect(original.transform).toMatchObject({ rotationDeg: 0, scaleX: 1, scaleY: 1 });
+  useStore.setState({ selectedObjectId: original.id, additionalSelectedIds: new Set() });
+  root = createRoot(document.createElement('div'));
+  await act(async () => root!.render(createElement(Probe)));
+  await settle(() => shown !== null && scan(qr(shown), original) === 'SN-0001');
+  return original;
+}
+beforeEach(() => {
+  resetStore();
+  shown = null;
+  useUiStore.getState().resetToolMode();
+  useWarpDeformSession.getState().setSession(null);
+});
+afterEach(() => {
+  act(() => root?.unmount());
+  root = null;
+  useUiStore.getState().resetToolMode();
+  useWarpDeformSession.getState().setSession(null);
+});
+for (const grid of ['warp', 'deform'] as const) {
+  it(`${grid} Apply preserves the current serial shown in its preview`, async () => {
+    const original = await insert();
+    act(() => useStore.getState().advanceVariablesManually());
+    await settle(() => shown !== null && scan(qr(shown), original) === 'SN-0002');
+    const before = useStore.getState().project;
+    expect(scan(qr(before), original)).toBe('SN-0001');
+    const history = useStore.getState().undoStack.length;
+    act(() => startWarpDeformTool(grid));
+    const start = activeWarpDeformSession()!;
+    act(() =>
+      useWarpDeformSession
+        .getState()
+        .setHandles(start.handles.map((p) => ({ x: p.x + 10, y: p.y + 5 }))),
+    );
+    const preview = shown!.scene.objects.find((o) => o.id === original.id)!;
+    const previewValue = scan(preview, original, 10, 5);
+    expect(previewValue).toBe('SN-0002');
+    act(() => applyWarpDeformTool());
+    const committed = useStore.getState().project;
+    { const toasts = (useToastStore.getState() as any).toasts; const g1 = gc(committed); act(() => useStore.getState().advanceVariablesManually()); const g2 = gc(useStore.getState().project); const b1 = gc(before); appendFileSync("C:/Users/stolk/kd-t1/zz-t38/vb.log", JSON.stringify({ grid, toast: toasts.at(-1)?.message, hasTemplate: JSON.stringify(committed.scene.objects).includes("serial"), gcodeSameAcrossSerials: g1 === g2, len: g1.length, beforeVsAfterAdvanceDiffer: b1 !== g1 }) + "\n"); }
+    const object = committed.scene.objects.find((o) => o.id === original.id)!;
+    const committedValue = scan(object, original, 10, 5);
+    console.log(
+      JSON.stringify({
+        grid,
+        previewValue,
+        committedValue,
+        kind: object.kind,
+        historyDelta: useStore.getState().undoStack.length - history,
+      }),
+    );
+    expect(object.kind).toBe('imported-svg');
+    expect(committedValue).toBe('SN-0002');
+    expect(useStore.getState().undoStack.length).toBe(history + 1);
+    act(() => useStore.getState().undo());
+    expect(useStore.getState().project).toBe(before);
+    await settle(() => shown !== null && scan(qr(shown), original) === 'SN-0002');
+    act(() => useStore.getState().redo());
+    expect(useStore.getState().project).toBe(committed);
+  });
+}
+it('unchanged serial preview and Apply agree; Cancel preserves current variable barcode', async () => {
+  const original = await insert();
+  act(() => startWarpDeformTool('warp'));
+  let start = activeWarpDeformSession()!;
+  act(() =>
+    useWarpDeformSession
+      .getState()
+      .setHandles(start.handles.map((p) => ({ x: p.x + 10, y: p.y + 5 }))),
+  );
+  expect(scan(shown!.scene.objects.find((o) => o.id === original.id)!, original, 10, 5)).toBe(
+    'SN-0001',
+  );
+  act(() => applyWarpDeformTool());
+  expect(
+    scan(
+      useStore.getState().project.scene.objects.find((o) => o.id === original.id)!,
+      original,
+      10,
+      5,
+    ),
+  ).toBe('SN-0001');
+  act(() => useStore.getState().undo());
+  act(() => useStore.getState().advanceVariablesManually());
+  await settle(() => shown !== null && scan(qr(shown), original) === 'SN-0002');
+  const before = useStore.getState().project;
+  const depth = useStore.getState().undoStack.length;
+  act(() => startWarpDeformTool('warp'));
+  start = activeWarpDeformSession()!;
+  act(() =>
+    useWarpDeformSession
+      .getState()
+      .setHandles(start.handles.map((p) => ({ x: p.x + 10, y: p.y + 5 }))),
+  );
+  act(() => cancelWarpDeformTool());
+  expect(useStore.getState().project).toBe(before);
+  expect(useStore.getState().undoStack.length).toBe(depth);
+  expect(scan(qr(shown!), original)).toBe('SN-0002');
+});

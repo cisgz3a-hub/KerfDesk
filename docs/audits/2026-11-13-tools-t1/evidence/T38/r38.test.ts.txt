@@ -1,0 +1,346 @@
+// @vitest-environment jsdom
+// T38 Warp refuter: own scenes, own G-code reader (gc.ts), real store + warp tool.
+import { beforeEach, it } from 'vitest';
+import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  DEFAULT_PROJECT_VARIABLE_DATA,
+  IDENTITY_TRANSFORM,
+  findRegistrationBoxes,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type TextObject,
+} from '../t36-main/src/core/scene';
+import { createRectangle } from '../t36-main/src/core/shapes/primitives/create-rectangle';
+import { createEllipse } from '../t36-main/src/core/shapes/primitives/create-ellipse';
+import { textToPolylines } from '../t36-main/src/core/text';
+import { parseVariableTemplateSource } from '../t36-main/src/core/variables';
+import { createBarcodeObject, defaultBarcodeSpec } from '../t36-main/src/core/barcode';
+import { prepareOutput } from '../t36-main/src/io/gcode/prepare-output';
+import { prepareOutputSnapshot, type VariableTextRenderer } from '../t36-main/src/io/gcode/prepare-output-snapshot';
+import { emitPreparedGcode } from '../t36-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t36-main/src/ui/state/store';
+import { resetStore } from '../t36-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t36-main/src/ui/state/toast-store';
+import { useUiStore } from '../t36-main/src/ui/state/ui-store';
+import { useWarpDeformSession } from '../t36-main/src/ui/state/warp-deform-session';
+import {
+  activeWarpDeformSession,
+  applyWarpDeformTool,
+  startWarpDeformTool,
+} from '../t36-main/src/ui/workspace/warp-deform-tool';
+import { warpDeformCommandContext } from '../t36-main/src/ui/commands/warp-deform-command-context';
+import { selectionCanWeld } from '../t36-main/src/ui/commands/selection-command-state';
+import { registrationJigCompilationRuns } from '../t36-main/src/core/job/registration-jig-compilation-runs';
+import {
+  centerJigArtwork,
+  changeJigDraft,
+  commitJigEditorSession,
+  createJigEditorSession,
+  replaceJigLayout,
+  selectJigObjects,
+} from '../t36-main/src/ui/workspace/registration-jig/jig-editor-session';
+import { readGcode, lit, litWhere, order, fp, segSet, type Seg } from './gc';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t38r/r38.log';
+const lines: string[] = [];
+const out = (s: string) => {
+  lines.push(s);
+  writeFileSync(LOG, lines.join('\n'));
+};
+beforeEach(() => {
+  resetStore();
+  useToastStore.setState({ toasts: [] } as never);
+  useUiStore.getState().resetToolMode();
+  useWarpDeformSession.getState().setSession(null);
+});
+const st = () => useStore.getState();
+const f3 = (n: number) => n.toFixed(3);
+const toasts = () => useToastStore.getState().toasts.map((t) => t.message);
+const selected = () => [st().selectedObjectId, ...st().additionalSelectedIds].filter((x): x is string => x !== null);
+
+const tinos = (() => {
+  const b = readFileSync('C:/Users/stolk/kd-t1/t36-main/src/ui/text/fonts/Tinos-Regular.ttf');
+  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+})();
+const render: VariableTextRenderer = ({ text, content }) =>
+  textToPolylines({ content, sizeMm: text.sizeMm, alignment: text.alignment, lineHeight: text.lineHeight, letterSpacing: text.letterSpacing, color: text.color, fontBuffer: tinos });
+
+const op = (id: string, mode: 'line' | 'fill', speed: number, power: number, color = '#000000') =>
+  ({ ...createLayer({ id, color, name: id, mode }), speed, power, ...(mode === 'fill' ? { hatchSpacingMm: 0.1 } : {}) }) as Layer;
+function project(objects: SceneObject[], layers: Layer[], extra: Partial<Project> = {}): Project {
+  const base = createProject();
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers, groups: [] }, ...extra };
+}
+function load(p: Project, sel: string[]) {
+  useStore.setState({ project: p, selectedObjectId: sel[0] ?? null, additionalSelectedIds: new Set(sel.slice(1)), undoStack: [], redoStack: [], dirty: false });
+}
+const rect = (id: string, color: string, w: number, h: number, x: number, y: number, ops: string[]) =>
+  ({ ...createRectangle({ id, color, spec: { widthMm: w, heightMm: h, cornerRadiusMm: 0 }, transform: { ...IDENTITY_TRANSFORM, x, y } }), operationIds: ops }) as SceneObject;
+const disc = (id: string, r: number, x: number, y: number, ops: string[], color = '#000000') =>
+  ({ ...createEllipse({ id, color, spec: { widthMm: 2 * r, heightMm: 2 * r }, transform: { ...IDENTITY_TRANSFORM, x, y } }), operationIds: ops }) as SceneObject;
+
+function burn(p: Project): Seg[] {
+  const prepared = prepareOutput(p);
+  if (!prepared.ok) return [];
+  return readGcode(emitPreparedGcode(prepared).gcode);
+}
+async function snapBurn(p: Project) {
+  const prepared = await prepareOutputSnapshot(p, { clock: () => new Date(0), renderVariableText: render });
+  if (!prepared.ok) return { ok: false as const, segs: [] as Seg[], warn: [] as string[], why: JSON.stringify(prepared).slice(0, 300) };
+  const anyP = prepared as unknown as { warnings?: unknown; preflight?: { issues?: { message?: string; severity?: string }[] } };
+  const warn = [JSON.stringify(anyP.warnings ?? null).slice(0, 300), ...(anyP.preflight?.issues ?? []).map((i) => `${i.severity}:${i.message}`)];
+  return { ok: true as const, segs: readGcode(emitPreparedGcode(prepared).gcode), warn };
+}
+
+/** Start Warp on the current selection and move handles with `move`; returns null when refused. */
+function warpWith(move: (h: ReadonlyArray<{ x: number; y: number }>) => { x: number; y: number }[]) {
+  startWarpDeformTool('warp');
+  const s = activeWarpDeformSession();
+  if (s === null) return null;
+  useWarpDeformSession.getState().setHandles(move(s.handles));
+  const objectIds = [...s.objectIds];
+  applyWarpDeformTool();
+  return { objectIds, box: s.box };
+}
+
+// ---------- the jig, made through the real editor (as T28's refuter did) ----------
+function buildJig() {
+  const A = op('art', 'line', 2222, 90, '#ff0000');
+  const E = op('eng', 'line', 1111, 10, '#0000ff');
+  load(project([], [E, A]), []);
+  let session = createJigEditorSession(st() as never);
+  const d1 = disc('C1', 8, 10, 10, ['art'], '#ff0000');
+  const d2 = disc('C2', 8, 18, 12, ['art'], '#ff0000');
+  const sq = rect('SQ', '#0000ff', 5, 5, 12, 22, ['eng']);
+  const dp = session.draft.project;
+  session = changeJigDraft(session, { project: { ...dp, scene: { ...dp.scene, objects: [...dp.scene.objects, d1, d2, sq], layers: [...dp.scene.layers.filter((l) => l.id !== 'art' && l.id !== 'eng'), E, A] } } });
+  session = replaceJigLayout(session, { outline: { kind: 'rectangle', widthMm: 60, heightMm: 50 }, rows: 1, columns: 2, spacingX: 10, spacingY: 10 });
+  session = selectJigObjects(session, new Set(['C1', 'C2', 'SQ']));
+  session = centerJigArtwork(session);
+  const committed = commitJigEditorSession(st() as never, session);
+  if (committed.kind !== 'saved') throw new Error(`commit ${committed.reason}`);
+  useStore.setState(committed.change as never);
+  st().setRegistrationOutput('artwork' as never);
+  useStore.setState({ selectedObjectId: null, additionalSelectedIds: new Set() });
+  const p0 = st().project;
+  const boxes = findRegistrationBoxes(p0.scene);
+  const bx = boxes.map((b) => b.transform.x).sort((a, b) => a - b);
+  const pitch = bx[1]! - bx[0]!;
+  const midX = bx[1]! - 5;
+  const region = (x: number) => (x < midX ? 'A' : 'B');
+  return { p0, boxes, pitch, midX, region };
+}
+function jigStats(tag: string, p: Project, jig: ReturnType<typeof buildJig>) {
+  const segs = burn(p);
+  const a = segs.filter((g) => (g.x0 + g.x1) / 2 < jig.midX);
+  const b = segs.filter((g) => (g.x0 + g.x1) / 2 >= jig.midX);
+  const sa = segSet(a), sb = segSet(b, jig.pitch, 0);
+  const boxes = findRegistrationBoxes(p.scene);
+  out(`${tag}: boxes ${boxes.length} (locked ${boxes.map((x) => x.locked === true).join(',')}); jig runs ${registrationJigCompilationRuns(p.scene)?.length ?? 0}; ` +
+    `lit A ${f3(litWhere(segs, (x) => x < jig.midX))} B ${f3(litWhere(segs, (x) => x >= jig.midX))}; A and B pieces identical after shift: ${JSON.stringify(sa) === JSON.stringify(sb)}`);
+  out(`${tag}: order ${order(segs, jig.region).join(' > ')}`);
+  out(`${tag}: kinds ${p.scene.objects.map((o) => `${o.id.slice(0, 30)}:${o.kind}${o.locked ? '[L]' : ''}`).join(' | ')}`);
+}
+
+it('J1 real jig (outlines locked by Save), Select All -> Warp', () => {
+  const jig = buildJig();
+  jigStats('J1 before', jig.p0, jig);
+  st().selectAllObjects();
+  const sel = selected();
+  out(`J1 Select All picked ${sel.length} of ${jig.p0.scene.objects.length}; boxes in selection: ${sel.some((id) => jig.boxes.some((b) => b.id === id))}`);
+  out(`J1 Warp enabled ${warpDeformCommandContext(jig.p0, sel).canWarpSelection}; Weld enabled ${selectionCanWeld(jig.p0, sel)}`);
+  const w = warpWith((h) => h.map((p, i) => (i === 1 ? { x: p.x + 5, y: p.y - 3 } : p)));
+  out(`J1 warp session: ${w === null ? 'REFUSED' : `objects ${w.objectIds.join(',')} box ${JSON.stringify(w.box)}`}; toasts ${JSON.stringify(toasts())}`);
+  jigStats('J1 after', st().project, jig);
+});
+
+it('J2 real jig, Unlock All -> Select All -> Warp (auditor route)', () => {
+  const jig = buildJig();
+  st().unlockAllObjects();
+  st().selectAllObjects();
+  const sel = selected();
+  out(`J2 Select All after Unlock All picked ${sel.length}`);
+  const w = warpWith((h) => h.map((p, i) => (i === 1 ? { x: p.x + 5, y: p.y - 3 } : p)));
+  out(`J2 warp: ${w === null ? 'REFUSED' : `objects ${w.objectIds.length}`}; toasts ${JSON.stringify(toasts())}`);
+  jigStats('J2 after', st().project, jig);
+});
+
+it('J3 real jig, box A pieces only (click-select the three sources) -> Warp', () => {
+  const jig = buildJig();
+  const inA = jig.p0.scene.objects.filter((o) => !findRegistrationBoxes(jig.p0.scene).some((b) => b.id === o.id) && o.transform.x < jig.midX && 'paths' in o).map((o) => o.id);
+  load(jig.p0, inA);
+  out(`J3 selected ${inA.join(',')}`);
+  const w = warpWith((h) => h.map((p, i) => (i === 1 ? { x: p.x + 5, y: p.y - 3 } : p)));
+  out(`J3 warp: ${w === null ? 'REFUSED' : `objects ${w.objectIds.join(',')}`}; toasts ${JSON.stringify(toasts())}`);
+  jigStats('J3 after', st().project, jig);
+  // Control: Move one box A piece by 2 mm with the ordinary transform action
+  load(jig.p0, [inA[0]!]);
+  const o = jig.p0.scene.objects.find((x) => x.id === inA[0])!;
+  const moved = { ...jig.p0, scene: { ...jig.p0.scene, objects: jig.p0.scene.objects.map((x) => (x.id === o.id ? { ...x, transform: { ...x.transform, scaleX: 1.2 } } : x)) } } as Project;
+  jigStats('J3 control (scale one source 1.2x by hand)', moved, jig);
+});
+
+// ---------- variable barcode ----------
+it('B1 variable Code 128 (stored value = current serial), Warp as a pure translation', async () => {
+  const parsed = parseVariableTemplateSource('LOT-{{serial:3}}');
+  if (!parsed.ok) throw new Error(parsed.message);
+  const spec = { ...defaultBarcodeSpec('code128'), moduleMm: 0.3, data: 'LOT-{{serial:3}}', variableTemplate: parsed.template };
+  const created = await createBarcodeObject({
+    id: 'BC', color: '#000000', spec, value: 'LOT-041',
+    renderCaption: async () => ({ polylines: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }),
+    transform: { ...IDENTITY_TRANSFORM, x: 20, y: 20 },
+  });
+  if (!created.ok) throw new Error(created.message);
+  const bc = { ...created.object, operationIds: ['L'] } as SceneObject;
+  const L = op('L', 'line', 1500, 30);
+  const p0 = project([bc], [L], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 41 } });
+  load(p0, ['BC']);
+  const b41 = await snapBurn(p0);
+  const b42 = await snapBurn({ ...p0, variables: { ...p0.variables, serialValue: 42 } });
+  out(`B1 before: serial41 ${fp(b41.segs)} serial42 ${fp(b42.segs)} differ ${fp(b41.segs) !== fp(b42.segs)}; warnings41 ${JSON.stringify(b41.warn)}`);
+  out(`B1 Warp enabled ${warpDeformCommandContext(p0, ['BC']).canWarpSelection}`);
+  const w = warpWith((h) => h.map((p) => ({ x: p.x + 10, y: p.y + 5 })));
+  const p1 = st().project;
+  const o1 = p1.scene.objects.find((o) => o.id === 'BC')!;
+  out(`B1 warp: ${w === null ? 'REFUSED' : 'applied'}; kind ${o1.kind}; template kept ${JSON.stringify((o1 as { spec?: { variableTemplate?: unknown } }).spec?.variableTemplate !== undefined)}; toasts ${JSON.stringify(toasts())}`);
+  const a41 = await snapBurn(p1);
+  const a42 = await snapBurn({ ...p1, variables: { ...p1.variables, serialValue: 42 } });
+  const a43 = await snapBurn({ ...p1, variables: { ...p1.variables, serialValue: 43 } });
+  out(`B1 after: serial41 ${fp(a41.segs)} serial42 ${fp(a42.segs)} serial43 ${fp(a43.segs)}; all same ${fp(a41.segs) === fp(a42.segs) && fp(a42.segs) === fp(a43.segs)}`);
+  const want41 = segSet(b41.segs), want42 = segSet(b42.segs), got = segSet(a42.segs, 10, -5);
+  const plain0 = burn(p0);
+  out(`B1 debug: plain stored burn ${fp(plain0)} lit ${f3(lit(plain0))}; snapshot41 lit ${f3(lit(b41.segs))} snapshot42 lit ${f3(lit(b42.segs))}; after plain ${fp(burn(p1))} lit ${f3(lit(burn(p1)))}`);
+  out(`B1 debug: after-warp set equals plain stored burn shifted: ${JSON.stringify(got) === JSON.stringify(segSet(plain0))}; sizes got ${got.length} want41 ${want41.length}`);
+  const ext = (s: Seg[]) => [Math.min(...s.flatMap((g) => [g.x0, g.x1])), Math.min(...s.flatMap((g) => [g.y0, g.y1])), Math.max(...s.flatMap((g) => [g.x0, g.x1])), Math.max(...s.flatMap((g) => [g.y0, g.y1]))].map(f3);
+  out(`B1 debug: extent before41 ${ext(b41.segs)} before42 ${ext(b42.segs)} after42 ${ext(a42.segs)}`);
+  out(`B1 oracle: after-warp at serial 42 equals pre-warp LOT-041 shifted (10,5): ${JSON.stringify(got) === JSON.stringify(want41)}; equals LOT-042: ${JSON.stringify(got) === JSON.stringify(want42)}; lit ${f3(lit(a42.segs))} vs ${f3(lit(b41.segs))}`);
+  out(`B1 after warnings at serial 42: ${JSON.stringify(a42.warn)}; project still has variable data: ${p1.scene.objects.some((o) => o.kind === 'shape' && (o as { spec: { kind: string; variableTemplate?: unknown } }).spec.variableTemplate !== undefined)}`);
+});
+
+// ---------- variable text ----------
+async function variableText(id: string, x: number, y: number) {
+  const source = 'No.{{serial:3}}';
+  const parsed = parseVariableTemplateSource(source);
+  if (!parsed.ok) throw new Error(parsed.message);
+  const base = {
+    kind: 'text', id, content: source, variableTemplate: parsed.template,
+    fontKey: 'tinos-regular', sizeMm: 8, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000',
+    bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 }, transform: { ...IDENTITY_TRANSFORM, x, y }, paths: [], operationIds: ['T'],
+  } as unknown as TextObject;
+  const stored = await render({ text: base, content: source, project: createProject() });
+  return { ...base, bounds: stored.bounds, paths: stored.paths } as TextObject;
+}
+
+it('V1 variable text + rectangle -> Warp; V2 variable text alone; V3 text in a group with a rectangle', async () => {
+  const T = op('T', 'line', 900, 55);
+  const text = await variableText('VT', 30, 30);
+  const r = rect('R', '#000000', 20, 10, 30, 50, ['T']);
+  const p0 = project([text, r], [T], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 7 } });
+  load(p0, ['VT', 'R']);
+  const b7 = await snapBurn(p0);
+  const b8 = await snapBurn({ ...p0, variables: { ...p0.variables, serialValue: 8 } });
+  const w = warpWith((h) => h.map((p, i) => (i === 2 ? { x: p.x + 8, y: p.y + 6 } : p)));
+  const p1 = st().project;
+  const t1 = p1.scene.objects.find((o) => o.id === 'VT')!;
+  const a7 = await snapBurn(p1);
+  const a8 = await snapBurn({ ...p1, variables: { ...p1.variables, serialValue: 8 } });
+  const textOnly = (s: Seg[]) => s.filter((g) => Math.max(g.y0, g.y1) > 400 - 45);
+  out(`V1 warp ${w === null ? 'REFUSED' : `objects ${w.objectIds.join(',')} box ${JSON.stringify(w.box)}`}; text same ref ${t1 === text}; toasts ${JSON.stringify(toasts())}`);
+  out(`V1 text burn: before 7 ${fp(textOnly(b7.segs))} 8 ${fp(textOnly(b8.segs))}; after 7 ${fp(textOnly(a7.segs))} 8 ${fp(textOnly(a8.segs))}; after differs by serial ${fp(textOnly(a7.segs)) !== fp(textOnly(a8.segs))}; text unchanged ${fp(textOnly(a7.segs)) === fp(textOnly(b7.segs))}`);
+  // V2: text alone
+  load(p0, ['VT']);
+  useToastStore.setState({ toasts: [] } as never);
+  out(`V2 Warp enabled for variable text alone: ${warpDeformCommandContext(p0, ['VT']).canWarpSelection}`);
+  const w2 = warpWith((h) => h.map((p) => ({ x: p.x + 1, y: p.y })));
+  out(`V2 start: ${w2 === null ? 'REFUSED' : 'started'}; project same ${st().project === p0}; toasts ${JSON.stringify(toasts())}`);
+  // V3: grouped text + rectangle; selecting the group selects its members
+  const pg = { ...p0, scene: { ...p0.scene, groups: [{ id: 'G', name: 'G', objectIds: ['VT', 'R'] }] } } as unknown as Project;
+  load(pg, ['VT', 'R']);
+  useToastStore.setState({ toasts: [] } as never);
+  const w3 = warpWith((h) => h.map((p, i) => (i === 2 ? { x: p.x + 8, y: p.y + 6 } : p)));
+  out(`V3 group: ${w3 === null ? 'REFUSED' : `objects ${w3.objectIds.join(',')}`}; text same ref ${st().project.scene.objects.find((o) => o.id === 'VT') === text}; toasts ${JSON.stringify(toasts())}`);
+});
+
+// ---------- tabs spot check (R3-P2-2) with an own homography oracle ----------
+function homography(src: { x: number; y: number }[], dst: { x: number; y: number }[]) {
+  // 8x8 DLT solve, h33 = 1
+  const A: number[][] = [];
+  const bv: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    const { x, y } = src[i]!, { x: u, y: v } = dst[i]!;
+    A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]); bv.push(u);
+    A.push([0, 0, 0, x, y, 1, -v * x, -v * y]); bv.push(v);
+  }
+  const n = 8;
+  for (let c = 0; c < n; c++) {
+    let p = c;
+    for (let r = c + 1; r < n; r++) if (Math.abs(A[r]![c]!) > Math.abs(A[p]![c]!)) p = r;
+    [A[c], A[p]] = [A[p]!, A[c]!]; [bv[c], bv[p]] = [bv[p]!, bv[c]!];
+    for (let r = 0; r < n; r++) {
+      if (r === c) continue;
+      const k = A[r]![c]! / A[c]![c]!;
+      for (let j = c; j < n; j++) A[r]![j]! -= k * A[c]![j]!;
+      bv[r]! -= k * bv[c]!;
+    }
+  }
+  const h = bv.map((v, i) => v / A[i]![i]!);
+  return (p: { x: number; y: number }) => {
+    const w = h[6]! * p.x + h[7]! * p.y + 1;
+    return { x: (h[0]! * p.x + h[1]! * p.y + h[2]!) / w, y: (h[3]! * p.x + h[4]! * p.y + h[5]!) / w };
+  };
+}
+
+it('K1 placed laser tabs on a drawn 80x40 rectangle follow a perspective warp', () => {
+  const L = { ...op('L', 'line', 1000, 50), tabsEnabled: true, tabSizeMm: 2, tabsPerShape: 3 } as Layer;
+  const ts = [0.1, 0.45, 0.8];
+  const r = { ...rect('R', '#000000', 80, 40, 50, 50, ['L']), laserTabAnchors: ts.map((pathT) => ({ layerColor: '#000000', pathIndex: 0, polylineIndex: 0, pathT })) } as SceneObject;
+  const p0 = project([r], [L]);
+  load(p0, ['R']);
+  const g0 = burn(p0);
+  const startPt = g0[0] ? { x: g0[0].x0, y: g0[0].y0 } : null;
+  const w = warpWith((h) => h.map((p, i) => (i === 2 ? { x: p.x + 30, y: p.y + 12 } : i === 3 ? { x: p.x - 6, y: p.y + 4 } : p)));
+  if (w === null) throw new Error('refused');
+  const s = activeWarpDeformSession();
+  void s;
+  const b = w.box;
+  const src = [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.minY }, { x: b.maxX, y: b.maxY }, { x: b.minX, y: b.maxY }];
+  const dst = [src[0]!, src[1]!, { x: src[2]!.x + 30, y: src[2]!.y + 12 }, { x: src[3]!.x - 6, y: src[3]!.y + 4 }];
+  const H = homography(src, dst);
+  const gaps = (segs: Seg[]) => {
+    const res: { x: number; y: number }[] = [];
+    for (let i = 1; i < segs.length; i++) {
+      const a = segs[i - 1]!, c = segs[i]!;
+      const d = Math.hypot(a.x1 - c.x0, a.y1 - c.y0);
+      if (d > 0.5 && d < 6) res.push({ x: (a.x1 + c.x0) / 2, y: (a.y1 + c.y0) / 2 });
+    }
+    const a = segs.at(-1)!, c = segs[0]!;
+    const d = Math.hypot(a.x1 - c.x0, a.y1 - c.y0);
+    if (d > 0.5 && d < 6) res.push({ x: (a.x1 + c.x0) / 2, y: (a.y1 + c.y0) / 2 });
+    return res;
+  };
+  const before = gaps(g0);
+  const after = gaps(burn(st().project));
+  // machine Y = bedH - world Y (bedH from the rectangle's top edge, world y 50)
+  const bedH = Math.max(...g0.flatMap((g) => [g.y0, g.y1])) + 50;
+  const toW = (p: { x: number; y: number }) => ({ x: p.x, y: bedH - p.y });
+  const want = before.map((p) => toW(H(toW(p))));
+  const err = want.map((q) => Math.min(...after.map((g) => Math.hypot(g.x - q.x, g.y - q.y))));
+  out(`K1 start ${JSON.stringify(startPt)}; gaps before ${JSON.stringify(before.map((p) => [+f3(p.x), +f3(p.y)]))}`);
+  out(`K1 gaps after ${JSON.stringify(after.map((p) => [+f3(p.x), +f3(p.y)]))}; oracle ${JSON.stringify(want.map((p) => [+f3(p.x), +f3(p.y)]))}; err mm ${err.map(f3).join(',')}; toasts ${JSON.stringify(toasts())}`);
+});
+
+it('X1 crossed handles (TR and BR swapped) on a 100x50 rectangle', () => {
+  const L = op('L', 'line', 1000, 50);
+  const r = rect('R', '#000000', 100, 50, 100, 100, ['L']);
+  load(project([r], [L]), ['R']);
+  const w = warpWith((h) => [h[0]!, h[2]!, h[1]!, h[3]!]);
+  const o = st().project.scene.objects[0]! as unknown as { kind: string; paths: { polylines: { points: { x: number; y: number }[] }[] }[]; transform: typeof IDENTITY_TRANSFORM };
+  const pts = o.paths[0]!.polylines[0]!.points;
+  let a = 0;
+  for (let i = 0; i < pts.length; i++) { const p = pts[i]!, q = pts[(i + 1) % pts.length]!; a += p.x * q.y - q.x * p.y; }
+  out(`X1 ${w === null ? 'REFUSED' : 'applied'}; kind ${o.kind}; points ${pts.length}; signed area (local) ${f3(a / 2)}; toasts ${JSON.stringify(toasts())}`);
+});

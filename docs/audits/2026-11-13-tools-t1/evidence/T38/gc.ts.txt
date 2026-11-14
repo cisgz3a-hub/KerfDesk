@@ -1,0 +1,65 @@
+// Refuter's own G-code reader for T38. Absolute G90 (G91 tracked). Lit = G1/G2/G3 with M3/M4 on
+// and S > 0. Arcs measured as chords.
+export type Seg = { x0: number; y0: number; x1: number; y1: number; f: number; s: number };
+
+export function readGcode(gcode: string): Seg[] {
+  let x = 0, y = 0, f = 0, s = 0, motion = 0, on = false, rel = false;
+  const segs: Seg[] = [];
+  for (const raw of gcode.split(/\r?\n/)) {
+    const line = raw.replace(/\(.*?\)/g, '').replace(/;.*$/, '').trim().toUpperCase();
+    if (line === '') continue;
+    let nx = x, ny = y, moved = false;
+    for (const m of line.matchAll(/([A-Z])\s*(-?\d*\.?\d+)/g)) {
+      const w = m[1]!, v = Number(m[2]);
+      if (w === 'G') {
+        if (v >= 0 && v <= 3 && Number.isInteger(v)) motion = v;
+        else if (v === 90) rel = false;
+        else if (v === 91) rel = true;
+      } else if (w === 'M') {
+        if (v === 3 || v === 4) on = true;
+        else if (v === 5) on = false;
+      } else if (w === 'X') { nx = rel ? x + v : v; moved = true; }
+      else if (w === 'Y') { ny = rel ? y + v : v; moved = true; }
+      else if (w === 'F') f = v;
+      else if (w === 'S') s = v;
+    }
+    if (moved) {
+      if (motion !== 0 && on && s > 0 && (nx !== x || ny !== y)) segs.push({ x0: x, y0: y, x1: nx, y1: ny, f, s });
+      x = nx; y = ny;
+    }
+  }
+  return segs;
+}
+
+export const lit = (segs: Seg[]) => segs.reduce((a, g) => a + Math.hypot(g.x1 - g.x0, g.y1 - g.y0), 0);
+export const litWhere = (segs: Seg[], keep: (x: number) => boolean) =>
+  lit(segs.filter((g) => keep((g.x0 + g.x1) / 2)));
+
+export function order(segs: Seg[], region: (x: number) => string): string[] {
+  const out: string[] = [];
+  for (const g of segs) {
+    const tag = `F${g.f}@${region((g.x0 + g.x1) / 2)}`;
+    if (out.at(-1) !== tag) out.push(tag);
+  }
+  return out;
+}
+
+export function fp(segs: Seg[], dx = 0, dy = 0): string {
+  let h = 2166136261;
+  for (const g of segs) {
+    const t = `${(g.x0 - dx).toFixed(3)},${(g.y0 - dy).toFixed(3)},${(g.x1 - dx).toFixed(3)},${(g.y1 - dy).toFixed(3)},${g.s}`;
+    for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 16777619) >>> 0;
+  }
+  return `${segs.length}:${h.toString(16)}`;
+}
+
+/** Sorted lit segment set as strings, for order-free comparison with a shift. */
+export function segSet(segs: Seg[], dx = 0, dy = 0): string[] {
+  return segs
+    .map((g) => {
+      const a = `${(g.x0 - dx).toFixed(2)},${(g.y0 - dy).toFixed(2)}`;
+      const b = `${(g.x1 - dx).toFixed(2)},${(g.y1 - dy).toFixed(2)}`;
+      return a < b ? `${a}|${b}` : `${b}|${a}`;
+    })
+    .sort();
+}
