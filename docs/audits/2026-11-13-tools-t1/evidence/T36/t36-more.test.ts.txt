@@ -1,0 +1,275 @@
+// @vitest-environment jsdom
+// T36 Reverse Direction: curves, tabs (laser + CNC), CNC climb, drawn polylines, degenerate input.
+import { beforeEach, it } from 'vitest';
+import {
+  DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_MACHINE_CONFIG,
+  IDENTITY_TRANSFORM,
+  createLayer,
+  flattenCurveSubpath,
+  type CurveSubpath,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type ShapeObject,
+} from '../t36-main/src/core/scene';
+import { DEFAULT_DEVICE_PROFILE } from '../t36-main/src/core/devices';
+import { compileCncJob } from '../t36-main/src/core/cnc/compile-cnc-job';
+import { createPolyline } from '../t36-main/src/core/shapes/create-polyline';
+import { reversePaths } from '../t36-main/src/core/geometry/path-direction-edits';
+import { resetStore } from '../t36-main/src/ui/state/test-helpers';
+import { totalLen, type LitMove } from './decode';
+import { burn, clearToasts, f3, layer, logger, proj, setProject, st, toasts } from './common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t36/t36-more2.log');
+beforeEach(() => {
+  resetStore();
+  clearToasts();
+});
+type V = { x: number; y: number };
+const sq = (x: number, y: number, w: number, h: number): V[] => [
+  { x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h },
+];
+function reverseOf(objects: SceneObject[], layers: Layer[], sel: string[], extra: Partial<Project> = {}) {
+  const p0 = proj(objects, layers, extra);
+  setProject(p0, sel);
+  st().reverseSelectedPaths();
+  return { before: p0, after: st().project, toast: toasts().join(' // ') };
+}
+const flat = (c: CurveSubpath) => {
+  const r = flattenCurveSubpath(c, { toleranceMm: 0.001 });
+  if (r.kind !== 'ok') throw new Error('flatten failed');
+  return r.polyline.points;
+};
+// Max distance from each point of A to polyline B (Hausdorff one-way, via segments).
+function hd(a: ReadonlyArray<V>, b: ReadonlyArray<V>): number {
+  let worst = 0;
+  for (const p of a) {
+    let best = Infinity;
+    for (let i = 0; i + 1 < b.length; i++) {
+      const s = b[i]!, e = b[i + 1]!;
+      const dx = e.x - s.x, dy = e.y - s.y;
+      const L = dx * dx + dy * dy;
+      const t = L === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - s.x) * dx + (p.y - s.y) * dy) / L));
+      best = Math.min(best, Math.hypot(s.x + t * dx - p.x, s.y + t * dy - p.y));
+    }
+    worst = Math.max(worst, best);
+  }
+  return worst;
+}
+// Position along a polyline at arc fraction t, for checking point order.
+function arcLenParam(pts: ReadonlyArray<V>, p: V): number {
+  let acc = 0, best = Infinity, at = 0;
+  const total = pts.slice(1).reduce((s, q, i) => s + Math.hypot(q.x - pts[i]!.x, q.y - pts[i]!.y), 0);
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const s = pts[i]!, e = pts[i + 1]!;
+    const dx = e.x - s.x, dy = e.y - s.y;
+    const L = Math.hypot(dx, dy);
+    const t = L === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - s.x) * dx + (p.y - s.y) * dy) / (L * L)));
+    const d = Math.hypot(s.x + t * dx - p.x, s.y + t * dy - p.y);
+    if (d < best) { best = d; at = acc + t * L; }
+    acc += L;
+  }
+  return at / total;
+}
+
+it.skip('C1 curves: open cubic + closed circle of two arcs; exact reversal and G-code', () => {
+  const k = 0.5522847498 * 20;
+  const open: CurveSubpath = {
+    start: { x: 0, y: 20 }, closed: false,
+    segments: [
+      { kind: 'cubic', control1: { x: 0, y: 20 + k }, control2: { x: 20 - k, y: 40 }, to: { x: 20, y: 40 } },
+      { kind: 'cubic', control1: { x: 20 + k, y: 40 }, control2: { x: 40, y: 20 + k }, to: { x: 40, y: 20 } },
+    ],
+  };
+  // circle r=10 at (70,30) as two half-arcs, implicit closing (ends at start)
+  const circle: CurveSubpath = {
+    start: { x: 80, y: 30 }, closed: true,
+    segments: [
+      { kind: 'elliptical-arc', radiusX: 10, radiusY: 10, rotationDeg: 0, largeArc: false, sweep: true, to: { x: 60, y: 30 } },
+      { kind: 'elliptical-arc', radiusX: 10, radiusY: 10, rotationDeg: 0, largeArc: false, sweep: true, to: { x: 80, y: 30 } },
+    ],
+  };
+  // three-quarter arc closed by an implicit line (ends at (70,40), start (80,30))
+  const pac: CurveSubpath = {
+    start: { x: 80, y: 70 }, closed: true,
+    segments: [
+      { kind: 'elliptical-arc', radiusX: 10, radiusY: 10, rotationDeg: 0, largeArc: true, sweep: true, to: { x: 70, y: 80 } },
+    ],
+  };
+  const curves = [open, circle, pac];
+  const polylines = curves.map((c) => ({ points: flat(c), closed: c.closed }));
+  const o = {
+    kind: 'imported-svg', id: 'a', source: 'a.svg', operationIds: ['L'],
+    bounds: { minX: 0, minY: 20, maxX: 80, maxY: 80 }, transform: IDENTITY_TRANSFORM,
+    paths: [{ color: '#000000', polylines, curves }],
+  } as unknown as ImportedSvg;
+  const r = reverseOf([o], [layer('L', 'line', 1000, 50)], ['a'], { optimization: { ...proj([], []).optimization, pathDirection: 'preserve', travelPolicy: 'source-order' } });
+  const a = r.after.scene.objects[0] as ImportedSvg;
+  out(`C1 toast ${r.toast}`);
+  a.paths[0]!.curves!.forEach((c, i) => {
+    const f0 = flat(curves[i]!);
+    const f1 = flat(c);
+    const pl = a.paths[0]!.polylines[i]!;
+    // oracle: same point set, start/end, and order reversed (param of f0 point 25% along -> ~75% along f1 for open)
+    const probe = f0[Math.floor(f0.length / 4)]!;
+    out(`C1 sub${i}: segs ${c.segments.map((s) => s.kind + (s.kind === 'elliptical-arc' ? `(sweep ${s.sweep},large ${s.largeArc})` : '')).join(',')} start ${f3(c.start.x)},${f3(c.start.y)} closed ${c.closed}; hausdorff curve ${f3(Math.max(hd(f0, f1), hd(f1, f0)))}; poly start ${f3(pl.points[0]!.x)},${f3(pl.points[0]!.y)} poly-vs-curve ${f3(Math.max(hd(pl.points, f1), hd(f1, pl.points)))}; probe param before ${f3(arcLenParam(f0, probe))} after ${f3(arcLenParam(f1, probe))}`);
+  });
+  const gb = burn(r.before), ga = burn(r.after);
+  const arcs = (g: string) => g.split('\n').filter((l) => /^G[23]\b/.test(l)).map((l) => l.slice(0, 3)).join('');
+  out(`C1 gcode arcs before ${arcs(gb.gcode) || '(none)'} after ${arcs(ga.gcode) || '(none)'}; lit ${f3(totalLen(gb.moves))} -> ${f3(totalLen(ga.moves))}`);
+  out(`C1 gcode identical ${gb.gcode === ga.gcode}`);
+});
+
+// Laser tabs: find lit gaps along the contour (where the lit run breaks).
+function gaps(moves: LitMove[], ring: V[] = sq(10, 10, 40, 20)): string {
+  // Sample the ring every 0.05 mm; a sample not on any lit move is uncut. Report uncut intervals.
+  const res: string[] = [];
+  let inGap = false; let gs: V | null = null; let prev: V | null = null;
+  const on = (p: V) => moves.some((m) => { const dx = m.to.x - m.from.x, dy = m.to.y - m.from.y; const L = dx * dx + dy * dy; const t = L === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - m.from.x) * dx + (p.y - m.from.y) * dy) / L)); return Math.hypot(m.from.x + t * dx - p.x, m.from.y + t * dy - p.y) < 1e-3; });
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]!, b = ring[(i + 1) % ring.length]!;
+    const L = Math.hypot(b.x - a.x, b.y - a.y);
+    const n = Math.round(L / 0.05);
+    for (let k = 0; k < n; k++) {
+      const p = { x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n };
+      const lit = on(p);
+      if (!lit && !inGap) { inGap = true; gs = p; }
+      if (lit && inGap) { inGap = false; res.push(`(${f3(gs!.x)},${f3(gs!.y)})-(${f3(prev!.x)},${f3(prev!.y)})`); }
+      prev = p;
+    }
+  }
+  if (inGap) res.push(`(${f3(gs!.x)},${f3(gs!.y)})-end`);
+  return res.sort().join(' ');
+}
+export function gapsOld(moves: LitMove[]): string {
+  const g: string[] = [];
+  for (let i = 0; i + 1 < moves.length; i++) {
+    const a = moves[i]!, b = moves[i + 1]!;
+    const d = Math.hypot(a.to.x - b.from.x, a.to.y - b.from.y);
+    if (d > 1e-3) g.push(`(${f3((a.to.x + b.from.x) / 2)},${f3((a.to.y + b.from.y) / 2)})`);
+  }
+  return g.sort().join(' ');
+}
+it('T1 laser tabs: placed anchors and automatic tabs keep their physical positions', () => {
+  const pts = sq(10, 10, 40, 20); // perimeter 120
+  for (const mode of ['placed', 'auto3', 'auto-open-placed']) {
+    resetStore();
+    clearToasts();
+    const L = layer('L', 'line', 1000, 50, { tabsEnabled: true, tabSizeMm: 2, tabsPerShape: 3, tabSkipInnerShapes: false } as Partial<Layer>);
+    const isOpen = mode === 'auto-open-placed';
+    const o = {
+      kind: 'imported-svg', id: 'a', source: 'a.svg', operationIds: ['L'],
+      bounds: { minX: 10, minY: 10, maxX: 50, maxY: 30 }, transform: IDENTITY_TRANSFORM,
+      paths: [{ color: '#000000', polylines: [{ points: pts, closed: !isOpen }] }],
+      ...(mode !== 'auto3' ? { laserTabAnchors: [{ layerColor: '#000000', pathIndex: 0, polylineIndex: 0, pathT: 0.1 }, { layerColor: '#000000', pathIndex: 0, polylineIndex: 0, pathT: 0.35 }] } : {}),
+    } as unknown as ImportedSvg;
+    const r = reverseOf([o], [L], ['a'], { optimization: { ...proj([], []).optimization, pathDirection: 'preserve' } });
+    const a = r.after.scene.objects[0] as ImportedSvg;
+    const gb = burn(r.before), ga = burn(r.after);
+    out(`T1 ${mode}: toast ${r.toast}; anchors after ${JSON.stringify(a.laserTabAnchors?.map((x) => f3(x.pathT)))}`);
+    out(`T1 ${mode}: lit ${f3(totalLen(gb.moves))} -> ${f3(totalLen(ga.moves))}; gaps before ${gaps(gb.moves)} | after ${gaps(ga.moves)}`);
+  }
+});
+
+function cncScene(objects: SceneObject[], cnc: Record<string, unknown>) {
+  const L = { ...createLayer({ id: 'L1', color: '#ff0000' }), cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, depthMm: 6, depthPerPassMm: 3, profileLead: { shape: 'none' }, ...cnc } } as Layer;
+  return { layers: [L], objects };
+}
+function cncDesc(scene: { layers: Layer[]; objects: SceneObject[] }) {
+  const job = compileCncJob(scene as never, DEFAULT_DEVICE_PROFILE, DEFAULT_CNC_MACHINE_CONFIG);
+  const g = job.groups[0];
+  if (g?.kind !== 'cnc') return `no cnc group ${JSON.stringify(job.groups.map((x) => x.kind))}`;
+  return g.passes
+    .map((p) => {
+      if (p.kind === 'contour') {
+        const pts = p.polyline;
+        let a = 0;
+        for (let i = 0; i < pts.length; i++) {
+          const s = pts[i]!, e = pts[(i + 1) % pts.length]!;
+          a += s.x * e.y - e.x * s.y;
+        }
+        return `contour z${f3(p.depthMm ?? (p as unknown as { z: number }).z ?? 0)} start ${f3(pts[0]!.x)},${f3(pts[0]!.y)} second ${f3(pts[1]!.x)},${f3(pts[1]!.y)} area ${f3(a / 2)}`;
+      }
+      if (p.kind === 'path3d') {
+        const deep = Math.min(...p.points.map((q) => q.z));
+        const rises: string[] = [];
+        for (let i = 1; i < p.points.length; i++)
+          if (p.points[i]!.z > p.points[i - 1]!.z + 1e-9 && Math.abs(p.points[i - 1]!.z - deep) < 1e-9) rises.push(`${f3(p.points[i]!.x)},${f3(p.points[i]!.y)}`);
+        return `path3d deep ${f3(deep)} start ${f3(p.points[0]!.x)},${f3(p.points[0]!.y)} rises@ ${rises.sort().join(' ')}`;
+      }
+      return p.kind;
+    })
+    .join(' ; ');
+}
+it('N1 CNC: profile climb / default direction / on-path, and manual tab anchors', () => {
+  const mk = (anchors: boolean, closed = true) =>
+    ({
+      kind: 'imported-svg', id: 'a', source: 'a.svg', bounds: { minX: 20, minY: 20, maxX: 60, maxY: 40 }, transform: IDENTITY_TRANSFORM,
+      paths: [{ color: '#ff0000', polylines: [{ closed, points: sq(20, 20, 40, 20) }] }],
+      ...(anchors ? { cncTabAnchors: [{ layerColor: '#ff0000', pathIndex: 0, polylineIndex: 0, pathT: 0.05 }, { layerColor: '#ff0000', pathIndex: 0, polylineIndex: 0, pathT: 0.4 }] } : {}),
+    }) as unknown as ImportedSvg;
+  const cases: [string, Record<string, unknown>, boolean, boolean][] = [
+    ['outside climb', { cutType: 'profile-outside', tabsEnabled: false }, false, true],
+    ['outside default-direction', { cutType: 'profile-outside', tabsEnabled: false, cutDirection: undefined }, false, true],
+    ['profile-on-path', { cutType: 'profile-on-path', tabsEnabled: false }, false, true],
+    ['on-path open', { cutType: 'profile-on-path', tabsEnabled: false }, false, false],
+    ['outside climb manual tabs', { cutType: 'profile-outside', tabsEnabled: true, tabHeightMm: 2, tabWidthMm: 4 }, true, true],
+    ['on-path manual tabs', { cutType: 'profile-on-path', tabsEnabled: true, tabHeightMm: 2, tabWidthMm: 4 }, true, true],
+  ];
+  for (const [name, cnc, anchors, closed] of cases) {
+    resetStore();
+    clearToasts();
+    const o = mk(anchors, closed);
+    const p0 = proj([o], []);
+    setProject(p0, ['a']);
+    st().reverseSelectedPaths();
+    const a = st().project.scene.objects[0] as ImportedSvg;
+    out(`N1 ${name}: toast ${toasts().join(' // ')}; anchors ${JSON.stringify(a.cncTabAnchors?.map((x) => f3(x.pathT)))}`);
+    out(`N1 ${name} before: ${cncDesc(cncScene([o], cnc))}`);
+    out(`N1 ${name} after : ${cncDesc(cncScene([a], cnc))}`);
+  }
+});
+
+it.skip('P1 drawn polyline shapes: exact and freehand (round fairing)', () => {
+  const L = layer('L', 'line', 1000, 50);
+  const raw = [{ x: 10, y: 10 }, { x: 20, y: 30 }, { x: 35, y: 12 }, { x: 50, y: 30 }, { x: 60, y: 10 }];
+  for (const [mode, closed] of [['exact', false], ['exact', true], ['round', false], ['round', true]] as const) {
+    resetStore();
+    clearToasts();
+    const s = { ...createPolyline({ id: 's', color: '#000000', spec: { points: raw, closed } as never, fairingMode: mode }), operationIds: ['L'] } as ShapeObject;
+    const r = reverseOf([s], [L], ['s'], { optimization: { ...proj([], []).optimization, pathDirection: 'preserve' } });
+    const a = r.after.scene.objects[0] as ShapeObject;
+    const spec = a.spec as unknown as { points: V[]; closed: boolean };
+    out(`P1 ${mode} closed=${closed}: toast ${r.toast}; spec points ${(s.spec as unknown as { points: V[] }).points.length} -> ${spec.points.length}; first ${f3(spec.points[0]!.x)},${f3(spec.points[0]!.y)}; curves ${a.paths[0]!.curves?.length}`);
+    const gb = burn(r.before), ga = burn(r.after);
+    out(`P1 ${mode} closed=${closed}: lit ${f3(totalLen(gb.moves))} -> ${f3(totalLen(ga.moves))}; first lit ${f3(gb.moves[0]!.from.x)},${f3(gb.moves[0]!.from.y)} -> ${f3(ga.moves[0]!.from.x)},${f3(ga.moves[0]!.from.y)}`);
+    st().undo();
+    out(`P1 ${mode} closed=${closed}: undo exact ${JSON.stringify(st().project.scene) === JSON.stringify(r.before.scene)}`);
+  }
+});
+
+it.skip('D1 degenerate and big input', () => {
+  const one = { color: '#000000', polylines: [{ points: [{ x: 1, y: 1 }], closed: false }, { points: [], closed: true }] };
+  out(`D1 one-point/empty: ${JSON.stringify(reversePaths([one]))}`);
+  // curve paired with a 1-point polyline (count still pairs)
+  const mixed = { color: '#000000', polylines: [{ points: [{ x: 0, y: 0 }], closed: false }, { points: [{ x: 0, y: 0 }, { x: 5, y: 0 }], closed: false }],
+    curves: [{ start: { x: 0, y: 0 }, closed: false, segments: [{ kind: 'line' as const, to: { x: 3, y: 0 } }] }, { start: { x: 0, y: 0 }, closed: false, segments: [{ kind: 'line' as const, to: { x: 5, y: 0 } }] }] };
+  const rm = reversePaths([mixed]);
+  out(`D1 1-point polyline + 1-seg curve: reversed ${rm.reversed}; poly0 ${JSON.stringify(rm.paths[0]!.polylines[0]!.points)} curve0 start ${JSON.stringify(rm.paths[0]!.curves![0]!.start)}`);
+  const mismatch = { color: '#000000', polylines: [{ points: [{ x: 0, y: 0 }, { x: 5, y: 0 }], closed: false }], curves: [] };
+  out(`D1 mismatch: reversed ${reversePaths([mismatch]).reversed}`);
+  // NaN point
+  const nan = { color: '#000000', polylines: [{ points: [{ x: 0, y: 0 }, { x: Number.NaN, y: 0 }, { x: 5, y: 5 }], closed: true }] };
+  out(`D1 NaN: ${JSON.stringify(reversePaths([nan]).paths[0]!.polylines[0])}`);
+  // perf
+  const many = Array.from({ length: 20000 }, (_, i) => ({ color: '#000000', polylines: [{ points: sq(i % 100, Math.floor(i / 100), 0.5, 0.5), closed: true }] }));
+  const t0 = performance.now();
+  const rr = reversePaths(many);
+  out(`D1 20000 paths: ${rr.reversed} reversed in ${f3(performance.now() - t0)} ms`);
+  // twice = identity?
+  const o = { color: '#000000', polylines: [{ points: [...sq(0, 0, 3, 3), { x: 0, y: 0 }], closed: true }, { points: sq(0, 0, 3, 3), closed: true }, { points: [{ x: 0, y: 0 }, { x: 1, y: 2 }], closed: false }] };
+  const twice = reversePaths(reversePaths([o]).paths).paths;
+  out(`D1 reverse twice identity: ${JSON.stringify(twice) === JSON.stringify([o])}`);
+});

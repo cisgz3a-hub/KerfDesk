@@ -1,0 +1,84 @@
+// @vitest-environment jsdom
+// T35 refuter R2: how often does Close Path make a partly retraced ring from single-line font strokes?
+// Per glyph subpath: Close Path's own decision, then the closed ring's even-odd outline vs its own length.
+import { writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  flattenCurveSubpath,
+  IDENTITY_TRANSFORM,
+  type ColoredPath,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type Vec2,
+} from '../t31-main/src/core/scene';
+import { closeOpenPaths, isCloseablePolyline, retracesItself } from '../t31-main/src/core/geometry/path-direction-edits';
+import { normalizeClosedPolylinesEvenOddChecked } from '../t31-main/src/core/geometry/polygon-difference';
+import { textToPolylines } from '../t31-main/src/core/text/text-to-polylines';
+import { prepareOutput } from '../t31-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t31-main/src/io/gcode/emit-gcode';
+import { fmt, litSegments, total } from './gdec';
+
+const lines: string[] = [];
+const log = (s: string) => {
+  lines.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t35r/r4.log', lines.join('\n'));
+};
+const FONTS = ['relief-single-line', 'ems-nixish', 'ems-decorous-script', 'ems-casual-hand'] as const;
+const CHARS = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ&@';
+const perim = (pts: ReadonlyArray<Vec2>, closed: boolean) => {
+  let p = 0;
+  const n = pts.length;
+  for (let i = 0; i < (closed ? n : n - 1); i += 1) {
+    const a = pts[i]!;
+    const b = pts[(i + 1) % n]!;
+    p += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  return p;
+};
+
+function lostOnClose(path: ColoredPath, index: number): { lost: number; ring: number } | null {
+  const curve = path.curves?.[index];
+  const pts = curve
+    ? (() => {
+        const f = flattenCurveSubpath(curve, { toleranceMm: 0.005, segmentBudget: 50_000 });
+        return f.kind === 'ok' ? f.polyline.points : null;
+      })()
+    : path.polylines[index]!.points;
+  if (!pts) return null;
+  const ring = perim(pts, true);
+  const norm = normalizeClosedPolylinesEvenOddChecked([{ points: pts, closed: true }]);
+  if (norm.kind !== 'ok') return null;
+  const outline = norm.value.reduce((a, r) => a + perim(r.points, true), 0);
+  return { lost: (ring - outline) / 2, ring };
+}
+
+async function render(fontKey: string, content: string) {
+  return textToPolylines({ geometry: 'single-line', fontKey, content, sizeMm: 20, alignment: 'left', lineHeight: 1.2, color: '#000000' } as never);
+}
+
+const burnLen = (paths: ReadonlyArray<ColoredPath>, kerf: number) => {
+  const base = createProject();
+  const L = { ...createLayer({ id: 'L', color: '#000000', name: 'Cut', mode: 'line' }), speed: 1200, power: 60, kerfOffsetMm: kerf } as Layer;
+  const o = {
+    kind: 'imported-svg', id: 'g', source: 'g.svg', operationIds: ['L'], bounds: { minX: 0, minY: 0, maxX: 200, maxY: 30 },
+    transform: { ...IDENTITY_TRANSFORM, x: 50, y: 50 }, paths,
+  } as unknown as ImportedSvg;
+  const p: Project = { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects: [o], layers: [L], groups: [] } };
+  const prep = prepareOutput(p);
+  if (!prep.ok) return NaN;
+  return total(litSegments(emitPreparedGcode(prep).gcode));
+};
+
+it('R4 glyph pipeline', async () => {
+  void FONTS; void CHARS; void isCloseablePolyline; void retracesItself;
+  for (const [font, word] of [['relief-single-line', 'P'], ['relief-single-line', 'R'], ['ems-nixish', 'H'], ['ems-nixish', 'T'], ['ems-nixish', 'p'], ['ems-decorous-script', 't'], ['ems-casual-hand', 'P']] as const) {
+    const r = await render(font, word);
+    const closed = closeOpenPaths(r.paths, IDENTITY_TRANSFORM);
+    const lost = closed.paths.flatMap((p) => p.polylines.map((_pl, i) => lostOnClose(p, i)?.lost ?? 0)).reduce((a, b) => a + b, 0);
+    log(`pipeline ${font} "${word}": Close Path closed ${closed.closed}; overlap≈${fmt(lost)}; open k0 ${fmt(burnLen(r.paths, 0))}, open k0.1 ${fmt(burnLen(r.paths, 0.1))}; closed k0 ${fmt(burnLen(closed.paths, 0))}, closed k0.1 ${fmt(burnLen(closed.paths, 0.1))}, closed k-0.1 ${fmt(burnLen(closed.paths, -0.1))}`);
+  }
+});
