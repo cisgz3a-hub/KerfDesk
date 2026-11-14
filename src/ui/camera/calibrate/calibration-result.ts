@@ -180,10 +180,20 @@ function extrapolationAdvice(record: CameraModelRecord): string | null {
     offTarget === null
       ? 'outside the target the picture is estimated.'
       : `outside the target the picture is estimated, and may be up to about ${roundToTenth(offTarget.worstMm)} mm off ${bedRegion(offTarget)}.`;
-  const fix = large
-    ? ' Engrave the target on a larger sheet, one that covers more of the bed the camera sees, to measure more of it.'
-    : '';
+  // A sheet that already covers the bed cannot be made larger (camera audit v2 K1-P2-1).
+  const fix =
+    large && !targetCoversBed(record)
+      ? ' Engrave the target on a larger sheet, one that covers more of the bed the camera sees, to measure more of it.'
+      : '';
   return `${outside} The accuracy is measured on its rings; ${estimate}${fix}`;
+}
+
+// The target reaches to within this much of every bed edge: a whole-bed sheet.
+const WHOLE_BED_MARGIN_MM = 15;
+
+function targetCoversBed(record: CameraModelRecord): boolean {
+  const area = record.accuracy.targetArea;
+  return area !== undefined && area.x <= WHOLE_BED_MARGIN_MM && area.y <= WHOLE_BED_MARGIN_MM;
 }
 
 function outsideSentence(share: number | null): string {
