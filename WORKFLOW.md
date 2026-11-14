@@ -9701,6 +9701,17 @@ Simulator-tested only; no real JCZ board has run this path.
    they do so at the same DPI so physical scale stays honest; the status row
    shows the resulting mm size before commit.
 
+#### Edge — the trace was moved, scaled, turned, mirrored or copied
+1. Re-trace keeps the operator's offset from the photo (ADR-408 Amendment 1):
+   a trace still on its photo stays registered, and one nudged, scaled to a
+   blank, turned, mirrored or copied onto a second blank stays where it was
+   put. Vector and Raster scan output both keep it.
+2. A same-mode re-trace keeps the trace's operations by colour, with their
+   power, speed and passes, and its name, power scale and per-operation
+   overrides. A colour the old trace lacked, or a changed trace mode, gets a
+   new operation. The toast says "Re-traced <name> in place … kept its place"
+   and which of these happened.
+
 ### F-L4. Editor history and sessions
 
 #### Success
