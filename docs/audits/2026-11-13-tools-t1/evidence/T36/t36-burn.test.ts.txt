@@ -1,0 +1,195 @@
+// @vitest-environment jsdom
+// T36 Reverse Direction: store action + G-code decode before/after.
+import { beforeEach, it } from 'vitest';
+import {
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type Transform,
+} from '../t36-main/src/core/scene';
+import { serializeProject } from '../t36-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t36-main/src/io/project/deserialize-project';
+import { resetStore } from '../t36-main/src/ui/state/test-helpers';
+import { totalLen, type LitMove } from './decode';
+import { burn, clearToasts, f3, layer, logger, proj, setProject, st, toasts } from './common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t36/t36-burn2.log');
+beforeEach(() => {
+  resetStore();
+  clearToasts();
+});
+type V = { x: number; y: number };
+const svgObj = (
+  id: string,
+  pts: V[][],
+  closed: boolean,
+  t: Partial<Transform> = {},
+  extra: Record<string, unknown> = {},
+  op = 'L',
+): ImportedSvg =>
+  ({
+    kind: 'imported-svg', id, source: `${id}.svg`, operationIds: [op],
+    bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 }, transform: { ...IDENTITY_TRANSFORM, ...t },
+    paths: [{ color: '#000000', polylines: pts.map((points) => ({ points, closed })) }],
+    ...extra,
+  }) as ImportedSvg;
+const sq = (x: number, y: number, w: number, h: number): V[] => [
+  { x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h },
+];
+
+function reverseOf(objects: SceneObject[], layers: Layer[], sel: string[], extra: Partial<Project> = {}) {
+  const p0 = proj(objects, layers, extra);
+  setProject(p0, sel);
+  st().reverseSelectedPaths();
+  return { before: p0, after: st().project, toast: toasts().join(' // ') };
+}
+// Lit moves split into continuous runs (a run ends where the next lit move does not start at its end).
+function runs(moves: LitMove[]): LitMove[][] {
+  const r: LitMove[][] = [];
+  for (const m of moves) {
+    const cur = r.at(-1);
+    const last = cur?.at(-1);
+    if (cur && last && Math.hypot(last.to.x - m.from.x, last.to.y - m.from.y) < 1e-3) cur.push(m);
+    else r.push([m]);
+  }
+  return r;
+}
+const signedArea = (run: LitMove[]) =>
+  run.reduce((a, m) => a + (m.from.x * m.to.y - m.to.x * m.from.y), 0) / 2;
+const desc = (moves: LitMove[]) =>
+  runs(moves)
+    .map((r) => `[start ${f3(r[0]!.from.x)},${f3(r[0]!.from.y)} end ${f3(r.at(-1)!.to.x)},${f3(r.at(-1)!.to.y)} len ${f3(totalLen(r))} area ${f3(signedArea(r))} n${r.length}]`)
+    .join(' ');
+function cmp(tag: string, before: Project, after: Project) {
+  const a = burn(before);
+  const b = burn(after);
+  if (!a.ok || !b.ok) {
+    out(`${tag}: NOT OK ${a.why} ${b.why}`);
+    return;
+  }
+  out(`${tag} before: lit ${f3(totalLen(a.moves))} ${desc(a.moves)}`);
+  out(`${tag} after : lit ${f3(totalLen(b.moves))} ${desc(b.moves)}`);
+  out(`${tag} gcode identical: ${a.gcode === b.gcode}`);
+}
+
+it.skip('R closed square, line op: start kept, direction flips, lit same', () => {
+  const L = layer('L', 'line', 1000, 50);
+  const r = reverseOf([svgObj('a', [sq(10, 10, 30, 20)], true)], [L], ['a']);
+  out(`R1 toast ${r.toast}; pts ${JSON.stringify((r.after.scene.objects[0] as ImportedSvg).paths[0]!.polylines[0]!.points)}`);
+  cmp('R1', r.before, r.after);
+  st().undo();
+  out(`R1 undo exact: ${JSON.stringify(st().project.scene) === JSON.stringify(r.before.scene)}`);
+  st().redo();
+  out(`R1 redo exact: ${JSON.stringify(st().project.scene) === JSON.stringify(r.after.scene)}`);
+  const re = deserializeProject(serializeProject(st().project)) as unknown as { project?: Project; value?: Project };
+  const rp = re.project ?? re.value ?? (re as unknown as Project);
+  out(`R1 save/reopen pts: ${JSON.stringify((rp.scene.objects[0] as ImportedSvg).paths[0]!.polylines[0]!.points)}`);
+});
+
+it.skip('R open polyline: default planner vs preserve', () => {
+  const L = layer('L', 'line', 1000, 50);
+  const pts = [[{ x: 10, y: 10 }, { x: 60, y: 10 }, { x: 60, y: 40 }]];
+  for (const opt of [{}, { pathDirection: 'preserve' }, { pathDirection: 'preserve', travelPolicy: 'source-order' }, { travelPolicy: 'source-order' }]) {
+    resetStore();
+    clearToasts();
+    const base = proj([], []);
+    const r = reverseOf([svgObj('a', pts, false)], [L], ['a'], { optimization: { ...base.optimization, ...opt } as Project['optimization'] });
+    out(`R2 opt ${JSON.stringify(opt)} toast ${r.toast}`);
+    cmp(`R2 ${JSON.stringify(opt)}`, r.before, r.after);
+  }
+});
+
+it.skip('R closed square with kerf, lead-in, overcut, closedShapeStart', () => {
+  const variants: [string, Partial<Layer>, Record<string, unknown>][] = [
+    ['kerf+0.1', { kerfOffsetMm: 0.1 }, {}],
+    ['kerf-0.1', { kerfOffsetMm: -0.1 }, {}],
+    ['lead-in line', { leadInEnabled: true, leadOutEnabled: true, leadStyle: 'line', leadLengthMm: 2, leadSide: 'outside' } as Partial<Layer>, {}],
+    ['lead-in arc auto', { leadInEnabled: true, leadStyle: 'arc', leadLengthMm: 2 } as Partial<Layer>, {}],
+    ['overcut 3', { overcutMm: 3 } as Partial<Layer>, {}],
+    ['nearest start', {}, { closedShapeStart: 'nearest' }],
+    ['nearest-corner', {}, { closedShapeStart: 'nearest-corner' }],
+  ];
+  for (const [name, lay, opt] of variants) {
+    resetStore();
+    clearToasts();
+    const L = layer('L', 'line', 1000, 50, lay);
+    const base = proj([], []);
+    // start mid-edge so start-rotation is visible
+    const pts = [{ x: 25, y: 10 }, { x: 40, y: 10 }, { x: 40, y: 30 }, { x: 10, y: 30 }, { x: 10, y: 10 }];
+    const r = reverseOf([svgObj('a', [pts], true)], [L], ['a'], { optimization: { ...base.optimization, ...opt } as Project['optimization'] });
+    out(`R3 ${name} toast ${r.toast}`);
+    cmp(`R3 ${name}`, r.before, r.after);
+  }
+});
+
+it.skip('R mirrored and rotated object: world direction flips relative to before', () => {
+  const L = layer('L', 'line', 1000, 50);
+  for (const t of [{ mirrorX: true, x: 50, y: 50 }, { scaleX: -1, x: 50, y: 50 }, { rotationDeg: 90, x: 50, y: 50 }]) {
+    resetStore();
+    clearToasts();
+    const r = reverseOf([svgObj('a', [sq(0, 0, 30, 20)], true, t as Partial<Transform>)], [L], ['a']);
+    cmp(`R4 ${JSON.stringify(t)}`, r.before, r.after);
+  }
+});
+
+it.skip('R outer + hole in one object, inside-first; line op', () => {
+  const L = layer('L', 'line', 1000, 50);
+  const outer = sq(10, 10, 40, 40);
+  const hole = [...sq(20, 20, 10, 10)].reverse();
+  const r = reverseOf([svgObj('a', [outer, hole], true)], [L], ['a']);
+  out(`R5 toast ${r.toast}`);
+  cmp('R5', r.before, r.after);
+});
+
+it.skip('R fill: one object reversed among overlapping nonzero / evenodd objects', () => {
+  for (const fillRule of ['nonzero', 'evenodd'] as const) {
+    resetStore();
+    clearToasts();
+    const F = layer('F', 'fill', 1000, 50, { hatchSpacingMm: 0.5 } as Partial<Layer>);
+    const mk = (id: string, pts: V[]) =>
+      ({ ...svgObj(id, [pts], true, {}, {}, 'F'), paths: [{ color: '#000000', fillRule, polylines: [{ points: pts, closed: true }] }] }) as ImportedSvg;
+    const a = mk('a', sq(10, 10, 40, 40));
+    const b = mk('b', sq(20, 20, 10, 10));
+    const r = reverseOf([a, b], [F], ['b']);
+    const x = burn(r.before);
+    const y = burn(r.after);
+    out(`R6 ${fillRule} toast ${r.toast}; fill lit before ${f3(totalLen(x.moves))} after ${f3(totalLen(y.moves))} identical ${x.gcode === y.gcode}`);
+    // reversal inside one object with outer+hole
+    resetStore();
+    clearToasts();
+    const c = { ...svgObj('c', [], true, {}, {}, 'F'), paths: [{ color: '#000000', fillRule, polylines: [{ points: sq(10, 10, 40, 40), closed: true }, { points: sq(20, 20, 10, 10), closed: true }] }] } as ImportedSvg;
+    const r2 = reverseOf([c], [F], ['c']);
+    const x2 = burn(r2.before);
+    const y2 = burn(r2.after);
+    out(`R6b ${fillRule} single-object same-winding pair: lit before ${f3(totalLen(x2.moves))} after ${f3(totalLen(y2.moves))} identical ${x2.gcode === y2.gcode}`);
+  }
+});
+
+it.skip('R enable rule and skipped kinds: text, rectangle, locked, polyline shape', async () => {
+  const { rect, textObj } = await import('./common');
+  const L = layer('L', 'line', 1000, 50);
+  const t = await textObj('t', 'A', { x: 10, y: 10 }, ['L']);
+  const rc = rect('r', 20, 10, { x: 50, y: 50 }, { operationIds: ['L'] });
+  const locked = svgObj('k', [sq(0, 0, 5, 5)], true, {}, { locked: true });
+  for (const sel of [['t'], ['r'], ['k'], ['t', 'r', 'k']]) {
+    resetStore();
+    clearToasts();
+    const r = reverseOf([t, rc, locked], [L], sel);
+    out(`R7 sel ${sel.join(',')}: toast ${r.toast}; changed ${r.before !== r.after}; undo ${st().undoStack.length}`);
+  }
+});
+
+it('R8 mixed selection text + svg + traced; metadata kept', async () => {
+  const { textObj } = await import('./common');
+  const L = layer('L', 'line', 1000, 50);
+  const t = await textObj('t', 'A', { x: 10, y: 10 }, ['L']);
+  const s = svgObj('a', [sq(10, 10, 30, 20)], true, { x: 5 }, { name: 'Part A', powerScale: 80, operationOverrides: { L: { speed: 500 } }, libraryAsset: { id: 'x' } });
+  const tr = { ...svgObj('tr', [sq(50, 50, 10, 10)], true), kind: 'traced-image', sourceImageId: 'img' } as unknown as SceneObject;
+  const r = reverseOf([t, s, tr], [L], ['t', 'a', 'tr']);
+  const a = r.after.scene.objects[1] as unknown as Record<string, unknown>;
+  const b = r.before.scene.objects[1] as unknown as Record<string, unknown>;
+  const diffKeys = Object.keys({ ...a, ...b }).filter((k) => JSON.stringify(a[k]) !== JSON.stringify(b[k]));
+  out(`R8 toast ${r.toast}; svg keys changed ${diffKeys.join(',')}; traced kind ${r.after.scene.objects[2]!.kind} changed ${r.after.scene.objects[2] !== r.before.scene.objects[2]}; text same ${r.after.scene.objects[0] === r.before.scene.objects[0]}`);
+});
