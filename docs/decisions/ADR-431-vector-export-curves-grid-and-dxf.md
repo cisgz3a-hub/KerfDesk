@@ -174,8 +174,9 @@ Frame-first contract (PROJECT.md non-negotiable 21, ADRs 228, 230, 232 and 237) 
    ("Could not read 1 image (b.png: <message>); it was skipped.") and uses the error style only when nothing
    was written. The batch's own Cancel still ends the whole batch. Trace notices are keyed by the
    file's position, so a skipped file cannot move a notice onto its neighbour.
-   The batch shares the one trace worker with the Trace Image dialog, whose live preview
-   supersedes every pending trace. A trace superseded by another caller while the batch's own
+   (The Amendment of 2026-11-14 gives the batch its own worker; the shared-worker text that
+   follows is kept as the history.) The batch shares the one trace worker with the Trace Image
+   dialog, whose live preview supersedes every pending trace. A trace superseded by another caller while the batch's own
    signal is not aborted is retried twice; a file still interrupted then becomes a
    `trace-failed` skip ("Another trace (such as a Trace Image preview) kept interrupting this
    file."), so ordinary editor use cannot end the batch. Only one batch runs at a time: starting
@@ -243,3 +244,55 @@ stored colour only while that colour names its operation alone, so imported artw
 authored; otherwise it takes the operation's colour. DXF therefore has one layer per operation and
 distinct operations stay distinct in the file (rolling audit v7 L7-P2-1). ADR-681 item 2
 writes a Fill operation of two or more objects as one even-odd SVG path, the region it burns.
+
+### Amendment: Multi-File Trace traces on its own worker (2026-11-14)
+
+Tools audit T1, area T25 (`docs/audits/2026-11-13-tools-t1/`), confirmed two P2s that came from
+the batch and the Trace Image dialog sharing one trace worker (Amendment 2026-09-27, item 1):
+
+- **T25-P2-1.** Every new request on the shared client superseded every pending one, and the
+  batch retried its own superseded trace at once, so the retry superseded the dialog's preview or
+  commit in turn. The dialog drops a superseded commit without a word, and nothing disables Trace
+  Image during a batch (the progress panel is non-modal), so a Trace press made at any time during
+  a batch did nothing and said nothing. With real files that is minutes; eight presses in a row
+  all lost, and the presses used up the batch's retries.
+- **T25R-P2-1.** The "kept interrupting" error counted as a failure of the file's finer grid, so
+  the file fell back to the preview grid (1000 x 750 instead of the planned 2744 x 2058) with a
+  notice that blamed the device ("This device could not trace the image at full resolution") and
+  named no file.
+
+This replaces the shared-worker sentence of item 1:
+
+1. **Two clients, two workers.** `use-trace-worker-client.ts` keeps its worker, epochs and
+   pending requests in a per-client state. The exported `traceImage` and `traceImageWithFallback`
+   use the default client, which the Trace Image dialog's preview, commit and region traces use as
+   before. `createTraceWorkerClient()` makes another client with its own worker; a request
+   supersedes only the requests of its own client. Each Multi-File Trace makes one when it starts
+   and disposes of it (its worker terminated) when it ends, cancelled or not. The batch's Cancel
+   still supersedes the batch's own request. The dialog and the batch therefore never interrupt
+   each other: a preview or Trace press during a batch lands, and the batch keeps its planned
+   grid. Supersession inside one client (a newer preview replacing an older one, TR-020) is
+   unchanged. While both run, two traces can be in memory at once, one in each worker; each is
+   still held to its own grid budget (ADR-409).
+2. **An interrupted file is skipped, never traced coarser.** The batch keeps its retry of a
+   superseded trace (an injected tracer or a late worker answer can still raise one). A file still
+   interrupted after two retries throws `TraceInterruptedError`, which the batch skips with the
+   "kept interrupting" message and never treats as a reason to fall back to the preview grid.
+3. **A preview-grid fallback names the file and the cause.** When a file's finer grid fails for
+   any other reason and the file is traced on the preview grid, the batch notice names each such
+   file with the error its finer grid hit ("Could not trace a.png (<message>) at full resolution,
+   so its trace uses the preview resolution.") and uses the warning style. The single-image
+   dialog's wording is unchanged.
+
+The Frame-first contract (PROJECT.md non-negotiable 21, ADRs 228, 230, 232 and 237) is untouched:
+no scene, compile, G-code, Frame or Start path reads this code.
+
+Evidence: `src/ui/commands/multi-file-trace-own-worker.test.ts` runs the real worker client and
+the real batch over a fake `Worker` that answers only when the test says so (a Trace press during
+a batch file lands; a preview during a batch lands; a preview and two presses during one batch
+file leave every batch trace on the finer grid with a success notice; the batch's worker is
+terminated at the end and the dialog's is not). `multi-file-trace-action-cancel.test.ts` (a file
+whose finer trace keeps being superseded is retried twice on the finer grid, then skipped with
+the "kept interrupting" message, never traced at the preview grid) and
+`multi-file-trace-action.test.ts` (the fallback notice names the file and the error). All six
+fail on main `53393cc16`.

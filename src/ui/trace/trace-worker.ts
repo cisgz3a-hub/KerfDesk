@@ -13,7 +13,7 @@
 //
 // Vite loads this from the direct
 // `new Worker(new URL('./trace-worker.ts', import.meta.url), { type: 'module' })`
-// expression in use-trace-worker-client.ts. That call-site shape is
+// expression in trace-worker-transport.ts. That call-site shape is
 // what makes Vite bundle the worker instead of shipping raw TS.
 
 /// <reference lib="webworker" />
