@@ -1,0 +1,39 @@
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { IDENTITY_TRANSFORM, type ImportedSvg, type Polyline } from '../t31-main/src/core/scene';
+import { analyseJointResize, previewJointResize } from '../t31-main/src/core/geometry/joint-resize';
+import { checkBoxAssembly } from '../t31-main/src/core/box/assembly-referee';
+import { buildPanelClaims } from '../t31-main/src/core/box/panel-claims';
+import { panelOutline } from '../t31-main/src/core/box/panel-outline';
+import { applyPanelFit } from '../t31-main/src/core/box/panel-fit';
+import type { BoxSpec } from '../t31-main/src/core/box/box-spec';
+it('F: assembly referee on tool-resized panels', () => {
+  const lines: string[] = [];
+  const spec3: BoxSpec = { widthMm: 60, depthMm: 40, heightMm: 30, dimensionMode: 'inner', thicknessMm: 3, targetFingerWidthMm: 9, style: 'closed', clearanceMm: 0, relief: { kind: 'none' }, partSpacingMm: 8 };
+  const locals = (spec: BoxSpec) => buildPanelClaims(spec).map((claims) => {
+    const fit = applyPanelFit({ outline: panelOutline(claims), cutouts: [] }, { clearanceMm: spec.clearanceMm, relief: spec.relief });
+    if (fit.kind !== 'fitted') throw new Error('fit');
+    return { panel: claims.panel, outline: fit.outline };
+  });
+  const l3 = locals(spec3);
+  lines.push(`T3 generator vs T3 spec: ${JSON.stringify(checkBoxAssembly(l3, spec3))}`);
+  const req = { currentWidthMm: 3, materialThicknessMm: 4, fitAllowanceMm: 0, detectionToleranceMm: 0.05 };
+  const resized = l3.map(({ panel, outline }) => {
+    const pts = outline.points.slice();
+    if (Math.hypot(pts[0]!.x - pts.at(-1)!.x, pts[0]!.y - pts.at(-1)!.y) < 1e-9) pts.pop();
+    const o = { kind: 'imported-svg', id: panel, source: 'x', transform: IDENTITY_TRANSFORM, bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 }, operationIds: ['cut'],
+      paths: [{ color: '#000000', operationIds: ['cut'], polylines: [{ closed: true, points: [...pts, pts[0]!] }] }] } as ImportedSvg;
+    const a = analyseJointResize([o], req);
+    if (a.kind !== 'ok') throw new Error('a');
+    const r = previewJointResize([o], req, a.value.candidates.map((c) => c.id));
+    if (r.kind !== 'ok') return { panel, outline };
+    lines.push(`${panel}: ${a.value.candidates.length} candidates applied`);
+    return { panel, outline: (r.value.objects[0] as ImportedSvg).paths[0]!.polylines[0]! as Polyline };
+  });
+  const inner4 = { ...spec3, thicknessMm: 4 };
+  const outer4: BoxSpec = { ...spec3, dimensionMode: 'outer', widthMm: 66, depthMm: 46, heightMm: 36, thicknessMm: 4 };
+  lines.push(`tool-resized vs T4 inner spec: ${checkBoxAssembly(resized, inner4).length} issues: ${JSON.stringify(checkBoxAssembly(resized, inner4).slice(0, 6))}`);
+  lines.push(`tool-resized vs T4 outer spec (66x46x36): ${checkBoxAssembly(resized, outer4).length} issues: ${JSON.stringify(checkBoxAssembly(resized, outer4).slice(0, 4))}`);
+  lines.push(`T4 generator vs T4 inner spec: ${JSON.stringify(checkBoxAssembly(locals(inner4), inner4))}`);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t31/t31-referee.log', lines.join('\n'));
+});

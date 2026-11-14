@@ -1,0 +1,355 @@
+// @vitest-environment jsdom
+// T32 refuter: own repro of T32-P1-1 and T32-P2-1 on the real modules, own G-code decoder,
+// own face oracles (raster luma mirror; even-odd glyph polygons).
+import { readFileSync, writeFileSync } from 'node:fs';
+import { beforeEach, it, vi } from 'vitest';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  DEFAULT_PROJECT_VARIABLE_DATA,
+  IDENTITY_TRANSFORM,
+  type Layer,
+  type Project,
+  type RasterImage,
+  type SceneObject,
+} from '../t31-main/src/core/scene';
+import { toSceneCoords } from '../t31-main/src/core/devices';
+import { prepareStampHeight } from '../t31-main/src/core/raster/stamp-height';
+import { canPrepareStamp, prepareStampSource } from '../t31-main/src/ui/raster/stamp-source';
+import { applyStampDraft, stampDraftImage } from '../t31-main/src/ui/state/stamp-preparation-actions';
+import { lumaToBase64 } from '../t31-main/src/ui/raster/luma-bitmap';
+import { prepareOutput } from '../t31-main/src/io/gcode/prepare-output';
+import { prepareOutputSnapshot, type VariableTextRenderer } from '../t31-main/src/io/gcode/prepare-output-snapshot';
+import { emitPreparedGcode } from '../t31-main/src/io/gcode/emit-gcode';
+import { textToPolylines } from '../t31-main/src/core/text';
+import { parseVariableTemplateSource } from '../t31-main/src/core/variables/template-source';
+import { evaluateVariableTemplate } from '../t31-main/src/core/variables/evaluate-template';
+import { detectJobIntentWarnings } from '../t31-main/src/ui/laser/job-intent-warnings';
+import { useStore } from '../t31-main/src/ui/state/store';
+import { resetStore } from '../t31-main/src/ui/state/test-helpers';
+
+vi.mock('../t31-main/src/ui/raster/convert-bitmap-worker-client', async () => {
+  const asm = await import('../t31-main/src/ui/raster/bitmap-assembly');
+  const lb = await import('../t31-main/src/ui/raster/luma-bitmap');
+  return {
+    convertBitmapInWorker: (vectors: never, options: never, id: string) =>
+      asm.assembleBitmapAsync(vectors, async (r) => ({ dataUrl: 'data:image/png;base64,AA==', lumaBase64: lb.lumaToBase64(r.luma) }), id, options),
+    resetConvertBitmapWorkerForTests: () => undefined,
+  };
+});
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t32r/r32.log';
+const log: string[] = [];
+const out = (s: string) => { log.push(s); writeFileSync(LOG, log.join('\n')); };
+const f3 = (n: number) => n.toFixed(3);
+beforeEach(() => resetStore());
+
+const font = (name: string) => {
+  const b = readFileSync(`C:/Users/stolk/kd-t1/t31-main/src/ui/text/fonts/${name}`);
+  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+};
+const TINOS = font('Tinos-Regular.ttf');
+const ROBOTO = font('Roboto-Regular.ttf');
+
+// ---------- own G-code decoder ----------
+type P = { x: number; y: number };
+type Seg = { a: P; b: P; s: number; len: number };
+function decode(gcode: string, project: Project): Seg[] {
+  let x = 0, y = 0, s = 0, motion = 0, on = false, abs = true;
+  const segs: Seg[] = [];
+  for (const raw of gcode.split(/\r?\n/)) {
+    const line = raw.split(';')[0]!.replace(/\([^)]*\)/g, '').trim().toUpperCase();
+    if (line === '') continue;
+    const words = line.match(/[A-Z][-+]?[0-9]*\.?[0-9]+/g) ?? [];
+    let nx: number | undefined, ny: number | undefined;
+    for (const w of words) {
+      const k = w[0]!, v = Number(w.slice(1));
+      if (k === 'G') {
+        if (v === 0 || v === 1) motion = v;
+        else if (v === 90) abs = true;
+        else if (v === 91) abs = false;
+      } else if (k === 'M') {
+        if (v === 3 || v === 4) on = true;
+        else if (v === 5 || v === 2 || v === 30) on = false;
+      } else if (k === 'S') s = v;
+      else if (k === 'X') nx = v;
+      else if (k === 'Y') ny = v;
+    }
+    if (nx === undefined && ny === undefined) continue;
+    const tx = nx === undefined ? x : abs ? nx : x + nx;
+    const ty = ny === undefined ? y : abs ? ny : y + ny;
+    if (motion === 1 && on && s > 0) {
+      const a = toSceneCoords({ x, y }, project.device);
+      const b = toSceneCoords({ x: tx, y: ty }, project.device);
+      segs.push({ a, b, s, len: Math.hypot(b.x - a.x, b.y - a.y) });
+    }
+    x = tx; y = ty;
+  }
+  return segs;
+}
+function burn(project: Project): Seg[] {
+  const prepared = prepareOutput(project);
+  if (!prepared.ok) throw new Error('prepare failed ' + JSON.stringify(prepared).slice(0, 300));
+  return decode(emitPreparedGcode(prepared).gcode, project);
+}
+const withOutputOff = (p: Project, opId: string): Project => ({
+  ...p, scene: { ...p.scene, layers: p.scene.layers.map((l) => (l.id === opId ? { ...l, output: false } : l)) },
+});
+
+// ---------- face grid: 0.1 mm cells over a world rectangle; face(x,y) is the oracle ----------
+type Grid = { minX: number; minY: number; nx: number; ny: number; step: number; face: Uint8Array; faceCells: number };
+function makeGrid(minX: number, minY: number, maxX: number, maxY: number, step: number, isFace: (x: number, y: number) => boolean): Grid {
+  const nx = Math.round((maxX - minX) / step), ny = Math.round((maxY - minY) / step);
+  const face = new Uint8Array(nx * ny);
+  let faceCells = 0;
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++)
+    if (isFace(minX + (i + 0.5) * step, minY + (j + 0.5) * step)) { face[j * nx + i] = 1; faceCells++; }
+  return { minX, minY, nx, ny, step, face, faceCells };
+}
+function measure(segs: Seg[], g: Grid) {
+  const hit = new Uint8Array(g.nx * g.ny);
+  let onFace = 0, total = 0;
+  for (const sg of segs) {
+    total += sg.len;
+    const n = Math.max(1, Math.ceil(sg.len / 0.01));
+    for (let k = 0; k < n; k++) {
+      const t = (k + 0.5) / n;
+      const x = sg.a.x + (sg.b.x - sg.a.x) * t, y = sg.a.y + (sg.b.y - sg.a.y) * t;
+      const i = Math.floor((x - g.minX) / g.step), j = Math.floor((y - g.minY) / g.step);
+      if (i < 0 || j < 0 || i >= g.nx || j >= g.ny) continue;
+      if (g.face[j * g.nx + i]) { onFace += sg.len / n; hit[j * g.nx + i] = 1; }
+    }
+  }
+  let burnedCells = 0;
+  for (let c = 0; c < hit.length; c++) burnedCells += hit[c]!;
+  return { onFace, total, burnedCells, pct: (100 * burnedCells) / g.faceCells };
+}
+
+function evenOdd(x: number, y: number, rings: P[][]): boolean {
+  let inside = false;
+  for (const r of rings) for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+    const a = r[i]!, b = r[j]!;
+    if ((a.y > y) !== (b.y > y) && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+const ringsOf = (paths: ReadonlyArray<{ polylines: ReadonlyArray<{ points: ReadonlyArray<P> }> }>, dx: number, dy: number): P[][] =>
+  paths.flatMap((p) => p.polylines.map((pl) => pl.points.map((q) => ({ x: q.x + dx, y: q.y + dy }))));
+
+const op = (id: string, mode: 'fill' | 'image'): Layer => ({ ...createLayer({ id, color: '#000000', name: id, mode }) }) as Layer;
+function proj(objects: SceneObject[], layers: Layer[], extra: Partial<Project> = {}): Project {
+  const base = createProject();
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects, layers, groups: [] }, ...extra };
+}
+
+/** Real Prepare Stamp path minus the worker: prepareStampSource → prepareStampHeight → stampDraftImage → applyStampDraft. */
+async function stamp(project: Project, ids: string[], o: { taper?: number; mirror?: boolean; dpi?: number } = {}) {
+  useStore.setState({ project, projectDocumentEpoch: 3, selectedObjectId: ids[0]!, additionalSelectedIds: new Set(ids.slice(1)), undoStack: [], redoStack: [] });
+  const source = await prepareStampSource(project, ids, o.dpi ?? 254, new AbortController().signal);
+  const draft = prepareStampHeight(source.pixels, { threshold: 127, taperMm: o.taper ?? 0.5, mirror: o.mirror ?? true });
+  const { face, luma, ...meta } = draft;
+  const enc = { ...meta, dataUrl: 'data:image/png;base64,AA==', lumaBase64: lumaToBase64(luma), sourceDataUrl: '', faceDataUrl: '' };
+  const image = stampDraftImage(source, enc, 'STAMP-R');
+  useStore.setState((s) => applyStampDraft(s, { project, documentEpoch: 3, ids }, image));
+  return { source, draft, face, image, after: useStore.getState().project };
+}
+
+// ---------- R1: raster source, asymmetric "F" + bar, 0.1 mm pixels, every default ----------
+it('R1 raster source with defaults: face burned by the kept source op', async () => {
+  const w = 300, h = 150; // 30 x 15 mm at 0.1 mm
+  const luma = new Uint8Array(w * h).fill(255);
+  const dark = (x0: number, y0: number, x1: number, y1: number) => { for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) luma[y * w + x] = 0; };
+  dark(20, 20, 45, 130); dark(45, 20, 110, 45); dark(45, 65, 95, 88); // "F"
+  dark(150, 20, 280, 40); dark(240, 40, 260, 130); // "T"-ish, off-centre
+  const img = {
+    kind: 'raster-image', id: 'SRC', source: 'logo.png', pixelWidth: w, pixelHeight: h,
+    bounds: { minX: 0, minY: 0, maxX: 30, maxY: 15 }, transform: { ...IDENTITY_TRANSFORM, x: 40, y: 30 },
+    color: '#000000', dither: 'threshold', linesPerMm: 10, dataUrl: 'data:image/png;base64,AA==', lumaBase64: lumaToBase64(luma), operationIds: ['SRCOP'],
+  } as unknown as RasterImage;
+  const srcOp = { ...op('SRCOP', 'image'), linesPerMm: 10 } as Layer;
+  const p0 = proj([img], [srcOp]);
+  for (const mirror of [true, false]) {
+    const r = await stamp(p0, ['SRC'], { mirror });
+    const st = r.after.scene.objects.find((o) => o.id === 'STAMP-R') as RasterImage;
+    const newOp = r.after.scene.layers.find((l) => st.operationIds?.includes(l.id))!;
+    // oracle: world point → source pixel; face if the (mirrored) source pixel is dark
+    const g = makeGrid(40, 30, 70, 45, 0.1, (x, y) => {
+      const i = Math.floor((x - 40) / 0.1), j = Math.floor((y - 30) / 0.1);
+      const si = mirror ? w - 1 - i : i;
+      return luma[j * w + si]! <= 127;
+    });
+    const both = measure(burn(r.after), g);
+    const stampOnly = measure(burn(withOutputOff(r.after, 'SRCOP')), g);
+    const srcOnly = measure(burn(p0), g);
+    out(`R1 mirror=${mirror}: layers ${r.after.scene.layers.map((l) => `${l.name}[${l.mode},out=${l.output},lpm=${l.linesPerMm},S%=${l.power}]`).join(' + ')}; stamp ${st.pixelWidth}x${st.pixelHeight} px, face cells oracle ${g.faceCells}, tool facePixels ${r.draft.facePixels}`);
+    out(`R1 mirror=${mirror}: AS APPLIED  lit ${f3(both.total)} mm, on face ${f3(both.onFace)} mm, face cells burned ${both.burnedCells}/${g.faceCells} = ${f3(both.pct)} %`);
+    out(`R1 mirror=${mirror}: SOURCE OFF  lit ${f3(stampOnly.total)} mm, on face ${f3(stampOnly.onFace)} mm, face cells burned ${stampOnly.burnedCells} = ${f3(stampOnly.pct)} %`);
+    out(`R1 mirror=${mirror}: SOURCE ONLY lit ${f3(srcOnly.total)} mm, on face ${f3(srcOnly.onFace)} mm (${f3(srcOnly.pct)} % of face cells)`);
+    const warn = detectJobIntentWarnings(r.after);
+    out(`R1 mirror=${mirror}: Job Review intent warnings ${warn.length}; any naming overlap/copies/stamp/source: ${warn.filter((x) => /overlap|cop(y|ies)|stamp|logo\.png/i.test(x)).map((x) => x.slice(0, 120)).join(' || ') || 'none'}`);
+    out(`R1 mirror=${mirror}: new op mode ${newOp.mode} name "${newOp.name}"; stamp dither ${st.dither}`);
+  }
+});
+
+// ---------- R2: the common case, plain text "KERF" on a Fill, defaults ----------
+it('R2 plain text on a Fill (taper 0.5, mirror on, 254 DPI defaults)', async () => {
+  const rendered = await textToPolylines({ content: 'KERF', sizeMm: 12, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000', fontBuffer: ROBOTO });
+  const text = {
+    kind: 'text', id: 'TX', content: 'KERF', fontKey: 'roboto-regular', sizeMm: 12, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000',
+    bounds: rendered.bounds, transform: { ...IDENTITY_TRANSFORM, x: 30, y: 30 }, paths: rendered.paths, operationIds: ['TXOP'],
+  } as unknown as SceneObject;
+  const p0 = proj([text], [op('TXOP', 'fill')]);
+  out(`R2 canPrepareStamp ${canPrepareStamp([text])}`);
+  const rings = ringsOf(rendered.paths as never, 30, 30);
+  for (const mirror of [true, false]) {
+    const r = await stamp(p0, ['TX'], { mirror });
+    const b = r.source.image.bounds, t = r.source.image.transform;
+    const minX = b.minX + t.x, maxX = b.maxX + t.x, minY = b.minY + t.y, maxY = b.maxY + t.y;
+    const axis = (minX + maxX) / 2;
+    const g = makeGrid(minX, minY, minX + Math.floor((maxX - minX) / 0.1) * 0.1, minY + Math.floor((maxY - minY) / 0.1) * 0.1, 0.1,
+      (x, y) => evenOdd(mirror ? 2 * axis - x : x, y, rings));
+    const both = measure(burn(r.after), g);
+    const stampOnly = measure(burn(withOutputOff(r.after, 'TXOP')), g);
+    const area = g.faceCells * 0.01;
+    out(`R2 mirror=${mirror}: raster bounds world x ${f3(minX)}..${f3(maxX)} y ${f3(minY)}..${f3(maxY)}; face area oracle ${f3(area)} mm²`);
+    out(`R2 mirror=${mirror}: AS APPLIED lit ${f3(both.total)} mm; on face ${f3(both.onFace)} mm; face cells burned ${f3(both.pct)} %`);
+    out(`R2 mirror=${mirror}: SOURCE OFF lit ${f3(stampOnly.total)} mm; on face ${f3(stampOnly.onFace)} mm; face cells burned ${f3(stampOnly.pct)} % (edge cells only expected)`);
+  }
+});
+
+// ---------- R3: variable text; what does the stamp face spell? ----------
+it('R3 variable text "LOT {{serial:3}}" Tinos 8 mm, serial 7', async () => {
+  const content = 'LOT {{serial:3}}';
+  const parsed = parseVariableTemplateSource(content);
+  if (!parsed.ok) throw new Error(parsed.message);
+  const R = (c: string) => textToPolylines({ content: c, sizeMm: 8, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000', fontBuffer: TINOS });
+  const tpl = await R(content);
+  const text = {
+    kind: 'text', id: 'VT', content, variableTemplate: parsed.template, fontKey: 'tinos-regular', sizeMm: 8, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000',
+    bounds: tpl.bounds, transform: { ...IDENTITY_TRANSFORM, x: 20, y: 20 }, paths: tpl.paths, operationIds: ['VOP'],
+  } as unknown as SceneObject;
+  const p0 = proj([text], [op('VOP', 'fill')], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 7 } });
+  const ev = evaluateVariableTemplate(parsed.template, text, p0, { now: new Date(0) });
+  const value = ev.ok ? ev.value : `ERR ${ev.message}`;
+  const val = await R(value);
+  out(`R3 canPrepareStamp ${canPrepareStamp([text])}; evaluated value "${value}"`);
+  const r = await stamp(p0, ['VT'], { mirror: false, taper: 0 });
+  // stamp face (tool) in world, compared with two independent even-odd renders placed at the text origin
+  const b = r.image.bounds, t = r.image.transform;
+  const pw = (b.maxX - b.minX) / r.draft.width, ph = (b.maxY - b.minY) / r.draft.height;
+  const tplR = ringsOf(tpl.paths as never, 20, 20), valR = ringsOf(val.paths as never, 20, 20);
+  let faceN = 0, agreeTpl = 0, agreeVal = 0, tplN = 0, valN = 0, minFx = Infinity, maxFx = -Infinity;
+  for (let j = 0; j < r.draft.height; j++) for (let i = 0; i < r.draft.width; i++) {
+    const x = b.minX + t.x + (i + 0.5) * pw, y = b.minY + t.y + (j + 0.5) * ph;
+    const f = r.face[j * r.draft.width + i] === 1, ft = evenOdd(x, y, tplR), fv = evenOdd(x, y, valR);
+    if (f) { faceN++; minFx = Math.min(minFx, x); maxFx = Math.max(maxFx, x); }
+    if (ft) tplN++; if (fv) valN++;
+    if (f && ft) agreeTpl++; if (f && fv) agreeVal++;
+  }
+  const iou = (a: number, n1: number, n2: number) => (100 * a) / (n1 + n2 - a);
+  out(`R3 stamp face width ${f3(maxFx - minFx + pw)} mm; template glyphs ${f3(tpl.bounds.maxX - tpl.bounds.minX)} mm; value "${value}" ${f3(val.bounds.maxX - val.bounds.minX)} mm`);
+  out(`R3 IoU(stamp face, template render) ${f3(iou(agreeTpl, faceN, tplN))} %; IoU(stamp face, value render) ${f3(iou(agreeVal, faceN, valN))} %`);
+  const stObj = r.after.scene.objects.find((o) => o.id === 'STAMP-R') as RasterImage;
+  out(`R3 stamp carries variableTemplate: ${'variableTemplate' in stObj}; stamp source label "${stObj.source}"`);
+  // what the job burns for the text itself (value) vs the stamp
+  const renderer: VariableTextRenderer = ({ text: tx, content: c }) => textToPolylines({ content: c, sizeMm: tx.sizeMm, alignment: tx.alignment, lineHeight: tx.lineHeight, letterSpacing: tx.letterSpacing, color: tx.color, fontBuffer: TINOS });
+  const snap = await prepareOutputSnapshot(withOutputOff(r.after, stObj.operationIds![0]!), { clock: () => new Date(0), renderVariableText: renderer });
+  if (snap.ok) {
+    const segs = decode(emitPreparedGcode(snap).gcode, r.after);
+    const xs = segs.flatMap((sg) => [sg.a.x, sg.b.x]);
+    out(`R3 source text burn (stamp op off) width ${f3(Math.max(...xs) - Math.min(...xs))} mm → it still burns the value`);
+  } else out(`R3 snapshot failed ${JSON.stringify(snap).slice(0, 200)}`);
+});
+
+// ---------- R6: P3 spot checks: H5-P3-3 (lines/mm), T32-P3-1 (single power), T32-P3-2 (menu gate) ----------
+it('R6 P3 spot checks', async () => {
+  const { stampPreparationCommand } = await import('../t31-main/src/ui/commands/stamp-preparation-command');
+  const w = 100, h = 50;
+  const luma = new Uint8Array(w * h).fill(255);
+  for (let y = 10; y < 40; y++) for (let x = 10; x < 60; x++) luma[y * w + x] = 0;
+  const img = {
+    kind: 'raster-image', id: 'SRC', source: 'photo.png', pixelWidth: w, pixelHeight: h,
+    bounds: { minX: 0, minY: 0, maxX: 10, maxY: 5 }, transform: { ...IDENTITY_TRANSFORM, x: 10, y: 10 },
+    color: '#000000', dither: 'threshold', linesPerMm: 10, dataUrl: 'data:image/png;base64,AA==', lumaBase64: lumaToBase64(luma), operationIds: ['SRCOP'],
+  } as unknown as RasterImage;
+  const p0 = proj([img], [{ ...op('SRCOP', 'image'), linesPerMm: 25, power: 55 } as Layer]);
+  const r = await stamp(p0, ['SRC'], { taper: 1 });
+  const st = r.after.scene.objects.find((o) => o.id === 'STAMP-R') as RasterImage;
+  const nop = r.after.scene.layers.find((l) => st.operationIds?.includes(l.id))!;
+  out(`R6 H5-P3-3: source op 25 lines/mm, source image field 10 → stamp op ${nop.linesPerMm} lines/mm, power ${nop.power} % (source op 55 %)`);
+  const segs = burn(withOutputOff(r.after, 'SRCOP'));
+  const hist = new Map<number, number>();
+  for (const sg of segs) hist.set(sg.s, (hist.get(sg.s) ?? 0) + sg.len);
+  const grey = Array.from(r.draft.luma).filter((v) => v > 0 && v < 255).length;
+  out(`R6 T32-P3-1: stamp has ${grey} intermediate-grey shoulder pixels; emitted S values ${[...hist].map(([s, l]) => `S${s}:${f3(l)}mm`).join(' ')}`);
+  const openOnly = { kind: 'imported-svg', id: 'OP', source: 'o.svg', bounds: { minX: 0, minY: 0, maxX: 10, maxY: 1 }, transform: IDENTITY_TRANSFORM, operationIds: ['SRCOP'], paths: [{ color: '#000000', polylines: [{ points: [{ x: 0, y: 0 }, { x: 10, y: 1 }], closed: false }] }] } as unknown as SceneObject;
+  const cmd = stampPreparationCommand({ hasSelection: true, prepareStamp: () => undefined } as never);
+  out(`R6 T32-P3-2: open path selected → canPrepareStamp ${canPrepareStamp([openOnly])}, menu enabled ${cmd.enabled}`);
+});
+
+// ---------- R5: sibling check, Convert to Bitmap (shared rasteriser) on the same variable text ----------
+it('R5 Convert to Bitmap on variable text (T22 sibling)', async () => {
+  const { buildBitmapFromVectors } = await import('../t31-main/src/ui/raster/vector-to-bitmap');
+  const { applyConvertToBitmap } = await import('../t31-main/src/ui/state/convert-to-bitmap');
+  const { selectedConvertibleVectors } = await import('../t31-main/src/ui/commands/selection-command-state');
+  const content = 'LOT {{serial:3}}';
+  const parsed = parseVariableTemplateSource(content);
+  if (!parsed.ok) throw new Error(parsed.message);
+  const R = (c: string) => textToPolylines({ content: c, sizeMm: 8, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000', fontBuffer: TINOS });
+  const tpl = await R(content);
+  const text = {
+    kind: 'text', id: 'VT', content, variableTemplate: parsed.template, fontKey: 'tinos-regular', sizeMm: 8, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000',
+    bounds: tpl.bounds, transform: { ...IDENTITY_TRANSFORM, x: 20, y: 20 }, paths: tpl.paths, operationIds: ['VOP'],
+  } as unknown as SceneObject;
+  const renderer: VariableTextRenderer = ({ text: tx, content: c }) => textToPolylines({ content: c, sizeMm: tx.sizeMm, alignment: tx.alignment, lineHeight: tx.lineHeight, letterSpacing: tx.letterSpacing, color: tx.color, fontBuffer: TINOS });
+  const p0 = proj([text], [op('VOP', 'fill')], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 7 } });
+  const width = (segs: Seg[]) => { const xs = segs.flatMap((s) => [s.a.x, s.b.x]); return Math.max(...xs) - Math.min(...xs); };
+  const snapBurn = async (p: Project) => { const s = await prepareOutputSnapshot(p, { clock: () => new Date(0), renderVariableText: renderer }); if (!s.ok) throw new Error('snap ' + JSON.stringify(s).slice(0, 200)); return decode(emitPreparedGcode(s).gcode, p); };
+  const before = await snapBurn(p0);
+  const conv = selectedConvertibleVectors(p0, ['VT']);
+  out(`R5 Convert to Bitmap menu-eligible (selectedConvertibleVectors) ${conv.length === 1}`);
+  const raster = await buildBitmapFromVectors(conv, { dpi: 254, renderType: 'fill-all' });
+  useStore.setState({ project: p0, selectedObjectId: 'VT', additionalSelectedIds: new Set(), undoStack: [], redoStack: [] });
+  useStore.setState((s) => applyConvertToBitmap(s as never, ['VT'], raster) as never);
+  const p1 = useStore.getState().project;
+  const after7 = await snapBurn(p1);
+  const after8 = await snapBurn({ ...p1, variables: { ...p1.variables, serialValue: 8 } } as Project);
+  const val = await R('LOT 007');
+  out(`R5 before: burn width ${f3(width(before))} mm (value "LOT 007" renders ${f3(val.bounds.maxX - val.bounds.minX)} mm); objects ${p0.scene.objects.map((o) => o.kind).join(',')}`);
+  out(`R5 after Convert to Bitmap: objects ${p1.scene.objects.map((o) => o.kind).join(',')}; burn width ${f3(width(after7))} mm (template ${f3(tpl.bounds.maxX - tpl.bounds.minX)} mm); serial 7 vs 8 identical G-code burn: ${JSON.stringify(after7) === JSON.stringify(after8)}`);
+});
+
+// ---------- R4: variable Code 128; canvas shows current serial; stamp uses stored code ----------
+it('R4 variable barcode: stamp vs what the canvas shows', async () => {
+  const { createBarcodeObject } = await import('../t31-main/src/core/barcode/materialize-barcode');
+  const { defaultBarcodeSpec } = await import('../t31-main/src/core/barcode/barcode-spec');
+  const { deriveVariableBarcodeDisplay, encodeWaiting } = await import('../t31-main/src/ui/workspace/variable-barcode-display');
+  const parsed = parseVariableTemplateSource('{{serial:5}}');
+  if (!parsed.ok) throw new Error(parsed.message);
+  const spec = { ...defaultBarcodeSpec('code128'), data: '{{serial:5}}', showText: false, variableTemplate: parsed.template };
+  const cap = async () => ({ polylines: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }) as never;
+  const made = await createBarcodeObject({ id: 'BC', color: '#000000', spec: spec as never, value: '00100', renderCaption: cap, transform: { ...IDENTITY_TRANSFORM, x: 15, y: 15 } });
+  if (!made.ok) throw new Error(made.message);
+  const bc = { ...made.object, operationIds: ['BOP'] } as SceneObject;
+  const p0 = proj([bc], [op('BOP', 'fill')], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 117 } });
+  const renderer: VariableTextRenderer = ({ text: tx, content: c }) => textToPolylines({ content: c, sizeMm: tx.sizeMm, alignment: tx.alignment, lineHeight: tx.lineHeight, letterSpacing: tx.letterSpacing, color: tx.color, fontBuffer: ROBOTO });
+  const d0 = deriveVariableBarcodeDisplay(p0);
+  await encodeWaiting(d0.waiting, p0, renderer);
+  const shown = deriveVariableBarcodeDisplay(p0).project.scene.objects[0] as SceneObject & { paths: never; transform: typeof IDENTITY_TRANSFORM };
+  const stored = bc as SceneObject & { paths: never };
+  out(`R4 canPrepareStamp ${canPrepareStamp([bc])}; canvas object differs from stored: ${JSON.stringify(shown.paths) !== JSON.stringify(stored.paths)}`);
+  const r = await stamp(p0, ['BC'], { mirror: false, taper: 0 });
+  const b = r.image.bounds, t = r.image.transform;
+  const pw = (b.maxX - b.minX) / r.draft.width, ph = (b.maxY - b.minY) / r.draft.height;
+  const storedR = ringsOf(stored.paths as never, 15, 15), shownR = ringsOf(shown.paths as never, shown.transform.x, shown.transform.y);
+  let n = 0, dStored = 0, dShown = 0;
+  for (let j = 0; j < r.draft.height; j++) for (let i = 0; i < r.draft.width; i++) {
+    const x = b.minX + t.x + (i + 0.5) * pw, y = b.minY + t.y + (j + 0.5) * ph;
+    const f = r.face[j * r.draft.width + i] === 1;
+    n++;
+    if (f !== evenOdd(x, y, storedR)) dStored++;
+    if (f !== evenOdd(x, y, shownR)) dShown++;
+  }
+  out(`R4 stamp face vs independent even-odd of STORED code (00100): ${dStored}/${n} px differ; vs code the CANVAS shows (00117): ${dShown}/${n} px differ`);
+});

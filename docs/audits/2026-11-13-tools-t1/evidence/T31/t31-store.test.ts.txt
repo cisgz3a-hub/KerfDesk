@@ -1,0 +1,146 @@
+// @vitest-environment jsdom
+// T31: store mutation, hand-placed laser tabs, undo/redo, save/reopen, decoded G-code.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  createLayer,
+  createProject,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type Project,
+  type Vec2,
+} from '../t31-main/src/core/scene';
+import { analyseJointResize } from '../t31-main/src/core/geometry/joint-resize';
+import { jointResizeSelectionMutation } from '../t31-main/src/ui/state/joint-resize-actions';
+import { projectCncTabAnchor } from '../t31-main/src/core/cnc/cnc-tab-anchors';
+import { laserTabAnchorPosition } from '../t31-main/src/core/job/laser-tab-anchors';
+import { burnedTabSpans } from '../t31-main/src/__fixtures__/burned-tab-spans';
+import { toSceneCoords } from '../t31-main/src/core/devices';
+import { prepareOutput } from '../t31-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t31-main/src/io/gcode/emit-gcode';
+import { serializeProject } from '../t31-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t31-main/src/io/project/deserialize-project';
+import { useStore } from '../t31-main/src/ui/state/store';
+import { resetStore } from '../t31-main/src/ui/state/test-helpers';
+import { litMoves, totalLen, bbox } from './decode';
+
+const log: string[] = [];
+const out = (s: string) => {
+  log.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t31/t31-store.log', log.join('\n'));
+};
+const f3 = (n: number) => n.toFixed(3);
+beforeEach(() => resetStore());
+const st = () => useStore.getState();
+
+// 80 x 30 panel; bottom edge (y=0) carries 4 outward finger tabs 8 wide x 3 deep at x=8..16, 24..32, 40..48, 56..64.
+function fingerPanel(): Vec2[] {
+  const pts: Vec2[] = [{ x: 0, y: 0 }];
+  for (const x0 of [8, 24, 40, 56]) {
+    pts.push({ x: x0, y: 0 }, { x: x0, y: -3 }, { x: x0 + 8, y: -3 }, { x: x0 + 8, y: 0 });
+  }
+  pts.push({ x: 80, y: 0 }, { x: 80, y: 30 }, { x: 0, y: 30 });
+  return pts;
+}
+
+function project(points: Vec2[], hand: Vec2[]): { p: Project; o: ImportedSvg } {
+  let o: ImportedSvg = {
+    kind: 'imported-svg',
+    id: 'panel',
+    name: 'Front panel',
+    source: 'panel.svg',
+    transform: { ...IDENTITY_TRANSFORM, x: 20, y: 40 },
+    bounds: { minX: 0, minY: -3, maxX: 80, maxY: 30 },
+    paths: [{ color: '#000000', operationIds: ['cut'], polylines: [{ closed: true, points: [...points, points[0]!] }] }],
+    operationIds: ['cut'],
+    powerScale: 0.8,
+  } as ImportedSvg;
+  const anchors = hand.map((pt) => {
+    const a = projectCncTabAnchor(o, '#000000', pt);
+    if (a === null) throw new Error('not on outline');
+    return a;
+  });
+  o = { ...o, laserTabAnchors: anchors };
+  const layer = {
+    ...createLayer({ id: 'cut', name: 'cut', color: '#000000' }),
+    mode: 'line' as const,
+    power: 50,
+    speed: 900,
+    tabsEnabled: true,
+    tabSizeMm: 2,
+    tabsPerShape: 4,
+    tabCutPowerPercent: 20,
+  };
+  const base = createProject();
+  return { p: { ...base, scene: { objects: [o], layers: [layer], groups: [] } }, o };
+}
+
+function load(p: Project): void {
+  useStore.setState({
+    project: p,
+    projectDocumentEpoch: 1,
+    selectedObjectId: p.scene.objects[0]!.id,
+    additionalSelectedIds: new Set(),
+    undoStack: [],
+    redoStack: [],
+    dirty: false,
+  });
+}
+
+function burn(p: Project) {
+  const prepared = prepareOutput(p);
+  if (!prepared.ok) return { gcode: '', moves: [], issues: JSON.stringify(prepared.preflight).slice(0, 300) };
+  const emitted = emitPreparedGcode(prepared);
+  return { gcode: emitted.gcode, moves: litMoves(emitted.gcode, p.device), issues: '' };
+}
+
+it('D: finger tabs 3->4 with hand-placed tabs on untouched edges; undo/redo; save/reopen; G-code', () => {
+  // Hand tabs on edges the resize does not touch: left edge, top edge, right edge.
+  const hand = [
+    { x: 20 + 0, y: 40 + 15 },
+    { x: 20 + 40, y: 40 + 30 },
+    { x: 20 + 80, y: 40 + 10 },
+  ];
+  const { p, o } = project(fingerPanel(), hand);
+  load(p);
+  const req = { currentWidthMm: 3, materialThicknessMm: 4, fitAllowanceMm: 0.1, detectionToleranceMm: 0.05 };
+  const a = analyseJointResize([o], req);
+  if (a.kind !== 'ok') throw new Error(a.error.message);
+  out(`D candidates: ${a.value.candidates.map((c) => `${c.kind} w${f3(c.widthMm)} d${f3(c.depthMm)}`).join(', ')}`);
+  const before = burn(p);
+  const placesBefore = o.laserTabAnchors!.map((an) => laserTabAnchorPosition(o, an)!);
+  const spansBefore = burnedTabSpans(p).map((m) => toSceneCoords(m, p.device));
+  const session = { project: p, documentEpoch: 1, ids: ['panel'] };
+  const r = jointResizeSelectionMutation(st(), session, req, a.value.candidates.map((c) => c.id));
+  if (r.kind !== 'ok') throw new Error(r.error.message);
+  useStore.setState(r.value);
+  const after = st().project;
+  const o2 = after.scene.objects[0] as ImportedSvg;
+  const placesAfter = o2.laserTabAnchors!.map((an) => laserTabAnchorPosition(o2, an)!);
+  out(`D name ${o2.name} powerScale ${o2.powerScale} ops ${JSON.stringify(o2.operationIds)} anchors same object ${o2.laserTabAnchors === o.laserTabAnchors}`);
+  placesBefore.forEach((pb, i) => {
+    const pa = placesAfter[i]!;
+    out(`D hand tab ${i}: placed (${f3(hand[i]!.x)},${f3(hand[i]!.y)}) before (${f3(pb.x)},${f3(pb.y)}) after (${f3(pa.x)},${f3(pa.y)}) moved ${f3(Math.hypot(pa.x - pb.x, pa.y - pb.y))} mm`);
+  });
+  const spansAfter = burnedTabSpans(after).map((m) => toSceneCoords(m, after.device));
+  const fmt = (ps: Vec2[]) => ps.map((q) => `(${f3(q.x)},${f3(q.y)})`).sort().join(' ');
+  out(`D G-code tab spans before: ${fmt(spansBefore)}`);
+  out(`D G-code tab spans after:  ${fmt(spansAfter)}`);
+  const aft = burn(after);
+  const bb0 = bbox(before.moves), bb1 = bbox(aft.moves);
+  out(`D lit length ${f3(totalLen(before.moves))} -> ${f3(totalLen(aft.moves))} (oracle +8.000 incl. tab gaps); bbox y ${f3(bb0.minY)}..${f3(bb0.maxY)} -> ${f3(bb1.minY)}..${f3(bb1.maxY)} (oracle minY 36.000 -> 37.000? scene y down: tabs at y=40-3=37 -> 40-4=36) issues ${before.issues}${aft.issues}`);
+  // Undo / redo / save-reopen
+  st().undo();
+  out(`D undo exact: ${st().project === p}`);
+  st().redo();
+  const redone = st().project.scene.objects[0] as ImportedSvg;
+  out(`D redo exact paths: ${JSON.stringify(redone.paths) === JSON.stringify(o2.paths)}`);
+  const text = serializeProject(st().project);
+  const back = deserializeProject(text);
+  if (back.kind === 'error' || (back as { ok?: boolean }).ok === false) out(`D reopen error ${JSON.stringify(back).slice(0, 200)}`);
+  else {
+    const proj = ((back as { value?: Project }).value ?? (back as { project?: Project }).project) as Project;
+    const ro = proj.scene.objects[0] as ImportedSvg;
+    out(`D reopen same polylines: ${JSON.stringify(ro.paths[0]!.polylines) === JSON.stringify(o2.paths[0]!.polylines)}`);
+  }
+});

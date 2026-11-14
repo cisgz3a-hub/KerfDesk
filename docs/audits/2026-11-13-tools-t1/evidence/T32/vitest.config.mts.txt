@@ -1,0 +1,18 @@
+export default ({
+  root: 'C:/Users/stolk/kd-t1/zz-t32',
+  define: {
+    __BUILD_TIME__: JSON.stringify('2026-11-14T00:00:00Z'),
+    __GIT_SHA__: JSON.stringify('eeac725e8'),
+    __APP_VERSION__: JSON.stringify('0.0.0-audit'),
+  },
+  server: { fs: { strict: false } },
+  esbuild: { jsx: 'automatic' },
+  resolve: { alias: { 'react-dom': 'C:/Users/stolk/kd-t1/t31-main/node_modules/react-dom', 'react': 'C:/Users/stolk/kd-t1/t31-main/node_modules/react' } },
+  test: {
+    environment: 'node',
+    globals: false,
+    include: ['*.test.ts', '*.test.tsx'],
+    setupFiles: ['C:/Users/stolk/kd-t1/t31-main/src/__fixtures__/jsdom-canvas-setup.ts'],
+    testTimeout: 180000,
+  },
+});
