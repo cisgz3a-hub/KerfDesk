@@ -161,7 +161,11 @@ function patchStats(grid: Grid, box: NonNullable<Grid['box']>): PatchStats {
 export type BedMotionFit = 'homography' | 'similarity' | 'translation';
 
 export type BedMotion = {
-  /** Where each of {@link bedSamplePoints} now shows, less where the calibration puts it, mm. */
+  /**
+   * For each of {@link bedSamplePoints}: where the bed point the calibration
+   * now draws there truly is, less that point, mm. This is the opposite of
+   * where the point now shows on the picture (camera audit v2 K2-P3-1).
+   */
   readonly displacementsMm: ReadonlyArray<Vec2>;
   /** The largest of them, mm. */
   readonly worstMm: number;
@@ -222,6 +226,12 @@ export function bedMotionFromPatches(args: {
   const kept = withoutOutliers(pairs, first.map);
   if (kept.length < Math.max(2, Math.ceil(pairs.length / 2))) return null;
   const { map, fit } = fitMotion(kept, bedSpanMm);
+  // No move of the camera turns the bed over: a mirrored picture (a flip
+  // setting changed) is no measurable move, and was read as one at up to 18
+  // times too small (camera audit v2 K2r-P3-1).
+  if (mirrors(map, bedSamplePoints(args.bedWidthMm, args.bedHeightMm)[0] ?? { x: 0, y: 0 })) {
+    return null;
+  }
   const displacementsMm = bedSamplePoints(args.bedWidthMm, args.bedHeightMm).map((p) => {
     const now = map(p);
     return { x: now.x - p.x, y: now.y - p.y };
@@ -229,6 +239,18 @@ export function bedMotionFromPatches(args: {
   const worstMm = displacementsMm.reduce((worst, d) => Math.max(worst, Math.hypot(d.x, d.y)), 0);
   if (!Number.isFinite(worstMm)) return null;
   return { displacementsMm, worstMm, fit, patches: kept.length };
+}
+
+// True when `map` reverses the bed's orientation around `at`.
+function mirrors(map: MotionMap, at: Vec2): boolean {
+  const here = map(at);
+  const alongX = map({ x: at.x + 1, y: at.y });
+  const alongY = map({ x: at.x, y: at.y + 1 });
+  const ax = alongX.x - here.x;
+  const ay = alongX.y - here.y;
+  const bx = alongY.x - here.x;
+  const by = alongY.y - here.y;
+  return ax * by - ay * bx < 0;
 }
 
 type Spread = { readonly mean: Vec2; readonly least: number; readonly most: number };

@@ -34,6 +34,7 @@ import { lastSourceKind, startRememberedCamera, type CameraStartDeps } from './a
 import { useCameraHelpersStore } from './camera-helpers-store';
 import { checkCameraMovedInWorker, rgbaView } from './moved-check';
 import { checkStartedCameraMoved } from './moved-check-capture';
+import { checkLivePictureForMoves } from './live-moved-check';
 import { scheduleAfterJobRefresh } from './schedule-after-job-refresh';
 import { refreshCameraPicture, reportRefresh, takePendingRefresh } from './refresh-picture';
 
@@ -43,6 +44,8 @@ export function installCameraHelpers(deps: CameraStartDeps): () => void {
     rememberRunningCamera(),
     refreshAfterJobs(),
     checkForMoves(),
+    // ADR-663 Amendment 8: a live picture is checked again while it is shown.
+    checkLivePictureForMoves(),
     followBedPictureFrame(),
     watchCanvasTargetBurns(),
   ];

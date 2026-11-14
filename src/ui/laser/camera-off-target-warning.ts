@@ -14,6 +14,7 @@ import type { JobOriginPlacement } from '../../core/job';
 import { computeJobBounds, type JobBounds } from '../../core/job/job-bounds';
 import type { Job } from '../../core/job';
 import type { Project } from '../../core/scene';
+import { cameraHeightWarnings } from './camera-height-warning';
 
 export function cameraOffTargetWarning(args: {
   readonly cameraPlacementActive: boolean | undefined;
@@ -33,15 +34,26 @@ export function cameraOffTargetWarning(args: {
   return `Camera placement is on, and part of this job lies where the camera calibration is estimated rather than measured: there the camera picture may be up to about ${Math.round(mm * 10) / 10} mm off, so the job may burn that far from where it shows on the picture. Watch the Frame, or engrave the calibration target on a larger sheet that covers this part of the bed.`;
 }
 
-/** Start's form: the job's own bounds, from the snapshot's camera facts. */
+/** The overlay's Material height in Start's snapshot: the one height its picture lines up at (ADR-441 Amendment 13). */
+export type CameraHeightSnapshot = { readonly cameraSurfaceHeightMm?: number };
+
+/**
+ * Start's form: the job's own bounds, from the snapshot's camera facts, and
+ * the height the picture is drawn at (ADR-441 Amendment 13).
+ */
 export function cameraOffTargetWarnings(
   machine: {
     readonly cameraPlacementActive?: boolean;
     readonly cameraCalibration?: CameraModelRecord | null;
+    readonly cameraSurfaceHeightMm?: number;
   },
   jobOrigin: JobOriginPlacement | undefined,
-  prepared: { readonly job: Job; readonly project: Pick<Project, 'device'> },
+  prepared: {
+    readonly job: Job;
+    readonly project: Pick<Project, 'device' | 'machine' | 'jobSetup'>;
+  },
 ): string[] {
+  const heights = cameraHeightWarnings(prepared.project, machine, jobOrigin);
   const warning = cameraOffTargetWarning({
     cameraPlacementActive: machine.cameraPlacementActive,
     model: machine.cameraCalibration,
@@ -51,5 +63,5 @@ export function cameraOffTargetWarnings(
         ? computeJobBounds(prepared.job, prepared.project.device)
         : null,
   });
-  return warning === null ? [] : [warning];
+  return warning === null ? heights : [warning, ...heights];
 }
