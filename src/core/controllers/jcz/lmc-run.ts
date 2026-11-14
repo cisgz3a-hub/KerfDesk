@@ -183,12 +183,16 @@ async function waitForList(
   link: LmcLink,
   hooks: LmcRunHooks,
 ): Promise<'ready' | 'cancelled' | 'not-ready' | 'link'> {
-  for (let poll = 0; poll < LMC_READY_POLLS; poll += 1) {
+  // Only reads of the board count towards the limit: a pause holds the next
+  // list for as long as the operator wants (audit of the last 200 PRs, #1725).
+  let polls = 0;
+  while (polls < LMC_READY_POLLS) {
     if (hooks.cancelled()) return 'cancelled';
     if (!hooks.paused()) {
       const status = await link.boardStatus();
       if (status === null) return 'link';
       if (status.ready) return 'ready';
+      polls += 1;
     }
     await hooks.sleep(READY_POLL_MS);
   }

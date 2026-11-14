@@ -23,7 +23,8 @@ import { MoshiUsbPanel } from './MoshiUsbPanel';
 function moshiProject(controllerKind: ControllerKind = 'moshi'): Project {
   return {
     ...createProject(),
-    device: { ...DEFAULT_DEVICE_PROFILE, controllerKind },
+    // A Moshiboard homes rear-left, and its route refuses any other origin.
+    device: { ...DEFAULT_DEVICE_PROFILE, controllerKind, origin: 'rear-left' },
     scene: {
       layers: [createLayer({ id: '#000000', color: '#000000', mode: 'line' })],
       objects: [

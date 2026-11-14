@@ -54,6 +54,7 @@ function fillProject(rotary: RotarySetup | undefined): Project {
   const base = createProject({
     ...DEFAULT_DEVICE_PROFILE,
     controllerKind: 'moshi',
+    origin: 'rear-left',
     ...(rotary === undefined ? {} : { rotary }),
   });
   const layer = {
