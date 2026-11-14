@@ -60,12 +60,12 @@ export type CameraStore = CameraSourceActions & {
   // the bed (ADR-449), shown instead of the live video until cleared.
   readonly bedPicture: BedPicture | null;
   // Top surface currently being viewed/placed on, measured above machine bed.
-  // The camera model corrects the picture to this height (ADR-440).
+  // The camera model corrects the picture to this height (ADR-440). It follows
+  // the job material and is kept between sessions (ADR-441 Amendment 14).
   readonly surfaceHeightMm: number;
   // Rectangles of the bed whose top stands at its own height, such as a box
   // beside the sheet; the overlay and the trace use them there (ADR-441
-  // Amendment 2). Ephemeral, like the material height: they describe what is
-  // on the bed now.
+  // Amendment 2). Ephemeral: they describe what is on the bed now.
   readonly heightAreas: ReadonlyArray<SurfaceHeightArea>;
   // Each calibration ring's measured error drawn over the overlay (ADR-441
   // Amendment 1), so the operator sees where on the bed the camera is trusted.
