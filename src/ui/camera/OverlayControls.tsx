@@ -23,6 +23,7 @@ import {
   useOwnCameraModel,
 } from './active-camera-model';
 import { CameraFrameNotice } from './CameraFrameNotice';
+import { CameraHeightNotes } from './CameraHeightNotes';
 import { HeadCaptureControls } from './head/HeadCaptureControls';
 import { useHeadPositionOnBed } from './head/head-position';
 import { headZChangedMessage, headZRule } from './head/head-z-note';
@@ -113,6 +114,7 @@ function CalibratedOverlayControls(props: {
         <OpacityControl opacity={opacity} onChange={setOpacity} />
       </div>
       <SurfaceHeightControl heightMm={surfaceHeightMm} onChange={setSurfaceHeightMm} />
+      <CameraHeightNotes surfaceHeightMm={surfaceHeightMm} />
       {placement.active ? <CameraPlacementStatus placement={placement} /> : null}
       <CameraFold title="Fill blanks" hint="the design on every piece" defaultOpen={piecesFound}>
         <PiecesControl />

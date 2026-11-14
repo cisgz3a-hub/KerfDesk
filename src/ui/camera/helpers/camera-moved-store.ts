@@ -15,7 +15,11 @@ export type CameraMovedState =
       readonly kind: 'moved';
       /** The worst of {@link displacementsMm}, mm. */
       readonly mm: number;
-      /** How far the bed's centre and four corners now show from where the calibration puts them. */
+      /**
+       * For the bed's centre and four corners: where the bed point the
+       * calibration now draws there truly is, less that point (the opposite of
+       * where it now shows). Only sizes and differences are used.
+       */
       readonly displacementsMm: ReadonlyArray<Vec2>;
       readonly calibratedAt: string;
     }
