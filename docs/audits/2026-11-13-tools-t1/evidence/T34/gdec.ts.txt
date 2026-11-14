@@ -1,0 +1,140 @@
+// T34 refuter's own G-code readers. Laser: lit length per F/S pair (M3/M4 on,
+// S>0, G1/G2/G3). CNC: XY length below Z 0, deepest Z, and the area swept by the
+// tool (grid of 0.2 mm cells) so a pocket and a profile can be told apart.
+
+export type Pt = { x: number; y: number };
+
+function words(raw: string): Map<string, number> {
+  const line = raw.replace(/;.*$/, '').replace(/\(.*?\)/g, '').toUpperCase();
+  const w = new Map<string, number>();
+  for (const m of line.matchAll(/([A-Z])\s*(-?\d*\.?\d+)/g)) {
+    if (m[1] === 'G' || m[1] === 'M') {
+      w.set(`${m[1]}${Number(m[2])}`, 1);
+    } else w.set(m[1]!, Number(m[2]));
+  }
+  return w;
+}
+
+function arcPoints(from: Pt, to: Pt, i: number, j: number, cw: boolean): Pt[] {
+  const c = { x: from.x + i, y: from.y + j };
+  const r = Math.hypot(i, j);
+  let a0 = Math.atan2(from.y - c.y, from.x - c.x);
+  let a1 = Math.atan2(to.y - c.y, to.x - c.x);
+  if (cw) {
+    if (a1 >= a0) a1 -= 2 * Math.PI;
+  } else if (a1 <= a0) a1 += 2 * Math.PI;
+  const n = Math.max(2, Math.ceil((Math.abs(a1 - a0) * r) / 0.1));
+  const pts: Pt[] = [];
+  for (let k = 1; k <= n; k++) {
+    const a = a0 + ((a1 - a0) * k) / n;
+    pts.push({ x: c.x + r * Math.cos(a), y: c.y + r * Math.sin(a) });
+  }
+  return pts;
+}
+
+export type LaserRun = { fs: string; len: number; minX: number; maxX: number; minY: number; maxY: number };
+
+/** Lit length per consecutive F/S run, in G-code order. */
+export function laserRuns(gcode: string): LaserRun[] {
+  let x = 0, y = 0, f = 0, s = 0, mode = 0, on = false;
+  const runs: LaserRun[] = [];
+  for (const raw of gcode.split('\n')) {
+    const w = words(raw);
+    if (w.has('M3') || w.has('M4')) on = true;
+    if (w.has('M5')) on = false;
+    for (const g of [0, 1, 2, 3]) if (w.has(`G${g}`)) mode = g;
+    if (w.has('F')) f = w.get('F')!;
+    if (w.has('S')) s = w.get('S')!;
+    const nx = w.get('X') ?? x;
+    const ny = w.get('Y') ?? y;
+    if ((w.has('X') || w.has('Y')) && mode >= 1 && on && s > 0) {
+      let len = 0;
+      if (mode === 1) len = Math.hypot(nx - x, ny - y);
+      else {
+        let p = { x, y };
+        for (const q of arcPoints(p, { x: nx, y: ny }, w.get('I') ?? 0, w.get('J') ?? 0, mode === 2)) {
+          len += Math.hypot(q.x - p.x, q.y - p.y);
+          p = q;
+        }
+      }
+      const key = `F${f}/S${s}`;
+      let run = runs[runs.length - 1];
+      if (run === undefined || run.fs !== key) {
+        run = { fs: key, len: 0, minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+        runs.push(run);
+      }
+      run.len += len;
+      run.minX = Math.min(run.minX, x, nx);
+      run.maxX = Math.max(run.maxX, x, nx);
+      run.minY = Math.min(run.minY, y, ny);
+      run.maxY = Math.max(run.maxY, y, ny);
+    }
+    x = nx;
+    y = ny;
+  }
+  return runs;
+}
+
+export function laserTotal(gcode: string): number {
+  return laserRuns(gcode).reduce((a, r) => a + r.len, 0);
+}
+
+export type CncStats = {
+  cutXY: number;
+  minZ: number;
+  sweptAreaMm2: number;
+  bbox: { minX: number; minY: number; maxX: number; maxY: number };
+};
+
+/**
+ * radiusAt(z) gives the tool's cutting radius at depth z (< 0). End mill:
+ * constant; V-bit: |z|·tan(half angle) capped at the radius.
+ */
+export function cncStats(gcode: string, radiusAt: (z: number) => number, cell = 0.2): CncStats {
+  let x = 0, y = 0, z = 10, mode = 0;
+  let cutXY = 0, minZ = Infinity;
+  const bbox = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  const hit = new Set<string>();
+  const stamp = (p: Pt, r: number) => {
+    const rr = Math.max(r, cell / 2);
+    const i0 = Math.floor((p.x - rr) / cell), i1 = Math.floor((p.x + rr) / cell);
+    const j0 = Math.floor((p.y - rr) / cell), j1 = Math.floor((p.y + rr) / cell);
+    for (let i = i0; i <= i1; i++)
+      for (let j = j0; j <= j1; j++) {
+        const cx = (i + 0.5) * cell, cy = (j + 0.5) * cell;
+        if (Math.hypot(cx - p.x, cy - p.y) <= rr) hit.add(`${i},${j}`);
+      }
+  };
+  for (const raw of gcode.split('\n')) {
+    const w = words(raw);
+    for (const g of [0, 1, 2, 3]) if (w.has(`G${g}`)) mode = g;
+    const nx = w.get('X') ?? x, ny = w.get('Y') ?? y, nz = w.get('Z') ?? z;
+    if (mode >= 1 && nz < 0) minZ = Math.min(minZ, nz);
+    if (mode >= 1 && nz < 0 && z < 0 && (nx !== x || ny !== y)) {
+      const pts =
+        mode === 1
+          ? (() => {
+              const L = Math.hypot(nx - x, ny - y);
+              const n = Math.max(1, Math.ceil(L / (cell / 2)));
+              return Array.from({ length: n }, (_, k) => ({ x: x + ((nx - x) * (k + 1)) / n, y: y + ((ny - y) * (k + 1)) / n }));
+            })()
+          : arcPoints({ x, y }, { x: nx, y: ny }, w.get('I') ?? 0, w.get('J') ?? 0, mode === 2);
+      let p = { x, y };
+      const r = radiusAt(Math.min(z, nz));
+      stamp(p, r);
+      for (const q of pts) {
+        cutXY += Math.hypot(q.x - p.x, q.y - p.y);
+        stamp(q, r);
+        p = q;
+      }
+      bbox.minX = Math.min(bbox.minX, x, nx);
+      bbox.maxX = Math.max(bbox.maxX, x, nx);
+      bbox.minY = Math.min(bbox.minY, y, ny);
+      bbox.maxY = Math.max(bbox.maxY, y, ny);
+    }
+    x = nx;
+    y = ny;
+    z = nz;
+  }
+  return { cutXY, minZ, sweptAreaMm2: hit.size * cell * cell, bbox };
+}

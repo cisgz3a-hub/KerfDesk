@@ -1,0 +1,37 @@
+// T33 G4: oracle reruns with the true boundary for nonzero self-intersection and unioned objects.
+import { appendFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { IDENTITY_TRANSFORM } from '../t31-main/src/core/scene';
+import { offsetShapes } from '../t31-main/src/core/geometry/offset-shapes';
+import { materializeVectorObject, type VectorSceneObject } from '../t31-main/src/core/geometry';
+import { createEllipse } from '../t31-main/src/core/shapes/primitives/create-ellipse';
+import { compare, edgeDistances, type Vec } from './oracle';
+const out = (s: string) => appendFileSync('C:/Users/stolk/kd-t1/zz-t33/t33-geom.log', '\n' + s);
+const f3 = (n: number) => n.toFixed(3);
+it('G4', () => {
+  const R = 15, cx = 20, cy = 20;
+  const star: Vec[] = Array.from({ length: 5 }, (_, k) => ({ x: cx + R * Math.cos(-Math.PI / 2 + (k * 4 * Math.PI) / 5), y: cy + R * Math.sin(-Math.PI / 2 + (k * 4 * Math.PI) / 5) }));
+  // true outline of the nonzero star: outer tips and inner pentagon vertices alternating
+  const r = R * Math.cos((2 * Math.PI) / 5) / Math.cos(Math.PI / 5);
+  const deca: Vec[] = Array.from({ length: 10 }, (_, k) => { const rr = k % 2 ? r : R; const a = -Math.PI / 2 + (k * Math.PI) / 5; return { x: cx + rr * Math.cos(a), y: cy + rr * Math.sin(a) }; });
+  const obj = { kind: 'imported-svg', id: 's', source: 's', transform: IDENTITY_TRANSFORM, bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 }, paths: [{ color: '#000000', fillRule: 'nonzero', polylines: [{ points: star, closed: true }] }] } as unknown as VectorSceneObject;
+  for (const dir of ['inward', 'outward'] as const) {
+    const res = offsetShapes([obj], { distanceMm: 0.5, direction: dir, cornerStyle: 'round', outerShapesOnly: false }, { outward: 'o', inward: 'i' });
+    if (res.kind === 'error') { out(`G4 star ${dir} ERROR ${res.error.message}`); continue; }
+    const o = (dir === 'inward' ? res.value.inward : res.value.outward)!;
+    const got = o.paths.flatMap((p) => p.polylines.map((pl) => pl.points.map((q) => ({ x: q.x, y: q.y }))));
+    const src = { closed: [deca], open: [], rule: 'nonzero' as const };
+    const c = compare(src, got, 0.5, dir === 'inward' ? 'in' : 'out', 0.05);
+    const ed = edgeDistances(src, got, 4);
+    out(`G4 pentagram nonzero ${dir} 0.5 (true decagon boundary): oracle ${f3(c.oracle)} actual ${f3(c.actual)} xor ${f3(c.xor)}; edge dist ${f3(ed.min)}..${f3(ed.max)}`);
+  }
+  const a = createEllipse({ id: 'a', color: '#000000', spec: { widthMm: 20, heightMm: 20 }, transform: IDENTITY_TRANSFORM }) as unknown as VectorSceneObject;
+  const b = createEllipse({ id: 'b', color: '#000000', spec: { widthMm: 20, heightMm: 20 }, transform: { ...IDENTITY_TRANSFORM, x: 12 } }) as unknown as VectorSceneObject;
+  const res = offsetShapes([a, b], { distanceMm: 1, direction: 'outward', cornerStyle: 'round', outerShapesOnly: false }, { outward: 'o', inward: 'i' });
+  if (res.kind === 'ok') {
+    const got = res.value.outward!.paths.flatMap((p) => p.polylines.map((pl) => pl.points.map((q) => ({ x: q.x, y: q.y }))));
+    const cl = [a, b].flatMap((o) => materializeVectorObject(o).paths.flatMap((p) => p.polylines.map((pl) => pl.points.map((q) => ({ x: q.x, y: q.y })))));
+    const c = compare({ closed: cl, open: [], rule: 'nonzero' }, got, 1, 'out', 0.08);
+    out(`G4 two overlapping circles as a union (nonzero across objects, ADR-410 Amd 3 item 2): oracle ${f3(c.oracle)} actual ${f3(c.actual)} xor ${f3(c.xor)}`);
+  }
+});

@@ -1,0 +1,52 @@
+// Refuter's own G-code decoder (independent of the auditor's decode.ts).
+// Sums lit length per "F<feed> S<power>" for G1/G2/G3 moves with the laser on and S > 0.
+export type Burn = { total: number; byFS: Map<string, number>; litMoves: number };
+
+export function decodeBurn(gcode: string): Burn {
+  let x = 0, y = 0, f = 0, s = 0, mode = 0, on = false, abs = true;
+  const byFS = new Map<string, number>();
+  let total = 0, litMoves = 0;
+  for (const raw of gcode.split(/\r?\n/)) {
+    const line = raw.replace(/;.*$/, '').replace(/\([^)]*\)/g, '').toUpperCase().trim();
+    if (line === '') continue;
+    const w: Record<string, number> = {};
+    const gs: number[] = [];
+    const ms: number[] = [];
+    for (const m of line.matchAll(/([A-Z])\s*([-+]?\d*\.?\d+(?:E[-+]?\d+)?)/g)) {
+      const k = m[1]!, v = Number(m[2]);
+      if (k === 'G') gs.push(v); else if (k === 'M') ms.push(v); else w[k] = v;
+    }
+    for (const m of ms) { if (m === 3 || m === 4) on = true; if (m === 5) on = false; }
+    for (const g of gs) {
+      if (g === 0 || g === 1 || g === 2 || g === 3) mode = g;
+      if (g === 90) abs = true;
+      if (g === 91) abs = false;
+    }
+    if (w.F !== undefined) f = w.F;
+    if (w.S !== undefined) s = w.S;
+    if (w.X === undefined && w.Y === undefined) continue;
+    const nx = w.X === undefined ? x : abs ? w.X : x + w.X;
+    const ny = w.Y === undefined ? y : abs ? w.Y : y + w.Y;
+    let len = Math.hypot(nx - x, ny - y);
+    if ((mode === 2 || mode === 3) && (w.I !== undefined || w.J !== undefined)) {
+      const cx = x + (w.I ?? 0), cy = y + (w.J ?? 0);
+      const r = Math.hypot(x - cx, y - cy);
+      let a0 = Math.atan2(y - cy, x - cx), a1 = Math.atan2(ny - cy, nx - cx);
+      let sweep = mode === 3 ? a1 - a0 : a0 - a1;
+      while (sweep <= 0) sweep += 2 * Math.PI;
+      if (Math.hypot(nx - x, ny - y) < 1e-9) sweep = 2 * Math.PI;
+      len = r * sweep;
+    }
+    if (mode !== 0 && on && s > 0 && len > 0) {
+      const key = `F${f} S${s}`;
+      byFS.set(key, (byFS.get(key) ?? 0) + len);
+      total += len;
+      litMoves += 1;
+    }
+    x = nx; y = ny;
+  }
+  return { total, byFS, litMoves };
+}
+
+export const fmt = (b: Burn) =>
+  `total ${b.total.toFixed(3)} mm [${[...b.byFS].map(([k, v]) => `${k}: ${v.toFixed(3)}`).join(' | ')}]`;

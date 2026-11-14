@@ -1,0 +1,295 @@
+// @vitest-environment jsdom
+// T34 refuter: own fixtures, own decoders (gdec.ts), real store action + real output.
+import { beforeEach, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import {
+  captureLayerOperationSettings,
+  createLayer,
+  createProject,
+  cutTypeLabel,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type Layer,
+  type Polyline,
+  type Project,
+  type SceneObject,
+} from '../t31-main/src/core/scene';
+import {
+  benchmarkLayer,
+  benchmarkProject,
+} from '../t31-main/src/__fixtures__/cnc-leader-fixtures';
+import { prepareOutput } from '../t31-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t31-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t31-main/src/ui/state/store';
+import { resetStore } from '../t31-main/src/ui/state/test-helpers';
+import { useToastStore } from '../t31-main/src/ui/state/toast-store';
+import { cncStats, laserRuns, laserTotal } from './gdec';
+
+const LOG = 'C:/Users/stolk/kd-t1/zz-t34r/r34.log';
+const lines: string[] = [];
+const out = (s: string) => {
+  lines.push(s);
+  writeFileSync(LOG, lines.join('\n'));
+};
+beforeEach(() => {
+  resetStore();
+  useToastStore.setState({ toasts: [] } as never);
+});
+const st = () => useStore.getState();
+const toasts = () =>
+  (useToastStore.getState() as unknown as { toasts: { message: string; variant: string }[] }).toasts.map(
+    (t) => `[${t.variant}] ${t.message}`,
+  );
+
+function poly(points: Array<[number, number]>): Polyline {
+  return { closed: true, points: points.map(([x, y]) => ({ x, y })) };
+}
+function vec(id: string, polylines: Polyline[], op: string): ImportedSvg {
+  const pts = polylines.flatMap((p) => p.points);
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `own ${id}`,
+    operationIds: [op],
+    transform: IDENTITY_TRANSFORM,
+    bounds: {
+      minX: Math.min(...pts.map((p) => p.x)),
+      minY: Math.min(...pts.map((p) => p.y)),
+      maxX: Math.max(...pts.map((p) => p.x)),
+      maxY: Math.max(...pts.map((p) => p.y)),
+    },
+    paths: [{ color: '#000000', operationIds: [op], polylines }],
+  };
+}
+function withScene(base: Project, objects: SceneObject[], layers: Layer[]): Project {
+  return {
+    ...base,
+    scene: { ...base.scene, objects, layers, groups: [], artworkOrder: objects.map((o) => o.id) },
+  } as Project;
+}
+function select(project: Project, ids: string[]) {
+  useStore.setState({
+    project,
+    selectedObjectId: ids[0] ?? null,
+    additionalSelectedIds: new Set(ids.slice(1)),
+    undoStack: [],
+    redoStack: [],
+    dirty: false,
+  });
+}
+function newest(before: Project): { obj: SceneObject; op: Layer } | null {
+  const ids = new Set(before.scene.objects.map((o) => o.id));
+  const obj = st().project.scene.objects.find((o) => !ids.has(o.id));
+  if (obj === undefined) return null;
+  const op = st().project.scene.layers.find((l) => obj.operationIds?.includes(l.id))!;
+  return { obj, op };
+}
+function only(project: Project, id: string): Project {
+  return {
+    ...project,
+    scene: { ...project.scene, objects: project.scene.objects.filter((o) => o.id === id), artworkOrder: [id] },
+  } as Project;
+}
+
+// ---------- CNC ----------
+const V_HALF = (60 / 2) * (Math.PI / 180);
+const radiusFor = (op: Layer) => {
+  const tool = op.cnc?.toolId;
+  if (tool === 'v60') return (z: number) => Math.min(3, Math.abs(z) * Math.tan(V_HALF));
+  if (tool === 'end2') return () => 1;
+  return () => 3;
+};
+function cncOutline(project: Project, id: string, op: Layer) {
+  const prepared = prepareOutput(only(project, id));
+  if (!prepared.ok) return { ok: false as const, why: JSON.stringify(prepared.preflight).slice(0, 300) };
+  const g = emitPreparedGcode(prepared).gcode;
+  const s = cncStats(g, radiusFor(op));
+  return {
+    ok: true as const,
+    s,
+    adv: (prepared.advisories ?? []).map((a) => (a as { message?: string }).message ?? JSON.stringify(a)).slice(0, 4),
+  };
+}
+const fmtS = (r: ReturnType<typeof cncOutline>) =>
+  r.ok
+    ? `cutXY=${r.s.cutXY.toFixed(1)} minZ=${r.s.minZ.toFixed(3)} swept=${r.s.sweptAreaMm2.toFixed(0)}mm2 bbox=[${r.s.bbox.minX.toFixed(1)},${r.s.bbox.minY.toFixed(1)}..${r.s.bbox.maxX.toFixed(1)},${r.s.bbox.maxY.toFixed(1)}] adv=${JSON.stringify(r.adv)}`
+    : `FAIL ${r.why}`;
+
+it('R1 CNC: sign letters on V-carve, pocket recess, cut-out profile', () => {
+  const base = benchmarkProject();
+  const letters = benchmarkLayer('letters', { cutType: 'v-carve', toolId: 'v60', depthMm: 3 });
+  const recess = benchmarkLayer('recess', { cutType: 'pocket', toolId: 'end6', depthMm: 3 });
+  const cutout = benchmarkLayer('cutout', { cutType: 'profile-outside', toolId: 'end6', depthMm: 12, depthPerPassMm: 3 });
+  const engrave = benchmarkLayer('scribe', { cutType: 'engrave', toolId: 'v60', depthMm: 0.5 });
+  // "K" ish and "D" ish letters, 8-10 mm strokes
+  const L1 = vec('letter-1', [poly([[20, 20], [28, 20], [28, 60], [20, 60]])], 'letters');
+  const L2 = vec('letter-2', [poly([[40, 20], [60, 20], [70, 40], [60, 60], [40, 60]])], 'letters');
+  const pocketObj = vec('recess-1', [poly([[30, 30], [50, 30], [50, 50], [30, 50]])], 'recess');
+  const cut = vec('cutout-1', [poly([[10, 10], [80, 10], [80, 70], [10, 70]])], 'cutout');
+  const scr = vec('scribe-1', [poly([[20, 20], [70, 20], [70, 60], [20, 60]])], 'scribe');
+  const cases: Array<{ name: string; objs: SceneObject[]; layers: Layer[]; sel: string[] }> = [
+    { name: 'a letters only (V-carve)', objs: [L1, L2], layers: [letters], sel: ['letter-1', 'letter-2'] },
+    { name: 'b recess (pocket, scene first) + cutout, select cutout first', objs: [pocketObj, cut], layers: [recess, cutout], sel: ['cutout-1', 'recess-1'] },
+    { name: 'c cutout scene first + recess', objs: [cut, pocketObj], layers: [cutout, recess], sel: ['recess-1', 'cutout-1'] },
+    { name: 'd recess only (pocket)', objs: [pocketObj], layers: [recess], sel: ['recess-1'] },
+    { name: 'e scribe only (engrave)', objs: [scr], layers: [engrave], sel: ['scribe-1'] },
+  ];
+  for (const c of cases) {
+    const p = withScene(base, c.objs, c.layers);
+    select(p, c.sel);
+    const ok = st().addRubberBandOutline();
+    const n = newest(p);
+    if (n === null) {
+      out(`R1${c.name}: NO OUTLINE ok=${ok} ${JSON.stringify(toasts())}`);
+      continue;
+    }
+    const cnc = n.op.cnc;
+    out(
+      `R1${c.name}: ok=${ok} op "${n.op.name}" mode=${n.op.mode} cut=${cnc?.cutType} ("${cnc ? cutTypeLabel(cnc.cutType) : '-'}") tool=${cnc?.toolId} depth=${cnc?.depthMm} toast=${JSON.stringify(toasts().slice(-1))}`,
+    );
+    out(`   outline as made:     ${fmtS(cncOutline(st().project, n.obj.id, n.op))}`);
+    // Oracle: the same outline object on a fresh CNC operation (what the "no Line source"
+    // branch makes: a new operation with the project default cut type), and on profile-outside
+    // with the cut-out's settings.
+    const fresh: Layer = { ...createLayer({ id: 'oracle-fresh', color: '#00ff00', name: 'oracle', mode: 'line' }) } as Layer;
+    const prof: Layer = { ...cutout, id: 'oracle-prof', name: 'oracle-prof' } as Layer;
+    for (const oracle of [fresh, prof]) {
+      const proj = st().project;
+      const re = {
+        ...proj,
+        scene: {
+          ...proj.scene,
+          layers: [...proj.scene.layers, oracle],
+          objects: proj.scene.objects.map((o) =>
+            o.id === n.obj.id
+              ? ({ ...o, operationIds: [oracle.id], paths: (o as ImportedSvg).paths.map((pp) => ({ ...pp, operationIds: [oracle.id] })) } as SceneObject)
+              : o,
+          ),
+        },
+      } as Project;
+      out(`   oracle ${oracle.id} (${oracle.cnc?.cutType ?? 'default'}): ${fmtS(cncOutline(re, n.obj.id, oracle))}`);
+    }
+    // undo restores
+    const after = st().project;
+    st().undo();
+    out(`   undo restores: ${st().project === p}; redo -> same: ${(st().redo(), JSON.stringify(st().project.scene) === JSON.stringify(after.scene))}`);
+  }
+});
+
+// ---------- Laser ----------
+function laserProject(objects: SceneObject[], layers: Layer[]): Project {
+  const b = createProject();
+  return withScene({ ...b, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION } } as Project, objects, layers);
+}
+function lineOp(id: string, power: number, speed: number, extra: Partial<Layer> = {}): Layer {
+  return { ...createLayer({ id, color: '#123456', name: id, mode: 'line' }), power, speed, ...extra } as Layer;
+}
+function burn(project: Project) {
+  const p = prepareOutput(project);
+  if (!p.ok) return { ok: false, g: '', why: JSON.stringify(p.preflight).slice(0, 300) };
+  return { ok: true, g: emitPreparedGcode(p).gcode, why: '' };
+}
+const runsStr = (g: string) => laserRuns(g).map((r) => `${r.fs}:${r.len.toFixed(2)}`).join(' > ');
+
+it('R2 laser: override + power scale on the first Line source', () => {
+  const cutOp = lineOp('cut', 25, 1200);
+  // part: a 30x20 plate cut with a per-artwork override (95 %, 250 mm/min) and power scale 80
+  const plate = { ...vec('plate', [poly([[0, 0], [30, 0], [30, 20], [0, 20]])], 'cut'), operationOverride: { power: 95, speed: 250 }, powerScale: 80 } as SceneObject;
+  const hole = vec('hole', [poly([[40, 0], [50, 0], [50, 10], [40, 10]])], 'cut');
+  const p = laserProject([plate, hole], [cutOp]);
+  out(`R2 source alone: ${runsStr(burn(only(p, 'plate')).g)}`);
+  out(`R2 hole alone:   ${runsStr(burn(only(p, 'hole')).g)}`);
+  select(p, ['plate', 'hole']);
+  st().addRubberBandOutline();
+  const n = newest(p)!;
+  out(`R2 outline op: ${JSON.stringify({ name: n.op.name, power: n.op.power, speed: n.op.speed, output: n.op.output })} obj override=${JSON.stringify((n.obj as { operationOverride?: unknown }).operationOverride)} powerScale=${(n.obj as { powerScale?: unknown }).powerScale}`);
+  out(`R2 outline alone burns: ${runsStr(burn(only(st().project, n.obj.id)).g)}`);
+  // Same hull, but select the plain hole first in scene order
+  const p2 = laserProject([hole, plate], [cutOp]);
+  select(p2, ['plate', 'hole']);
+  st().addRubberBandOutline();
+  const n2 = newest(p2)!;
+  out(`R2 hole first in scene: outline burns ${runsStr(burn(only(st().project, n2.obj.id)).g)}`);
+  // Offset Shapes from the plate, for comparison with the rule ADR-480 cites
+  select(laserProject([plate], [cutOp]), ['plate']);
+  st().offsetShapesSelection({ distanceMm: 1, direction: 'outward', cornerStyle: 'round', outerShapesOnly: false, deleteOriginals: false } as never);
+  const off = st().project.scene.objects.find((o) => o.id !== 'plate')!;
+  out(`R2 offset of plate burns: ${runsStr(burn(only(st().project, off.id)).g)} override=${JSON.stringify((off as { operationOverride?: unknown }).operationOverride)} ps=${(off as { powerScale?: unknown }).powerScale}`);
+});
+
+it('R3 laser: output-off guide first, Select All', () => {
+  const guideOp = lineOp('guide', 10, 4000, { output: false } as Partial<Layer>);
+  const cutOp = lineOp('cut', 90, 300);
+  const guide = vec('guide', [poly([[0, 0], [100, 0], [100, 60], [0, 60]])], 'guide');
+  const a = vec('a', [poly([[10, 10], [30, 10], [30, 30], [10, 30]])], 'cut');
+  const b = vec('b', [poly([[60, 20], [85, 20], [85, 45], [60, 45]])], 'cut');
+  const p = laserProject([guide, a, b], [guideOp, cutOp]);
+  select(p, []);
+  st().selectAllObjects();
+  out(`R3 select all -> ${JSON.stringify([st().selectedObjectId, ...st().additionalSelectedIds])}`);
+  const before = laserTotal(burn(p).g);
+  st().addRubberBandOutline();
+  const n = newest(p)!;
+  const after = laserTotal(burn(st().project).g);
+  out(`R3 outline op ${JSON.stringify({ name: n.op.name, output: n.op.output, power: n.op.power })} lit before ${before.toFixed(3)} after ${after.toFixed(3)} toast ${JSON.stringify(toasts().slice(-1))}`);
+  // Without the guide (only the two parts) for control
+  select(p, ['a', 'b']);
+  st().addRubberBandOutline();
+  const n2 = newest(p)!;
+  out(`R3 control parts only: op ${JSON.stringify({ output: n2.op.output, power: n2.op.power, speed: n2.op.speed })} outline burns ${runsStr(burn(only(st().project, n2.obj.id)).g)}`);
+  // Is there any advisory for artwork on an output-off operation?
+  const prep = prepareOutput(p.scene.objects.length ? st().project : p);
+  out(`R3 advisories: ${prep.ok ? JSON.stringify((prep.advisories ?? []).map((x) => (x as { message?: string }).message)).slice(0, 400) : 'not ok'}`);
+});
+
+it('R4 guard: variable text and variable barcode', () => {
+  const op = lineOp('cut', 50, 1000);
+  const r = vec('r', [poly([[0, 0], [10, 0], [10, 10], [0, 10]])], 'cut');
+  const vt = {
+    kind: 'text', id: 'vt', content: 'SN {{serial:4}}', fontKey: 'roboto-regular', sizeMm: 10, alignment: 'left', lineHeight: 1.4, letterSpacing: 0,
+    color: '#000000', bounds: { minX: 0, minY: 0, maxX: 60, maxY: 10 }, transform: { ...IDENTITY_TRANSFORM, x: 0, y: 40 },
+    paths: [{ color: '#000000', polylines: [poly([[0, 0], [60, 0], [60, 10], [0, 10]])] }], operationIds: ['cut'],
+    variableTemplate: { tokens: [{ kind: 'literal', value: 'SN ' }, { kind: 'serial', prefix: '', width: 4 }] },
+  } as unknown as SceneObject;
+  const bc = {
+    kind: 'shape', id: 'bc', color: '#000000', transform: { ...IDENTITY_TRANSFORM, x: 100, y: 0 }, operationIds: ['cut'],
+    bounds: { minX: 0, minY: 0, maxX: 20, maxY: 20 }, paths: [{ color: '#000000', polylines: [poly([[0, 0], [20, 0], [20, 20], [0, 20]])] }],
+    spec: { kind: 'barcode', variableTemplate: { tokens: [{ kind: 'serial', prefix: '', width: 4 }] } },
+  } as unknown as SceneObject;
+  for (const sel of [['r', 'vt'], ['r', 'bc'], ['vt'], ['bc'], ['vt', 'bc']]) {
+    useToastStore.setState({ toasts: [] } as never);
+    const p = laserProject([r, vt, bc], [op]);
+    select(p, sel);
+    let ok: unknown;
+    try {
+      ok = st().addRubberBandOutline();
+    } catch (e) {
+      ok = `THROW ${(e as Error).message}`;
+    }
+    const n = newest(p);
+    out(`R4 ${sel.join('+')}: ok=${ok} outline bounds ${JSON.stringify(n?.obj.bounds)} undo=${st().undoStack.length} toasts ${JSON.stringify(toasts())}`);
+  }
+});
+
+it('R5 laser: Line root with a Fill sub-operation', () => {
+  const root = lineOp('art', 80, 400);
+  const withFill = {
+    ...root,
+    subLayers: [
+      { id: 'art-fill', label: 'Engrave', enabled: true, settings: { ...captureLayerOperationSettings(root), mode: 'fill', power: 30, speed: 3000, hatchSpacingMm: 0.5 } },
+    ],
+  } as Layer;
+  const a = vec('a', [poly([[0, 0], [10, 0], [10, 10], [0, 10]])], 'art');
+  const b = vec('b', [poly([[40, 30], [50, 30], [50, 40], [40, 40]])], 'art');
+  const p = laserProject([a, b], [withFill]);
+  out(`R5 sources burn: ${runsStr(burn(p).g)}`);
+  select(p, ['a', 'b']);
+  st().addRubberBandOutline();
+  const n = newest(p)!;
+  out(`R5 outline op: mode=${n.op.mode} subLayers=${JSON.stringify(n.op.subLayers.map((s) => ({ mode: s.settings.mode, enabled: s.enabled })))}`);
+  const g = burn(only(st().project, n.obj.id)).g;
+  const runs = laserRuns(g);
+  out(`R5 outline alone burns: ${runsStr(g)}; lit bbox ${runs.map((r) => `[${r.minX.toFixed(1)},${r.minY.toFixed(1)}..${r.maxX.toFixed(1)},${r.maxY.toFixed(1)}]`).join(' ')}`);
+  out(`R5 sources lit ${laserTotal(burn(p).g).toFixed(1)} -> all after ${laserTotal(burn(st().project).g).toFixed(1)}`);
+});

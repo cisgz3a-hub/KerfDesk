@@ -1,0 +1,175 @@
+// T33 Offset Shapes: core geometry against an independent distance-field oracle.
+import { writeFileSync, readFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { IDENTITY_TRANSFORM, type SceneObject, type Transform } from '../t31-main/src/core/scene';
+import { createRectangle } from '../t31-main/src/core/shapes/primitives/create-rectangle';
+import { createEllipse } from '../t31-main/src/core/shapes/primitives/create-ellipse';
+import { textToPolylines } from '../t31-main/src/core/text';
+import { materializeVectorObject, type VectorSceneObject } from '../t31-main/src/core/geometry';
+import { offsetShapes, type OffsetShapesOptions } from '../t31-main/src/core/geometry/offset-shapes';
+import { area, compare, edgeDistances, type Region, type Vec } from './oracle';
+
+const lines: string[] = [];
+const out = (s: string) => {
+  lines.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t33/t33-geom.log', lines.join('\n'));
+};
+const f3 = (n: number) => n.toFixed(3);
+const IDS = { outward: 'o', inward: 'i' };
+const opt = (p: Partial<OffsetShapesOptions>): OffsetShapesOptions => ({
+  distanceMm: 1, direction: 'outward', cornerStyle: 'round', outerShapesOnly: false, ...p,
+});
+const rect = (id: string, w: number, h: number, t: Partial<Transform> = {}, r = 0) =>
+  createRectangle({ id, color: '#000000', spec: { widthMm: w, heightMm: h, cornerRadiusMm: r }, transform: { ...IDENTITY_TRANSFORM, ...t } }) as unknown as VectorSceneObject;
+const circ = (id: string, d: number, t: Partial<Transform> = {}) =>
+  createEllipse({ id, color: '#000000', spec: { widthMm: d, heightMm: d }, transform: { ...IDENTITY_TRANSFORM, ...t } }) as unknown as VectorSceneObject;
+const svg = (id: string, contours: Vec[][], closed = true, fillRule?: 'evenodd' | 'nonzero') =>
+  ({
+    kind: 'imported-svg', id, source: id, transform: IDENTITY_TRANSFORM,
+    bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+    paths: [{ color: '#000000', ...(fillRule ? { fillRule } : {}), polylines: contours.map((points) => ({ points, closed })) }],
+  }) as unknown as VectorSceneObject;
+const box = (x: number, y: number, w: number, h: number): Vec[] => [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }];
+
+function contoursOf(o: { paths: ReadonlyArray<{ polylines: ReadonlyArray<{ points: ReadonlyArray<Vec> }> }> } | null): Vec[][] {
+  return o === null ? [] : o.paths.flatMap((p) => p.polylines.map((pl) => pl.points.map((q) => ({ x: q.x, y: q.y }))));
+}
+/** World source region from the app's materialization (the offset is what is under test). */
+function worldRegion(objs: VectorSceneObject[]): Region {
+  const closed: Vec[][] = [];
+  const open: Vec[][] = [];
+  let rule: 'evenodd' | 'nonzero' = 'nonzero';
+  for (const o of objs) {
+    const m = materializeVectorObject(o);
+    for (const p of m.paths) {
+      if (p.fillRule !== 'nonzero') rule = 'evenodd';
+      for (const pl of p.polylines) {
+        const pts = pl.points.map((q) => ({ x: q.x, y: q.y }));
+        if (pl.closed) closed.push(pts);
+        else open.push(pts);
+      }
+    }
+  }
+  return { closed, open, rule };
+}
+function run(name: string, objs: VectorSceneObject[], o: OffsetShapesOptions) {
+  const t0 = performance.now();
+  const r = offsetShapes(objs, o, IDS);
+  const ms = performance.now() - t0;
+  if (r.kind === 'error') {
+    out(`${name}: ERROR ${r.error.kind}: ${r.error.message} (${ms.toFixed(0)} ms)`);
+    return null;
+  }
+  return { out: contoursOf(r.value.outward), in: contoursOf(r.value.inward), ms, raw: r.value };
+}
+
+it('G1 transformed rectangles: area oracles', () => {
+  // A 20 x 10 rectangle scaled (2, 0.5) is a 40 x 5 world rectangle, rotated and mirrored.
+  const W = 40, H = 5, d = 1, t = Math.tan(Math.PI / 8);
+  const expect = {
+    round: (W + 2 * d) * (H + 2 * d) - (4 - Math.PI) * d * d,
+    bevel: (W + 2 * d) * (H + 2 * d) - 2 * (d * (1 - t)) ** 2,
+    corner: (W + 2 * d) * (H + 2 * d),
+  } as const;
+  for (const tr of [
+    { scaleX: 2, scaleY: 0.5 },
+    { scaleX: 2, scaleY: 0.5, rotationDeg: 30 },
+    { scaleX: 2, scaleY: 0.5, rotationDeg: 30, mirrorX: true },
+    { scaleX: -2, scaleY: 0.5, rotationDeg: 211, mirrorY: true, x: 50, y: 70 },
+  ] as Partial<Transform>[]) {
+    const src = rect('r', 20, 10, tr);
+    const reg = worldRegion([src]);
+    for (const cs of ['round', 'bevel', 'corner'] as const) {
+      const res = run('rect', [src], opt({ cornerStyle: cs, direction: 'both' }))!;
+      const ed = edgeDistances(reg, res.out);
+      out(`G1 ${JSON.stringify(tr)} ${cs}: out area ${f3(Math.abs(area(res.out)))} (oracle ${f3(expect[cs])}); in area ${f3(Math.abs(area(res.in)))} (oracle ${f3((W - 2) * (H - 2))}); out edge dist ${f3(ed.min)}..${f3(ed.max)}`);
+    }
+  }
+});
+
+it('G2 distance-field oracle (round)', async () => {
+  const roboto = (() => {
+    const b = readFileSync('C:/Users/stolk/kd-t1/t31-main/src/ui/text/fonts/Roboto-Regular.ttf');
+    return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+  })();
+  const r = await textToPolylines({ content: 'B&8o', sizeMm: 12, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000', fontBuffer: roboto });
+  const text = {
+    kind: 'text', id: 'T', content: 'B&8o', fontKey: 'roboto-regular', sizeMm: 12, alignment: 'left', lineHeight: 1.2, letterSpacing: 0, color: '#000000',
+    bounds: r.bounds, transform: { ...IDENTITY_TRANSFORM, x: 10, y: 10, scaleX: 1.5, rotationDeg: 20, mirrorY: true }, paths: r.paths,
+  } as unknown as VectorSceneObject;
+  const star = (cx: number, cy: number, R: number): Vec[] =>
+    Array.from({ length: 5 }, (_, k) => ({ x: cx + R * Math.cos(-Math.PI / 2 + (k * 4 * Math.PI) / 5), y: cy + R * Math.sin(-Math.PI / 2 + (k * 4 * Math.PI) / 5) }));
+  const cases: Array<[string, VectorSceneObject[], OffsetShapesOptions, 'out' | 'in', number]> = [
+    ['ellipse (circle 20 scaled 2x1 rot 45)', [circ('c', 20, { scaleX: 2, rotationDeg: 45 })], opt({ distanceMm: 2 }), 'out', 0.1],
+    ['ellipse inward 3', [circ('c', 20, { scaleX: 2, rotationDeg: 45 })], opt({ distanceMm: 3, direction: 'inward' }), 'in', 0.1],
+    ['rounded rect r3 inward 1', [rect('rr', 30, 20, { x: 5 }, 3)], opt({ direction: 'inward' }), 'in', 0.05],
+    ['rounded rect r3 outward 2', [rect('rr', 30, 20, { x: 5 }, 3)], opt({ distanceMm: 2 }), 'out', 0.05],
+    ['text B&8o transformed outward 0.4', [text], opt({ distanceMm: 0.4 }), 'out', 0.04],
+    ['text B&8o transformed inward 0.2', [text], opt({ distanceMm: 0.2, direction: 'inward' }), 'in', 0.03],
+    ['pentagram evenodd outward 0.5', [svg('s', [star(20, 20, 15)], true, 'evenodd' as never)], opt({ distanceMm: 0.5 }), 'out', 0.05],
+    ['pentagram evenodd inward 0.5', [svg('s', [star(20, 20, 15)], true, 'evenodd' as never)], opt({ distanceMm: 0.5, direction: 'inward' }), 'in', 0.05],
+    ['pentagram nonzero inward 0.5', [svg('s', [star(20, 20, 15)], true, 'nonzero')], opt({ distanceMm: 0.5, direction: 'inward' }), 'in', 0.05],
+    ['open zigzag outward 1.5', [svg('z', [[{ x: 0, y: 0 }, { x: 10, y: 8 }, { x: 12, y: 0 }, { x: 25, y: 3 }]], false)], opt({ distanceMm: 1.5 }), 'out', 0.05],
+    ['two overlapping circles', [circ('a', 20, { x: 0 }), circ('b', 20, { x: 12 })], opt({ distanceMm: 1 }), 'out', 0.08],
+    ['plate + separate hole + island inward 1', [rect('p', 50, 30), rect('h', 30, 20, { x: 10, y: 5 }), rect('isl', 10, 10, { x: 20, y: 10 })], opt({ direction: 'inward' }), 'in', 0.05],
+    ['plate + separate hole + island outward 1', [rect('p', 50, 30), rect('h', 30, 20, { x: 10, y: 5 }), rect('isl', 10, 10, { x: 20, y: 10 })], opt({}), 'out', 0.05],
+  ];
+  for (const [name, objs, o, dir, step] of cases) {
+    const reg = worldRegion(objs);
+    // The source's own fill: for evenodd SVG pass the fill rule through.
+    const res = run(name, objs, o);
+    if (res === null) continue;
+    const got = dir === 'out' ? res.out : res.in;
+    const c = compare(reg, got, o.distanceMm, dir, step);
+    const ed = edgeDistances(reg, got, 4);
+    out(`G2 ${name}: oracle ${f3(c.oracle)} actual ${f3(c.actual)} xor ${f3(c.xor)} (xor/perimeter ${f3(c.xorOverPerim)} mm, grid ${step}); edge dist ${f3(ed.min)}..${f3(ed.max)} (want ${o.distanceMm}); rings ${got.length}; ${res.ms.toFixed(0)} ms`);
+  }
+});
+
+it('G3 corner styles on sharp angles, collapse, degenerate input, huge distances', () => {
+  for (const deg of [90, 45, 20, 10]) {
+    const a = (deg * Math.PI) / 180;
+    const tri: Vec[] = [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30 * Math.cos(a), y: 30 * Math.sin(a) }];
+    const src = svg('t', [tri]);
+    const reg = worldRegion([src]);
+    for (const cs of ['round', 'bevel', 'corner'] as const) {
+      const res = run(`tri ${deg}`, [src], opt({ cornerStyle: cs, direction: 'both' }));
+      if (res === null) continue;
+      const eo = edgeDistances(reg, res.out, 4);
+      const ei = res.in.length ? edgeDistances(reg, res.in, 4) : { min: NaN, max: NaN };
+      out(`G3 tri ${deg}° ${cs}: out dist ${f3(eo.min)}..${f3(eo.max)} (miter cap 4d=4; LightBurn corner = 1/sin(${deg / 2}°)=${f3(1 / Math.sin(a / 2))}); in dist ${f3(ei.min)}..${f3(ei.max)}`);
+    }
+  }
+  run('collapse inward', [rect('s', 2, 2)], opt({ distanceMm: 1.5, direction: 'inward' }));
+  const both = run('collapse both', [rect('s', 2, 2)], opt({ distanceMm: 1.5, direction: 'both' }));
+  out(`G3 collapse both: outward rings ${both?.out.length} inward ${both?.in.length}`);
+  // Partial collapse: a big square and a small one, inward 1.5
+  const part = run('partial', [rect('big', 20, 20), rect('small', 2, 2, { x: 30 })], opt({ distanceMm: 1.5, direction: 'inward' }));
+  out(`G3 partial collapse inward: rings ${part?.in.length} (small square vanished silently: ${part?.in.length === 1})`);
+  // Inward with an open line + a closed square: open line dropped?
+  const mixed = run('mixed', [rect('sq', 20, 20), svg('ln', [[{ x: 30, y: 0 }, { x: 50, y: 0 }]], false)], opt({ direction: 'inward' }));
+  out(`G3 inward on square + open line: rings ${mixed?.in.length}; outward ${mixed?.out.length}`);
+  for (const v of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, 0.0009, 0.001]) run(`distance ${v}`, [rect('s', 10, 10)], opt({ distanceMm: v }));
+  const tiny = run('tiny 0.001', [rect('s', 10, 10)], opt({ distanceMm: 0.001 }));
+  out(`G3 0.001 mm: area ${f3(Math.abs(area(tiny?.out ?? [])))} (oracle ${f3(100 + 40 * 0.001 + Math.PI * 1e-6)})`);
+  for (const v of [1e3, 1e5, 1e7]) {
+    const r = run(`huge ${v}`, [rect('s', 10, 10)], opt({ distanceMm: v }));
+    if (r) out(`G3 huge ${v}: points ${r.out.flat().length}; ${r.ms.toFixed(0)} ms; area/(πd²) ${f3(Math.abs(area(r.out)) / (Math.PI * v * v))}`);
+  }
+  // degenerate input
+  run('empty paths', [svg('e', [])], opt({}));
+  run('single point', [svg('p', [[{ x: 1, y: 1 }]], false)], opt({}));
+  run('two identical points', [svg('p', [[{ x: 1, y: 1 }, { x: 1, y: 1 }]], false)], opt({}));
+  const zero = run('zero-area closed', [svg('z', [[{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 0, y: 0 }]])], opt({}));
+  out(`G3 zero-area closed outward: area ${f3(Math.abs(area(zero?.out ?? [])))} (stroke oracle 20·1·... = ${f3(10 * 2 + Math.PI)})`);
+  run('NaN point', [svg('n', [[{ x: 0, y: 0 }, { x: Number.NaN, y: 0 }, { x: 5, y: 5 }]])], opt({}));
+  // Outer shapes only with the plate+hole+island
+  const osh = run('outer only', [rect('p', 50, 30), rect('h', 30, 20, { x: 10, y: 5 }), rect('isl', 10, 10, { x: 20, y: 10 })], opt({ outerShapesOnly: true, direction: 'both' }));
+  out(`G3 outer shapes only: out rings ${osh?.out.length} area ${f3(Math.abs(area(osh?.out ?? [])))} (oracle 52x32-(4-π)=${f3(52 * 32 - 4 + Math.PI)}); in rings ${osh?.in.length} area ${f3(Math.abs(area(osh?.in ?? [])))} (oracle 48x28=1344)`);
+  // Result metadata
+  const meta = offsetShapes([{ ...rect('m', 10, 10), name: 'Named', powerScale: 40, locked: false, laserTabAnchors: [{ t: 0.5 }] } as unknown as VectorSceneObject, { ...rect('n', 5, 5, { x: 20 }), color: '#ff0000', paths: rect('n', 5, 5, { x: 20 }).paths.map((p) => ({ ...p, color: '#ff0000' })), powerScale: 90 } as unknown as VectorSceneObject], opt({}), IDS);
+  if (meta.kind === 'ok') {
+    const o = meta.value.outward!;
+    out(`G3 result meta: keys ${Object.keys(o).join(',')}; name ${(o as { name?: string }).name}; powerScale ${o.powerScale}; colours ${o.paths.map((p) => p.color)}; source ${o.source}; rings ${o.paths[0]!.polylines.length}`);
+  }
+});

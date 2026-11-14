@@ -1,0 +1,122 @@
+// T33 oracle: an exact distance field to the source (segments), independent of
+// Clipper. Outward round offset = {p : inside(src) or dist(p, src) <= d};
+// inward round offset = {p : inside(src) and dist(p, boundary) >= d}.
+export type Vec = { x: number; y: number };
+export type Region = { closed: Vec[][]; rule: 'evenodd' | 'nonzero'; open: Vec[][] };
+
+function windAt(contours: ReadonlyArray<ReadonlyArray<Vec>>, p: Vec): { wind: number; parity: number } {
+  let wind = 0;
+  let parity = 0;
+  for (const c of contours)
+    for (let i = 0; i < c.length; i++) {
+      const a = c[i]!;
+      const b = c[(i + 1) % c.length]!;
+      if ((a.y <= p.y && b.y > p.y) || (b.y <= p.y && a.y > p.y)) {
+        const x = a.x + ((p.y - a.y) / (b.y - a.y)) * (b.x - a.x);
+        if (x > p.x) {
+          wind += b.y > a.y ? 1 : -1;
+          parity ^= 1;
+        }
+      }
+    }
+  return { wind, parity };
+}
+
+export function inside(r: { closed: Vec[][]; rule: 'evenodd' | 'nonzero' }, p: Vec): boolean {
+  const w = windAt(r.closed, p);
+  return r.rule === 'evenodd' ? w.parity === 1 : w.wind !== 0;
+}
+
+type Seg = [number, number, number, number];
+export function segments(r: Region): Seg[] {
+  const s: Seg[] = [];
+  for (const c of r.closed)
+    for (let i = 0; i < c.length; i++) {
+      const a = c[i]!;
+      const b = c[(i + 1) % c.length]!;
+      s.push([a.x, a.y, b.x, b.y]);
+    }
+  for (const c of r.open)
+    for (let i = 0; i + 1 < c.length; i++) s.push([c[i]!.x, c[i]!.y, c[i + 1]!.x, c[i + 1]!.y]);
+  return s;
+}
+
+export function distTo(segs: ReadonlyArray<Seg>, p: Vec): number {
+  let best = Infinity;
+  for (const [ax, ay, bx, by] of segs) {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const l2 = dx * dx + dy * dy;
+    let t = l2 === 0 ? 0 : ((p.x - ax) * dx + (p.y - ay) * dy) / l2;
+    t = Math.max(0, Math.min(1, t));
+    const ex = ax + t * dx - p.x;
+    const ey = ay + t * dy - p.y;
+    const d2 = ex * ex + ey * ey;
+    if (d2 < best) best = d2;
+  }
+  return Math.sqrt(best);
+}
+
+/** Grid comparison of the oracle region against the actual result (nonzero). */
+export function compare(
+  src: Region,
+  actual: Vec[][],
+  d: number,
+  dir: 'out' | 'in',
+  step: number,
+): { oracle: number; actual: number; xor: number; xorOverPerim: number } {
+  const segs = segments(src);
+  const all = [...src.closed.flat(), ...src.open.flat(), ...actual.flat()];
+  const minX = Math.min(...all.map((p) => p.x)) - d - 1;
+  const maxX = Math.max(...all.map((p) => p.x)) + d + 1;
+  const minY = Math.min(...all.map((p) => p.y)) - d - 1;
+  const maxY = Math.max(...all.map((p) => p.y)) + d + 1;
+  const act = { closed: actual, rule: 'nonzero' as const };
+  let o = 0;
+  let a = 0;
+  let x = 0;
+  let perim = 0;
+  for (const c of actual) for (let i = 0; i < c.length; i++) perim += Math.hypot(c[(i + 1) % c.length]!.x - c[i]!.x, c[(i + 1) % c.length]!.y - c[i]!.y);
+  for (let y = minY + step / 2; y < maxY; y += step)
+    for (let xx = minX + step / 2; xx < maxX; xx += step) {
+      const p = { x: xx, y };
+      const ins = src.closed.length > 0 && inside(src, p);
+      const dist = distTo(segs, p);
+      const want = dir === 'out' ? ins || dist <= d : ins && dist >= d;
+      const got = inside(act, p);
+      if (want) o += step * step;
+      if (got) a += step * step;
+      if (want !== got) x += step * step;
+    }
+  return { oracle: o, actual: a, xor: x, xorOverPerim: perim === 0 ? 0 : x / perim };
+}
+
+/** Distances from points sampled along the result's edges to the source. */
+export function edgeDistances(src: Region, actual: Vec[][], perEdge = 8): { min: number; max: number } {
+  const segs = segments(src);
+  let min = Infinity;
+  let max = -Infinity;
+  for (const c of actual)
+    for (let i = 0; i < c.length; i++) {
+      const a = c[i]!;
+      const b = c[(i + 1) % c.length]!;
+      for (let k = 0; k < perEdge; k++) {
+        const t = k / perEdge;
+        const dd = distTo(segs, { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) });
+        min = Math.min(min, dd);
+        max = Math.max(max, dd);
+      }
+    }
+  return { min, max };
+}
+
+export function area(contours: Vec[][]): number {
+  let s = 0;
+  for (const c of contours)
+    for (let i = 0; i < c.length; i++) {
+      const a = c[i]!;
+      const b = c[(i + 1) % c.length]!;
+      s += a.x * b.y - b.x * a.y;
+    }
+  return s / 2;
+}

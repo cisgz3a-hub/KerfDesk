@@ -1,0 +1,213 @@
+// @vitest-environment jsdom
+// T33 Offset Shapes through the real store action: inheritance, undo/redo, save/reopen,
+// decoded G-code, guards and silent losses.
+import { beforeEach, it } from 'vitest';
+import {
+  createRegistrationLayer,
+  DEFAULT_PROJECT_VARIABLE_DATA,
+  IDENTITY_TRANSFORM,
+  createLayer,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type RasterImage,
+  type SceneObject,
+  type TextObject,
+} from '../t31-main/src/core/scene';
+import { createRegistrationBox } from '../t31-main/src/core/shapes';
+import { registrationJigCopyId } from '../t31-main/src/core/scene/registration-jig-artwork';
+import { textToPolylines } from '../t31-main/src/core/text';
+import { serializeProject } from '../t31-main/src/io/project/serialize-project';
+import { deserializeProject } from '../t31-main/src/io/project/deserialize-project';
+import { offsetShapesTargets, type OffsetShapesRequest } from '../t31-main/src/ui/state/offset-shapes-actions';
+import { resetStore } from '../t31-main/src/ui/state/test-helpers';
+import { totalLen, bbox } from './decode';
+import { burn, byFS, circ, clearToasts, f3, layer, logger, proj, rect, roboto, setProject, st, svg, toasts } from './common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t33/t33-store.log');
+beforeEach(() => {
+  resetStore();
+  clearToasts();
+});
+const req = (p: Partial<OffsetShapesRequest>): OffsetShapesRequest => ({
+  distanceMm: 1, direction: 'outward', cornerStyle: 'round', outerShapesOnly: false, deleteOriginals: false, ...p,
+});
+const ids = (p: Project) => p.scene.objects.map((o) => o.id).join(',');
+const offs = (p: Project) => p.scene.objects.filter((o) => o.id.startsWith('offset')) as ImportedSvg[];
+
+it('S1 mixed operations, power scale, overrides, names; undo/redo; save/reopen', () => {
+  const L1 = layer('L1', 'line', 1000, 80);
+  const L2 = layer('L2', 'fill', 3000, 30, { hatchSpacingMm: 0.1, color: '#0000ff' } as Partial<Layer>);
+  const A = rect('A', 20, 10, { x: 10, y: 10 }, { operationIds: ['L1'], powerScale: 50, name: 'Alpha', operationOverride: { byOperation: { L1: { power: 12, speed: 777 } } } });
+  const B = rect('B', 20, 10, { x: 50, y: 15 }, { operationIds: ['L2'], name: 'Beta', powerScale: 90 });
+  for (const order of [[A, B], [B, A]]) {
+    const p0 = proj(order, [L1, L2]);
+    setProject(p0, ['A', 'B']);
+    clearToasts();
+    const ok = st().offsetShapesSelection(req({}));
+    const p1 = st().project;
+    const o = offs(p1);
+    const lay = p1.scene.layers.filter((l) => !['L1', 'L2'].includes(l.id));
+    out(`S1 scene order ${order.map((x) => x.id)}: ok ${ok}; offsets ${o.map((x) => `${x.id} name=${x.name} ps=${x.powerScale} ov=${JSON.stringify(x.operationOverride)} ops=${x.operationIds} rings=${x.paths[0]!.polylines.length}`)}; new layers ${lay.map((l) => `${l.id}/${l.mode}/p${l.power}/s${l.speed}`)}`);
+    out(`   burn after ${byFS(burn(p1).moves)}; before ${byFS(burn(p0).moves)}; toasts ${JSON.stringify(toasts())}; selected ${st().selectedObjectId}+${[...st().additionalSelectedIds]}`);
+    st().undo();
+    out(`   undo exact: ${JSON.stringify(st().project) === JSON.stringify(p0)}; undo depth ${st().undoStack.length}`);
+    st().redo();
+    out(`   redo equal: ${JSON.stringify(st().project) === JSON.stringify(p1)}`);
+    const re = deserializeProject(serializeProject(p1));
+    out(`   reopen: ${re.kind}; burn same ${re.kind === 'ok' ? byFS(burn((re as unknown as { project: Project }).project).moves) === byFS(burn(p1).moves) : 'n/a'}`);
+  }
+});
+
+it('S2 decoded G-code: transformed rectangle, all corner styles, Delete originals', () => {
+  const t = Math.tan(Math.PI / 8);
+  const oracle = { round: 90 + 2 * Math.PI, bevel: 90 + 16 * t, corner: 98 } as const;
+  for (const cs of ['round', 'bevel', 'corner'] as const) {
+    const A = rect('A', 20, 10, { x: 60, y: 60, scaleX: 2, scaleY: 0.5, rotationDeg: 30, mirrorX: true }, { operationIds: ['L'] });
+    const p0 = proj([A], [layer('L', 'line', 1200, 70)]);
+    setProject(p0, ['A']);
+    st().offsetShapesSelection(req({ cornerStyle: cs, deleteOriginals: true }));
+    const b = burn(st().project);
+    out(`S2 ${cs}: lit ${f3(totalLen(b.moves))} (oracle perimeter ${f3(oracle[cs])}); ${byFS(b.moves)}; objects ${ids(st().project)}; bbox ${JSON.stringify(bbox(b.moves))}`);
+  }
+  // inward both with a separate hole, burn
+  const P = rect('P', 50, 30, { x: 10, y: 10 }, { operationIds: ['L'] });
+  const H = rect('H', 10, 10, { x: 30, y: 20 }, { operationIds: ['L'] });
+  const p0 = proj([P, H], [layer('L', 'line', 1200, 70)]);
+  setProject(p0, ['P', 'H']);
+  st().offsetShapesSelection(req({ direction: 'both', deleteOriginals: true }));
+  const b = burn(st().project);
+  out(`S2 plate+hole both: lit ${f3(totalLen(b.moves))} (oracle out 2(52+32)-(8-2π)=${f3(168 - 8 + 2 * Math.PI)} + hole out 4·8=32 ... in 2(48+28)=152 + hole in 2(12+12)-(8-2π)=${f3(48 - 8 + 2 * Math.PI)}; total ${f3(168 - 8 + 2 * Math.PI + 32 + 152 + 48 - 8 + 2 * Math.PI)}); objects ${ids(st().project)}`);
+});
+
+it('S3 silent losses with Delete original objects', () => {
+  // (a) partial collapse inward
+  const big = rect('big', 20, 20, { x: 10, y: 10 }, { operationIds: ['L'] });
+  const small = rect('small', 2, 2, { x: 40, y: 10 }, { operationIds: ['L'] });
+  const p0 = proj([big, small], [layer('L', 'line', 1200, 70)]);
+  setProject(p0, ['big', 'small']);
+  const before = burn(p0);
+  const ok = st().offsetShapesSelection(req({ direction: 'inward', distanceMm: 1.5, deleteOriginals: true }));
+  const b = burn(st().project);
+  out(`S3a partial collapse inward 1.5 + delete: ok ${ok}; objects ${ids(st().project)}; lit ${f3(totalLen(before.moves))} -> ${f3(totalLen(b.moves))} (oracle inward big 4·17=68; small 8 mm square cut gone); bbox after ${JSON.stringify(bbox(b.moves))}; toasts ${JSON.stringify(toasts())}`);
+  // (b) both, small collapses
+  setProject(p0, ['big', 'small']);
+  clearToasts();
+  st().offsetShapesSelection(req({ direction: 'both', distanceMm: 1.5, deleteOriginals: true }));
+  out(`S3b both 1.5 + delete: objects ${ids(st().project)}; rings ${offs(st().project).map((o) => o.paths[0]!.polylines.length)}; toasts ${JSON.stringify(toasts())}`);
+  // (c) inward on square + open line
+  const line = svg('line', [[{ x: 40, y: 40 }, { x: 70, y: 40 }]], { operationIds: ['L'] }, false);
+  const p2 = proj([big, line], [layer('L', 'line', 1200, 70)]);
+  setProject(p2, ['big', 'line']);
+  clearToasts();
+  const b0 = burn(p2);
+  st().offsetShapesSelection(req({ direction: 'inward', deleteOriginals: true }));
+  const b2 = burn(st().project);
+  out(`S3c inward on square + open line + delete: objects ${ids(st().project)}; lit ${f3(totalLen(b0.moves))} -> ${f3(totalLen(b2.moves))} (line 30 mm gone: ${totalLen(b2.moves) < 80}); toasts ${JSON.stringify(toasts())}`);
+  // (d) open line alone inward: refused?
+  setProject(proj([line], [layer('L', 'line', 1200, 70)]), ['line']);
+  clearToasts();
+  const okd = st().offsetShapesSelection(req({ direction: 'inward', deleteOriginals: true }));
+  out(`S3d open line alone inward: ok ${okd}; objects ${ids(st().project)}; toasts ${JSON.stringify(toasts())}`);
+});
+
+it('S4 guards: variable text, jig, locked, mask, tabs, groups', async () => {
+  const template = 'SN {{serial:4}}';
+  const glyphs = await textToPolylines({ content: template, sizeMm: 10, alignment: 'left', lineHeight: 1.4, letterSpacing: 0, color: '#000000', fontBuffer: roboto });
+  const vt = {
+    kind: 'text', id: 'VT', content: template,
+    variableTemplate: { tokens: [{ kind: 'literal', value: 'SN ' }, { kind: 'serial', prefix: '', width: 4 }] },
+    fontKey: 'roboto-regular', sizeMm: 10, alignment: 'left', lineHeight: 1.4, letterSpacing: 0, color: '#000000',
+    bounds: glyphs.bounds, transform: { ...IDENTITY_TRANSFORM, x: 50, y: 50 }, paths: glyphs.paths, operationIds: ['L'],
+  } as unknown as TextObject;
+  const plate = rect('PLATE', 10, 10, { x: 10, y: 10 }, { operationIds: ['L'] });
+  const p0 = proj([vt, plate], [layer('L', 'line', 1234, 37)], { variables: { ...DEFAULT_PROJECT_VARIABLE_DATA, serialValue: 42 } });
+  for (const del of [false, true]) {
+    const t = offsetShapesTargets(p0.scene, ['VT', 'PLATE'], del);
+    out(`S4a dialog targets (delete ${del}): ${t.targets.map((o) => o.id)}; notice "${t.notice}"`);
+  }
+  // jig
+  const BOX_A = '379754e4-b1f1-45b1-853d-75a769147a71';
+  const BOX_B = '389754e4-b1f1-45b1-853d-75a769147a72';
+  const SRC = 'd9c94761-4f55-4e18-b166-3dbb322a789a';
+  const boxes = [BOX_A, BOX_B].map((id, i) => createRegistrationBox({ id, widthMm: 60, heightMm: 60, x: 10 + i * 80, y: 10 }));
+  const s1 = circ(SRC, 20, { x: 25, y: 25 }, { operationIds: ['art'] });
+  const c1 = { ...s1, id: registrationJigCopyId(SRC, BOX_B), transform: { ...s1.transform, x: 105 } };
+  const layers = [{ ...createRegistrationLayer(), output: false }, layer('art', 'line', 2222, 90)];
+  const pj = proj([...boxes, s1, c1], layers as Layer[]);
+  for (const del of [false, true]) {
+    const t = offsetShapesTargets(pj.scene, pj.scene.objects.map((o) => o.id), del);
+    out(`S4b jig dialog targets (delete ${del}): ${t.targets.map((o) => o.id.slice(0, 8))}; notice "${t.notice}"`);
+  }
+  // locked + all locked
+  const lockedP = proj([rect('K', 10, 10, {}, { operationIds: ['L'], locked: true })], [layer('L', 'line', 1, 1)]);
+  setProject(lockedP, ['K']);
+  clearToasts();
+  out(`S4c all locked: ok ${st().offsetShapesSelection(req({}))}; toasts ${JSON.stringify(toasts())}`);
+  // mask + tabs + group with delete originals
+  const N = 10;
+  const photo = {
+    kind: 'raster-image', id: 'photo', source: 'p.png', dataUrl: 'data:image/png;base64,AA==', pixelWidth: N, pixelHeight: N,
+    bounds: { minX: 0, minY: 0, maxX: 40, maxY: 40 }, transform: { ...IDENTITY_TRANSFORM, x: 100, y: 100 }, color: '#808080',
+    operationIds: ['img'], dither: 'threshold', linesPerMm: 1, imageMaskId: 'M',
+  } as unknown as RasterImage;
+  const M = circ('M', 20, { x: 110, y: 110 }, { operationIds: ['L'], laserTabAnchors: [{ polylineIndex: 0, t: 0.25 }] });
+  const pm = { ...proj([photo, M], [layer('L', 'line', 1, 1), { ...createLayer({ id: 'img', color: '#808080', mode: 'image' }) } as Layer]) };
+  const pg = { ...pm, scene: { ...pm.scene, groups: [{ id: 'G', name: 'G', objectIds: ['photo', 'M'] }] } } as unknown as Project;
+  setProject(pg, ['M']);
+  clearToasts();
+  st().offsetShapesSelection(req({ deleteOriginals: true }));
+  const pr = st().project;
+  const img = pr.scene.objects.find((o) => o.id === 'photo') as RasterImage;
+  out(`S4d mask+tabs+group delete: objects ${ids(pr)}; imageMaskId ${img.imageMaskId}; groups ${JSON.stringify(pr.scene.groups)}; toasts ${JSON.stringify(toasts())}`);
+});
+
+it('S5 registration jig: Offset without Delete originals', async () => {
+  const { registrationJigCompilationRuns } = await import('../t31-main/src/core/job/registration-jig-compilation-runs');
+  const { findRegistrationBoxes } = await import('../t31-main/src/core/scene/registration-layer');
+  const BOX_A = '379754e4-b1f1-45b1-853d-75a769147a71';
+  const BOX_B = '389754e4-b1f1-45b1-853d-75a769147a72';
+  const SRC = 'd9c94761-4f55-4e18-b166-3dbb322a789a';
+  for (const lockedBoxes of [false, true]) {
+    const boxes = [BOX_A, BOX_B].map((id, i) => ({ ...createRegistrationBox({ id, widthMm: 60, heightMm: 60, x: 10 + i * 80, y: 10 }), ...(lockedBoxes ? { locked: true } : {}) }) as SceneObject);
+    const s1 = circ(SRC, 20, { x: 25, y: 25 }, { operationIds: ['art'] });
+    const c1 = { ...s1, id: registrationJigCopyId(SRC, BOX_B), transform: { ...s1.transform, x: 105 } };
+    const layers = [{ ...createRegistrationLayer(), output: false }, layer('art', 'line', 2222, 90)];
+    const p0 = proj([...boxes, s1, c1], layers as Layer[]);
+    setProject(p0, []);
+    st().selectAllObjects();
+    const sel = [st().selectedObjectId, ...st().additionalSelectedIds];
+    clearToasts();
+    const ok = st().offsetShapesSelection(req({}));
+    const p1 = st().project;
+    const o = offs(p1);
+    const newLayers = p1.scene.layers.filter((l) => !layers.some((x) => x.id === l.id));
+    const b0 = burn(p0);
+    const b1 = burn(p1);
+    out(`S5 boxes locked ${lockedBoxes}: Select All picked ${sel.length}; ok ${ok}; offsets ${o.map((x) => `${x.id} rings=${x.paths[0]!.polylines.length} ops=${x.operationIds}`)}; new layers ${newLayers.map((l) => `${l.id} mode=${l.mode} output=${l.output} kind=${(l as { kind?: string }).kind ?? ''} registration=${JSON.stringify((l as Record<string, unknown>).registration ?? (l as Record<string, unknown>).isRegistration ?? null)}`)}`);
+    out(`   boxes ${findRegistrationBoxes(p0.scene).length} -> ${findRegistrationBoxes(p1.scene).length}; jig runs ${registrationJigCompilationRuns(p0.scene)?.length ?? 0} -> ${registrationJigCompilationRuns(p1.scene)?.length ?? 0}; burn ${b0.ok ? byFS(b0.moves) : b0.why} -> ${b1.ok ? byFS(b1.moves) : b1.why}; toasts ${JSON.stringify(toasts())}`);
+  }
+});
+
+it('S6 first source on an output-off operation', async () => {
+  const { runPreflight } = await import('../t31-main/src/core/preflight');
+  const guide = rect('GUIDE', 30, 30, { x: 5, y: 5 }, { operationIds: ['G'] });
+  const part = rect('PART', 20, 10, { x: 50, y: 10 }, { operationIds: ['CUT'] });
+  const layers = [layer('G', 'line', 1000, 10, { output: false } as Partial<Layer>), layer('CUT', 'line', 400, 95)];
+  const p0 = proj([guide, part], layers);
+  setProject(p0, ['GUIDE', 'PART']);
+  clearToasts();
+  st().offsetShapesSelection(req({ deleteOriginals: true }));
+  const p1 = st().project;
+  const b0 = burn(p0);
+  const b1 = burn(p1);
+  const nl = p1.scene.layers.filter((l) => !['G', 'CUT'].includes(l.id)).map((l) => `${l.id} output=${l.output} p${l.power} s${l.speed}`);
+  let pf = '';
+  try { pf = JSON.stringify((runPreflight as unknown as (p: Project) => unknown)(p1)).slice(0, 300); } catch (e) { pf = `n/a ${String(e).slice(0, 80)}`; }
+  out(`S6 guide(output off)+part, delete originals: objects ${ids(p1)}; layers ${p1.scene.layers.map((l) => l.id)}; new ${nl}; burn ${byFS(b0.moves)} -> ${b1.ok ? byFS(b1.moves) || '(nothing)' : b1.why}; toasts ${JSON.stringify(toasts())}`);
+  out(`   preflight ${pf}`);
+  // scene order reversed
+  setProject(proj([part, guide], layers), ['PART', 'GUIDE']);
+  st().offsetShapesSelection(req({ deleteOriginals: true }));
+  out(`S6 reversed order: burn ${byFS(burn(st().project).moves)} (guide offset now burns at the part's cut settings)`);
+});
