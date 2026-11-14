@@ -1,7 +1,7 @@
 // Tools audit T1, T32-P1-1: after Prepare Stamp's Apply the source artwork
 // kept burning under the stamp and engraved away the raised face the stamp
 // leaves standing (54-100 % of it on main eeac725e8). Apply now keeps the
-// source with Output off (ADR-570 Amendment 2). Also T32-P3-1 (the stamp
+// source with Output off (ADR-570 Amendment 3). Also T32-P3-1 (the stamp
 // burned as full-power dots) and rolling v3 H5-P3-3 (the stamp operation took
 // the photo's import-time 10 lines/mm, not its operation's).
 // The oracle is the job's own G-code, decoded here, against a per-cell face
