@@ -8,7 +8,8 @@ Plan: [AREAS.md](AREAS.md). Severity follows [METHOD.md §3](../2026-10-21-rolli
 | # | Area | Tree | Report | Raised | Refuted | P1 | P2 | P3 | Known |
 |---|---|---|---|---|---|---|---|---|---|
 | K1 | Calibration and camera model | origin/main @ ba08a81af (auditor and refuter). The coordinator re-read 4078a4c7b: no camera file changed. Both rendered synthetic frames from their own truth cameras (the auditor Brown, fisheye and division lenses; the refuter OpenCV-style Brown and equidistant fisheye with a forward-only error measure) and ran the app's real calibration chain; no camera, browser or hardware | [K1-calibration-and-model.md](K1-calibration-and-model.md) | 6 | 0 | 2 | 3 | 1 | 10 |
-| **Total** | | | | **6** | **0** | **2** | **3** | **1** | **10** |
+| K2 | Overlay placement | origin/main @ ba08a81af (auditor and refuter). The coordinator re-read 3bbcd4137: only `docs/audits/` changed. The auditor calibrated its own rendered target with the app's real fit (35/35 rings, graded good) and measured burns from the real G-code; the refuter used a truth camera in the app's own lens type (so no calibration error mixes in) and drove the real camera-helper code with only the picture capture stubbed | [K2-overlay-placement.md](K2-overlay-placement.md) | 5 | 0 | 2 | 1 | 2 | 10 |
+| **Total** | | | | **11** | **0** | **4** | **4** | **3** | **20** |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
@@ -19,10 +20,15 @@ Plan: [AREAS.md](AREAS.md). Severity follows [METHOD.md §3](../2026-10-21-rolli
 | K1-P2-1 | K1 | **A calibration that is accurate gets a false "fair" alarm in two set-ups:** an 80 mm off-centre full-bed sheet (graded fair at about 1.6 mm, true 0.30 mm) and a straight-down camera with its height typed in, as the wizard asks ("up to about 6 mm", true 0.80 mm). ADR-441 Amd 9 promises a whole-bed sheet stays "Accurate enough". The centred full-bed case did not reproduce for the refuter. | Auditor and refuter **REPRO**. | routed to the camera session, with K1-P1-1 (same estimate) |
 | K1-P2-2 | K1 | **A calibration lined up at the target height is used silently at any material height.** The caveat appears only in the wizard and the settings row; Material height 20 or 40 mm puts the overlay 1.1–16.9 mm off (depending on where the unpinned camera height lands) with no notice at that control or in Job Review. | Auditor and refuter **REPRO**. | routed to the camera session. Fix: warn at the Material height control and in Job Review when the calibration is target-height-only, with the expected offset |
 | K1-P3-1→P2 (refuter) | K1 | **Head camera figures overstate precision:** it reports 0.00–0.01 mm, while the middle 80 % of each tile (the part the stitch uses) is up to 3.84 mm off under a "good" grade, and the auditor's stitched picture is up to 0.83 mm off with tiles disagreeing by up to 1.1 mm. If the real stitch is also over 1.5 mm this is a P1. | Auditor **REPRO** (stitch), refuter **REPRO** (per tile; the real stitch not run). | routed to the camera session. Fix: report the error over the stitched area, not the fit residual |
+| K2-P1-1 | K2 | **A live camera picture is checked for moves only once per camera start, 3 s after it starts; there is no check at Job Review or Start.** Held pictures (Refresh, Alt+C) are checked; the live picture, the default for a camera that starts by itself, never is again. A knock or a lid closing differently after that puts the burn 4–7 mm (0.5° tip), 13.5 mm (1°) or 38.6 mm (3°) off, with no warning: a 0.8° tip stayed "steady" through 24 s of live use and a finished job, while the same view as a held picture was flagged at once (9.73 mm). A camera setting changed after calibration (1.25–1.30× zoom) reads "weak", counted as unknown, and stays silent at 102–109 mm off. ADR-663 Amd 3 promises a move is "noticed at the next refresh, before a job burns in the wrong place"; a live picture has no next refresh. | **READ** on main `3bbcd4137`: `install-camera-helpers.ts:139` schedules one `checkStartedCameraMoved` after `MOVED_CHECK_SETTLE_MS` (3000 ms); `refreshAfterJobs` (`:150`) re-checks only a held picture ("the live camera follows the job anyway"). Auditor **READ** + detector runs; refuter **REPRO** through the real helper code. | routed to the camera session (local_3a5a202f). Fix: re-check the live picture periodically and before Job Review/Start of a camera-placed job, and treat a "weak" match after a change as a warning, not unknown |
+| K2-P1-2 | K2 | **On an A or Z rotary at Absolute the camera picture is drawn at the overlay's Material height, not at the top of the part.** On an 80 mm tumbler (top 85 mm up) with Material height at 0, the picture is 11–37 mm off along the part and 41 mm across it, and the real G-code burns 17–32 mm from the mark on both an A and a Z rotary. Job Review says nothing, though it tells the operator this path "burns where it sits on the picture" (ADR-228 Amd 3). Setting Material height to 85 mm brings it to 0.08 mm; nothing ties the two. | Auditor and refuter **REPRO** (independent truth cameras and cylinders; real G-code). | routed to the camera session. Fix: draw the rotary picture at the part's top height from Rotary Setup (or refuse placement on the picture with a rotary until the height is set), and warn in Job Review |
+| K2-P2-1 | K2 | **Material height starts at 0 mm every session and ignores the job material's thickness**, and a camera that starts by itself draws on the canvas without the Camera panel opening: 3 / 6 / 18 mm stock puts the picture 2.6 / 5.1–5.3 / 16.3–16.5 mm off with no warning. "Not saved" was decided in ADR-441 Amd 2 §5 and the v11 W4 audit dropped this candidate; new here are the self-starting path and the ignored material thickness. P1 is arguable on the self-starting path. | Auditor and refuter **REPRO**. | routed to the camera session, with K2-P1-2 and K1-P2-2 (one height rule). **Maintainer decision:** whether Material height should follow the job's material thickness (and be saved) |
 
-### P3s (1)
+### P3s (3)
 
 - **K1r-P3-1 (refuter):** the full-bed sheet the app recommends is refused ("anchors-unclear") on a mildly soft 1280×960 webcam: four far-row rings read as solid discs. A safe refusal, but the message never suggests a larger ring size; 16 mm rings calibrate (36/36).
+- **K2-P3-1:** the moved check reports per-point offsets with the opposite sign to its documentation (the negative of the true displacement in all 13 cases); only sizes are used today.
+- **K2r-P3-1 (refuter):** a mirrored picture can be measured as an ordinary move; it warns with the right advice, but the stated size is about 18 times too small (24.3 mm against a true 437 mm).
 
 ### Verified clean
 
@@ -31,6 +37,14 @@ Plan: [AREAS.md](AREAS.md). Severity follows [METHOD.md §3](../2026-10-21-rolli
 - **Bad rings** (swapped labels, rings 4 px or more off, rings engraved 2.5–6 mm off) are dropped; saved calibrations reload bit-exact; blur, a half-covered target and over-wide fisheyes are refused rather than misfitted.
 - **Material height** is exact when the camera height is pinned (about +0.5 mm at 40 mm).
 - **KNOWN:** Y1-P2-1 is fixed by #1684 for off-centre cameras but still reachable for centred ones (K1-P1-1); Y1-P3-3 (σ 1.0 px blur blamed on a covered target) still reproduces; #1546 items 1, 2, 3 and 6 are still open.
+
+### K2 verified clean
+
+- **The overlay drawing is exact:** on a flat bed, artwork burns within 0.01 mm of where the canvas shows it (four origins), including the shader's CPU copy at fit and 3.5× zoom with panning and the bed image used by trace and pieces.
+- **Origins:** a work offset under Absolute is right; Current Position and User Origin are warned in Job Review; a refused origin change and a bed-size change after calibration behave.
+- **Picture changes:** a shrunk picture is accepted and a cropped one refused (Y1-P1-1 stays fixed); upside-down and front-rail cameras work; a picture mirrored at calibration is refused.
+- **Elsewhere:** two cameras, and a project reopened on another computer (the camera identity is per computer, so the overlay refuses to draw), show no gap.
+- **KNOWN still open:** K1-P1-1 (seen again: graded good, 2.39 mm at the rear-right corner, passed 1:1 to the burn); Z1-P3-2 (EXIF-rotated pictures) and W4-P3-1 (a frozen USB picture stays on the canvas), by reading.
 
 ### Not verified
 
