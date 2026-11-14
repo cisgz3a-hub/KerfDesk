@@ -5,6 +5,7 @@ import {
   type CameraCaptureBinding,
 } from '../../core/camera/camera-capture-binding';
 import { savedCameraModel } from '../../core/camera/model/model-fixtures';
+import { modelFromElsewhere } from '../../core/camera/model/saved-cameras';
 import { createProject } from '../../core/scene';
 import { deserializeProject } from '../../io/project/deserialize-project';
 import { serializeProject } from '../../io/project/serialize-project';
@@ -55,7 +56,7 @@ describe('RTSP resource capture binding', () => {
     const remembered = loadRtspCameraUrl();
     expect(remembered).toBe(PUBLIC);
     const current = await capture(remembered ?? '');
-    const { queryFingerprint: _identity, ...legacy } = current;
+    const { queryFingerprint: _identity, portableFingerprint: _portable, ...legacy } = current;
     expect(cameraBindingCompatibility(legacy, current)).toBe('unbound');
     expect(cameraBindingCompatibility(legacy, legacy)).toBe('unbound');
   });
@@ -125,11 +126,18 @@ describe('RTSP resource capture binding', () => {
     expect(loadRtspCameraUrl()).toBe(PUBLIC);
   });
 
-  it('requires a new matching binding after the app-local key is lost', async () => {
+  // ADR-692 Amendment 3: a lost app-local key is like another computer. The
+  // same camera and address still match by the portable identity, and the
+  // calibration is reported as made elsewhere; another channel does not.
+  it('matches by the portable identity after the app-local key is lost', async () => {
     const saved = await capture(`${BASE}?channel=1`);
     localStorage.clear();
     const current = await capture(`${BASE}?channel=1`);
-    expect(cameraBindingCompatibility(saved, current)).toBe('source-mismatch');
+    expect(current.queryFingerprint).not.toBe(saved.queryFingerprint);
+    expect(cameraBindingCompatibility(saved, current)).toBe('match');
+    expect(modelFromElsewhere(savedCameraModel(saved), current)).toBe(true);
+    const other = await capture(`${BASE}?channel=2`);
+    expect(cameraBindingCompatibility(saved, other)).toBe('source-mismatch');
   });
 
   it('keeps raw capture usable when secure identity is unavailable', async () => {

@@ -269,6 +269,7 @@ describe('camera-store', () => {
       cameraUrl: 'http://192.168.10.1:8080/media/getCapturePhoto',
       proxyFrameUrl: 'http://127.0.0.1:51731/frame.jpg?url=x',
       queryFingerprint: expect.stringMatching(/^hmac-sha256:[0-9a-f]{64}$/),
+      portableFingerprint: expect.stringMatching(/^pbkdf2-sha256:[0-9a-f]{64}$/),
     });
   });
 
@@ -345,6 +346,7 @@ describe('camera-store', () => {
       source: {
         kind: 'machine-rtsp',
         queryFingerprint: expect.stringMatching(/^hmac-sha256:[0-9a-f]{64}$/),
+        portableFingerprint: expect.stringMatching(/^pbkdf2-sha256:[0-9a-f]{64}$/),
         previewUrl: 'http://127.0.0.1:51731/stream.mjpg?url=x',
         frameUrl: `http://127.0.0.1:51731/frame.jpg?url=${encodeURIComponent(
           'rtsp://192.168.10.1:8554/',
