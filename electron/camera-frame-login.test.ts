@@ -125,10 +125,30 @@ describe('a camera that fails is left alone for a while', () => {
     expect(sources.heldBack(id)).not.toBeNull();
     now = 3000;
     expect(sources.heldBack(id)).toBeNull();
-    for (let i = 0; i < 10; i += 1) sources.noteFrame(id, { reason: 'timed out' });
-    now += 16_000;
+    // Each failure after the last wait ends: the wait stops growing at 16 s.
+    for (let i = 0; i < 10; i += 1) {
+      now += 16_000;
+      sources.noteFrame(id, { reason: 'timed out' });
+    }
+    now += 15_999;
+    expect(sources.heldBack(id)).not.toBeNull();
+    now += 1;
     expect(sources.heldBack(id)).toBeNull();
     sources.noteFrame(id, null);
+    expect(sources.heldBack(id)).toBeNull();
+  });
+
+  // Camera audit v2 K4r-P3-1: requests that shared one fetch report its one failure.
+  it('counts one failure once, however many requests shared it', () => {
+    let now = 0;
+    const sources = new CameraFrameSources(
+      () => 'id-3',
+      () => now,
+    );
+    const id = sources.register('http://192.168.1.51:8080/shot.jpg');
+    sources.noteFrame(id, { reason: 'timed out' });
+    sources.noteFrame(id, { reason: 'timed out' });
+    now = 1000;
     expect(sources.heldBack(id)).toBeNull();
   });
 

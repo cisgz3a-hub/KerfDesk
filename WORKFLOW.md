@@ -795,9 +795,18 @@ the linked artwork.
 ### F-A6e. Rubber-band outline, Close Path, Reverse Direction, Delete Duplicates, Flatten Image Mask (ADR-480)
 
 1. **Tools → Vector → Rubber-Band Outline** adds one closed shape stretched around everything
-   selected, images included, and selects it. It takes a copy of the first selected Line
-   operation's settings, or a new Line operation named Outline. A selection lying on one straight
-   line has no area; the notice says so and nothing changes.
+   selected, images included, and selects it. A dialog shows the operation it will be cut with
+   and lets the user pick another (ADR-480 Amendment 7):
+   - the choices are the selected artwork's operations that cut along a line, in the order the
+     artwork was selected: a Line operation whose enabled sub-operations are Line too, and in CNC a
+     Profile (Outside, Inside or On path). A copy keeps that artwork's own settings and power
+     scale. Fill, Image, Pocket, V-carve and the rest are listed as not offered;
+   - the last choice is a new operation named Outline: Line on a laser, Outside path in CNC;
+   - the default is the first choice whose output is on. Choosing one with output off is warned in
+     the dialog and in a notice after it is added.
+   Variable text and barcodes are left out, and the notice says the outline does not go round
+   them. A selection lying on one straight line, or narrower than 0.01 mm, is refused with a
+   notice and nothing changes.
 2. **Tools → Vector → Close Path** closes every open path of three or more points in the selected
    imported, traced or drawn-line artwork with a straight line. The notice gives the widest gap it
    closed. Text and drawn rectangles, ellipses and polygons keep their own paths; the notice says
@@ -9700,6 +9709,17 @@ Simulator-tested only; no real JCZ board has run this path.
 1. Crop (and IE-2 resize) are the only operations that change mm bounds, and
    they do so at the same DPI so physical scale stays honest; the status row
    shows the resulting mm size before commit.
+
+#### Edge — the trace was moved, scaled, turned, mirrored or copied
+1. Re-trace keeps the operator's offset from the photo (ADR-408 Amendment 1):
+   a trace still on its photo stays registered, and one nudged, scaled to a
+   blank, turned, mirrored or copied onto a second blank stays where it was
+   put. Vector and Raster scan output both keep it.
+2. A same-mode re-trace keeps the trace's operations by colour, with their
+   power, speed and passes, and its name, power scale and per-operation
+   overrides. A colour the old trace lacked, or a changed trace mode, gets a
+   new operation. The toast says "Re-traced <name> in place … kept its place"
+   and which of these happened.
 
 ### F-L4. Editor history and sessions
 

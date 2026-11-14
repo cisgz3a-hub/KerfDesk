@@ -8,6 +8,7 @@ import {
   type Vec2,
 } from '../scene';
 import { applyTransform } from '../scene/transform';
+import { laserTabAnchorPosition } from '../job/laser-tab-anchors';
 
 const request: JointResizeRequest = {
   currentWidthMm: 3,
@@ -147,7 +148,11 @@ describe('bounded joint-opening resizing', () => {
     expect(result.id).toBe(source.id);
     expect(result.operationIds).toBe(source.operationIds);
     expect(result.operationOverride).toBe(source.operationOverride);
-    expect(result.laserTabAnchors).toBe(source.laserTabAnchors);
+    // The placed tab at (20, 5) sits on an edge the resize leaves alone, so it
+    // stays there (T31-P1-2).
+    const tab = laserTabAnchorPosition(result, result.laserTabAnchors![0]!)!;
+    expect(tab.x).toBeCloseTo(20, 9);
+    expect(tab.y).toBeCloseTo(5, 9);
     expect(result.paths[0]!.operationIds).toBe(source.paths[0]!.operationIds);
     expect(result.paths[0]!.strokeWidthMm).toBe(0.2);
     expect(result.paths[0]!.fillRule).toBe('evenodd');

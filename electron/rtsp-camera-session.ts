@@ -26,10 +26,19 @@ const STARTING_TIMEOUT_MS = 15_000;
 const TERMINAL_RETENTION_MS = 60_000;
 const MAX_TRACKED_SESSIONS = 64;
 const MISSING_SESSION_REASON = 'RTSP preview session is missing or expired.';
-const CLOSED_SESSION_REASON = 'RTSP preview connection closed.';
 const STARTING_TIMEOUT_REASON = 'RTSP preview request did not start in time.';
 
-/** Bridge-owned lifecycle records for exact RTSP preview requests. */
+/**
+ * Bridge-owned lifecycle records for exact RTSP preview requests.
+ *
+ * ADR-490 Amendment 3 (camera audit v2 K4-P2-2): a session with no viewers
+ * is idle, not failed. Job watch keeps a camera on with the panel closed, but
+ * the last viewer closing (the burn-check picture or a held still replacing
+ * the live overlay, the panel closing) used to fail the session, the window
+ * then turned the camera off, and the recording ended mid-job. Each viewer has
+ * its own ffmpeg, so one viewer's ffmpeg failing fails the shared session only
+ * when no other viewer is still running.
+ */
 export class RtspPreviewSessions {
   private readonly sessions = new Map<string, SessionEntry>();
 
@@ -81,17 +90,18 @@ export class RtspPreviewSessions {
         if (!connectionSettled) this.update(id, entry, { kind: 'live' });
       },
       markFailed: (reason) => {
-        if (finishConnection()) this.update(id, entry, { kind: 'failed', reason });
+        if (finishConnection() && entry.activeConnections === 0) {
+          this.update(id, entry, { kind: 'failed', reason });
+        }
       },
       markRejected: (reason) => {
         if (finishConnection() && entry.activeConnections === 0) {
           this.update(id, entry, { kind: 'failed', reason });
         }
       },
+      // The last viewer going leaves the session idle, ready for the next.
       markClosed: () => {
-        if (finishConnection() && entry.activeConnections === 0) {
-          this.update(id, entry, { kind: 'failed', reason: CLOSED_SESSION_REASON });
-        }
+        finishConnection();
       },
     };
   }

@@ -41,7 +41,7 @@ export const DESIGN_TOOLS_COMMAND_HELP: Readonly<Record<DesignToolsCommandId, Co
   'tools.rubber-band-outline': {
     family: 'tools',
     tooltip:
-      'Add one closed outline stretched around everything selected, as a rubber band would be, on a Line operation.',
+      'Add one closed outline stretched around everything selected, as a rubber band would be. The dialog picks the operation it is cut with: a Line operation (a Profile in CNC) from the selection, or a new one named Outline.',
   },
   'arrange.copy-along-path': {
     family: 'arrange',

@@ -20438,7 +20438,7 @@ air-cut and material-cut qualification remain separate.
 
 ## ADR-319 — V-carve conversion, clearing dependencies and final coordinate containment
 
-**Status:** Accepted
+**Status:** Accepted; Decision 1 amended by ADR-319 Amendment 1 (Convert to Path keeps curves)
 
 **Date:** 2026-09-12
 

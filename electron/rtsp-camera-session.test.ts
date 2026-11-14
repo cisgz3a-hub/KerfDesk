@@ -67,7 +67,9 @@ describe('RTSP preview session lifecycle', () => {
     });
   });
 
-  it('reports an active client disconnect as terminal without creating a replacement', () => {
+  // Camera audit v2 K4-P2-2 (ADR-490 Amendment 3): job watch keeps the camera on
+  // with no viewer, so the last viewer going leaves the session idle, not failed.
+  it('keeps a session whose last viewer closed idle and ready for the next', () => {
     const sessions = new RtspPreviewSessions(
       () => 100,
       () => 'session-a',
@@ -80,9 +82,32 @@ describe('RTSP preview session lifecycle', () => {
     lifecycle?.markLive();
     lifecycle?.markClosed();
 
+    expect(sessions.status(id)).toEqual({ kind: 'live' });
+    const next = sessions.claim(id, 'rtsp://192.168.1.20/live');
+    expect(next).not.toBeNull();
+    next?.markLive();
+    expect(sessions.status(id)).toEqual({ kind: 'live' });
+  });
+
+  it("fails the session for one viewer's ffmpeg only when no other viewer runs", () => {
+    const sessions = new RtspPreviewSessions(
+      () => 100,
+      () => 'session-a',
+    );
+    const id = sessions.create('rtsp://192.168.1.20/live');
+    if (id === null) throw new Error('expected a session');
+    const panel = sessions.claim(id, 'rtsp://192.168.1.20/live');
+    const overlay = sessions.claim(id, 'rtsp://192.168.1.20/live');
+    panel?.markLive();
+    overlay?.markLive();
+
+    panel?.markFailed('FFmpeg camera preview ended unexpectedly.');
+    expect(sessions.status(id)).toEqual({ kind: 'live' });
+
+    overlay?.markFailed('FFmpeg camera preview ended unexpectedly.');
     expect(sessions.status(id)).toEqual({
       kind: 'failed',
-      reason: 'RTSP preview connection closed.',
+      reason: 'FFmpeg camera preview ended unexpectedly.',
     });
   });
 

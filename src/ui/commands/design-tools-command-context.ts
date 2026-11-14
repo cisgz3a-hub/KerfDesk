@@ -7,6 +7,7 @@ import { startTwoPointTool } from '../workspace/two-point-tool';
 import { useDockOptionsStore } from './dock-options-store';
 import { openClosePathsToleranceDialog } from './ClosePathsToleranceDialog';
 import { openRadiusFilletDialog } from './RadiusFilletDialog';
+import { openRubberBandOutlineDialog } from './RubberBandOutlineDialog';
 import { openShearDialog } from './ShearDialog';
 import { useGuideLockStore } from '../workspace/guide-lock-store';
 import { openTangentCircleDialog, selectedThreeCircles } from './TangentCircleDialog';
@@ -37,9 +38,7 @@ export function designToolsCommandContext(
     canEditSelectedPaths: selectionHasEditablePaths(app.project, selectedIds),
     closeSelectedPaths: app.closeSelectedPaths,
     reverseSelectedPaths: app.reverseSelectedPaths,
-    addRubberBandOutline: () => {
-      app.addRubberBandOutline();
-    },
+    addRubberBandOutline: openRubberBandOutlineDialog,
     flattenImageMask: flattenImageMaskAction(app, maskedImage, (message, kind) =>
       useToastStore.getState().pushToast(message, kind),
     ),

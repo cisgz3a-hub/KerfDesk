@@ -1,5 +1,5 @@
 import type { CameraModelRecord } from '../../core/camera/model/camera-model-record';
-import { cameraOffTargetWarnings } from './camera-off-target-warning';
+import { cameraOffTargetWarnings, type CameraHeightSnapshot } from './camera-off-target-warning';
 import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
 import type { StatusQueryCapability } from '../../core/controllers';
@@ -196,7 +196,7 @@ export type MachineStartSnapshot = {
   readonly controllerSettingsObservation?: SessionObservationStamp | null;
   /** The connection's laser-module probe result (Smoothieware M221). */
   readonly laserModuleReport?: LaserModuleEvidence | null;
-};
+} & CameraHeightSnapshot;
 
 export function prepareStartJob(
   project: Project,

@@ -233,7 +233,7 @@ describe('Trace Image raster output', () => {
     expect(ctx.commitRasterizedTrace).toHaveBeenCalledWith(
       'src-1',
       expect.objectContaining({ id: 'existing-trace' }),
-      { deleteSourceAfterTrace: false, replaceTraceId: 'existing-trace' },
+      expect.objectContaining({ deleteSourceAfterTrace: false, replaceTraceId: 'existing-trace' }),
     );
   });
 
