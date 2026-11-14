@@ -9813,7 +9813,10 @@ Simulator-tested only; no real JCZ board has run this path.
   Start would stream them from Current Position, User Origin or Verified Origin; and the photo step
   refuses rings burned from another mode (naming it) or never seen to burn, asking for a Start at
   Absolute or Engrave target. If Machine Setup has changed since the target was added and no burn
-  was seen, the photo step says that instead, and asks for the target to be added again.
+  was seen, the photo step says that instead, and asks for the target to be added again. Adding
+  the target drops the project's Print and Cut marks in the same Undo step, as every generated
+  pattern does, so no registration moves the rings; rings a Start did burn through a registration
+  are refused at the photo step, naming it (ADR-443 Amendment 4).
 - **Warning / not homed.** While connected, the target step says to home first on a homing machine
   that is not homed, and on a machine without homing that the camera lines up only while the
   controller keeps its zero. Advice only: **Engrave target** stays available. A calibration whose
@@ -10172,7 +10175,7 @@ Simulator-tested only; no real JCZ board has run this path.
 - **Empty / no feed.** **Find pieces** is disabled without a live camera; without a calibration
   the section is absent.
 
-### F-CAM10. Print and Cut marks found by the camera (ADR-443, Amendment 1)
+### F-CAM10. Print and Cut marks found by the camera (ADR-443, Amendments 1 and 4)
 
 - **Success / register a printed sheet.** With Print and Cut on in Labs, a saved calibration and a
   live camera, the operator lays the printed sheet on the bed and sets the material height in the
@@ -10202,6 +10205,12 @@ Simulator-tested only; no real JCZ board has run this path.
 - **Edge / no pair.** When no two marks are the design's spacing apart (within 2 %), the points
   stay as they were and the dialog says how many mark-like shapes the camera saw, and what to
   check.
+- **Edge / mark partly covered (Amendment 4).** A mark partly under tape, a clip or a shadow is not
+  taken: its box sides may differ by at most 5 % of its size (2 px on a small mark), its dark
+  centre must lie within 5 % of its size from the box's centre, and each side within 10 % of the
+  design mark (plus 2 px). A mark 15 % or more covered is refused; about a tenth covered can pass
+  with its centre within 0.3 mm. The dialog then says the camera could not find both marks;
+  uncover the mark or use **Capture head**.
 - **Edge / trust changes.** After a reconnect, reset or frame change, the points must be captured
   again, as with head captures; **Find marks with camera** does it in one click.
 - **Empty / no selection or no feed.** **Use selected marks** without two selected objects says

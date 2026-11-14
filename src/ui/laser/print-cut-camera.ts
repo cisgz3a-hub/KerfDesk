@@ -74,6 +74,14 @@ export function locatePrintCutMarks(args: {
     pixelsPerMm,
     minSizeMm: size === null ? MIN_MARK_MM : 0.6 * (typeof size === 'number' ? size : size.minMm),
     maxSizeMm: size === null ? MAX_MARK_MM : 1.6 * (typeof size === 'number' ? size : size.maxMm),
+    ...(size === null
+      ? {}
+      : {
+          expectedSizeMm:
+            typeof size === 'number'
+              ? { minMm: size, maxMm: size }
+              : { minMm: size.minMm, maxMm: size.maxMm },
+        }),
   });
   const targets = [args.targets.first, args.targets.second] as const;
   const result = matchMarkPair(targets, marks);
