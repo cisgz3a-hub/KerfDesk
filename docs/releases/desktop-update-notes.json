@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "74191e0c7c922c71fb201f18e66f686fc0bc4f26",
+  "sinceSourceSha": "a74e385406d1a80b788daca272db5343796aed9e",
   "highlights": [
-    "New experimental connections: stock K40 (M2/M3 Nano, with .egv export) and Moshiboard lasers over USB, and live Ruida control over the network. They are tested on simulators only, so air-cut on scrap first.",
-    "Import EPS and Illustrator 3–8 (.ai) files as editable paths, and DXF splines given only by fit points. Design Studio adds typed length and angle, tangent and perpendicular snaps, alignment guides, a Dimension tool and Trim.",
-    "A new 3D Sliced image mode and Fill Ramp for rubber stamps, and a dense trace no longer freezes the window. A recovered job advances its serial number once, and {{time}} jobs can now be confirmed in Job Review.",
-    "Fewer interruptions: questions appear inside the app instead of system pop-ups, Run again skips Job Review for an unchanged job you already reviewed, and autosave keeps going during a job. Beginners get a guided first job.",
-    "After Abort, a laser without homing gets its origin back by itself. Unlock keeps the position unless the alarm lost it, a Frame placed from a fixed origin survives a clean jog, and a jog stuck on a lost reply is released in place.",
-    "Rotary: a tapered Fill burns its whole hatch, Moshi and Ruida .rd jobs match the part's surface speed, and ramped Fills scan along X. Job Review warns when a move needs more than the rotary max rate ($112/$113)."
+    "CNC: multi-bit jobs continue past their bit changes, a capped spindle scales its feeds, a spindle at 0 RPM refuses to send the job, tabs keep their width, and Job Review adds a depth guide and a low chip-load warning.",
+    "CNC reliefs step down by the stock still standing under the tip, tiled jobs keep registration bores clear of parts and board edges, and recovery keeps Work Z across an Abort.",
+    "Imports keep their true shape: DXF splines, arcs, circles and ellipses, GeoJSON holes, and DXF and STL numbers read whole. PostScript imports have a time limit, and Latin text kerns as the font says.",
+    "Design tools leave variable text and the registration jig alone. Re-trace keeps its placement, Offset Shapes and Kerf name what they drop, and Convert to Path keeps curves as curves.",
+    "Image Studio filters preview in the background with Cancel, a new Photo Test Card finds a photo's power and speed, and image masks keep the Fill region and real edge pixels.",
+    "Cameras: a network camera's calibration follows it to another computer, timelapses ride out hiccups and wait until saved, and live pictures are rechecked for moves. JCZ galvo lasers connect over USB (experimental)."
   ]
 }
