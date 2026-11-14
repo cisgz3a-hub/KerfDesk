@@ -24,6 +24,7 @@ import {
   sceneObjectUsesOperation,
   type TextObject,
   type TracedImage,
+  type Transform,
 } from '../../core/scene';
 import { applyCncTextDefaultsToNewLayer } from './cnc-text-defaults';
 import { duplicateSceneSelection } from './duplicate-scene-selection';
@@ -33,7 +34,7 @@ import {
   freshArtworkNameForColor,
 } from './fresh-artwork-mode';
 import { applyFreshTraceScanDirection } from './fresh-trace-scan-direction';
-import { positionTraceOverRasterSource } from './trace-placement';
+import { bindVectorTraceOperations, placeVectorTrace, replacedTraceResult } from './retrace-carry';
 import { pushUndo } from './undo-stack';
 import type { BedFit } from '../../core/scene/fit-to-bed';
 import type { WhiteKnockout } from '../../core/geometry/white-fill-knockout';
@@ -87,6 +88,10 @@ export type TraceExistingImageOptions = {
   readonly cameraSource?: RasterImage;
   readonly deleteSourceAfterTrace?: boolean;
   readonly replaceTraceId?: string;
+  /** Re-trace: the source's transform when the dialog opened. The replaced
+   *  trace's offset is measured against it, so a source moved while the
+   *  dialog was open still takes the trace along (ADR-408 Amendment 1). */
+  readonly retraceSourceTransform?: Transform;
   /** Colour-layer trace (ADR-461): set each colour's laser operation power
    *  by darkness; paper colours start with output off. */
   readonly colourLayers?: ColourLayerCommit;
@@ -284,19 +289,22 @@ export function applyTraceToExisting(
   // come too late to matter). A kept photo is still artwork that engraves, so
   // it keeps its operation and colour and the trace takes the next free one.
   let scene = prepared.shouldPruneLayers ? pruneOrphanLayers(prepared.scene) : prepared.scene;
-  const positionedTrace =
-    prepared.source === undefined ? traced : positionTraceOverRasterSource(prepared.source, traced);
+  // Re-trace keeps the replaced trace's placement offset and operations
+  // (ADR-408 Amendment 1).
+  const previous = replacedTraceResult(s.project.scene, options.replaceTraceId);
+  const positionedTrace = placeVectorTrace(
+    prepared.source,
+    traced,
+    previous,
+    options.retraceSourceTransform,
+  );
   if (options.replaceTraceId !== undefined && options.replaceTraceId !== positionedTrace.id) {
     scene = removeObject(scene, options.replaceTraceId);
   }
   const replaceInPlace =
     options.replaceTraceId === positionedTrace.id &&
     scene.objects.some((object) => object.id === positionedTrace.id);
-  const created = createArtworkOperations(scene, positionedTrace, {
-    mode: freshArtworkMode(positionedTrace),
-    modeForColor: freshArtworkModeForColor(positionedTrace),
-    nameForColor: freshArtworkNameForColor(positionedTrace),
-  });
+  const created = bindVectorTraceOperations(scene, positionedTrace, previous);
   const operations = withColourLayerPowers(
     created.object,
     applyFreshTraceScanDirection(positionedTrace, created.operations, s.project.device),

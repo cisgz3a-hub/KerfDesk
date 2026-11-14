@@ -80,6 +80,10 @@ export class CameraFrameSources {
       this.health.delete(id);
       return;
     }
+    // Requests that shared one fetch of the camera report its one failure:
+    // count it once, or the wait doubles for each (camera audit v2 K4r-P3-1).
+    const known = this.health.get(id);
+    if (known !== undefined && known.login === undefined && this.now() < known.retryAt) return;
     const failures = (this.health.get(id)?.failures ?? 0) + 1;
     const wait = Math.min(LONGEST_RETRY_MS, FIRST_RETRY_MS * 2 ** (failures - 1));
     this.health.set(id, { ...failure, failures, retryAt: this.now() + wait });

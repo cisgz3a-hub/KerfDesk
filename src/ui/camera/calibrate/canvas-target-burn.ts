@@ -4,7 +4,8 @@
 // rings were placed in, which for these rings is the frame at the Start that
 // streams them, so it is taken there (ADR-440 Amendment 5, rolling audit v3
 // G6-P2-1). The Start is recognised by its scene: every ring of the
-// remembered layout, unmoved, burned at Absolute Coordinates.
+// remembered layout, unmoved, burned at Absolute Coordinates, with no Print
+// and Cut registration to move them (camera audit v2 K3-P1-4).
 
 import { DEFAULT_RING_DIAMETER_MM } from '../../../core/camera/target/bed-target';
 import { generateCameraBedTarget } from '../../../core/job/camera-bed-target-pattern';
@@ -57,7 +58,13 @@ export function stampCanvasTargetBurn(
   for (const headCamera of [false, true]) {
     const target = rememberedEngravedTarget(device, headCamera);
     if (target?.onCanvas !== true || !streamsRings(scene, target)) continue;
-    const { burnSeen: _seen, burnedFrom: _from, ...rest } = target;
+    const { burnSeen: _seen, burnedFrom: _from, burnedRegistered: _moved, ...rest } = target;
+    // A Start that streams a project with Print and Cut marks applies their
+    // registration (or is refused), so the rings burned moved and turned.
+    if (carriesPrintCutRegistration(started.project)) {
+      rememberEngravedTarget(device, headCamera, { ...rest, burnedRegistered: true });
+      continue;
+    }
     if (startFrom !== 'absolute') {
       rememberEngravedTarget(device, headCamera, { ...rest, burnedFrom: startFrom });
       continue;
@@ -71,6 +78,10 @@ export function stampCanvasTargetBurn(
     stamped = true;
   }
   return stamped;
+}
+
+function carriesPrintCutRegistration(project: StartedJob['project']): boolean {
+  return project.printAndCutTargets !== undefined && project.machine?.kind !== 'cnc';
 }
 
 /** True when the scene holds the rings of a target put on the canvas, unmoved. */

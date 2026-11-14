@@ -43,8 +43,10 @@ import { useLaserStore } from '../../state/laser-store';
 import type { NativeBedEvidence } from '../../state/native-bed-frame';
 import { resetStore } from '../../state/test-helpers';
 import { captureSourceFrame, type ActiveCameraSource } from '../frame-source';
+import { currentPrintCutOutputRegistration } from '../../laser/print-cut-output';
 import {
   CANVAS_TARGET_BURN_NOT_SEEN,
+  CANVAS_TARGET_BURNED_REGISTERED,
   CANVAS_TARGET_FRAME_CHANGED,
   canvasTargetBurnedOffAbsolute,
   currentAssumedTarget,
@@ -310,6 +312,41 @@ describe('a calibration target added to the canvas', () => {
       expect(currentAssumedTarget().refusal).toBeUndefined();
     },
   );
+
+  // Camera audit v2 K3-P1-4: the target's Start applied the project's Print
+  // and Cut registration, burned the rings 8.6-18 mm off, and was still
+  // recorded as burned where the target put them.
+  it('drops the project Print and Cut marks in the same Undo step', () => {
+    useMachine(MACHINE);
+    const marks = { first: { x: 40, y: 40 }, second: { x: 300, y: 40 } };
+    useStore.setState({ project: { ...useStore.getState().project, printAndCutTargets: marks } });
+    addCalibrationTargetToCanvas(SETTINGS);
+    const { project } = useStore.getState();
+    expect(project.printAndCutTargets).toBeUndefined();
+    expect(currentPrintCutOutputRegistration(project)).toBeUndefined();
+    useStore.getState().undo();
+    expect(useStore.getState().project.printAndCutTargets).toEqual(marks);
+  });
+
+  it('refuses rings a Start burned through a Print and Cut registration', () => {
+    useMachine(MACHINE);
+    addCalibrationTargetToCanvas(SETTINGS);
+    const { project } = useStore.getState();
+    const registered = started({
+      project: {
+        ...project,
+        printAndCutTargets: { first: { x: 40, y: 40 }, second: { x: 300, y: 40 } },
+      },
+    });
+    expect(stampCanvasTargetBurn(registered, UNHOMED)).toBe(false);
+    expect(rememberedEngravedTarget(MACHINE, false)).toMatchObject({ burnedRegistered: true });
+    expect(rememberedEngravedTarget(MACHINE, false)?.burnSeen).toBeUndefined();
+    expect(currentAssumedTarget().refusal).toBe(CANVAS_TARGET_BURNED_REGISTERED);
+    // A plain Absolute Start of the same rings is calibrated on.
+    expect(stampCanvasTargetBurn(started({}), UNHOMED)).toBe(true);
+    expect(rememberedEngravedTarget(MACHINE, false)?.burnedRegistered).toBeUndefined();
+    expect(currentAssumedTarget().refusal).toBeUndefined();
+  });
 
   it('is stamped by the Start the laser store records, once', () => {
     useMachine(MACHINE);

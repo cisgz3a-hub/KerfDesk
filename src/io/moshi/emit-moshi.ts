@@ -29,12 +29,21 @@ export type MoshiJobResult =
     }
   | { readonly ok: false; readonly messages: ReadonlyArray<string> };
 
+export const MOSHI_ORIGIN_MESSAGE =
+  'A Moshiboard homes to the rear-left corner and its moves run from there. Set the machine origin to Rear left in Machine Setup. Nothing was sent.';
+const ORIGIN_MESSAGE = MOSHI_ORIGIN_MESSAGE;
+
 /** Encodes an output prepared with absolute placement (no jobOrigin). */
 export function emitPreparedMoshiJob(prepared: PreparedOutput): MoshiJobResult {
   if (!prepared.ok) {
     return { ok: false, messages: prepared.preflight.issues.map((issue) => issue.message) };
   }
   const project: Project = prepared.project;
+  // The board's frame is fixed: home at the rear-left, Y toward the operator
+  // (moshi-profile.ts). The job is already in machine coordinates for the
+  // profile's origin, so any other origin would burn mirrored, as the K40
+  // route refuses too (audit of the last 200 PRs, #1723).
+  if (project.device.origin !== 'rear-left') return { ok: false, messages: [ORIGIN_MESSAGE] };
   // A Moshi rotary turns on its own Y; a dedicated A or Z axis has no
   // Moshi command, so it gets no job rather than one that moves the gantry.
   const rotaryAxis = rotaryOutputAxis(project.device, project.machine);

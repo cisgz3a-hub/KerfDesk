@@ -39,6 +39,7 @@ const definition = z
             kind: z.enum(['sheet', 'remnant']),
             materialKey: label,
             thicknessMm: finitePositive,
+            thicknessSet: z.literal(true).optional(),
             widthMm: finitePositive,
             heightMm: finitePositive,
             grain,
@@ -77,7 +78,7 @@ export function parseProductionNestDefinition(
   if (value === undefined) return { kind: 'ok', value: undefined };
   const parsed = definition.safeParse(value);
   if (!parsed.success) return invalid('Invalid quantity nesting definition');
-  const data = parsed.data;
+  const data = { ...parsed.data, sheets: parsed.data.sheets.map(withThicknessMark) };
   if (!unique(data.parts.map((part) => part.id)) || !unique(data.sheets.map((sheet) => sheet.id)))
     return invalid('Duplicate production part or sheet identity');
   if (data.parts.reduce((count, part) => count + part.quantity, 0) > 10_000)
@@ -92,6 +93,13 @@ export function parseProductionNestDefinition(
     kind: 'ok',
     value: { ...data, ...(data.output === undefined ? {} : { output: data.output }) },
   };
+}
+/** The optional thickness mark (ADR-258 Amendment 9), present only when true. */
+function withThicknessMark<T extends { readonly thicknessSet?: true | undefined }>(
+  sheet: T,
+): Omit<T, 'thicknessSet'> & { readonly thicknessSet?: true } {
+  const { thicknessSet, ...rest } = sheet;
+  return thicknessSet === true ? { ...rest, thicknessSet } : rest;
 }
 export function validateProductionNestDefinition(value: unknown): string | null {
   const result = parseProductionNestDefinition(value);

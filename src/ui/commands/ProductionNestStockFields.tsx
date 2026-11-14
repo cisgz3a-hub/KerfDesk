@@ -72,7 +72,12 @@ function StockDimensionFields({ stock, onChange }: Omit<StockProps, 'onRemove'>)
           min={0.01}
           step={0.1}
           onChange={(event) =>
-            onChange({ ...stock, thicknessMm: Number(event.currentTarget.value) })
+            // Typing the thickness sets it, as in Machine Setup (ADR-258 Amd 9).
+            onChange({
+              ...stock,
+              thicknessMm: Number(event.currentTarget.value),
+              thicknessSet: true,
+            })
           }
         />
       </label>

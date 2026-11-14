@@ -1341,6 +1341,35 @@ that owns those fields, without changing the existing Frame/Start policy.
 6. On a rotary a ramped fill scans every pass along X in one direction, as an image does
    (ADR-699 Amendment 1): its scan angle, Cross-hatch and angle per pass are set aside, and Job
    Review says so when any of them was set.
+7. For a photo or any artwork that is not a plate with holes, **Tools → Prepare Stamp** (F-A7e3)
+   makes a tapered height image instead.
+
+### F-A7e3. Prepare Stamp: a tapered height image from artwork (ADR-570 Amendment 2)
+
+**Success**:
+1. Select one raster image, or closed vector artwork only. The menu item stays disabled for open
+   paths, a mix of images and vectors, two images, or only variable text or barcodes.
+2. **Tools → Prepare Stamp…**: set the measured taper width (mm), the source threshold (0–254,
+   darker pixels form the raised face), the vector DPI and **Mirror raised face** (on by default),
+   then **Prepare preview**. Compare Source, Face and Height map; tick "I reviewed …".
+3. **Apply as new image** adds the stamp on a new "Stamp height intent" Image operation as
+   Grayscale, so power follows the height: the face burns at 0 and the shoulder slopes. A photo's
+   stamp burns at its Image operation's lines/mm; a vector stamp at the dialog's DPI. Switch the
+   operation to 3D Sliced (ADR-699) to burn it as depth slices instead.
+4. Apply keeps the source artwork but turns its output off, because it would burn the raised face.
+   An operation the source shares with other artwork is copied as "<name> (stamp source)" with
+   Output off, so the other artwork still burns. The toast says "source kept with Output off"; one
+   Undo restores everything.
+5. Set power for the material and burn a test coupon first. **Export PNG…** saves the height map
+   instead, with its mm extent in the toast.
+
+**Edge**:
+1. Variable text and variable barcodes are left out of the stamp with "use Bake Variable Text first
+   to fix its value" (ADR-350 Amendment 3): their stored outlines are the template or an old code.
+   The dialog shows the notice before Prepare preview; with only variable data selected the tool
+   refuses with it.
+2. Turn the source's output back on in Cuts / Layers only if it should burn too; it lands on the
+   stamp's face.
 
 ### F-A7f. Material Test grids that vary any two settings (ADR-497)
 
@@ -5954,6 +5983,12 @@ LightBurn's manual "duplicate first" guidance.
 4. **Failure or cancellation.** A missing worker, encoding error, timeout, or resource
    refusal leaves the scene unchanged. Failures show an error and keep the dialog open
    for retry. Cancel and Escape close the dialog and terminate conversion work.
+5. **Variable data (ADR-350 Amendment 3).** Variable text and variable barcodes are left out:
+   their stored outlines are the template ("LOT {{serial:3}}") or the code stored when they were
+   made, and converting would delete the object that burns the current value. The rest of the
+   selection converts, and a toast says "Variable text was left as text: use Bake Variable Text
+   first to fix its value" (barcodes: "… left as it is: …"). With only variable data selected the
+   command stays disabled.
 
 **Verification status.** Fill + PNG-encode + luma fidelity verified
 in a real browser, side-effect-free (CLAUDE.md #4): the pure builder
@@ -9710,6 +9745,17 @@ Simulator-tested only; no real JCZ board has run this path.
    they do so at the same DPI so physical scale stays honest; the status row
    shows the resulting mm size before commit.
 
+#### Edge — the trace was moved, scaled, turned, mirrored or copied
+1. Re-trace keeps the operator's offset from the photo (ADR-408 Amendment 1):
+   a trace still on its photo stays registered, and one nudged, scaled to a
+   blank, turned, mirrored or copied onto a second blank stays where it was
+   put. Vector and Raster scan output both keep it.
+2. A same-mode re-trace keeps the trace's operations by colour, with their
+   power, speed and passes, and its name, power scale and per-operation
+   overrides. A colour the old trace lacked, or a changed trace mode, gets a
+   new operation. The toast says "Re-traced <name> in place … kept its place"
+   and which of these happened.
+
 ### F-L4. Editor history and sessions
 
 #### Success
@@ -9822,7 +9868,10 @@ Simulator-tested only; no real JCZ board has run this path.
   Start would stream them from Current Position, User Origin or Verified Origin; and the photo step
   refuses rings burned from another mode (naming it) or never seen to burn, asking for a Start at
   Absolute or Engrave target. If Machine Setup has changed since the target was added and no burn
-  was seen, the photo step says that instead, and asks for the target to be added again.
+  was seen, the photo step says that instead, and asks for the target to be added again. Adding
+  the target drops the project's Print and Cut marks in the same Undo step, as every generated
+  pattern does, so no registration moves the rings; rings a Start did burn through a registration
+  are refused at the photo step, naming it (ADR-443 Amendment 4).
 - **Warning / not homed.** While connected, the target step says to home first on a homing machine
   that is not homed, and on a machine without homing that the camera lines up only while the
   controller keeps its zero. Advice only: **Engrave target** stays available. A calibration whose
@@ -10140,7 +10189,7 @@ Simulator-tested only; no real JCZ board has run this path.
 - **Edge / watching a job.** **Larger view** in Camera settings toggles the panel between compact
   and wide monitoring widths, with the preference kept locally.
 
-### F-CAM9. Find pieces on the bed and place the design on each (ADR-442, Amendment 1)
+### F-CAM9. Find pieces on the bed and place the design on each (ADR-442, Amendments 1 and 2)
 
 - **Success / fill a batch of blanks.** With a saved calibration and a live camera, the operator
   lays out blanks, puts the design on one of them, selects it and presses **Find pieces** in the
@@ -10151,7 +10200,19 @@ Simulator-tested only; no real JCZ board has run this path.
 - **Success / design not on a piece.** The design is centred on each piece, its long side along
   the piece's long side, and the design itself moves to the first piece. A design already turned
   on the canvas is measured along its own turn, so it lies along the piece rather than keeping
-  its old angle (Amendment 1).
+  its old angle (Amendment 1). On an offcut whose rectangle's centre lies off the material (an L
+  in its notch, a ring in its hole) the design goes to the point of the material furthest from
+  its edges nearest that centre (Amendment 2).
+- **Edge / design does not fit a piece (Amendment 2).** A copy that would run more than 1 mm off
+  its piece, or into its hole, is left out of Place; the piece's row says how far, and the
+  message after Place names the pieces left out. When it fits none of them, nothing is placed and
+  the panel says to make the design smaller or put it on one of the pieces.
+- **Edge / doubtful piece (Amendment 2).** A piece whose colour is not like the other pieces'
+  (glare, a shadow, a mark on the bed), or that is far smaller or larger than a batch of
+  same-sized pieces (glare, or two blanks touching), is listed with the reason and starts
+  unticked; ticking it includes it. Scorch marks, old cuts and shadows darker than the bed are
+  never found as pieces, and blanks 1 mm or more apart are found one by one; coasters touching at
+  a point are cut apart.
 - **Edge / piece partly out of view.** It is listed and outlined but starts unticked, with the
   reason; ticking it includes it.
 - **Edge / different piece.** A piece of another shape, or more than 3 mm longer or wider than the
@@ -10169,7 +10230,7 @@ Simulator-tested only; no real JCZ board has run this path.
 - **Empty / no feed.** **Find pieces** is disabled without a live camera; without a calibration
   the section is absent.
 
-### F-CAM10. Print and Cut marks found by the camera (ADR-443, Amendment 1)
+### F-CAM10. Print and Cut marks found by the camera (ADR-443, Amendments 1 and 4)
 
 - **Success / register a printed sheet.** With Print and Cut on in Labs, a saved calibration and a
   live camera, the operator lays the printed sheet on the bed and sets the material height in the
@@ -10199,6 +10260,12 @@ Simulator-tested only; no real JCZ board has run this path.
 - **Edge / no pair.** When no two marks are the design's spacing apart (within 2 %), the points
   stay as they were and the dialog says how many mark-like shapes the camera saw, and what to
   check.
+- **Edge / mark partly covered (Amendment 4).** A mark partly under tape, a clip or a shadow is not
+  taken: its box sides may differ by at most 5 % of its size (2 px on a small mark), its dark
+  centre must lie within 5 % of its size from the box's centre, and each side within 10 % of the
+  design mark (plus 2 px). A mark 15 % or more covered is refused; about a tenth covered can pass
+  with its centre within 0.3 mm. The dialog then says the camera could not find both marks;
+  uncover the mark or use **Capture head**.
 - **Edge / trust changes.** After a reconnect, reset or frame change, the points must be captured
   again, as with head captures; **Find marks with camera** does it in one click.
 - **Empty / no selection or no feed.** **Use selected marks** without two selected objects says

@@ -164,6 +164,13 @@ describe('which old rotary projects changed (ADR-127 Amd 4)', () => {
     ).toBeCloseTo(2 * Math.PI, 6);
   });
 
+  it('stays quiet for a line along X whose layer speed is above the Max feed', () => {
+    // Audit of the last 200 PRs (#1745): the compiler holds a layer at the
+    // Max feed before and after, so nothing along X changed; the notice
+    // read the raw speed and said 1.50×.
+    expect(rotaryFeedChange(project(CHUCK, { speed: 9000 }, { x: 40, y: 10 }))).toEqual([]);
+  });
+
   it('names the held change on a k > 1 roller: 0.25×, not 1/k', () => {
     // 1500 mm/min round the part needs 6876 > Max feed 6000, so the new dose is 1500/6000.
     const [change] = rotaryFeedChange(project(PLACEHOLDER, { speed: 1500 }, { x: 10, y: 40 }));

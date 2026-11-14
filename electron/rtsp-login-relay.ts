@@ -8,6 +8,9 @@
 // a repeated request stays in order, and passes everything else through.
 // FFmpeg runs with -rtsp_transport tcp, so video arrives interleaved on the
 // same connection. The relay takes one connection and then stops listening.
+//
+// ADR-692 Amendment 2: the relay serves only the FFmpeg KerfDesk started, so
+// another program on the same computer cannot use the camera's login through it.
 
 import { randomBytes } from 'node:crypto';
 import { createServer, Socket, type AddressInfo, type Server } from 'node:net';
@@ -26,6 +29,9 @@ export type RtspLoginRelay = {
 // FFmpeg connects at once; a relay nobody used goes away.
 const CONNECT_WITHIN_MS = 15_000;
 const MAX_HEAD_BYTES = 64 * 1024;
+// How long a new connection may take to begin, and how many may begin at once.
+const FIRST_REQUEST_WITHIN_MS = 5_000;
+const MAX_WAITING_CONNECTIONS = 8;
 const MAX_BODY_BYTES = 1024 * 1024;
 // A login answer is repeated once, and once more for a nonce gone stale.
 const MAX_LOGIN_REPEATS = 2;
@@ -64,21 +70,76 @@ export async function openRtspLoginRelay(
     for (const socket of sockets) socket.destroy();
   };
   const unused = setTimeout(close, CONNECT_WITHIN_MS);
-  server.on('connection', (client) => {
+  let taken = false;
+  let waiting = 0;
+  const accept = (client: Socket, first: Buffer): void => {
+    taken = true;
     clearTimeout(unused);
     stopListening(server);
     const upstream = connectCamera(Number(camera.port || '554'), bareHost(camera.hostname));
     sockets.push(client, upstream);
-    relayConnection(client, upstream, {
+    const options = {
       relayBase,
       cameraBase: rtspRequestUri(camera),
       login: rtspLogin(camera),
-      onProblem: (next) => {
+      onProblem: (next: CameraLoginProblem) => {
         problem = next;
       },
+    };
+    relayConnection(client, upstream, options, first);
+  };
+  server.on('connection', (client) => {
+    if (taken || waiting >= MAX_WAITING_CONNECTIONS) {
+      client.destroy();
+      return;
+    }
+    waiting += 1;
+    sockets.push(client);
+    awaitFirstRequest(client, relayBase, (first) => {
+      waiting -= 1;
+      if (first === null || taken) client.destroy();
+      else accept(client, first);
     });
   });
   return { url: relayBase, loginProblem: () => problem, close };
+}
+
+// The connection's first bytes when it is the relay's own, else null.
+function awaitFirstRequest(
+  client: Socket,
+  relayBase: string,
+  done: (first: Buffer | null) => void,
+): void {
+  let buffer = Buffer.alloc(0);
+  let settled = false;
+  const settle = (first: Buffer | null): void => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    client.off('data', onData);
+    done(first);
+  };
+  const onData = (chunk: Buffer): void => {
+    buffer = Buffer.concat([buffer, chunk]);
+    const lineEnd = buffer.indexOf('\r\n');
+    if (lineEnd < 0) {
+      if (buffer.length > MAX_HEAD_BYTES) settle(null);
+      return;
+    }
+    const start = /^[A-Z_]+ (\S+) RTSP\/\d\.\d$/.exec(
+      buffer.subarray(0, lineEnd).toString('latin1'),
+    );
+    settle(start !== null && isUnder(start[1] ?? '', relayBase) ? buffer : null);
+  };
+  const timer = setTimeout(() => settle(null), FIRST_REQUEST_WITHIN_MS);
+  client.on('data', onData);
+  client.once('error', () => settle(null));
+  client.once('close', () => settle(null));
+}
+
+// `uri` is `base` itself or a path under it.
+function isUnder(uri: string, base: string): boolean {
+  return uri === base || uri.startsWith(`${base}/`) || uri.startsWith(`${base}?`);
 }
 
 function defaultConnect(port: number, host: string): Socket {
@@ -100,8 +161,16 @@ type RelayOptions = {
   readonly onProblem: (problem: CameraLoginProblem) => void;
 };
 
-/** Relay one FFmpeg connection to the camera; exported for the relay's own tests. */
-export function relayConnection(client: Socket, upstream: Socket, options: RelayOptions): void {
+/**
+ * Relay one FFmpeg connection to the camera, starting with `first` (bytes it
+ * already sent); exported for the relay's own tests.
+ */
+export function relayConnection(
+  client: Socket,
+  upstream: Socket,
+  options: RelayOptions,
+  first: Buffer = Buffer.alloc(0),
+): void {
   const pending = new Map<string, Pending>();
   let cseq = 0;
   let answer: LoginAnswer | null = null;
@@ -159,6 +228,7 @@ export function relayConnection(client: Socket, upstream: Socket, options: Relay
     socket.on('error', end);
     socket.on('close', end);
   }
+  if (first.length > 0) fromClient(first);
 }
 
 // The answer to repeat a request the camera refused with 401, or null to
@@ -191,8 +261,8 @@ function parseRequest(message: Message, options: RelayOptions): Pending | null {
   let cameraUri = uri;
   if (uri.startsWith(options.relayBase)) {
     cameraUri = `${options.cameraBase}${uri.slice(options.relayBase.length)}`;
-  } else if (/^rtsps?:\/\/(?:127\.0\.0\.1|localhost|\[::1\])(?:[:/]|$)/i.test(uri)) {
-    // Only the relay's own address may name the loopback side.
+  } else if (uri !== '*' && !sameCamera(uri, options.cameraBase)) {
+    // Requests stay with this camera.
     return null;
   }
   const headers = lines
@@ -206,6 +276,20 @@ function parseRequest(message: Message, options: RelayOptions): Pending | null {
     body: message.body,
     repeats: 0,
   };
+}
+
+// `uri` names the same camera (scheme, host and port) as `cameraBase`.
+function sameCamera(uri: string, cameraBase: string): boolean {
+  const origin = (value: string): string | null => {
+    try {
+      const url = new URL(value);
+      return `${url.protocol}//${url.hostname}:${url.port || '554'}`.toLowerCase();
+    } catch {
+      return null;
+    }
+  };
+  const camera = origin(cameraBase);
+  return camera !== null && origin(uri) === camera;
 }
 
 function withCseq(message: Message, cseq: string): Buffer {

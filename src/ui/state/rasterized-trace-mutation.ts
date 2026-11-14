@@ -26,6 +26,7 @@ import {
   operationOverrideForObject,
 } from '../../core/effective-output';
 import { repairRemovedProjectObjectReferences } from './repair-object-dependencies';
+import { placeRasterTraceResult, replacedTraceResult } from './retrace-carry';
 
 /**
  * Atomically replace a trace result with an Image-pipeline raster.
@@ -65,7 +66,13 @@ export function applyRasterizedTraceToExisting(
     scene = removeObject(scene, source.id);
   }
 
-  const prepared = prepareRasterizedTrace(raster, sourceId, source);
+  // Re-trace keeps where the operator put the result (ADR-408 Amendment 1).
+  const prepared = placeRasterTraceResult(
+    prepareRasterizedTrace(raster, sourceId, source),
+    replacedTraceResult(s.project.scene, options.replaceTraceId),
+    source,
+    options.retraceSourceTransform,
+  );
   const inPlace =
     options.replaceTraceId === raster.id
       ? scene.objects.find((object) => object.id === raster.id)

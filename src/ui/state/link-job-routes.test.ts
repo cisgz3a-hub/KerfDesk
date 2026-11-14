@@ -67,7 +67,12 @@ function project(
   objects: ReadonlyArray<SceneObject>,
 ): Project {
   return {
-    ...createProject({ ...DEFAULT_DEVICE_PROFILE, controllerKind: kind }),
+    // A Moshiboard homes rear-left, and its route refuses any other origin.
+    ...createProject({
+      ...DEFAULT_DEVICE_PROFILE,
+      controllerKind: kind,
+      ...(kind === 'moshi' ? { origin: 'rear-left' as const } : {}),
+    }),
     scene: { layers: [...layers], objects: [...objects] },
   };
 }

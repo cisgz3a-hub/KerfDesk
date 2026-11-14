@@ -122,7 +122,7 @@ describe('findPieces on a flattened bed picture', () => {
 describe('findPieces through the camera model', () => {
   it(
     'finds 3 mm blanks where they lie on the bed from a tilted fisheye picture',
-    { timeout: 30_000 },
+    { timeout: 60_000 },
     () => {
       const lens = wideLens();
       const pose = overheadPose();

@@ -11,7 +11,12 @@ import { isVectorPathObject, type VectorSceneObject } from '../../core/geometry'
 import { subpathCount } from '../../core/geometry/outer-shape-groups';
 import { isConvertibleVector, type ConvertibleVector } from '../raster/vector-to-bitmap';
 import { groupsWithinFocus } from '../state/design-hierarchy-store';
-import { geometryToolSkipReasons, type GeometryToolGuard } from '../state/geometry-tool-sources';
+import {
+  geometryToolSkippedNotice,
+  geometryToolSkipReasons,
+  geometryToolSources,
+  type GeometryToolGuard,
+} from '../state/geometry-tool-sources';
 import { vectorRepairSources } from '../state/vector-repair-sources';
 
 export function selectedObject(project: Project, selectedObjectId: string | null) {
@@ -84,16 +89,35 @@ export function selectionHasUnlockedVectorObject(
 // among the vectors) stays disabled rather than converting an ambiguous
 // subset. Returns the convertibles in scene order (deterministic render
 // order), or an empty array when the selection doesn't qualify.
+// Variable text and barcodes are left out (ADR-350 Amendment 3): a bitmap of
+// their stored outlines would burn the template or one stored code on every
+// record, and Convert to Bitmap deletes the source that burned the value
+// (tools audit T32R-P1-1).
 export function selectedConvertibleVectors(
   project: Project,
   selectedIds: ReadonlyArray<string>,
 ): ReadonlyArray<ConvertibleVector> {
-  if (selectedIds.length === 0) return [];
+  const selection = convertibleSelection(project, selectedIds);
+  return selection === null ? [] : selection.kept;
+}
+
+/** What Convert to Bitmap left out of this selection; empty when nothing. */
+export function convertibleSkippedNotice(
+  project: Project,
+  selectedIds: ReadonlyArray<string>,
+): string {
+  const selection = convertibleSelection(project, selectedIds);
+  return selection === null ? '' : geometryToolSkippedNotice(selection.skipped);
+}
+
+function convertibleSelection(project: Project, selectedIds: ReadonlyArray<string>) {
+  if (selectedIds.length === 0) return null;
   const selected = new Set(selectedIds);
   const convertibles = project.scene.objects.filter(
     (object): object is ConvertibleVector => selected.has(object.id) && isConvertibleVector(object),
   );
-  return convertibles.length === selectedIds.length ? convertibles : [];
+  if (convertibles.length !== selectedIds.length) return null;
+  return geometryToolSources(project.scene, convertibles, 'variable');
 }
 
 /**

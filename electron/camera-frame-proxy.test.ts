@@ -14,7 +14,11 @@ import {
 import { CameraFrameSources } from './camera-frame-sources';
 import { startLocalRtspCameraBridge, type RtspCameraBridgeHandle } from './rtsp-camera-bridge';
 
-const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
+const JPEG_BYTES = Buffer.from([
+  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0xff, 0xd9,
+]);
+// The same picture cut short: no end marker (camera audit v2 K4-P3-2).
+const CUT_JPEG_BYTES = JPEG_BYTES.subarray(0, 8);
 const TRUSTED_ORIGIN = 'http://localhost:5173';
 
 function listenEphemeral(server: Server): Promise<number> {
@@ -48,6 +52,11 @@ describe('camera frame proxy over the real bridge server', () => {
         // Some embedded cameras omit Content-Type; the JPEG magic must carry.
         res.writeHead(200);
         res.end(JPEG_BYTES);
+        return;
+      }
+      if (req.url === '/cut-frame') {
+        res.writeHead(200, { 'Content-Type': 'image/jpeg' });
+        res.end(CUT_JPEG_BYTES);
         return;
       }
       if (req.url === '/error') {
@@ -140,6 +149,12 @@ describe('camera frame proxy over the real bridge server', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('image/jpeg');
     expect(Buffer.from(await response.arrayBuffer())).toEqual(JPEG_BYTES);
+  });
+
+  it('refuses a JPEG cut short, with no end marker (camera audit v2 K4-P3-2)', async () => {
+    const response = await serveHttpFrameResponse('/cut-frame');
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({ reason: 'The camera sent a picture cut short.' });
   });
 
   it('defaults the content type from JPEG magic when the camera omits it', async () => {

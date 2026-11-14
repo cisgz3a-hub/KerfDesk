@@ -119,6 +119,9 @@ function fillSteps(group: FillGroup, offsetMm: number): LhyStep[] {
       pushStep(steps, run.burnStart, false);
       for (const span of spans) {
         pushStep(steps, span.start, false);
+        // A curved run (ADR-694 Amendment 1, a taper-warped row) burns
+        // through its interior points, as the G-code Fill does.
+        for (const point of span.via ?? []) pushStep(steps, point, true);
         pushStep(steps, span.end, true);
       }
       pushStep(steps, run.leadEnd, false);

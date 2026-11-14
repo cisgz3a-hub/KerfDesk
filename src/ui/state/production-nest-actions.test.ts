@@ -4,6 +4,7 @@ import { planProductionNest } from '../../core/nesting/production-nest-plan';
 import { previewProcessRecipe } from '../../core/material-library/process-recipe-selectors';
 import { applyProcessRecipeTemplate } from '../../core/material-library/apply-process-recipe-template';
 import { combinedBBox, type Project } from '../../core/scene';
+import { setStockThicknessMm } from '../../core/scene/machine';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 import {
@@ -46,6 +47,45 @@ describe('quantity production sheets', () => {
     expect(useStore.getState().switchProjectSheet(accepted.sheetBook!.inactive[0]!.id)).toBe(true);
     expect(useStore.getState().project.productionNest?.output?.sheetId).toBe('one');
   });
+  it.each([
+    ['typed in the nest counts as set', true, 6.35],
+    ['left as filled in stays unset', false, undefined],
+  ] as const)('a 6.35 mm stock %s on the generated sheet (ADR-258 Amd 9)', (_name, typed, set) => {
+    // Audit of the last 200 PRs (#1892): the nest wrote the thickness but never
+    // the mark, so a typed 6.35 mm (the shipped default) read as never set.
+    const project = productionProjectFixture();
+    if (project.machine?.kind !== 'cnc') throw new Error('Expected a CNC fixture');
+    const unset = { ...project.machine.stock, thicknessMm: 6.35 };
+    delete (unset as { thicknessSet?: true }).thicknessSet;
+    const base = productionDefinitionFixture();
+    const definition = {
+      ...base,
+      parts: base.parts.map((part) => ({ ...part, thicknessMm: 6.35 })),
+      sheets: base.sheets.map((sheet) => ({
+        ...sheet,
+        thicknessMm: 6.35,
+        ...(typed ? { thicknessSet: true as const } : {}),
+      })),
+    };
+    useStore.setState({
+      project: { ...project, machine: { ...project.machine, stock: unset } },
+      selectedObjectId: 'source',
+    });
+    const prepared = useStore.getState().prepareProductionNest(definition);
+    if (prepared.kind !== 'ok') throw new Error(prepared.reason);
+    const result = planProductionNest(prepared.value.input);
+    expect(useStore.getState().acceptProductionNest(prepared.value, result).kind).toBe('ok');
+    const accepted = useStore.getState().project;
+    const reopened = deserializeProject(accepted.sheetBook!.inactive[0]!.projectJson);
+    if (reopened.kind !== 'ok') throw new Error(JSON.stringify(reopened));
+    const machine = reopened.project.machine;
+    expect(machine?.kind === 'cnc' ? setStockThicknessMm(machine.stock) : null).toBe(set);
+    // The mark is saved with the nest and reads back.
+    const saved = deserializeProject(serializeProject(accepted));
+    if (saved.kind !== 'ok') throw new Error(JSON.stringify(saved));
+    expect(saved.project.productionNest?.sheets[0]?.thicknessSet).toBe(typed ? true : undefined);
+  });
+
   it('requires explicit partial acceptance and rejects stale or invalid drafts without mutations', () => {
     const project = productionProjectFixture();
     const definition = productionDefinitionFixture();

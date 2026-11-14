@@ -3,6 +3,7 @@ import { useStore } from './store';
 import { analyseJointResize } from '../../core/geometry/joint-resize';
 import { jointResizeSelectionMutation, type JointResizeSession } from './joint-resize-actions';
 import { jointResizeFixture } from './joint-resize.test-fixture';
+import { useToastStore } from './toast-store';
 
 const request = {
   currentWidthMm: 3,
@@ -46,6 +47,7 @@ describe('joint resize acceptance', () => {
     expect(state.project.scene.objects[0]!.operationIds).toBe(object.operationIds);
     const points = (state.project.scene.objects[0] as typeof object).paths[0]!.polylines[0]!.points;
     expect(Math.abs(points[4]!.x - points[5]!.x)).toBeCloseTo(3.6, 10);
+    expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(/^Resized \d+ joint feature/);
   });
   it('rejects owner drift, document reopen and changed selection without changing history', () => {
     const { project, session, ids } = prepare();

@@ -5,6 +5,7 @@ import { stampOwnerIsCurrent, type StampOwner } from '../state/stamp-preparation
 import { usePlatform } from '../app/platform-context';
 import { useStampWork } from './use-stamp-work';
 import type { PreparedStampSource } from '../raster/stamp-source';
+import { stampSourceSelection } from '../raster/stamp-source-selection';
 import type { StampEncodedDraft } from '../raster/stamp-worker-protocol';
 export type StampForm = {
   readonly taperMm: string;
@@ -30,6 +31,9 @@ export function useStampPreparation(onClose: () => void) {
     dpi: '254',
     mirror: true,
   });
+  const [skippedNotice] = useState(
+    () => stampSourceSelection(owner.project.scene, owner.ids).notice,
+  );
   const [preview, setPreview] = useState<'source' | 'face' | 'height'>('height');
   const current = stampOwnerIsCurrent(state, owner);
   const work = useStampWork(owner, current);
@@ -46,6 +50,7 @@ export function useStampPreparation(onClose: () => void) {
     form,
     preview,
     current,
+    skippedNotice,
     ...work,
     change,
     close,

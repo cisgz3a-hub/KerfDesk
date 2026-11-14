@@ -34,8 +34,16 @@ export function cameraOffTargetWarning(args: {
   return `Camera placement is on, and part of this job lies where the camera calibration is estimated rather than measured: there the camera picture may be up to about ${Math.round(mm * 10) / 10} mm off, so the job may burn that far from where it shows on the picture. Watch the Frame, or engrave the calibration target on a larger sheet that covers this part of the bed.`;
 }
 
-/** The overlay's Material height in Start's snapshot: the one height its picture lines up at (ADR-441 Amendment 13). */
-export type CameraHeightSnapshot = { readonly cameraSurfaceHeightMm?: number };
+/** Camera facts in Start's snapshot, read by the camera warnings below. */
+export type CameraHeightSnapshot = {
+  /** The overlay's Material height: the one height its picture lines up at (ADR-441 Amendment 13). */
+  readonly cameraSurfaceHeightMm?: number;
+  /** A timelapse will be wanted but the last one is not saved (ADR-490 Amendment 4). */
+  readonly timelapseUnsaved?: boolean;
+};
+
+export const TIMELAPSE_UNSAVED_WARNING =
+  'The last camera timelapse is not saved yet, so this job will not be recorded. To record it, cancel, then save the timelapse (Save video) or clear it in the Camera panel, and start again.';
 
 /**
  * Start's form: the job's own bounds, from the snapshot's camera facts, and
@@ -46,6 +54,7 @@ export function cameraOffTargetWarnings(
     readonly cameraPlacementActive?: boolean;
     readonly cameraCalibration?: CameraModelRecord | null;
     readonly cameraSurfaceHeightMm?: number;
+    readonly timelapseUnsaved?: boolean;
   },
   jobOrigin: JobOriginPlacement | undefined,
   prepared: {
@@ -54,6 +63,7 @@ export function cameraOffTargetWarnings(
   },
 ): string[] {
   const heights = cameraHeightWarnings(prepared.project, machine, jobOrigin);
+  if (machine.timelapseUnsaved === true) heights.push(TIMELAPSE_UNSAVED_WARNING);
   const warning = cameraOffTargetWarning({
     cameraPlacementActive: machine.cameraPlacementActive,
     model: machine.cameraCalibration,

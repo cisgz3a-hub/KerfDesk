@@ -97,6 +97,8 @@ function useSaveVideo(frames: ReadonlyArray<Blob>): {
       );
       if (target === null) return;
       await target.write(video);
+      // Saved: the next job may replace it (ADR-490 Amendment 4).
+      useJobWatchStore.getState().markTimelapseSaved();
       pushToast('Timelapse video saved.', 'success');
     } catch (error) {
       pushToast(

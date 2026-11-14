@@ -208,6 +208,7 @@ export type AppCommandContext = CommandContextSlices & {
   readonly canPhotoEngraveSelection?: boolean;
   readonly canRetraceOriginal: boolean;
   readonly hasConvertibleSelection: boolean;
+  readonly canPrepareStamp: boolean;
   readonly canConvertSelectionToPath: boolean;
   readonly canWeldSelection: boolean;
   readonly canUnionSilhouette: boolean;

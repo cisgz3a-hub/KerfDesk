@@ -7,28 +7,27 @@ import {
 } from './vector-path-selection';
 import { pruneDesignTreeOrder } from '../../core/scene/design-hierarchy-order';
 export { uniqueObjectId } from './vector-path-selection';
+export { prepareIndependentArtwork } from './independent-artwork';
+import { prepareIndependentArtwork } from './independent-artwork';
 import { retainBooleanCompoundResult } from '../../core/geometry/boolean-compound';
 import { booleanCompoundActions, type BooleanCompoundActions } from './boolean-compound-actions';
 import { type VectorBooleanOp, type VectorSceneObject } from '../../core/geometry';
 import { dogboneOperationRegions } from '../../core/geometry/dogbone-operations';
 import { canonicalArtworkOrder } from '../../core/artwork-order';
-import { effectiveOperationForObject } from '../../core/effective-output';
 import {
   addLayer,
   addObject,
-  captureLayerOperationSettings,
   createArtworkOperation,
-  layerFromSubLayer,
   operationIdsForObject,
   primaryOperationForObject,
   removeObject,
   replaceObject,
   type ImportedSvg,
-  type Layer,
   type Project,
   type Scene,
   type SceneObject,
 } from '../../core/scene';
+import { inheritRegistrationArtworkOutput } from './registration-output-actions';
 import type { PathNodeRef } from './path-node-edit-actions';
 import { combineSelectionNotingTabs, removedTabsNotice } from './removed-tabs-notice';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
@@ -71,6 +70,7 @@ export type VectorPathState = StateSlice & {
   readonly selectedPathNode: PathNodeRef | null;
   readonly selectedPathNodes: ReadonlyArray<PathNodeRef>;
   readonly additionalSelectedIds: ReadonlySet<string>;
+  readonly registrationArtworkOutputSnapshot?: Readonly<Record<string, boolean>> | null;
 };
 
 export type VectorPathMutation = {
@@ -82,6 +82,7 @@ export type VectorPathMutation = {
   readonly undoStack: ReadonlyArray<Project>;
   readonly redoStack: ReadonlyArray<Project>;
   readonly dirty: true;
+  readonly registrationArtworkOutputSnapshot?: Readonly<Record<string, boolean>>;
 };
 
 export type VectorPathSet = (
@@ -311,8 +312,17 @@ function offsetSelectionMutation(
   const offset = prepared.object;
   let scene = prepared.scene;
   scene = addObject(scene, offset);
+  // A jig's Outline only must not leave the art's offset off in Artwork only.
+  const source =
+    selected[0] === undefined ? null : primaryOperationForObject(selected[0], scene.layers);
+  const project = { ...state.project, scene };
+  const cloneId = offset.operationIds?.[0];
+  const jig =
+    source === null || cloneId === undefined
+      ? null
+      : inheritRegistrationArtworkOutput(state, project, [{ sourceId: source.id, cloneId }]);
   return {
-    project: { ...state.project, scene },
+    ...(jig ?? { project }),
     selectedObjectId: offset.id,
     selectedPathNode: null,
     selectedPathNodes: [],
@@ -321,49 +331,6 @@ function offsetSelectionMutation(
     redoStack: [],
     dirty: true,
   };
-}
-
-export function prepareIndependentArtwork(
-  scene: Scene,
-  artwork: ImportedSvg,
-  source: SceneObject | undefined,
-): { readonly scene: Scene; readonly object: ImportedSvg } {
-  const sourceOperation =
-    source === undefined ? null : primaryOperationForObject(source, scene.layers);
-  const seed = createArtworkOperation(scene, artwork, {
-    subLayers: sourceOperation?.subLayers ?? [],
-  });
-  const operation: Layer =
-    sourceOperation === null
-      ? seed.operation
-      : independentOperationForArtwork(sourceOperation, seed.operation, artwork);
-  return {
-    scene: addLayer(scene, operation),
-    object: seed.object as ImportedSvg,
-  };
-}
-
-function independentOperationForArtwork(source: Layer, seed: Layer, artwork: ImportedSvg): Layer {
-  const effectiveRoot = effectiveOperationForObject(source, artwork);
-  const subLayers = source.subLayers.map((subLayer) => ({
-    ...subLayer,
-    settings: captureLayerOperationSettings(
-      effectiveOperationForObject(layerFromSubLayer(source, subLayer), artwork),
-    ),
-  }));
-  const { bindingOperationId: _bindingOperationId, ...withoutRuntimeBinding } = effectiveRoot;
-  const cloned: Layer = {
-    ...withoutRuntimeBinding,
-    id: seed.id,
-    name: seed.name,
-    color: seed.color,
-    subLayers,
-  };
-  if (artwork.operationOverride === undefined) return cloned;
-  // The override is materialized into the root and every sublayer, so a later
-  // linked-preset refresh must not silently erase the derived artwork's output.
-  const { materialBinding: _materialBinding, ...detached } = cloned;
-  return detached;
 }
 
 function prepareDogboneEdit(

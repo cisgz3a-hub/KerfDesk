@@ -5,7 +5,10 @@
 // crosses and dots all do), and surrounded by clear paper. The clear-paper
 // test is what keeps a honeycomb bed's holes and the printed artwork out. The
 // centre is then the darkness-weighted mean over the mark's box, so it does
-// not depend on where the threshold fell. Pure core.
+// not depend on where the threshold fell. Every mark the design uses is
+// symmetric under a quarter turn, so its box is square at any angle: a box
+// that is not, or that is smaller than the design's mark, is a mark partly
+// covered, whose centre would be off (ADR-443 Amendment 4). Pure core.
 
 import type { BedArea } from '../model/camera-model-accuracy';
 import type { RgbaImage } from '../rgba-image';
@@ -28,6 +31,12 @@ export type FindMarksInput = {
   /** Marks between these sizes are kept, mm. */
   readonly minSizeMm: number;
   readonly maxSizeMm: number;
+  /**
+   * The design's mark size when known, mm: both sides of a kept mark lie
+   * within SIDE_TOLERANCE of it, so a mark partly covered on one side is not
+   * taken.
+   */
+  readonly expectedSizeMm?: { readonly minMm: number; readonly maxMm: number };
 };
 
 // A pixel is dark when it is this much below the brightest paper near it:
@@ -37,10 +46,16 @@ const DARK_OFFSET = 30;
 // Around a mark, from 1.25 to 2 half-sizes out, at most this share may be dark:
 // a margin of clear paper as wide as half the mark.
 const CLEAR_SHARE = 0.03;
-// Box sides within this ratio of each other.
-const MAX_ASPECT = 1.4;
+// Box sides apart by at most this share of the size, or SIDE_SLACK_PX on a
+// small mark: what the picture's pixels allow, not a side covered (camera
+// audit v2 K3-P2-3 accepted a ring 30 % covered at a 1.4 aspect).
+const MAX_SIDE_DIFFERENCE = 0.05;
 // Dark centre within this share of the size from the box's centre.
-const MAX_OFF_CENTRE = 0.12;
+const MAX_OFF_CENTRE = 0.05;
+// Each side within this share of the design's mark size, when it is known,
+// and this many pixels for the picture's blur either side of a small mark.
+const SIDE_TOLERANCE = 0.1;
+const SIDE_SLACK_PX = 2;
 
 type Blob = {
   x0: number;
@@ -92,7 +107,8 @@ function asMark(blob: Blob, picture: Picture, input: FindMarksInput): FoundMark 
   const sizePx = Math.max(w, h);
   const sizeMm = sizePx / ppm;
   if (sizeMm < input.minSizeMm || sizeMm > input.maxSizeMm) return null;
-  if (Math.max(w, h) / Math.min(w, h) > MAX_ASPECT) return null;
+  if (Math.abs(w - h) > Math.max(SIDE_SLACK_PX, MAX_SIDE_DIFFERENCE * sizePx)) return null;
+  if (!sidesMatch(w / ppm, h / ppm, SIDE_SLACK_PX / ppm, input.expectedSizeMm)) return null;
   const boxX = (blob.x0 + blob.x1) / 2;
   const boxY = (blob.y0 + blob.y1) / 2;
   const offCentre = Math.hypot(blob.sx / blob.area - boxX, blob.sy / blob.area - boxY);
@@ -108,6 +124,18 @@ function asMark(blob: Blob, picture: Picture, input: FindMarksInput): FoundMark 
     sizeMm,
     offCentreMm: offCentre / ppm,
   };
+}
+
+function sidesMatch(
+  widthMm: number,
+  heightMm: number,
+  slackMm: number,
+  expected: FindMarksInput['expectedSizeMm'],
+): boolean {
+  if (expected === undefined) return true;
+  const low = (1 - SIDE_TOLERANCE) * expected.minMm - slackMm;
+  const high = (1 + SIDE_TOLERANCE) * expected.maxMm + slackMm;
+  return [widthMm, heightMm].every((side) => side >= low && side <= high);
 }
 
 // The mean grey of the ring of paper around a mark, or null when that ring
