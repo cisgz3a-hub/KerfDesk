@@ -51,8 +51,8 @@ Plan: [AREAS.md](AREAS.md). Severity follows [METHOD.md §3](../2026-10-21-rolli
 | N7-P1-1 | N7 | **#1885 still bores registration holes through parts cut with the default arc lead-in, and the tile advisory says the bores are "clear of every part and cut".** A 600 × 300 panel in 3 × 2 tiles still gets 11 of 14 bores; a tabletop 6 of 8; a Ø320 disc 5 of 8; a coaster one bore 3.65 mm inside its edge. With leads off or a ramp entry every bore lands in waste. Not a regression (the tree before #1889 behaves the same); a gap in N4-P1-1's fix. | **READ** on main `951f94712`: `tile-registration-placement.ts:397` `isLoop` counts only closed or ramped passes as part outlines; a lead-in profile compiles to an open pass. Auditor and refuter **REPRO**. | **fixed by #1901** (ADR-392 Amd 8) for closed parts with every lead, ramp and tab setting (0 of 1,693 bores in a part across N8's auditor and refuter); parts drawn as open outlines are N8-P1-1 |
 | N7-P1-2 | N7 | **An outline that stops just over one bit width short gets no tabs and no warning, held only by a sliver** (0.005–0.125 mm on the ⅛" bit at gaps of 3.18–3.30 mm; 0.010 mm on the ¼" bit at 6.36 mm), thin enough for normal bit runout to remove. | **READ** on main: `cnc-tabbed-contour-passes.ts:146` `bitClosesOutline` treats the outline as closed only when `gapMm < cutWidthMm`. Auditor and refuter **REPRO**. | **fixed by #1903** (ADR-258 Amd 7): gaps under D + 1.89 mm are tabbed; the tab shift it added is the regression N8-P2-1 |
 | N7-P2-1 | N7 | **N2-P2-1 is only partly fixed:** on the N2 refuter's surfaces the 60° V-bit still takes up to 3.12 mm under its tip along about 100 mm of the edge band (unchanged by #1878 on all four surfaces), the 30° engraver 2.74 mm, and the 1 mm-tip tapered ball peaks at 2.87 mm on the ellipse; the note claims one 1.5 mm pass. | Auditor and refuter **REPRO** (independent stock models). | **fixed by #1904** (ADR-421 Amd 5): no finishing row over 1.50 mm under the tip on either N8 model (residual wording N8-P3-2) |
-| N8-P2-1→P1 (refuter; regression from #1903) | N8 | **On an open outline, #1903 moves every tab together to clear the gap, so on a square or L open at mid-edge all tabs land on corners.** Default 6 mm tabs drop from 6.00 to 3.27 mm bridges with no warning; at 1.5 mm tabs the necks are 0.12 mm, silent (0.48–1.00 mm before #1903); 8–10 mm squares with 0.5–1 mm tabs come free with only "is given holding tabs as closed shapes", and a 1 mm-tab 60 mm square comes free under "as little as 0 mm". The tab-width tooltip says "Tabs are kept off corners", and the warning's advice cannot be followed on an open outline. For gaps under the bit width it is worse than before #1903, when a tab over the gap held a full 6.00 mm. | **READ** on main `2e653bf66`: `cnc-open-outline-tabs.ts:67` `planClearOfGap` computes one `delta` and shifts every tab centre by it. Auditor and refuter **REPRO** (refuter: a raster of the stock bottom). | routed to the CNC tabs session (local_ce8c9a2a). Fix: move only the tab that covers the gap (to the nearest non-corner spot), keep the others on N1-P2-1's corner-avoiding positions, and let a tab span a gap narrower than the bit |
-| N8-P1-1 | N8 | **A part drawn as an open outline still gets registration bores drilled through it**, even when the tab code treats it as closed and Job Review says so: a 600 × 300 panel 11 of 14, a 500 × 250 tabletop 11 of 14 at gaps of 2, 4 and 8 mm, a Ø300 disc 5 of 8. With a gap under the bit width the toolpath does go round the outline, yet the advisory says the bores are "outside every outline the toolpaths go round"; its caveat that open outlines are not known as parts names no outline and no bore. Not a #1901 regression. | Auditor and refuter **REPRO** (the same results on the tree before #1901). | routed to the CNC tiling session (local_cff7f8bd). Fix: the bore keep-out uses #1903's "effectively closed" rule (gap under D + 1.89 mm with default tabs), and a genuinely open line gets a named warning |
+| N8-P2-1→P1 (refuter; regression from #1903) | N8 | **On an open outline, #1903 moves every tab together to clear the gap, so on a square or L open at mid-edge all tabs land on corners.** Default 6 mm tabs drop from 6.00 to 3.27 mm bridges with no warning; at 1.5 mm tabs the necks are 0.12 mm, silent (0.48–1.00 mm before #1903); 8–10 mm squares with 0.5–1 mm tabs come free with only "is given holding tabs as closed shapes", and a 1 mm-tab 60 mm square comes free under "as little as 0 mm". The tab-width tooltip says "Tabs are kept off corners", and the warning's advice cannot be followed on an open outline. For gaps under the bit width it is worse than before #1903, when a tab over the gap held a full 6.00 mm. | **READ** on main `2e653bf66`: `cnc-open-outline-tabs.ts:67` `planClearOfGap` computes one `delta` and shifts every tab centre by it. Auditor and refuter **REPRO** (refuter: a raster of the stock bottom). | **fixed by #1907** (ADR-258 Amd 8): `planClearOfGap` removed; open outlines keep the corner-avoiding plan, and a tab over a gap holds its full width (60 mm square bridges > 5.9 mm, where main had 3.27 mm; 1 mm and 0.5 mm-tab squares held). Not re-audited |
+| N8-P1-1 | N8 | **A part drawn as an open outline still gets registration bores drilled through it**, even when the tab code treats it as closed and Job Review says so: a 600 × 300 panel 11 of 14, a 500 × 250 tabletop 11 of 14 at gaps of 2, 4 and 8 mm, a Ø300 disc 5 of 8. With a gap under the bit width the toolpath does go round the outline, yet the advisory says the bores are "outside every outline the toolpaths go round"; its caveat that open outlines are not known as parts names no outline and no bore. Not a #1901 regression. | Auditor and refuter **REPRO** (the same results on the tree before #1901). | **fixed by #1906** (ADR-392 Amd 9): a nearly-closed open cut (gap under the layer's #1903 limit) is kept clear like a part, and a bore inside any other open outline gets a warning naming it. Not re-audited |
 
 ### P3s (28, plus J1's three)
 
@@ -163,9 +163,7 @@ Plan: [AREAS.md](AREAS.md). Severity follows [METHOD.md §3](../2026-10-21-rolli
 
 **Fixed on main:** #1878 (N2, J1-P2-1), #1884 (N3), #1885 (N4), #1889 (N1, J1-P1-1), #1893 (N5), #1894 and #1898 (N6), and the decisions #1891 (AC-6), #1892 (J1-P3-3), #1895 and #1897 (FS-5, JR-5, FS-2).
 
-**Open after N8 (2026-11-14):**
-- N8-P2-1→P1 (open-outline tabs shifted onto corners) with the tabs session; N8-P1-1 (bores through open-outline parts) with the tiling session;
-- the P3 sweep (28, plus J1's three), routed to the owning sessions.
+**Open after N8:** nothing. N8-P2-1 was fixed by #1907 and N8-P1-1 by #1906; the P3s are resolved below.
 
 **Maintainer decisions:**
 - J1-P3-3: whether real 6.35 mm stock should count as "set";
@@ -173,3 +171,40 @@ Plan: [AREAS.md](AREAS.md). Severity follows [METHOD.md §3](../2026-10-21-rolli
 - the re-ratings of FS-2, FS-5 and JR-5 to P2 under METHOD.
 
 **Structural direction.** Hold every part by construction: a single "what keeps this piece attached" check that tabs, pockets, tiling and registration all feed, warning per piece rather than per layer. Treat every interruption as losing the machine's position until proven otherwise: keep the zero's provenance (G92 or G10, which bit) across Abort and reconnect, and refuse "retained" when it cannot be shown.
+
+## P3 sweep (2026-11-14)
+
+The maintainer chose "Verify N7 fixes + CNC P3 sweep". Each P3 went to the session that wrote the code; every sweep PR merged with CI green.
+
+| P3 | Resolution |
+|---|---|
+| J1-P3-1 fully tabbed loop re-cut at the tab top | **fixed by #1889** |
+| J1-P3-2 inlay fit gap leaves an unannounced seam | **fixed by #1907**: a finding names the seam when fit ÷ tan(half angle) exceeds the glue gap |
+| J1-P3-3 real 6.35 mm stock reads as never set | **fixed by #1892** (maintainer decision) |
+| N1-P3-1 split offset loops each get the full tab count | **fixed by #1889** |
+| N1-P3-2 "Edit positions" re-seeds tabs | **fixed by #1889** |
+| N1-P3-3 Tab height documented from the cut floor | **fixed by #1889** and #1892 |
+| N2-P3-1 rest scallop coarser than the finish | **fixed by #1878** |
+| N3-P3-1 island-adaptive seams with zero overlap | **fixed by #1884** (ADR-154 Amd 6): a cleanup pass runs along each seam (an overlap notched cells next to islands) |
+| N3-P3-2 raster stepover above 100 % leaves strips | **fixed by #1884** (ADR-105 Amd 1): raster rows are never further apart than the bit cuts, and the advisory says why |
+| N4-P3-1 tile overlap strip cut twice | **won't fix**: disclosed since #1885; splitting strip ownership changes every tile's geometry and seam entries, and with exact registration the repeat cuts air |
+| N4-P3-2 nest spacing turns facing leads into plunges | **fixed by #1906** (ADR-433 Amd 7): spacing adds the Outside lead's reach (5.8 mm with the default ⅛" arc lead) |
+| N4-P3-3 surfacing overhang unannounced | **fixed by #1906**: the panel names the one-radius overhang at every edge, the zero corner included |
+| N5-P3-1 CNC review advises M4 for a laser fire risk | **fixed by #1893** |
+| N5-P3-2 every Pause logs "KerfDesk did not request this pause" | **fixed by #1910** (ADR-333 Amd 1) |
+| N5-P3-3 write-failure notice talks about the disconnect | **fixed by #1910** (ADR-398 Amd 10) |
+| N5-P3-4 kinematic simulator limits | **partly fixed by #1910**: the spindle is restored at a door resume. Won't fix freezing the clock in holds or combining it with the planner model, which changes how every simulated hold settles (noted in `grbl-sim-kinematics.ts`) |
+| N5r-P3-1 recovery warning blames skipped layers | **fixed by #1893** |
+| N6-P3-1 recipe feed above max feed capped silently | **fixed by #1894** |
+| N6-P3-2 warnings on values no program sends | **fixed by #1894** |
+| N6-P3-3 presets never record Z travel | **fixed by #1908** |
+| N6-P3-4 wrap design taller than one circumference | **fixed by #1908** |
+| N7-P3-1 tab-hold warning says "0 mm" | **fixed by #1903** |
+| N7-P3-2 plain 1 mm ball deeper stretches | **fixed by #1904** and #1909 |
+| N7-P3-3 surfacing caps RPM without scaling the feed | **fixed by #1908** |
+| N7r-P3-1 4040 advice to lower RPM at the floor | **fixed by #1908** |
+| N7r-P3-2 material button keeps the lowered 3,000 RPM | **fixed by #1908** |
+| N8-P3-1 relief finishing programs 8–31 % longer | **fixed by #1909**: each finishing row is judged on the stock still standing |
+| N8-P3-2 ADR-421 Amd 5's 1.6 mm claim | **fixed by #1909** (wording and measure aligned) |
+
+**CNC audit v3 is closed.** Every P1 and P2 from N1–N8 is fixed on main, every P3 is fixed, disclosed or declined with a reason, and the maintainer's four decisions (6.35 mm stock, 50 % slots, FS-2/FS-5/JR-5 re-ratings, FS-2 option A) are in. The last two P1 fixes (#1906, #1907) and the sweep PRs were checked by their own regression tests, not by a further audit round.
