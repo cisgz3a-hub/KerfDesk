@@ -1,0 +1,95 @@
+// @vitest-environment jsdom
+// T35 refuter R1: Close Path on partly / fully retraced strokes, then kerf, read back from G-code.
+import { writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type SceneObject,
+} from '../t31-main/src/core/scene';
+import { closeOpenPaths, retracesItself } from '../t31-main/src/core/geometry/path-direction-edits';
+import { compileJob } from '../t31-main/src/core/job';
+import { prepareOutput } from '../t31-main/src/io/gcode/prepare-output';
+import { emitPreparedGcode } from '../t31-main/src/io/gcode/emit-gcode';
+import { useStore } from '../t31-main/src/ui/state/store';
+import { useToastStore } from '../t31-main/src/ui/state/toast-store';
+import { resetStore } from '../t31-main/src/ui/state/test-helpers';
+import { fmt, litSegments, show, total } from './gdec';
+
+const lines: string[] = [];
+const log = (s: string) => {
+  lines.push(s);
+  writeFileSync('C:/Users/stolk/kd-t1/zz-t35r/r1.log', lines.join('\n'));
+};
+type V = { x: number; y: number };
+const obj = (id: string, pts: V[], x = 100, y = 100): ImportedSvg =>
+  ({
+    kind: 'imported-svg', id, source: `${id}.svg`, operationIds: ['L'],
+    bounds: {
+      minX: Math.min(...pts.map((p) => p.x)), minY: Math.min(...pts.map((p) => p.y)),
+      maxX: Math.max(...pts.map((p) => p.x)), maxY: Math.max(...pts.map((p) => p.y)),
+    },
+    transform: { ...IDENTITY_TRANSFORM, x, y },
+    paths: [{ color: '#000000', polylines: [{ points: pts, closed: false }] }],
+  }) as unknown as ImportedSvg;
+const project = (o: SceneObject, kerf: number): Project => {
+  const base = createProject();
+  const L = { ...createLayer({ id: 'L', color: '#000000', name: 'Cut', mode: 'line' }), speed: 1200, power: 60, kerfOffsetMm: kerf } as Layer;
+  return { ...base, optimization: { ...DEFAULT_PROJECT_OPTIMIZATION }, scene: { ...base.scene, objects: [o], layers: [L], groups: [] } };
+};
+function burn(p: Project) {
+  const prep = prepareOutput(p);
+  if (!prep.ok) return { len: NaN, segs: [], diag: 'NOT OK', adv: JSON.stringify(prep).slice(0, 300) };
+  const segs = litSegments(emitPreparedGcode(prep).gcode);
+  const diag = JSON.stringify(compileJob(p.scene, p.device).diagnostics ?? []);
+  const adv = JSON.stringify((prep as unknown as { advisories?: unknown }).advisories ?? []);
+  return { len: total(segs), segs, diag, adv };
+}
+
+const shapes: Record<string, V[]> = {
+  // "P": up the stem, round the bowl, end on the stem at mid height. Closing line runs down the lower stem (25 mm).
+  P: [{ x: 0, y: 0 }, { x: 0, y: 50 }, { x: 25, y: 50 }, { x: 25, y: 25 }, { x: 0, y: 25 }],
+  // "b": end at the stem foot, start at the top; closing line runs up the upper stem (30 mm).
+  b: [{ x: 0, y: 60 }, { x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 30 }, { x: 0, y: 30 }],
+  // lollipop: 40 mm stick, 20 mm loop, stick back; ends coincide, flag open.
+  lolli: [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: -10 }, { x: 60, y: -10 }, { x: 60, y: 10 }, { x: 40, y: 10 }, { x: 40, y: 0 }, { x: 0, y: 0 }],
+  // pure out-and-back, ends coincide: must stay open (ADR-486 Amd 4).
+  outBack: [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 0, y: 0 }],
+  // pure collinear partial retrace (zero area, ends do not meet): must stay open.
+  collinear: [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 10, y: 0 }],
+  // out-and-back with a 5 mm spur at the far end (area 0 everywhere except none): zero area -> stays open.
+  outBackKink: [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 5 }, { x: 30, y: 0 }, { x: 0, y: 0 }],
+  // "P" whose end misses the stem by 0.05 mm: sliver instead of exact retrace.
+  Pnear: [{ x: 0, y: 0 }, { x: 0, y: 50 }, { x: 25, y: 50 }, { x: 25, y: 25 }, { x: 0.05, y: 25 }],
+  // control: open C, closing line lands on nothing.
+  C: [{ x: 20, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 20 }, { x: 20, y: 20 }],
+};
+
+it('R1 Close Path then kerf', () => {
+  for (const [name, pts] of Object.entries(shapes)) {
+    const o = obj(name, pts);
+    const retr = retracesItself(o.paths[0]!, 0, o.transform);
+    const res = closeOpenPaths(o.paths, o.transform);
+    const closedObj = { ...o, paths: res.paths } as ImportedSvg;
+    log(`== ${name}: retracesItself ${retr}; closeOpenPaths closed ${res.closed}, gap ${fmt(res.longestGapMm)}`);
+    // Store action for the toast (same object).
+    for (const kerf of [0, 0.1, -0.1, 0.001]) {
+      const before = burn(project(o, kerf));
+      const after = burn(project(closedObj, kerf));
+      log(`  kerf ${kerf}: open ${fmt(before.len)} -> closed ${fmt(after.len)} | diag ${after.diag} | adv ${after.adv}`);
+      if (kerf === 0.1) log(`    closed segs ${show(after.segs)}`);
+    }
+    resetStore();
+    useToastStore.setState({ toasts: [] } as never);
+    useStore.setState({ project: project(o, 0.1), selectedObjectId: name, additionalSelectedIds: new Set(), undoStack: [], redoStack: [] } as never);
+    useStore.getState().closeSelectedPaths();
+    const storeObj = useStore.getState().project.scene.objects[0] as ImportedSvg;
+    const sameAsCore = JSON.stringify(storeObj.paths) === JSON.stringify(res.paths);
+    log(`  store toast: ${useToastStore.getState().toasts.map((t) => `${t.variant}:${t.message}`).join(' // ')} | store==core ${sameAsCore}`);
+  }
+});

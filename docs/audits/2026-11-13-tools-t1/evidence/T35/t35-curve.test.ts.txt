@@ -1,0 +1,61 @@
+// @vitest-environment jsdom
+// T35: exact curves close with a straight line; hook at kerf 0 double-burns its stem.
+import { beforeEach, it } from 'vitest';
+import { IDENTITY_TRANSFORM, type ImportedSvg, type Layer } from '../t31-main/src/core/scene';
+import { resetStore } from '../t31-main/src/ui/state/test-helpers';
+import { totalLen } from './decode';
+import { burn, clearToasts, f3, layer, logger, proj, setProject, st, toasts } from './common';
+
+const out = logger('C:/Users/stolk/kd-t1/zz-t35/t35-curve.log');
+beforeEach(() => {
+  resetStore();
+  clearToasts();
+});
+
+it('C1 cubic semicircle (r 20) closes with its 40 mm diameter; scaled x2', () => {
+  for (const s of [1, 2]) {
+    resetStore();
+    clearToasts();
+    const k = 0.5522847498 * 20;
+    const curve = {
+      start: { x: 0, y: 20 },
+      closed: false,
+      segments: [
+        { kind: 'cubic', control1: { x: 0, y: 20 + k }, control2: { x: 20 - k, y: 40 }, to: { x: 20, y: 40 } },
+        { kind: 'cubic', control1: { x: 20 + k, y: 40 }, control2: { x: 40, y: 20 + k }, to: { x: 40, y: 20 } },
+      ],
+    };
+    const poly = { points: Array.from({ length: 33 }, (_, i) => ({ x: 20 - 20 * Math.cos((Math.PI * i) / 32), y: 20 + 20 * Math.sin((Math.PI * i) / 32) })), closed: false };
+    const o = {
+      kind: 'imported-svg', id: 'a', source: 'a.svg', operationIds: ['L'],
+      bounds: { minX: 0, minY: 20, maxX: 40, maxY: 40 }, transform: { ...IDENTITY_TRANSFORM, x: 50, y: 50, scaleX: s, scaleY: s },
+      paths: [{ color: '#000000', polylines: [poly], curves: [curve] }],
+    } as unknown as ImportedSvg;
+    const L = layer('L', 'line', 1000, 50);
+    const p0 = proj([o], [L]);
+    setProject(p0, ['a']);
+    st().closeSelectedPaths();
+    const p1 = st().project;
+    const a = p1.scene.objects[0] as ImportedSvg;
+    const c = a.paths[0]!.curves![0]!;
+    out(`C1 s${s}: toast ${toasts().join(' // ')}; curve closed ${c.closed} segs ${c.segments.map((x) => x.kind).join(',')}; poly ${a.paths[0]!.polylines[0]!.closed} n${a.paths[0]!.polylines[0]!.points.length}`);
+    const l0 = totalLen(burn(p0).moves);
+    const l1 = totalLen(burn(p1).moves);
+    out(`C1 s${s}: before ${f3(l0)} (oracle ${f3(Math.PI * 20 * s)}) after ${f3(l1)} delta ${f3(l1 - l0)} (oracle ${f3(40 * s)})`);
+  }
+});
+
+it('C2 hook at kerf 0: stem burned twice after Close Path', () => {
+  const L = layer('L', 'line', 1000, 50, { kerfOffsetMm: 0 } as Partial<Layer>);
+  const o = {
+    kind: 'imported-svg', id: 'a', source: 'a.svg', operationIds: ['L'],
+    bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 }, transform: IDENTITY_TRANSFORM,
+    paths: [{ color: '#000000', polylines: [{ closed: false, points: [{ x: 10, y: 80 }, { x: 10, y: 40 }, { x: 30, y: 40 }, { x: 30, y: 60 }, { x: 10, y: 60 }] }] }],
+  } as unknown as ImportedSvg;
+  const p0 = proj([o], [L]);
+  setProject(p0, ['a']);
+  st().closeSelectedPaths();
+  const b = burn(st().project);
+  const onStem = b.moves.filter((m) => Math.abs(m.from.x - 10) < 1e-6 && Math.abs(m.to.x - 10) < 1e-6);
+  out(`C2 toast ${toasts().join(' // ')}; lit ${f3(totalLen(b.moves))}; stem moves ${onStem.map((m) => `${f3(m.from.y)}->${f3(m.to.y)}`).join(' ')}`);
+});
