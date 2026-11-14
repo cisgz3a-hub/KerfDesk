@@ -23,7 +23,12 @@ type GeneratedScenePatch = {
 type GeneratedSceneSet = (fn: (state: GeneratedSceneState) => GeneratedScenePatch) => void;
 
 export type GeneratedSceneActions = {
-  /** `placement` changes Start From in the same Undo step as the scene. */
+  /**
+   * `placement` changes Start From in the same Undo step as the scene. The
+   * project's Print and Cut marks go too: they name marks of the design
+   * being replaced, and a Start would otherwise move the generated pattern by
+   * their registration (camera audit v2 K3-P1-4, ADR-443 Amendment 4).
+   */
   readonly replaceSceneWithGeneratedScene: (
     scene: Scene,
     selectGenerated?: boolean,
@@ -35,7 +40,8 @@ export function generatedSceneActions(set: GeneratedSceneSet): GeneratedSceneAct
   return {
     replaceSceneWithGeneratedScene: (scene, selectGenerated = false, placement) =>
       set((state) => {
-        const project = { ...state.project, scene };
+        const { printAndCutTargets: _marks, ...rest } = state.project;
+        const project = { ...rest, scene };
         const patch = {
           project,
           selectedObjectId: selectGenerated ? (scene.objects[0]?.id ?? null) : null,

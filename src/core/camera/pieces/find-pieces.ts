@@ -2,14 +2,16 @@
 // (ADR-442): blanks, offcuts, coasters. Each piece comes back in bed mm with
 // its outline, its smallest rotated rectangle, and the cues that fix its
 // orientation: whether it is round, square or oblong, and which way its mass
-// leans when it is lopsided. Pieces are ordered in rows, top to bottom and
-// left to right. Nothing here guesses what a piece is. Pure core.
+// leans when it is lopsided. Each also has the point of its material
+// furthest from any edge, where a centred design goes (Amendment 2), and a
+// doubt when it does not look like the other pieces (piece-doubts.ts).
+// Pieces are ordered in rows, top to bottom and left to right. Pure core.
 
 import type { BedArea } from '../model/camera-model-accuracy';
 import type { RgbaImage } from '../rgba-image';
 import { pieceComponents, type PieceComponent } from './piece-components';
-import { pieceImage } from './piece-image';
-import { pieceMask, type PixelPoint } from './piece-mask';
+import { withDoubts, type PieceDoubt } from './piece-doubts';
+import { pieceMask, type Colour, type PixelPoint } from './piece-mask';
 import { minAreaRect, snugRect, type Point, type RotatedRect } from './rotated-rect';
 
 export type PieceShape = 'round' | 'square' | 'oblong';
@@ -30,6 +32,20 @@ export type DetectedPiece = {
   readonly headingDeg: number | null;
   /** True when part of the piece lies outside what the camera saw. */
   readonly partial: boolean;
+  /** Outlines of the holes in it, bed mm; absent on pieces saved before holes were kept. */
+  readonly holes?: ReadonlyArray<ReadonlyArray<Point>>;
+  /**
+   * The point a centred design goes to: the rectangle's centre when that is
+   * about as far from every edge as any point of the material, otherwise the
+   * point of the material furthest from its edges nearest to it, bed mm.
+   */
+  readonly onMaterial?: Point;
+  /** How far `onMaterial` lies from the nearest edge or hole, mm. */
+  readonly clearanceMm?: number;
+  /** Mean colour of the piece, 0..255 per channel. */
+  readonly colour?: Colour;
+  /** Why the piece may not be a piece at all; it then starts left out. */
+  readonly doubt?: PieceDoubt;
 };
 
 export type FindPiecesInput = {
@@ -49,28 +65,37 @@ export type FindPiecesInput = {
 
 /** Default smallest piece: a 10 mm square. */
 export const MIN_PIECE_AREA_MM2 = 100;
-// Specks and hairline gaps narrower than this are cleaned away.
-const CLEAN_RADIUS_MM = 1;
+// Specks and streaks narrower than twice this are cleaned away.
+const OPEN_RADIUS_MM = 1;
+// Gaps narrower than twice this are bridged: a crack, not the gap between two blanks.
+const CLOSE_RADIUS_MM = 0.5;
 // Long side over short side below this reads as square.
 const SQUARISH_RATIO = 1.08;
 // A square piece filling less of its rectangle than this is round (a disc
-// fills π/4, about 0.785; a square fills 1).
+// fills π/4, about 0.785; a square fills 1), when its area is also within
+// this share of the disc its rectangle holds: an L-shaped offcut fills its
+// square as little as a disc does, but not that disc.
 const ROUND_FILL = 0.86;
+const ROUND_AREA_TOLERANCE = 0.06;
+// The rectangle's centre is used for a centred design when it lies within
+// this of the material's deepest point, mm.
+const CENTRE_DEPTH_SLACK_MM = 1;
 // A centroid this far from the rectangle's centre gives the piece a heading.
 const HEADING_MIN_MM = 0.5;
 const HEADING_LENGTH_FRACTION = 0.02;
 
 export function findPieces(input: FindPiecesInput): DetectedPiece[] {
   const ppm = input.pixelsPerMm;
-  const image = pieceImage(input.image, ppm);
-  const mask = pieceMask(image, referencePixel(input));
+  const mask = pieceMask(input.image, ppm, referencePixel(input));
+  const visible = visibility(input.image);
   const minPixels = Math.max(1, input.minAreaMm2 * ppm * ppm);
-  const components = pieceComponents(mask, image.visible, CLEAN_RADIUS_MM * ppm, minPixels);
+  const radii = { openPx: OPEN_RADIUS_MM * ppm, closePx: CLOSE_RADIUS_MM * ppm };
+  const components = pieceComponents(mask, visible, radii, minPixels, ppm);
   const pieces = components.flatMap((component) => {
     const piece = toPiece(component, input.region, ppm);
     return piece === null ? [] : [piece];
   });
-  return inRows(pieces);
+  return withDoubts(inRows(pieces), mask.bedColour, mask.pieceColour);
 }
 
 function referencePixel(input: FindPiecesInput): PixelPoint | null {
@@ -79,6 +104,13 @@ function referencePixel(input: FindPiecesInput): PixelPoint | null {
   const y = (input.reference.y - input.region.y) * input.pixelsPerMm - 0.5;
   const inside = x >= 0 && y >= 0 && x <= input.image.width - 1 && y <= input.image.height - 1;
   return inside ? { x, y } : null;
+}
+
+function visibility(image: RgbaImage): Uint8Array {
+  const visible = new Uint8Array(image.width * image.height);
+  for (let i = 0; i < visible.length; i += 1)
+    visible[i] = (image.data[i * 4 + 3] ?? 0) === 0 ? 0 : 1;
+  return visible;
 }
 
 function toPiece(component: PieceComponent, region: BedArea, ppm: number): DetectedPiece | null {
@@ -95,15 +127,59 @@ function toPiece(component: PieceComponent, region: BedArea, ppm: number): Detec
     rect,
     areaMm2,
     centroid,
-    shape: shapeOf(rect, areaMm2),
+    // By the outer outline, so a ring is as round as the disc it was cut from.
+    shape: shapeOf(rect, Math.abs(polygonArea(outline))),
     headingDeg: headingOf(rect, centroid),
     partial: component.partial,
+    holes: component.holes.map((hole) => hole.map(toBed)),
+    ...placementPoint(component, rect, region, ppm),
+    colour: component.colour,
   };
+}
+
+function placementPoint(
+  component: PieceComponent,
+  rect: RotatedRect,
+  region: BedArea,
+  ppm: number,
+): Pick<DetectedPiece, 'onMaterial' | 'clearanceMm'> {
+  const toPixel = (p: Point): PixelPoint => ({
+    x: (p.x - region.x) * ppm,
+    y: (p.y - region.y) * ppm,
+  });
+  const centre = toPixel(rect.centre);
+  const atCentre = component.depthAt(centre);
+  if (atCentre >= component.depthPx - CENTRE_DEPTH_SLACK_MM * ppm) {
+    return { onMaterial: rect.centre, clearanceMm: atCentre / ppm };
+  }
+  let best = component.deepest[0] ?? centre;
+  for (const point of component.deepest) {
+    const nearer =
+      Math.hypot(point.x - centre.x, point.y - centre.y) <
+      Math.hypot(best.x - centre.x, best.y - centre.y);
+    if (nearer) best = point;
+  }
+  return {
+    onMaterial: { x: region.x + best.x / ppm, y: region.y + best.y / ppm },
+    clearanceMm: component.depthAt(best) / ppm,
+  };
+}
+
+function polygonArea(points: ReadonlyArray<Point>): number {
+  let twice = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    if (a !== undefined && b !== undefined) twice += a.x * b.y - b.x * a.y;
+  }
+  return twice / 2;
 }
 
 function shapeOf(rect: RotatedRect, areaMm2: number): PieceShape {
   if (rect.length / rect.width >= SQUARISH_RATIO) return 'oblong';
-  return areaMm2 / (rect.length * rect.width) < ROUND_FILL ? 'round' : 'square';
+  if (areaMm2 / (rect.length * rect.width) >= ROUND_FILL) return 'square';
+  const disc = (Math.PI * rect.length * rect.width) / 4;
+  return Math.abs(areaMm2 / disc - 1) <= ROUND_AREA_TOLERANCE ? 'round' : 'square';
 }
 
 function headingOf(rect: RotatedRect, centroid: Point): number | null {

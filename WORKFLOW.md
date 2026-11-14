@@ -9833,7 +9833,10 @@ Simulator-tested only; no real JCZ board has run this path.
   Start would stream them from Current Position, User Origin or Verified Origin; and the photo step
   refuses rings burned from another mode (naming it) or never seen to burn, asking for a Start at
   Absolute or Engrave target. If Machine Setup has changed since the target was added and no burn
-  was seen, the photo step says that instead, and asks for the target to be added again.
+  was seen, the photo step says that instead, and asks for the target to be added again. Adding
+  the target drops the project's Print and Cut marks in the same Undo step, as every generated
+  pattern does, so no registration moves the rings; rings a Start did burn through a registration
+  are refused at the photo step, naming it (ADR-443 Amendment 4).
 - **Warning / not homed.** While connected, the target step says to home first on a homing machine
   that is not homed, and on a machine without homing that the camera lines up only while the
   controller keeps its zero. Advice only: **Engrave target** stays available. A calibration whose
@@ -10151,7 +10154,7 @@ Simulator-tested only; no real JCZ board has run this path.
 - **Edge / watching a job.** **Larger view** in Camera settings toggles the panel between compact
   and wide monitoring widths, with the preference kept locally.
 
-### F-CAM9. Find pieces on the bed and place the design on each (ADR-442, Amendment 1)
+### F-CAM9. Find pieces on the bed and place the design on each (ADR-442, Amendments 1 and 2)
 
 - **Success / fill a batch of blanks.** With a saved calibration and a live camera, the operator
   lays out blanks, puts the design on one of them, selects it and presses **Find pieces** in the
@@ -10162,7 +10165,19 @@ Simulator-tested only; no real JCZ board has run this path.
 - **Success / design not on a piece.** The design is centred on each piece, its long side along
   the piece's long side, and the design itself moves to the first piece. A design already turned
   on the canvas is measured along its own turn, so it lies along the piece rather than keeping
-  its old angle (Amendment 1).
+  its old angle (Amendment 1). On an offcut whose rectangle's centre lies off the material (an L
+  in its notch, a ring in its hole) the design goes to the point of the material furthest from
+  its edges nearest that centre (Amendment 2).
+- **Edge / design does not fit a piece (Amendment 2).** A copy that would run more than 1 mm off
+  its piece, or into its hole, is left out of Place; the piece's row says how far, and the
+  message after Place names the pieces left out. When it fits none of them, nothing is placed and
+  the panel says to make the design smaller or put it on one of the pieces.
+- **Edge / doubtful piece (Amendment 2).** A piece whose colour is not like the other pieces'
+  (glare, a shadow, a mark on the bed), or that is far smaller or larger than a batch of
+  same-sized pieces (glare, or two blanks touching), is listed with the reason and starts
+  unticked; ticking it includes it. Scorch marks, old cuts and shadows darker than the bed are
+  never found as pieces, and blanks 1 mm or more apart are found one by one; coasters touching at
+  a point are cut apart.
 - **Edge / piece partly out of view.** It is listed and outlined but starts unticked, with the
   reason; ticking it includes it.
 - **Edge / different piece.** A piece of another shape, or more than 3 mm longer or wider than the
@@ -10180,7 +10195,7 @@ Simulator-tested only; no real JCZ board has run this path.
 - **Empty / no feed.** **Find pieces** is disabled without a live camera; without a calibration
   the section is absent.
 
-### F-CAM10. Print and Cut marks found by the camera (ADR-443, Amendment 1)
+### F-CAM10. Print and Cut marks found by the camera (ADR-443, Amendments 1 and 4)
 
 - **Success / register a printed sheet.** With Print and Cut on in Labs, a saved calibration and a
   live camera, the operator lays the printed sheet on the bed and sets the material height in the
@@ -10210,6 +10225,12 @@ Simulator-tested only; no real JCZ board has run this path.
 - **Edge / no pair.** When no two marks are the design's spacing apart (within 2 %), the points
   stay as they were and the dialog says how many mark-like shapes the camera saw, and what to
   check.
+- **Edge / mark partly covered (Amendment 4).** A mark partly under tape, a clip or a shadow is not
+  taken: its box sides may differ by at most 5 % of its size (2 px on a small mark), its dark
+  centre must lie within 5 % of its size from the box's centre, and each side within 10 % of the
+  design mark (plus 2 px). A mark 15 % or more covered is refused; about a tenth covered can pass
+  with its centre within 0.3 mm. The dialog then says the camera could not find both marks;
+  uncover the mark or use **Capture head**.
 - **Edge / trust changes.** After a reconnect, reset or frame change, the points must be captured
   again, as with head captures; **Find marks with camera** does it in one click.
 - **Empty / no selection or no feed.** **Use selected marks** without two selected objects says

@@ -2,7 +2,8 @@
 // design already sits on one piece, that piece is the sample: every other
 // piece gets a copy moved by the offset between the pieces' centres and
 // turned by the angle between them, so the design lands on each blank the way
-// it sits on the sample. Otherwise the design is centred on each piece, its
+// it sits on the sample. Otherwise the design is centred on each piece (on
+// its material, Amendment 2), its
 // own long side along the piece's long side, counting any turn the design
 // already has (amendment 1). Moves and turns only, never a scale. Pure core.
 
@@ -75,11 +76,14 @@ export function placementOn(
   sample: DetectedPiece | null,
 ): ArrayPlacement {
   if (sample === null) {
+    // On the material, not merely the rectangle's centre: an L-shaped or
+    // ring offcut's rectangle centre lies in its notch or hole (Amendment 2).
+    const target = piece.onMaterial ?? piece.rect.centre;
     return placement(
-      piece.rect.centre.x - design.centre.x,
-      piece.rect.centre.y - design.centre.y,
+      target.x - design.centre.x,
+      target.y - design.centre.y,
       alignedRotationDeg(piece, design),
-      piece.rect.centre,
+      target,
     );
   }
   return placement(
