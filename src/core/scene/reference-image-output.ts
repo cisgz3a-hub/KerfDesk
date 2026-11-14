@@ -4,7 +4,7 @@
 // left with Output off, so it shows without engraving until the operator turns
 // that on. An operation another object also uses keeps its Output: the capture
 // moves onto an output-off copy of it instead, so no other artwork stops.
-// ADR-570 Amendment 2 does the same for a stamp's source artwork, a whole
+// ADR-570 Amendment 3 does the same for a stamp's source artwork, a whole
 // selection at once.
 
 import { createArtworkOperation } from './artwork-operation';
@@ -27,7 +27,7 @@ export function withImageOutputOff(scene: Scene, imageId: string): Scene {
  * Keep these objects but stop them burning. An operation only they use has
  * its Output turned off; an operation other artwork also uses is copied once,
  * with Output off, and these objects move to the copy, so the other artwork
- * keeps burning (ADR-570 Amendment 2 for Prepare Stamp's sources).
+ * keeps burning (ADR-570 Amendment 3 for Prepare Stamp's sources).
  */
 export function withObjectsOutputOff(
   scene: Scene,

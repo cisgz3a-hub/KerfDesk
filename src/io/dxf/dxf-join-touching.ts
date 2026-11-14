@@ -17,12 +17,16 @@
 // A LINE drawn twice meets itself at both ends, but closed it would be a loop
 // with no area, which Kerf Offset drops. The shared pairing leaves such a chain
 // as it was (ADR-486 Amendment 4), so both LINEs import open and burn as drawn.
+// A chain that would close into a ring running back over part of itself (a
+// stick with a loop at its end, its ends meeting) stays apart too: closed,
+// Kerf Offset would cut the loop and drop the stick (ADR-486 Amendment 5).
 
 import {
   joinCurveEndpointsWithin,
   type JoinableCurve,
 } from '../../core/geometry/path-endpoint-join';
 import { ARC_CHORD_TOLERANCE_MM } from '../../core/geometry/arc-sampling';
+import { curveRetracedLineMm } from '../../core/geometry/zero-area-contour';
 import { flattenCurveSubpath, type CurveSubpath, type Polyline } from '../../core/scene';
 import { CLOSURE_EPS_MM } from '../../core/scene/polyline-closure';
 import type { ColoredPolyline } from './dxf-expand';
@@ -41,10 +45,11 @@ export function joinTouchingDxfPieces(
   if (open.length === 0) return pieces;
   const joined = joinCurveEndpointsWithin(open, DXF_JOIN_TOLERANCE_MM);
   if (joined.replacements.size === 0) return pieces;
+  const kept = partlyRetracedMembers(joined);
   const replaced = new Map<number, ColoredPolyline | null>();
   for (const [at, curve] of joined.replacements) {
     const source = open[at];
-    if (source === undefined) continue;
+    if (source === undefined || kept.has(at)) continue;
     const piece = pieces[source.index] as ColoredPolyline;
     replaced.set(source.index, curve === null ? null : joinedPiece(piece.color, curve));
   }
@@ -53,6 +58,19 @@ export function joinTouchingDxfPieces(
     if (replacement === undefined) return [piece];
     return replacement === null ? [] : [replacement];
   });
+}
+
+// The members of each chain that would close into a ring running back over
+// part of itself; they are left as they were.
+function partlyRetracedMembers(
+  joined: ReturnType<typeof joinCurveEndpointsWithin>,
+): ReadonlySet<number> {
+  const kept = new Set<number>();
+  for (const [leader, curve] of joined.replacements) {
+    if (curve === null || !curve.closed || curveRetracedLineMm(curve) <= 0) continue;
+    for (const member of joined.members.get(leader) ?? [leader]) kept.add(member);
+  }
+  return kept;
 }
 
 function joinedPiece(color: string, curve: CurveSubpath): ColoredPolyline {

@@ -25,9 +25,16 @@
 //
 // A hole narrower than twice the offset closes up and leaves no contour behind.
 // Those are counted (kerf-closed-up.ts) so Job Review can say what is missing.
+//
+// A contour can also lose only a stretch: where it runs back over itself (a
+// "P" whose closing line runs down its stem), or where two of its sides come
+// closer than the kerf and it shrinks. Each contour is compared with its
+// offset, and the line with no offset line near it is named with its object
+// (ADR-486 Amendment 5, dropped-contour-line.ts).
 
 import { toMachineCoords, type DeviceProfile } from '../devices';
 import { laserArcMovesEnabled } from '../devices/laser-arc-moves';
+import { partlyDroppedLineMm } from '../geometry/dropped-contour-line';
 import { offsetClosedPolylinesForKerfChecked } from '../geometry/kerf-offset';
 import { closedContourEnclosesNoArea } from '../geometry/zero-area-contour';
 import {
@@ -85,7 +92,12 @@ export type LayerKerfResult = LineSegmentsWithTabs & {
   /** Closed contours that enclose no area (a line drawn twice, a path out and
    * back), which the offset drops on either side (ADR-486 Amendment 4). */
   readonly noArea: number;
+  /** Closed contours kept only in part, by scene contour (ADR-486 Amendment 5). */
+  readonly droppedLine: ReadonlyArray<KerfDroppedLine>;
 };
+
+/** Line of one closed contour the offset left uncut, counted once where it retraces. */
+export type KerfDroppedLine = { readonly sceneContour?: string; readonly lengthMm: number };
 
 // For each ring of a path: how many rings of other paths enclose it, and how
 // many rings on the layer enclose it in all.
@@ -141,7 +153,9 @@ export function withLayerKerf(
   contextDepths?: ReadonlyMap<Polyline, KerfContextDepth>,
 ): LayerKerfResult {
   const pending = collected.kerf;
-  if (pending.length === 0) return { ...collected, failed: false, closedUp: 0, noArea: 0 };
+  if (pending.length === 0) {
+    return { ...collected, failed: false, closedUp: 0, noArea: 0, droppedLine: [] };
+  }
   const rings = pending.map((group) => group.sources.map((source) => source.polyline));
   const depths =
     contextDepths === undefined
@@ -156,12 +170,16 @@ export function withLayerKerf(
   let failed = false;
   let closedUp = 0;
   let noArea = 0;
+  const droppedLine: KerfDroppedLine[] = [];
   const offsets = pending.map((group, index): OffsetContours => {
     const sources = rings[index] ?? [];
     const offset = offsetGroup(sources, depths[index] ?? NO_DEPTHS, layer.kerfOffsetMm);
     if (offset === null) failed = true;
     closedUp += offset?.closedUp ?? 0;
     noArea += offset?.noArea ?? 0;
+    if (offset !== null) {
+      droppedLine.push(...droppedLineOf(group.sources, offset.rings, layer.kerfOffsetMm));
+    }
     const started = startKerfRingsAtSources(offset?.rings ?? [], sources, layer.kerfOffsetMm);
     const leadSources = kerfLeadSources(started, group.sources, layer.kerfOffsetMm);
     return {
@@ -173,7 +191,35 @@ export function withLayerKerf(
       tabs: placedTabPointsForKerfContours(started, group.sources),
     };
   });
-  return { ...interleave(collected, pending, offsets), failed, closedUp, noArea };
+  return { ...interleave(collected, pending, offsets), failed, closedUp, noArea, droppedLine };
+}
+
+// A source point is cut when an offset line passes within three offsets of it:
+// a mitred corner, the furthest a correct offset strays, is under two. A run of
+// at least 1 mm, and ten offsets, counts, so a sharp notch the offset fills is
+// not named (ADR-486 Amendment 5).
+function droppedLineOf(
+  sources: ReadonlyArray<KerfSource>,
+  offset: ReadonlyArray<Polyline>,
+  kerfOffsetMm: number,
+): KerfDroppedLine[] {
+  const kerf = Math.abs(kerfOffsetMm);
+  if (!Number.isFinite(kerf) || kerf === 0) return [];
+  const minRunMm = Math.max(1, 10 * kerf);
+  const lengths = partlyDroppedLineMm(
+    sources.map((source) => source.polyline.points),
+    offset.map((ring) => ring.points),
+    { reachMm: 3 * kerf + 0.002, minRunMm },
+  );
+  return sources.flatMap((source, index) => {
+    const lengthMm = lengths[index] ?? 0;
+    if (lengthMm < minRunMm / 2) return [];
+    return [
+      source.sceneContour === undefined
+        ? { lengthMm }
+        : { sceneContour: source.sceneContour, lengthMm },
+    ];
+  });
 }
 
 // Each offset contour carries the scene contour it was offset from, when its
@@ -192,10 +238,12 @@ function kerfLeadSources(
   return owners.map((owner) => sources[owner]?.leadSource);
 }
 
-/** What the offset lost, for Job Review: a failure, or holes it closed up. */
+/** What the offset lost, for Job Review: a failure, holes it closed up, and
+ * contours it dropped in whole or in part. `nameOf` names a scene contour's object. */
 export function layerKerfDiagnostics(
   result: LayerKerfResult,
   layer: Layer,
+  nameOf: (sceneContour: string | undefined) => string = () => '',
 ): ReadonlyArray<JobDiagnostic> {
   const diagnostics: JobDiagnostic[] = [];
   if (result.failed) diagnostics.push({ kind: 'kerf-offset-failed', layerName: layer.name });
@@ -209,6 +257,17 @@ export function layerKerfDiagnostics(
   }
   if (result.noArea > 0) {
     diagnostics.push({ kind: 'kerf-offset-no-area', layerName: layer.name, count: result.noArea });
+  }
+  if (result.droppedLine.length > 0) {
+    diagnostics.push({
+      kind: 'kerf-offset-dropped-line',
+      layerName: layer.name,
+      kerfOffsetMm: layer.kerfOffsetMm,
+      parts: result.droppedLine.map((dropped) => ({
+        name: nameOf(dropped.sceneContour),
+        lengthMm: dropped.lengthMm,
+      })),
+    });
   }
   return diagnostics;
 }

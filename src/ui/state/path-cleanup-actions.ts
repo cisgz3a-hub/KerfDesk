@@ -13,7 +13,8 @@ import {
   retracesItself,
   reversePaths,
 } from '../../core/geometry/path-direction-edits';
-import { retracedPathsNote } from './retraced-paths-note';
+import { subpathRetracedLineMm } from '../../core/geometry/zero-area-contour';
+import { partlyRetracedNote, retracedPathsNote } from './retraced-paths-note';
 import {
   closePathsWithinTolerance,
   type CloseToleranceMode,
@@ -50,14 +51,16 @@ export function pathCleanupActions(set: Setter): PathCleanupActions {
       set((state) => {
         let longestGapMm = 0;
         let retraced = 0;
+        const partly = new PartlyRetraced();
         const edit = editSelectedPaths(state, 'close', (object) => {
           retraced += retracedPolylines(object.paths, object.transform);
           const result = closeOpenPaths(object.paths, object.transform);
           longestGapMm = Math.max(longestGapMm, result.longestGapMm);
+          partly.add(object.paths, result.paths, object.transform);
           return { paths: result.paths, count: result.closed };
         });
         const message = closeMessage(edit.count, longestGapMm, skippedOpenObjects(state));
-        toast(
+        partly.toast(
           edit.count === 0 && retraced > 0
             ? retracedPathsNote(retraced)
             : withNote(message, retraced),
@@ -68,6 +71,7 @@ export function pathCleanupActions(set: Setter): PathCleanupActions {
       set((state) => {
         let remaining = 0;
         let retraced = 0;
+        const partly = new PartlyRetraced();
         const edit = editSelectedPaths(state, 'close', (object) => {
           retraced += retracedPolylines(object.paths, object.transform);
           const result = closePathsWithinTolerance(
@@ -77,6 +81,7 @@ export function pathCleanupActions(set: Setter): PathCleanupActions {
             mode,
           );
           remaining += result.remaining;
+          partly.add(object.paths, result.paths, object.transform);
           return { paths: result.paths, count: result.closed };
         });
         const left =
@@ -90,7 +95,7 @@ export function pathCleanupActions(set: Setter): PathCleanupActions {
               ? retracedPathsNote(retraced)
               : closeMessage(0, 0, skippedOpenObjects(state)),
           );
-        } else toast(withNote(`${done}${left}`, retraced));
+        } else partly.toast(withNote(`${done}${left}`, retraced));
         return edit.state;
       }),
     reverseSelectedPaths: () =>
@@ -273,6 +278,41 @@ function retracedPolylines(paths: ReadonlyArray<ColoredPath>, transform: Transfo
       sum + path.polylines.filter((_, index) => retracesItself(path, index, transform)).length,
     0,
   );
+}
+
+// ADR-486 Amendment 5: paths the edit closed whose closing line runs back over
+// part of their own line. They stay closed, as asked; the toast warns.
+class PartlyRetraced {
+  private count = 0;
+  private lengthMm = 0;
+
+  add(
+    before: ReadonlyArray<ColoredPath>,
+    after: ReadonlyArray<ColoredPath>,
+    transform: Transform,
+  ): void {
+    for (const [pathIndex, path] of before.entries()) {
+      const next = after[pathIndex];
+      if (next === undefined || next === path) continue;
+      for (const [index, polyline] of path.polylines.entries()) {
+        if (polyline.closed || next.polylines[index]?.closed !== true) continue;
+        const lengthMm = subpathRetracedLineMm(next, index, transform);
+        if (lengthMm <= 0) continue;
+        this.count += 1;
+        this.lengthMm += lengthMm;
+      }
+    }
+  }
+
+  toast(message: string): void {
+    if (this.count === 0) {
+      toast(message);
+      return;
+    }
+    useToastStore
+      .getState()
+      .pushToast(`${message} ${partlyRetracedNote(this.count, this.lengthMm)}`, 'warning');
+  }
 }
 
 function withNote(message: string, retraced: number): string {

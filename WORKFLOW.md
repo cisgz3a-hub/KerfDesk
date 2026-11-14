@@ -1344,7 +1344,7 @@ that owns those fields, without changing the existing Frame/Start policy.
 7. For a photo or any artwork that is not a plate with holes, **Tools → Prepare Stamp** (F-A7e3)
    makes a tapered height image instead.
 
-### F-A7e3. Prepare Stamp: a tapered height image from artwork (ADR-570 Amendment 2)
+### F-A7e3. Prepare Stamp: a tapered height image from artwork (ADR-570 Amendment 3)
 
 **Success**:
 1. Select one raster image, or closed vector artwork only. The menu item stays disabled for open

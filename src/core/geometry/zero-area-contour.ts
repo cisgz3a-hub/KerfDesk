@@ -21,6 +21,7 @@ import {
   type Transform,
   type Vec2,
 } from '../scene';
+import { partlyDroppedLineMm } from './dropped-contour-line';
 import { normalizeClosedPolylinesEvenOddChecked } from './polygon-difference';
 
 // A contour whose shoelace area exceeds its perimeter times this half-width is
@@ -40,6 +41,15 @@ export function curveEnclosesNoArea(curve: CurveSubpath): boolean {
   return flattened.kind === 'ok' && closedContourEnclosesNoArea(flattened.polyline.points);
 }
 
+/** The line (millimetres, counted once) `curve` (world millimetres), closed, runs back over. */
+export function curveRetracedLineMm(curve: CurveSubpath): number {
+  const flattened = flattenCurveSubpath(curve, {
+    toleranceMm: FLATTEN_TOLERANCE_MM,
+    segmentBudget: FLATTEN_BUDGET,
+  });
+  return flattened.kind === 'ok' ? retracedLineMm(flattened.polyline.points) : 0;
+}
+
 /**
  * Whether subpath `index` of `path`, closed and placed by `transform`, encloses
  * no area. Reads the exact curve when the path has one, in world millimetres:
@@ -51,9 +61,64 @@ export function subpathEnclosesNoArea(
   index: number,
   transform: Transform,
 ): boolean {
+  const points = worldSubpathPoints(path, index, transform);
+  return points !== undefined && closedContourEnclosesNoArea(points);
+}
+
+/**
+ * How much line (world millimetres, counted once) subpath `index` of `path`,
+ * closed, runs back over: the stretch Kerf Offset would not cut (ADR-486
+ * Amendment 5). 0 when none, or when the whole ring encloses no area.
+ */
+export function subpathRetracedLineMm(
+  path: ColoredPath,
+  index: number,
+  transform: Transform,
+): number {
+  const points = worldSubpathPoints(path, index, transform);
+  return points === undefined ? 0 : retracedLineMm(points);
+}
+
+// A stretch counts once it is 1 mm of contour (half a millimetre retraced),
+// the kerf warning's own floor. The even-odd outline's edges lie on the
+// ring's own, within the engine's 1 µm grid.
+const RETRACED = { reachMm: 0.005, minRunMm: 1 } as const;
+
+/**
+ * The line (millimetres, counted once) of closed ring `points` that the
+ * even-odd reading leaves without an edge: where the ring runs back over
+ * itself. 0 when none, or when the whole ring encloses no area.
+ */
+export function retracedLineMm(points: ReadonlyArray<Vec2>): number {
+  if (points.length < 3) return 0;
+  const normalized = normalizeClosedPolylinesEvenOddChecked([{ points, closed: true }]);
+  if (normalized.kind !== 'ok') return 0;
+  const rings = normalized.value.map((ring) => ring.points);
+  // Most rings keep every edge, so their even-odd outline is as long as they are.
+  const kept = rings.reduce((sum, ring) => sum + ringLength(ring), 0);
+  if (kept >= ringLength(points) - RETRACED.minRunMm / 2) return 0;
+  return partlyDroppedLineMm([points], rings, RETRACED)[0] ?? 0;
+}
+
+function ringLength(points: ReadonlyArray<Vec2>): number {
+  let length = 0;
+  for (const [index, a] of points.entries()) {
+    const b = points[(index + 1) % points.length] as Vec2;
+    length += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  return length;
+}
+
+// The subpath's points in world millimetres, flattened from its exact curve
+// when it has one; undefined when it cannot be read.
+function worldSubpathPoints(
+  path: ColoredPath,
+  index: number,
+  transform: Transform,
+): ReadonlyArray<Vec2> | undefined {
   const curve = path.curves?.[index];
   const scale = Math.max(Math.abs(transform.scaleX), Math.abs(transform.scaleY));
-  if (!(scale > 0) || !Number.isFinite(scale)) return false;
+  if (!(scale > 0) || !Number.isFinite(scale)) return undefined;
   let local = path.polylines[index]?.points;
   if (curve !== undefined) {
     const flattened = flattenCurveSubpath(curve, {
@@ -62,8 +127,7 @@ export function subpathEnclosesNoArea(
     });
     local = flattened.kind === 'ok' ? flattened.polyline.points : undefined;
   }
-  if (local === undefined) return false;
-  return closedContourEnclosesNoArea(local.map((point) => applyTransform(point, transform)));
+  return local?.map((point) => applyTransform(point, transform));
 }
 
 /** Whether `points`, read as a closed ring, encloses no area under the even-odd rule. */
