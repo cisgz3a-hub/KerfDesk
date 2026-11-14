@@ -22,6 +22,7 @@ import { JobWatchSection } from '../job-watch/JobWatchSection';
 import { jobWatchWantsCamera, useJobWatchStore } from '../job-watch/job-watch-store';
 import { startRememberedCamera } from '../helpers/auto-start';
 import { CameraFold } from './CameraFold';
+import { CameraElsewhereNotice } from './CameraElsewhereNotice';
 import { CameraMovedNotice } from './CameraMovedNotice';
 import { CameraPreviewCard } from './CameraPreviewCard';
 import { CameraSettingsView } from './CameraSettingsView';
@@ -58,6 +59,7 @@ function CameraPanelOpen(): JSX.Element {
       {view === 'main' ? (
         <>
           <CameraPreviewCard onChooseCamera={() => setView('settings')} />
+          <CameraElsewhereNotice />
           <CameraMovedNotice />
           <CameraSetupCallout />
           <OverlayControls />

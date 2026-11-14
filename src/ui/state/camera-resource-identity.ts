@@ -29,6 +29,73 @@ export async function cameraQueryFingerprint(raw: string): Promise<string | unde
   }
 }
 
+// ADR-692 Amendment 3 (the maintainer's choices on camera audit v2 K5-P3-3
+// and K5r-P3-4): a calibration of a network camera follows the same camera at
+// the same address to another computer. The keyed fingerprint above never
+// leaves this computer, so beside it a calibration keeps a portable one: a
+// slow, fixed-salt PBKDF2 hash of the address without its login, so the path
+// and query count (two channels of one recorder differ only there) without
+// being revealed, and a changed password does not change it.
+const PORTABLE_SALT = 'kerfdesk.camera.identity.v1';
+const PORTABLE_ITERATIONS = 200_000;
+const LOGIN_FIELD = /^(?:user|usr|username|login|pass|password|pwd|passwd|passwort)$/i;
+const LOGIN_IN_PATH = /(^|[_&;])(?:user|usr|username|login|pass|password|pwd|passwd)=[^_&;/]*/gi;
+
+/** `raw` with every login removed: userinfo, login-shaped query fields and path fields. */
+export function cameraAddressWithoutLogin(raw: string): string {
+  const url = new URL(raw.trim());
+  const kept = [...url.searchParams].filter(([name]) => !LOGIN_FIELD.test(name));
+  const search = kept.length === 0 ? '' : `?${new URLSearchParams(kept).toString()}`;
+  const path = url.pathname
+    .split('/')
+    .map((segment) => segment.replace(LOGIN_IN_PATH, '$1').replace(/^[_&;]+|[_&;]+$/g, ''))
+    .join('/');
+  return `${url.protocol}//${url.host}${path}${search}`;
+}
+
+/** The camera's identity that travels with its calibration; undefined without secure crypto. */
+export async function cameraPortableFingerprint(raw: string): Promise<string | undefined> {
+  try {
+    const subtle = globalThis.crypto?.subtle;
+    if (subtle === undefined) return undefined;
+    const encoder = new TextEncoder();
+    const material = await subtle.importKey(
+      'raw',
+      encoder.encode(cameraAddressWithoutLogin(raw.trim())),
+      'PBKDF2',
+      false,
+      ['deriveBits'],
+    );
+    const bits = await subtle.deriveBits(
+      {
+        name: 'PBKDF2',
+        hash: 'SHA-256',
+        salt: encoder.encode(PORTABLE_SALT),
+        iterations: PORTABLE_ITERATIONS,
+      },
+      material,
+      256,
+    );
+    return `pbkdf2-sha256:${hex(new Uint8Array(bits))}`;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Both identities of a network camera, as a camera source carries them. */
+export async function cameraIdentityFingerprints(
+  raw: string,
+): Promise<{ readonly queryFingerprint?: string; readonly portableFingerprint?: string }> {
+  const [queryFingerprint, portableFingerprint] = await Promise.all([
+    cameraQueryFingerprint(raw),
+    cameraPortableFingerprint(raw),
+  ]);
+  return {
+    ...(queryFingerprint === undefined ? {} : { queryFingerprint }),
+    ...(portableFingerprint === undefined ? {} : { portableFingerprint }),
+  };
+}
+
 function loadOrCreateKey(): string {
   let stored: string | null;
   try {

@@ -9,6 +9,9 @@ export type CameraCaptureBinding = {
   // App-keyed network resource identity, including an explicitly empty query.
   // Absent for USB, ambiguous legacy bindings, or unavailable secure identity.
   readonly queryFingerprint?: string;
+  // The same camera's identity on any computer: a slow hash of its address
+  // without its login (ADR-692 Amendment 3). Absent in older files.
+  readonly portableFingerprint?: string;
   readonly width: number;
   readonly height: number;
   readonly resizeMode: 'none' | 'crop-and-scale' | 'unknown';
@@ -25,7 +28,7 @@ export function normalizeCameraCaptureBinding(value: unknown): CameraCaptureBind
   const raw = value as Record<string, unknown>;
   const sourceKind = normalizeSourceKind(raw.sourceKind);
   const sourceId = nonEmptyString(raw.sourceId);
-  const queryFingerprint = normalizeQueryFingerprint(raw.queryFingerprint);
+  const fingerprints = normalizeFingerprints(raw);
   const width = finitePositive(raw.width);
   const height = finitePositive(raw.height);
   const resizeMode = normalizeResizeMode(raw.resizeMode);
@@ -33,7 +36,7 @@ export function normalizeCameraCaptureBinding(value: unknown): CameraCaptureBind
     raw.version !== 1 ||
     sourceKind === undefined ||
     sourceId === undefined ||
-    (raw.queryFingerprint !== undefined && queryFingerprint === undefined) ||
+    fingerprints === undefined ||
     width === undefined ||
     height === undefined ||
     resizeMode === undefined
@@ -47,8 +50,46 @@ export function normalizeCameraCaptureBinding(value: unknown): CameraCaptureBind
     width,
     height,
     resizeMode,
-    ...(queryFingerprint === undefined ? {} : { queryFingerprint }),
+    ...fingerprints,
   };
+}
+
+// A network camera's identities; undefined when a keyed one is malformed. A
+// malformed portable one is dropped: the keyed one still names the camera.
+function normalizeFingerprints(
+  raw: Record<string, unknown>,
+): Pick<CameraCaptureBinding, 'queryFingerprint' | 'portableFingerprint'> | undefined {
+  const queryFingerprint = normalizeQueryFingerprint(raw.queryFingerprint);
+  if (raw.queryFingerprint !== undefined && queryFingerprint === undefined) return undefined;
+  const portableFingerprint = normalizePortableFingerprint(raw.portableFingerprint);
+  return {
+    ...(queryFingerprint === undefined ? {} : { queryFingerprint }),
+    ...(portableFingerprint === undefined ? {} : { portableFingerprint }),
+  };
+}
+
+function normalizePortableFingerprint(value: unknown): string | undefined {
+  return typeof value === 'string' && /^pbkdf2-sha256:[0-9a-f]{64}$/.test(value)
+    ? value
+    : undefined;
+}
+
+/**
+ * How two network identities compare (ADR-692 Amendment 3): `same` by this
+ * computer's keyed fingerprint; `elsewhere` when only the portable one
+ * agrees (another computer, or a changed password); `different`; or
+ * `unknown` when neither can be compared.
+ */
+export function networkIdentityMatch(
+  saved: Pick<CameraCaptureBinding, 'queryFingerprint' | 'portableFingerprint'>,
+  current: Pick<CameraCaptureBinding, 'queryFingerprint' | 'portableFingerprint'>,
+): 'same' | 'elsewhere' | 'different' | 'unknown' {
+  const keyed = saved.queryFingerprint !== undefined && current.queryFingerprint !== undefined;
+  if (keyed && saved.queryFingerprint === current.queryFingerprint) return 'same';
+  const portable =
+    saved.portableFingerprint !== undefined && current.portableFingerprint !== undefined;
+  if (portable && saved.portableFingerprint === current.portableFingerprint) return 'elsewhere';
+  return keyed || portable ? 'different' : 'unknown';
 }
 
 export function cameraBindingCompatibility(
@@ -59,13 +100,13 @@ export function cameraBindingCompatibility(
   if (!sameCameraSource(saved, current)) {
     return 'source-mismatch';
   }
-  if (
-    current.sourceKind !== 'usb' &&
-    (saved.queryFingerprint === undefined || current.queryFingerprint === undefined)
-  ) {
-    return 'unbound';
+  if (current.sourceKind !== 'usb') {
+    const identity = networkIdentityMatch(saved, current);
+    if (identity === 'unknown') return 'unbound';
+    if (identity === 'different') return 'source-mismatch';
+  } else if (saved.queryFingerprint !== current.queryFingerprint) {
+    return 'source-mismatch';
   }
-  if (saved.queryFingerprint !== current.queryFingerprint) return 'source-mismatch';
   if (!captureGeometryMatches(saved, current)) return 'geometry-mismatch';
   return 'match';
 }

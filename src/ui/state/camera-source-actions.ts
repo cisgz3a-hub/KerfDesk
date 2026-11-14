@@ -4,7 +4,7 @@
 // bridge-proxied machine camera).
 
 import type { CameraAdapter, CameraBridgeAdapter } from '../../platform/types';
-import { cameraQueryFingerprint } from './camera-resource-identity';
+import { cameraIdentityFingerprints } from './camera-resource-identity';
 import { publicCameraSourceId, type ActiveCameraSource } from '../camera/frame-source';
 import {
   handleUsbStatus,
@@ -39,6 +39,7 @@ export type MachineCameraState =
       readonly cameraUrl: string;
       readonly proxyFrameUrl: string;
       readonly queryFingerprint?: string;
+      readonly portableFingerprint?: string;
     }
   | { readonly kind: 'not-found' }
   // The bridge is missing/unreachable; `reason` says how to start it.
@@ -132,14 +133,14 @@ function makeDetectMachineCamera(set: CameraSourceSet): CameraSourceActions['det
     const result = await bridge.discoverMachineCamera();
     if (request !== latestRequest) return;
     if (result.kind === 'found') {
-      const queryFingerprint = await cameraQueryFingerprint(result.cameraUrl);
+      const fingerprints = await cameraIdentityFingerprints(result.cameraUrl);
       if (request !== latestRequest) return;
       set({
         machineCamera: {
           kind: 'found',
           cameraUrl: result.cameraUrl,
           proxyFrameUrl: result.proxyFrameUrl,
-          ...(queryFingerprint === undefined ? {} : { queryFingerprint }),
+          ...fingerprints,
         },
       });
       return;
@@ -175,6 +176,9 @@ function makeActivateMachineCamera(
           ...(machine.queryFingerprint === undefined
             ? {}
             : { queryFingerprint: machine.queryFingerprint }),
+          ...(machine.portableFingerprint === undefined
+            ? {}
+            : { portableFingerprint: machine.portableFingerprint }),
         },
       },
     });
@@ -261,9 +265,9 @@ function makeStartRtspSource(
       });
       return;
     }
-    const [frame, queryFingerprint] = await Promise.all([
+    const [frame, fingerprints] = await Promise.all([
       bridge.registerFrameSource(url),
-      cameraQueryFingerprint(url),
+      cameraIdentityFingerprints(url),
     ]);
     if (get().sourceEpoch !== epoch) return;
     if (frame.kind !== 'ok') {
@@ -281,7 +285,7 @@ function makeStartRtspSource(
           ? { kind: 'unmonitored', advisory: UNMONITORED_RTSP_ADVISORY }
           : { kind: 'monitored', streamSessionId: probe.streamSessionId },
       sourceId: publicCameraSourceId(url),
-      ...(queryFingerprint === undefined ? {} : { queryFingerprint }),
+      ...fingerprints,
     };
     set({
       sourceState: {

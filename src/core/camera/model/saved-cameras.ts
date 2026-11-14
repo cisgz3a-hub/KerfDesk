@@ -7,13 +7,17 @@
 // still read; the others sit in `otherCameraModels`. Pure core.
 
 import type { DeviceProfile } from '../../devices/device-profile';
-import { sameCameraSource, type CameraCaptureBinding } from '../camera-capture-binding';
+import {
+  networkIdentityMatch,
+  sameCameraSource,
+  type CameraCaptureBinding,
+} from '../camera-capture-binding';
 import { normalizeCameraModelRecord, type CameraModelRecord } from './camera-model-record';
 
 /** What names one camera: its kind, id and, for network cameras, its query. */
 export type CameraSourceIdentity = Pick<
   CameraCaptureBinding,
-  'sourceKind' | 'sourceId' | 'queryFingerprint'
+  'sourceKind' | 'sourceId' | 'queryFingerprint' | 'portableFingerprint'
 >;
 
 type SavedCameraFields = Pick<DeviceProfile, 'cameraModel' | 'otherCameraModels'>;
@@ -38,7 +42,30 @@ export function modelBelongsTo(model: CameraModelRecord, source: CameraSourceIde
   return (
     saved !== undefined &&
     sameCameraSource(saved, source) &&
-    (source.sourceKind === 'usb' || saved.queryFingerprint === source.queryFingerprint)
+    (source.sourceKind === 'usb' || matchesNetworkCamera(saved, source))
+  );
+}
+
+// The same network camera: by this computer's fingerprint, or by the portable
+// one when the calibration was made elsewhere (ADR-692 Amendment 3). Two
+// calibrations both saved without fingerprints still match, as before.
+function matchesNetworkCamera(saved: CameraCaptureBinding, source: CameraSourceIdentity): boolean {
+  const identity = networkIdentityMatch(saved, source);
+  if (identity === 'unknown') return saved.queryFingerprint === source.queryFingerprint;
+  return identity !== 'different';
+}
+
+/** True when `model` belongs to `source` only by the portable identity: made on another computer. */
+export function modelFromElsewhere(
+  model: CameraModelRecord,
+  source: CameraSourceIdentity,
+): boolean {
+  const saved = model.capture;
+  return (
+    saved !== undefined &&
+    source.sourceKind !== 'usb' &&
+    sameCameraSource(saved, source) &&
+    networkIdentityMatch(saved, source) === 'elsewhere'
   );
 }
 

@@ -27,6 +27,7 @@ export type ActiveCameraSource =
       readonly frameUrl: string;
       readonly cameraUrl: string;
       readonly queryFingerprint?: string;
+      readonly portableFingerprint?: string;
       /** How often to fetch a new picture; the embedded-camera pace when absent. */
       readonly pollIntervalMs?: number;
     }
@@ -41,6 +42,7 @@ export type ActiveCameraSource =
         | { readonly kind: 'unmonitored'; readonly advisory: string };
       readonly sourceId: string;
       readonly queryFingerprint?: string;
+      readonly portableFingerprint?: string;
     };
 
 export function cameraCaptureBindingForFrame(
@@ -63,9 +65,9 @@ export function cameraSourceIdentity(source: ActiveCameraSource): CameraSourceId
     case 'usb':
       return { sourceKind: 'usb', sourceId: source.stream.sourceId };
     case 'machine-jpeg':
-      return networkIdentity('machine-jpeg', source.cameraUrl, source.queryFingerprint);
+      return networkIdentity('machine-jpeg', source.cameraUrl, source);
     case 'machine-rtsp':
-      return networkIdentity('machine-rtsp', source.sourceId, source.queryFingerprint);
+      return networkIdentity('machine-rtsp', source.sourceId, source);
     default:
       return assertNever(source, 'camera source');
   }
@@ -78,12 +80,14 @@ export function publicCameraSourceId(raw: string): string {
 function networkIdentity(
   sourceKind: 'machine-jpeg' | 'machine-rtsp',
   rawId: string,
-  queryFingerprint: string | undefined,
+  fingerprints: { readonly queryFingerprint?: string; readonly portableFingerprint?: string },
 ): CameraSourceIdentity {
+  const { queryFingerprint, portableFingerprint } = fingerprints;
   return {
     sourceKind,
     sourceId: publicCameraSourceId(rawId),
     ...(queryFingerprint === undefined ? {} : { queryFingerprint }),
+    ...(portableFingerprint === undefined ? {} : { portableFingerprint }),
   };
 }
 
