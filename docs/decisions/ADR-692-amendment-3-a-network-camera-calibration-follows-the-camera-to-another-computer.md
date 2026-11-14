@@ -73,4 +73,10 @@ The maintainer chose the following:
 
 `src/ui/camera/panel/CameraElsewhereNotice.test.tsx`: the notice shows for a calibration made
 elsewhere, goes once a check keeps a view here, and stays away for a calibration made on this
-computer. Existing camera binding, saved-camera and identity tests are unchanged and pass.
+computer.
+
+`src/ui/state/camera-query-binding.test.ts` now expects the new rule: a lost app-local key
+matches the same camera and address by the portable identity, and another channel still does not.
+Its legacy fixture drops both fingerprints. `camera-store.test.ts` expects the portable identity
+on found and RTSP sources. The other camera binding, saved-camera and identity tests are unchanged
+and pass.
