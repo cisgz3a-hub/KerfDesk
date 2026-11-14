@@ -7,6 +7,7 @@ import type { CameraCaptureBinding } from '../../../core/camera/camera-capture-b
 import type { CameraBedFrame } from '../../../core/camera/model/camera-bed-frame';
 import { savedMarkErrors, type BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
+import { headCameraBandEstimateMm } from '../../../core/camera/model/head-camera-estimate';
 import type { Vec2 } from '../../../core/scene';
 import type {
   BedCalibration,
@@ -151,6 +152,15 @@ export function calibrationGrade(record: CameraModelRecord): CalibrationGrade {
 // millimetres off, and the grade said "Accurate enough" for all of it. Good
 // now means the whole bed the camera sees (ADR-441 Amendment 9).
 function goodOnTheRings(record: CameraModelRecord, advice: string | null): CalibrationGrade {
+  // A head camera's rings sit in the middle of its picture; the stitch uses 80 % of it.
+  const band = headCameraBandEstimateMm(record);
+  if (band !== null && band > GOOD_EXTRAPOLATED_MM) {
+    return {
+      tone: 'fair',
+      headline: `Accurate on the target; elsewhere in the picture the stitch uses, up to about ${roundToTenth(band)} mm off.`,
+      advice,
+    };
+  }
   const offTarget = offTargetEstimate(record);
   if (offTarget !== null && offTarget.worstMm > GOOD_EXTRAPOLATED_MM) {
     return {
@@ -173,7 +183,12 @@ function extrapolationAdvice(record: CameraModelRecord): string | null {
   const large = offTarget !== null && offTarget.worstMm > GOOD_EXTRAPOLATED_MM;
   if ((share === null || share < EXTRAPOLATED_SHARE) && !large) return null;
   if (record.mount?.kind === 'head') {
-    return `About ${Math.round((share ?? 0) * 100)} % of the picture lies outside the target. The accuracy is measured on its rings; elsewhere the picture is estimated. A larger target size measures more of it.`;
+    const band = headCameraBandEstimateMm(record);
+    const figure =
+      band === null
+        ? ''
+        : `, and may be up to about ${roundToTenth(band)} mm off where the stitch uses it`;
+    return `About ${Math.round((share ?? 0) * 100)} % of the picture lies outside the target. The accuracy is measured on its rings; elsewhere the picture is estimated${figure}. A larger target size measures more of it.`;
   }
   const outside = outsideSentence(share);
   const estimate =

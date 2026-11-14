@@ -1,6 +1,6 @@
 ## ADR-441 Amendment 11 - The off-target estimate is a bound past the rings, and a whole-bed sheet is believed (2026-11-14)
 
-**Status:** Accepted (camera audit v2 findings K1-P1-1 and K1-P2-1, confirmed by the area's
+**Status:** Accepted (camera audit v2 findings K1-P1-1, K1-P2-1 and K1-P3-1, raised to P2, confirmed by the area's
 independent refuter and the audit coordinator on main `ba08a81af`; the maintainer's standing
 instruction to fix confirmed audit findings). Amends Amendment 9's estimate (Decision 1), its
 promised range, and the larger-sheet advice. | **Date:** 2026-11-14
@@ -48,6 +48,11 @@ promised range, and the larger-sheet advice. | **Date:** 2026-11-14
      phone straight down with and without a typed height.
 6. **The larger-sheet advice is not given when the target already reaches within 15 mm of every bed
    edge.**
+7. **A head camera is estimated over the band its stitch uses** (the middle 80 % of the picture),
+   with the same alternatives and floor (`head-camera-estimate.ts`). Over 1.5 mm it grades fair:
+   "Accurate on the target; elsewhere in the picture the stitch uses, up to about N mm off", and the
+   advice gives the figure. Its ring figures read 0.00–0.01 mm on 20 small rings in the middle,
+   while the band was up to 3.4 mm off on a tilted barrel lens.
 
 ### Consequences
 
@@ -75,5 +80,9 @@ promised range, and the larger-sheet advice. | **Date:** 2026-11-14
   limit.
 - `src/core/camera/model/extrapolation-estimate.test.ts`: the earlier 1280 × 720 cameras, now within
   a factor of three.
+- `src/core/camera/model/head-camera-estimate.test.ts`: the refuter's head camera (8.5° tilt, Brown
+  k1 −0.30, 70 mm up) on the 40 mm head target. The band is over 1.5 mm off in truth; the estimate
+  is over the limit and at least 0.66 times the truth. Over four head cameras in the audit's
+  harness the estimate was 0.77 to 7 times the truth, and graded fair only the one over 1.5 mm.
 - The audit's own harness (scratchpad `zz-k1`), repointed at this change: 28 cases, the scores
   above.
