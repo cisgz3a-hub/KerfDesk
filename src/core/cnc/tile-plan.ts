@@ -28,6 +28,7 @@ import {
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import type { EffectiveCncTileGrid } from './effective-cnc-tile-grid';
 import type { TileEntryReport } from './tile-clipped-entries';
+import type { RegistrationLayers } from './tile-registration-open-outlines';
 import { clipGroupToTile, clippedLengthMm, tiledSourceLengthMm } from './tile-clip';
 import { countsTowardCutLength, tileSetAdvisories } from './tile-plan-advisories';
 
@@ -39,6 +40,8 @@ export { REGISTRATION_HOLE_DEPTH_MM } from './tile-registration';
 type TileContext = {
   readonly machine: CncMachineConfig;
   readonly device: DeviceProfile;
+  /** The layers the job compiled from: open outlines are judged by their tab settings. */
+  readonly layers?: RegistrationLayers;
 };
 
 /** Split a CNC job across a bounded effective grid, dropping motionless tiles. */
@@ -97,6 +100,7 @@ function boresFor(
     tiles,
     context.machine.stock,
     registration.settings.holeDiameterMm,
+    context.layers,
   );
   return { registration, context, placement };
 }
@@ -203,6 +207,7 @@ function registrationForGrid(
 export function plannedTileRegistration(
   job: Job,
   machine: CncMachineConfig,
+  layers?: RegistrationLayers,
 ): { readonly placement: RegistrationPlacement; readonly holeDiameterMm: number } | null {
   const tiling = machine.tiling;
   if (tiling === undefined || !tiling.registrationHoles) return null;
@@ -214,7 +219,7 @@ export function plannedTileRegistration(
   if (registration === null || typeof registration === 'string') return null;
   const holeDiameterMm = registration.settings.holeDiameterMm;
   return {
-    placement: placeTileRegistrationHoles(job, plan.tiles, machine.stock, holeDiameterMm),
+    placement: placeTileRegistrationHoles(job, plan.tiles, machine.stock, holeDiameterMm, layers),
     holeDiameterMm,
   };
 }

@@ -6,14 +6,23 @@
 // seam, inside the overlap strip and the stock, clear of every cut footprint
 // (the cutter's radius plus the bore's radius plus a wall) and outside every
 // ring a cut goes round (a part, a pocket or a hole), whatever its lead, tabs
-// or ramp (ringsOf). The two clear spots furthest apart along the seam win, so the pins square the stock as well as locate it.
+// or ramp (ringsOf). The two clear spots furthest apart along the seam win,
+// so the pins square the stock as well as locate it.
 // The stock margin at a seam's ends is part of the search. A seam with no
 // clear spot gets no bore and a warning that names it; it is never drilled
-// through the work.
+// through the work. An open outline whose ends nearly meet (as the tab
+// compiler counts it) is kept clear like a part; a bore inside any other open
+// outline is named (tile-registration-open-outlines.ts, N8-P1-1).
 
 import { cncPassXyPoints, type CncGroup, type CncPass, type Job } from '../job';
 import type { CncStock, Vec2 } from '../scene';
 import type { CncTile } from './cnc-tile';
+import {
+  openOutlineBoreWarnings,
+  readOpenOutlines,
+  type RegistrationLayers,
+} from './tile-registration-open-outlines';
+import { ringsOf } from './tile-registration-rings';
 
 /** Wall left between a registration bore and any cut, part edge or board edge. */
 export const REGISTRATION_HOLE_CLEARANCE_MM = 2;
@@ -96,9 +105,11 @@ export function placeTileRegistrationHoles(
   tiles: ReadonlyArray<CncTile>,
   stock: CncStock,
   holeDiameterMm: number,
+  layers: RegistrationLayers = [],
 ): RegistrationPlacement {
   const holeRadiusMm = holeDiameterMm / 2;
-  const obstacles = collectObstacles(job, holeRadiusMm);
+  const outlines = readOpenOutlines(job, TILE_REGISTRATION_LAYER_ID, layers);
+  const obstacles = collectObstacles(job, holeRadiusMm, outlines.closing);
   const byIndex = new Map(tiles.map((tile) => [`${tile.row},${tile.col}`, tile]));
   const placed: Vec2[] = [];
   const seams: RegistrationSeam[] = [];
@@ -127,6 +138,7 @@ export function placeTileRegistrationHoles(
       if (warning !== null) warnings.push(warning);
     }
   }
+  warnings.push(...openOutlineBoreWarnings(outlines.open, placed));
   return { seams, warnings };
 }
 
@@ -359,9 +371,14 @@ function isInside(intervals: ReadonlyArray<readonly [number, number]>, along: nu
   return intervals.some(([low, high]) => along >= low && along <= high);
 }
 
-function collectObstacles(job: Job, holeRadiusMm: number): Obstacles {
+// An effectively closed open outline (N8-P1-1) is kept clear like a part.
+function collectObstacles(
+  job: Job,
+  holeRadiusMm: number,
+  closing: ReadonlyArray<ReadonlyArray<Vec2>>,
+): Obstacles {
   const segments: Segment[] = [];
-  const loops: Loop[] = [];
+  const loops: Loop[] = closing.map(loopOf);
   for (const group of job.groups) {
     if (group.kind !== 'cnc' || group.layerId === TILE_REGISTRATION_LAYER_ID) continue;
     const clearMm = cutRadiusMm(group) + holeRadiusMm + REGISTRATION_HOLE_CLEARANCE_MM;
@@ -385,48 +402,6 @@ function addPassObstacles(pass: CncPass, clearMm: number, segments: Segment[], l
   if (pass.kind === 'helical-contour' && pass.polyline.length >= 3) {
     loops.push(loopOf(pass.polyline));
   }
-}
-
-// A closed cut encloses a part, a pocket or a hole: never a place for a bore.
-// Most closed cuts do not compile as closed passes. A profile with its default
-// lead (ADR-250) is one open path: lead in, the ring, lead out. A tabbed ring
-// rises over its tabs, and a ramped ring laps. Each still goes round its ring
-// and comes back to the ring's start vertex, so the stretch between a vertex
-// and the path's next return to it is a ring (N7-P1-1). Reading the path, not
-// a compile flag, keeps this true for any entry or tab the profile has. An open
-// cut never returns to a vertex, and a zig-zag ramp's back-and-forth encloses
-// no area, so neither adds a ring.
-function ringsOf(points: ReadonlyArray<Vec2>): ReadonlyArray<ReadonlyArray<Vec2>> {
-  const rings: Array<ReadonlyArray<Vec2>> = [];
-  let seen = new Map<string, number>();
-  for (const [index, point] of points.entries()) {
-    const key = vertexKey(point);
-    const start = seen.get(key);
-    if (start !== undefined && index - start >= MIN_RING_VERTICES) {
-      const ring = points.slice(start, index);
-      if (Math.abs(signedArea(ring)) > MIN_RING_AREA_MM2) rings.push(ring);
-      seen = new Map();
-    }
-    if (!seen.has(key)) seen.set(key, index);
-  }
-  return rings;
-}
-
-const MIN_RING_VERTICES = 3;
-const MIN_RING_AREA_MM2 = 1e-6;
-const VERTEX_KEY_DECIMALS = 6;
-
-function vertexKey(point: Vec2): string {
-  return `${point.x.toFixed(VERTEX_KEY_DECIMALS)},${point.y.toFixed(VERTEX_KEY_DECIMALS)}`;
-}
-
-function signedArea(ring: ReadonlyArray<Vec2>): number {
-  let twice = 0;
-  for (const [index, a] of ring.entries()) {
-    const b = ring[(index + 1) % ring.length] as Vec2;
-    twice += a.x * b.y - b.x * a.y;
-  }
-  return twice / 2;
 }
 
 function cutRadiusMm(group: CncGroup): number {

@@ -112,6 +112,12 @@ export function QuickNestDialog(props: QuickNestDialogProps): JSX.Element {
 }
 // A router's parts start one bit plus a margin apart, never closer than the
 // laser default (ADR-433 Amendment 4).
+// The lead's reach into the gap, when the profile has one (CNC audit v3 N4-P3-2).
+function leadText(spacing: CncNestSpacing): string {
+  if (!(spacing.leadReachMm > 0)) return '';
+  return ` and its ${Math.round(spacing.leadReachMm * 100) / 100} mm lead`;
+}
+
 function initialForm(cncSpacing: CncNestSpacing | null): NestForm {
   if (cncSpacing === null) return INITIAL;
   return { ...INITIAL, padding: String(Math.max(LASER_SPACING_MM, cncSpacing.spacingMm)) };
@@ -192,9 +198,10 @@ function NestBoundaryFields({
       </label>
       {cncSpacing !== null && nonNegative(form.padding) < cncSpacing.spacingMm && (
         <p role="status" style={spacingWarningStyle}>
-          Closer than the {cncSpacing.bitDiameterMm} mm bit plus {CNC_NEST_SPACING_MARGIN_MM} mm:
-          the bit that cuts one part out can cut into the next. Use at least {cncSpacing.spacingMm}{' '}
-          mm.
+          Closer than the {cncSpacing.bitDiameterMm} mm bit{leadText(cncSpacing)} plus{' '}
+          {CNC_NEST_SPACING_MARGIN_MM} mm: the bit that cuts one part out can cut into the next
+          {cncSpacing.leadReachMm > 0 ? ', or plunge on its cut line where no lead fits' : ''}. Use
+          at least {cncSpacing.spacingMm} mm.
         </p>
       )}
     </>

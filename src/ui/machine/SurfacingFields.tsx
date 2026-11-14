@@ -67,6 +67,20 @@ export function useSurfacingValues(
   };
 }
 
+/**
+ * The program runs the bit's centre over the whole area, so its edge reaches one
+ * bit radius past every side, behind and left of the zeroed corner too (CNC
+ * audit v3 N4-P3-3). That is the usual way to face a board edge to edge; a
+ * fence or stop standing above the faced depth there is in the cut.
+ */
+export function surfacingOverhangNote(toolDiameterMm: number): string {
+  const radius = Math.round((Math.max(0, toolDiameterMm) / 2) * 100) / 100;
+  return (
+    `The bit's edge cuts ${radius} mm past every edge of the area, left of and in front of ` +
+    'the zero corner too. Keep fences, stops and clamps that far out, or below the faced depth.'
+  );
+}
+
 type Values = ReturnType<typeof useSurfacingValues>;
 export function SurfacingFields({
   values,
@@ -93,6 +107,7 @@ export function SurfacingFields({
           ? 'Generic starting values; verify them for this cutter and material.'
           : 'Starting values use the stock material and the Default bit; verify them with a test cut.'}
       </p>
+      <p>{surfacingOverhangNote(tool.diameterMm)}</p>
       {limited ? (
         <p role="note">
           Output uses {Math.min(inputs.feedMmPerMin, maxFeed)} mm/min feed,{' '}

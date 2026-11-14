@@ -68,9 +68,10 @@ function registrationListing(
   return [
     `Registration holes, Ø${mm(holeDiameterMm)} mm, at stock X, Y (and tile X, Y): ` +
       `${perTile.join('; ')}. Each is placed at least the cutter's radius, the hole's radius ` +
-      'and 2 mm from every toolpath, outside every outline the toolpaths go round, and on the ' +
-      'stock. A part drawn as an open outline is not known as a part. Preview draws them; check ' +
-      'them against your parts and fixture before cutting.',
+      'and 2 mm from every toolpath, outside every outline the toolpaths go round or nearly ' +
+      'close (ends closer than the bit plus what a tab holds, as tabs count it), and on the ' +
+      'stock. A hole inside any other open outline is named in its own warning. Preview draws ' +
+      'them; check them against your parts and fixture before cutting.',
   ];
 }
 

@@ -48,6 +48,7 @@ export function finalizeTiledOutput(
   const tiled = tileJobs(prepared.job, machine.tiling, {
     machine,
     device: prepared.project.device,
+    layers: prepared.project.scene.layers,
   });
   if (tiled.kind === 'registration-invalid')
     return { kind: 'preparation-failed', messages: [tiled.message] };
