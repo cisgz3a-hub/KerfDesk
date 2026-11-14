@@ -31,6 +31,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     hasRasterSelection: false,
     canRetraceOriginal: false,
     hasConvertibleSelection: false,
+    canPrepareStamp: false,
     canConvertSelectionToPath: false,
     canWeldSelection: false,
     canUnionSilhouette: false,
